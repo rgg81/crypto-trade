@@ -1,0 +1,19 @@
+{
+  "candidate_center": "team-04-utc-reference-001",
+  "family_id": "team-04-uncrowded-trend-carry-v1",
+  "minimum_median_sharpe": 0.5,
+  "minimum_profitable_count": 7,
+  "neighbors": [
+    {"axis": "slow_trend_days", "value": 28},
+    {"axis": "slow_trend_days", "value": 56},
+    {"axis": "fast_trend_days", "value": 7},
+    {"axis": "fast_trend_days", "value": 21},
+    {"axis": "funding_weight", "paired_fast_weight": 0.4, "value": 0.1},
+    {"axis": "funding_weight", "paired_fast_weight": 0.2, "value": 0.3},
+    {"axis": "volatility_keep_fraction", "value": 0.7},
+    {"axis": "volatility_keep_fraction", "value": 0.9}
+  ],
+  "size_including_center": 9,
+  "status": "preregistered-not-run",
+  "team_id": "team-04"
+}

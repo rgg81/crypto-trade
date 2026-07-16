@@ -1,0 +1,46 @@
+{
+  "causality_tests": [
+    {"failure_condition": "Any target at or before the prefix boundary changes.", "name": "future_truncation", "procedure": "Remove every later price and funding row and compare exact prefix targets."},
+    {"failure_condition": "Any prefix target changes.", "name": "future_corruption", "procedure": "Append extreme non-finite rows at or after the decision and compare exact prefix targets."},
+    {"failure_condition": "Input order changes feature, membership, or target bytes.", "name": "deterministic_rerun", "procedure": "Reverse symbol, price-row, and funding-row order under seed 20260801."},
+    {"failure_condition": "A future, duplicate, stale, ineligible, missing, or non-grid row enters a feature.", "name": "availability_membership", "procedure": "Inject each violation and require exclusion or a fail-closed flat request."}
+  ],
+  "decision_contract": {
+    "bar_cutoff": "decision_time minus 8h",
+    "funding_cutoff": "strictly before decision_time",
+    "insufficient_or_off_grid": "empty mapping requests flat",
+    "non_rebalance": "None holds",
+    "rebalance_rule": "integer 8h epoch index modulo 9 equals zero",
+    "runtime_seed": 20260801
+  },
+  "derived_features": [
+    {"availability": "132 exact 8h returns through the lagged cutoff", "formula": "M=fsum(42d returns ending 2d before cutoff); F=fsum(14d returns ending 1d before cutoff)", "id": "skipped_multi_horizon_trend", "inputs": ["transaction_closes"], "missing_rule": "all 133 exact positive closes required; no fill or older anchor"},
+    {"availability": "latest 90 exact 8h returns", "formula": "V=sqrt(fsum((r-mean)^2)/90)", "id": "realized_volatility_filter", "inputs": ["transaction_closes"], "missing_rule": "inherits exact close window"},
+    {"availability": "unique funding in [t-7d,t), >=7 events, newest age<=16h", "formula": "C=fsum(funding_rate)/7 calendar days", "id": "realized_funding_intensity", "inputs": ["realized_funding"], "missing_rule": "no fill; duplicate, stale, non-finite, insufficient, or abs(rate)>0.05 excludes symbol"},
+    {"availability": ">=30 complete current symbols before and >=24 after filter", "formula": "retain lowest floor(4N/5) V; S=0.50*rank(M)+0.30*rank(F)-0.20*rank(C)", "id": "uncrowded_trend_carry_score", "inputs": ["skipped_multi_horizon_trend", "realized_volatility_filter", "realized_funding_intensity", "point_in_time_eligibility"], "missing_rule": "flat if filter, ranks, or cross section fail"},
+    {"availability": "finite scores at scheduled boundary", "formula": "K=max(6,floor(N/4)); top K long, bottom K short; equal B_eff=min(0.30,K*0.04)", "id": "target_weights", "inputs": ["uncrowded_trend_carry_score"], "missing_rule": "flat if sleeves, trend/funding polarity, cap, gross, or net invariant fails"}
+  ],
+  "family_id": "team-04-uncrowded-trend-carry-v1",
+  "forbidden_inputs": [
+    "future or unclosed price/funding rows",
+    "execution open or mark price as a feature",
+    "OHLC shape, quote volume, taker flow, or order book",
+    "common-market factor, beta, residual, regime label, or direction switch",
+    "position, fill, cost, equity, drawdown, or PnL",
+    "private/final observations, V1 results, other teams, ballots, or leaderboards"
+  ],
+  "forward_diagnostic": {
+    "embargo": "30 calendar days for any outcome-selected later candidate",
+    "label": "next scheduled three-day executable-open-to-open symbol return",
+    "purge": "labels are non-overlapping; reject malformed overlap",
+    "required": "pooled score IC>0 and score IC>0 in at least four of six folds"
+  },
+  "raw_inputs": [
+    {"availability_timestamp": "close_time<=decision_time-8h", "coverage": "organizer-streamed 8h transaction bars for current eligible symbols", "event_timestamp": "close_time", "fields": ["open_time", "close_time", "close"], "id": "transaction_closes", "lag": "one complete 8h bar", "missing_rule": "exact contiguous history only"},
+    {"availability_timestamp": "funding_time<decision_time", "coverage": "organizer-streamed realized funding for current eligible symbols", "event_timestamp": "funding_time", "fields": ["funding_time", "symbol", "funding_rate"], "id": "realized_funding", "lag": "strictly past", "missing_rule": "no fill or synthetic schedule"},
+    {"availability_timestamp": "current decision after weekly causal reconstitution", "coverage": "point-in-time Top-40 intersected with executable symbols", "event_timestamp": "reconstitution_time", "fields": ["eligible_symbols"], "id": "point_in_time_eligibility", "lag": "available at decision", "missing_rule": "never synthesize membership"}
+  ],
+  "reference_candidate_id": "team-04-utc-reference-001",
+  "schema_version": 1,
+  "team_id": "team-04"
+}

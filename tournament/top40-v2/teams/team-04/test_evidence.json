@@ -1,0 +1,44 @@
+{
+  "candidate_id": "team-04-utc-reference-001",
+  "commands_run": [
+    "uv run ruff check tournament/top40-v2/teams/team-04/strategy.py tournament/top40-v2/teams/team-04/test_strategy.py",
+    "uv run ruff format tournament/top40-v2/teams/team-04/strategy.py tournament/top40-v2/teams/team-04/test_strategy.py",
+    "PYTHONDONTWRITEBYTECODE=1 uv run pytest -q tournament/top40-v2/teams/team-04/test_strategy.py",
+    "uv run python scripts/top40_v2_tournament_active.py validate-risk-policy tournament/top40-v2/teams/team-04/risk_policy.json"
+  ],
+  "coverage_written": [
+    "exact 42-day/2-day-skip and 14-day/1-day-skip trend windows",
+    "exact 30-day realized-volatility filter",
+    "strict seven-day funding cutoff, daily sum, freshness, count, duplicate, and finite-rate rules",
+    "exact average ranks and fixed 50/30/minus-20 composite",
+    "low-volatility four-fifths filter and minimum cross sections",
+    "trend and funding sleeve polarity",
+    "future append, corruption, and truncation invariance",
+    "missing, duplicate, stale, non-finite, and ineligible data failure behavior",
+    "point-in-time membership, input-order determinism, and context immutability",
+    "two sleeves, equal budgets, cap, cash capacity, gross, and net",
+    "off-grid flat, non-rebalance hold, canonical seed, frozen config, and disabled risk policy"
+  ],
+  "family_id": "team-04-uncrowded-trend-carry-v1",
+  "files_sha256": {
+    "frozen_config.json": "a7dc06d00affa46b6c8dc82edc5342f31d289a14330333d0239e39c5e0796d05",
+    "risk_policy.json": "850e792495dd1861fbf61377d3131e4b43ecf3794b2f9545f6b9897c184b0fd2",
+    "strategy.py": "0e63f868f99684bef394bc1996a6034032c0657b76eceefc1b1b052fdd0e02cc",
+    "test_strategy.py": "120c09acef3e9bdac7f5e2df0a5cba501ab0b32fbd2d3549194a7a2c001930ad"
+  },
+  "market_data_accessed": false,
+  "material_trial_run": false,
+  "risk_policy_validation": {
+    "enabled": false,
+    "policy_id": "team-04-utc-reference-no-control",
+    "valid": true
+  },
+  "schema_version": 1,
+  "status": "synthetic-tests-passed",
+  "test_result": {
+    "duration_seconds": 2.10,
+    "failed": 0,
+    "passed": 11
+  },
+  "team_id": "team-04"
+}

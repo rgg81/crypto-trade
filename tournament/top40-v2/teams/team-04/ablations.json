@@ -1,0 +1,31 @@
+{
+  "budget": {
+    "causal_diagnostics": 5,
+    "coarse_additional": 10,
+    "cumulative_team_limit": 80,
+    "initial_family_maximum": 36,
+    "neighbors_additional": 8,
+    "portfolio_schedule": 4,
+    "reference": 1,
+    "risk_cost_observations": 8
+  },
+  "causal_diagnostics": [
+    {"change": "slow_weight=1 and other weights=0", "deployable": false, "id": "utc-medium-only", "question": "Does current trend and funding improve medium continuation?"},
+    {"change": "fast_weight=1 and other weights=0", "deployable": false, "id": "utc-fast-only", "question": "Does the medium horizon stabilize recent continuation?"},
+    {"change": "funding score only with sign -rank(C)", "deployable": false, "id": "utc-funding-only", "question": "Does price continuation add return beyond carry selection?"},
+    {"change": "retain every valid volatility value", "deployable": false, "id": "utc-no-volatility-filter", "question": "Does exclusion reduce squeeze and tail loss?"},
+    {"change": "replace -0.20*rank(C) with +0.20*rank(C)", "deployable": false, "id": "utc-funding-sign-flip", "question": "Does de-crowding beat deliberately paying crowded carry?"}
+  ],
+  "family_id": "team-04-uncrowded-trend-carry-v1",
+  "global_stop": "Stop before every later observation if the exact reference fails completeness, solvency, aggregate, cost, fold, regime, sleeve, or score-IC falsifiers.",
+  "reference": {"candidate_id": "team-04-utc-reference-001", "no_control_first": true, "status": "implemented-not-registered-not-run"},
+  "risk_factorial": {
+    "allowed_only_after_positive_no_control_core": true,
+    "arms": ["none", "volatility-target-only", "drawdown-brake-only", "combined"],
+    "cost_multipliers": [1.0, 2.0],
+    "disabled": ["position-stop", "time-stop", "turnover-limit", "side-scaling", "same-boundary-reentry"]
+  },
+  "schema_version": 1,
+  "selection_order": ["all non-compensatory gates", "positive folds", "worst regime Sharpe", "worst fold Sharpe", "doubled-cost Sharpe", "median fold Sharpe", "aggregate Sharpe", "Calmar", "lower drawdown", "lower turnover", "candidate_id"],
+  "team_id": "team-04"
+}
