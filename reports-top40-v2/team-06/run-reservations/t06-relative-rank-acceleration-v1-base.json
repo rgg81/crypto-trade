@@ -1,0 +1,15 @@
+{
+  "candidate_id": "t06-relative-rank-acceleration-v1-base",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "organizer_journal_head_sha256": "72ee5a5b104cf24b751809f256f595bb83f54d043e48d672f38eb3db5f219b5f",
+  "private_attempt_number": null,
+  "registration_sha256": "3a8e7b1e692a3e2481017650b594a0c8dccef24c9534ff3ba1be6c105b77aa39",
+  "reserved_at_utc": "2026-07-16T19:23:03.622143+00:00",
+  "risk_policy_sha256": "7671efed25b8f9130e8f06fb9dbe44b5735e1cd2f23fd8c20e9dcc1a6b61c30b",
+  "schema_version": 1,
+  "source_bundle_sha256": "46a6042f84ee634e94ce0b9f09b67bc0662d4e3c69d9b10ee52fba36686f66fb",
+  "stage": "development",
+  "strategy_sha256": "5740a259c95020b9c7dd05d849308d97090bf67640692d2aec6e65a347b4127b",
+  "team_id": "team-06",
+  "tournament": "quant-portfolio-blind-top40-v2"
+}
