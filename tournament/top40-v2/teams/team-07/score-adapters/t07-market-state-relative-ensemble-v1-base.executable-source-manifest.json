@@ -1,0 +1,39 @@
+{
+  "candidate_id": "t07-market-state-relative-ensemble-v1-base",
+  "family_id": "t07-market-state-relative-ensemble-v1",
+  "files": [
+    {
+      "path": "candidate_variant.py",
+      "sha256": "65b5db5d81324e33b11b2162aca2be9fffd28927b027ebab23803b92d8ced65b",
+      "size": 185
+    },
+    {
+      "path": "frozen_config.json",
+      "sha256": "9580746fd8a5b3441ea86067ba18f64a8ec5352eebc7a01c0d2e0267435e5d9e",
+      "size": 5103
+    },
+    {
+      "path": "risk_policy.json",
+      "sha256": "d3b918f600f2b548b6a2c8dc44a3077b7b34d8c911ecc6e9c776eada8ad77b6c",
+      "size": 580
+    },
+    {
+      "path": "strategy.py",
+      "sha256": "d4bad60615eee4be283e146fbde8bae6d1c782df48f62027ad05559c34563de2",
+      "size": 22010
+    },
+    {
+      "path": "test_risk_policy_contract.py",
+      "sha256": "98f45a1ef0a2d9124caf90a73c157cb8cd790e6c927dd98e5aa98d4fa2828b47",
+      "size": 4058
+    },
+    {
+      "path": "test_strategy.py",
+      "sha256": "a4085f78c87096b14ef80f69d988eba271ea503e2ac97f9975ad66768a0c77e3",
+      "size": 12601
+    }
+  ],
+  "manifest_kind": "top40-v2-executable-source-manifest-v1",
+  "schema_version": 1,
+  "team_id": "team-07"
+}
