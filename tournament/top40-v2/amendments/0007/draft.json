@@ -1,0 +1,89 @@
+{
+  "activation": {
+    "active_entrypoint_unchanged": {
+      "path": "scripts/top40_v2_tournament_score_diagnostics_v5.py",
+      "sha256": "0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4"
+    },
+    "candidate_entrypoint": "scripts/top40_v2_tournament_runtime_preload_v7.py",
+    "integration_authority_present": false,
+    "result_bearing_execution_authorized": false
+  },
+  "amendment_id": "top40-v2-amendment-0007-frozen-worker-a5-protocol-preload",
+  "dispatch_scope": {
+    "all_argv_delegated_to_exact_amendment_0005_integration": true,
+    "eligible_teams": [
+      "team-04",
+      "team-05",
+      "team-06",
+      "team-07",
+      "team-08",
+      "team-09",
+      "team-10"
+    ],
+    "exact_root_entrypoint": "strategy.py",
+    "monkeypatch_binding": "crypto_trade.tournament.runner_v2._strategy_worker_command",
+    "monkeypatch_scope": "canonical-four-token-run-window-development-team-04-through-team-10-only",
+    "replacement_module": "crypto_trade.tournament._strategy_worker_preload_v7",
+    "restoration": "exact-original-identity-under-shared-a4-rlock",
+    "source_module": "crypto_trade.tournament._strategy_worker_v2"
+  },
+  "forbidden_changes": [
+    "active-entrypoint-before-integration-freeze",
+    "candidate-fallback-or-duplicate-hook",
+    "frozen-a4-a5-a6-file-edit",
+    "journal-or-result-rewrite",
+    "post-mask-import-path-expansion",
+    "snapshot-or-pure-crypto-universe-change",
+    "team-bundle-organizer-protocol-copy"
+  ],
+  "governance": {
+    "a5_registration_boundary_unchanged": true,
+    "active_dispatch_requires_unique_integration_chain": true,
+    "amendment_freeze_alone_activates": false,
+    "automatic_retry_authorized": false,
+    "implementation_and_integration_reviewers_must_differ": true,
+    "required_commit_order": [
+      "implementation",
+      "independent-review",
+      "amendment-freeze",
+      "integration-draft",
+      "independent-integration-review",
+      "integration-freeze"
+    ],
+    "serialized_validation_required": true
+  },
+  "implementation_files": [
+    "scripts/top40_v2_tournament_runtime_preload_v7.py",
+    "src/crypto_trade/tournament/_strategy_worker_preload_v7.py",
+    "src/crypto_trade/tournament/amendment_0007_v2.py",
+    "tests/tournament/test_top40_v2_amendment_0007.py",
+    "tournament/top40-v2/amendments/0007/AMENDMENT.md",
+    "tournament/top40-v2/amendments/0007/draft.json"
+  ],
+  "parent_authorities": {
+    "amendment_0002_shared_patch_sha256": "fc70dbdb752c58857c5ed60a96e497324e93b9d5dc7e6afa0692bd3e02ad21aa",
+    "amendment_0004_active_runner_sha256": "03006ea1ce391ef3c8da6244acb89aab19f7e63d1e0a617e2743894a575fd6cd",
+    "amendment_0004_freeze_sha256": "bfb9e82c0b9a0950ead9b94ae61fe9f6c091462b106e46bd51113894b6eb9465",
+    "amendment_0005_active_entrypoint_sha256": "0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4",
+    "amendment_0005_integration_freeze_sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c",
+    "amendment_0005_integration_module_sha256": "c9e0b0be288edebf86f8c7d441b4093843ae3d64f0cbac42dbadf21625f786f8",
+    "amendment_0005_protocol_sha256": "8f8f5db3be3069cce7c7c0605fb15b31c4f28af7c2e0f2e24d79d861a65ae4ff",
+    "amendment_0006_canonical_report_sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
+    "amendment_0006_integration_freeze_sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34",
+    "amendment_integrity_helpers_sha256": "e3a4f60aa955ebcf461026527da5b6b28b87e9e7ec057dd2e10a1e884612a8ab",
+    "phase0_freeze_sha256": "cc7484d0be2fe6b64b34b6f4c7ce76647af750b02c3df065c4b81e10f1396259",
+    "phase0_runner_sha256": "d4fc1c381f9e69c0dbdd5b7c6e5d273e43b39c5df16a082a99af1b4ef7310ec2",
+    "phase0_strategy_worker_sha256": "fff67076592e337adb721b72c4c77326c3e40e396ba57217c387a8b5f58f2b5d"
+  },
+  "schema_version": 1,
+  "status": "implementation-draft-pending-independent-review-freeze-and-integration",
+  "worker_preload": {
+    "filesystem_allowlist_expanded": false,
+    "protocol_imported_before_repository_mask": true,
+    "protocol_sha256": "8f8f5db3be3069cce7c7c0605fb15b31c4f28af7c2e0f2e24d79d861a65ae4ff",
+    "protocol_source_copied_to_team_bundle": false,
+    "worker_main_delegation": "exact-captured-phase0-main",
+    "worker_wrapper_sha256": "a90ff198d5c03e4f3b85bfda8e95f218627b631884154858f6d084537fdd70ac",
+    "worker_wrapper_size": 7351
+  }
+}
