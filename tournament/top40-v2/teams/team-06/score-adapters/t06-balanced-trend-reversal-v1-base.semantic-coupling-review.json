@@ -1,0 +1,23 @@
+{
+  "candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "decision": "approve",
+  "declared_capture_boundary": "candidate-declared-post-transform-pre-selection-weight-cap-risk",
+  "executable_source_manifest_path": "tournament/top40-v2/teams/team-06/score-adapters/t06-balanced-trend-reversal-v1-base.executable-source-manifest.json",
+  "executable_source_manifest_sha256": "cec67687dcff5036c5f2a8d38d1df0b28628524baefbbd4a069e2239fa50062d",
+  "family_id": "t06-balanced-trend-reversal-v1",
+  "findings": {
+    "direct_hook_call_found": true,
+    "hook_after_declared_score_transform": true,
+    "hook_before_selection_weight_caps_and_risk": true,
+    "no_decoy_or_transient_score_path_found": true,
+    "score_object_is_declared_model_ranking_signal": true
+  },
+  "hook": "strategy.score_boundary",
+  "review_kind": "top40-v2-score-semantic-coupling-static-review-v1",
+  "reviewed_at_utc": "2026-07-16T17:20:11Z",
+  "reviewer_id": "independent-agent-team06-semantic-review",
+  "runtime_proof_limit": "static-review-attestation-not-runtime-semantic-proof",
+  "schema_version": 1,
+  "strategy_sha256": "ead419349cef8983549ad3d1f98af89354d4fba818357637170f3ca48dbe1022",
+  "team_id": "team-06"
+}
