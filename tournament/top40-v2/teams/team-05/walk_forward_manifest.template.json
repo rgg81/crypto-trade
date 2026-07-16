@@ -7,7 +7,7 @@
   "candidate_registration_sha256": "REPLACE_WITH_ACCEPTED_CANDIDATE_REGISTRATION_64_LOWERCASE_HEX",
   "risk_policy_path": "REPLACE_WITH_EXACT_REGISTERED_CANDIDATE_RISK_POLICY_PATH",
   "risk_policy_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
-  "candidate_identity_rule": "Materialize a separate manifest for team05-crtr-core-v1 with risk_policy.json and for team05-crtr-base-v1 with risk_ablations/combined.json. Candidate-specific fold, model, target, return paths and hashes cannot be reused across those declarations.",
+  "candidate_identity_rule": "Materialize a separate manifest for team05-crtr-core-v1 with the initial no-control root risk_policy.json and for team05-crtr-base-v1 after risk_ablations/combined.json has been copied byte-for-byte to root risk_policy.json. Candidate-specific fold, model, target, return paths and hashes cannot be reused across those declarations.",
   "evidence_class": "organizer-derived-equal-chronological-folds",
   "fold_derivation_manifest_sha256": "REPLACE_WITH_ORGANIZER_DERIVATION_MANIFEST_64_LOWERCASE_HEX",
   "stitched_daily_returns_path": "REPLACE_WITH_CANDIDATE_SPECIFIC_STITCHED_DAILY_RETURNS_PATH",

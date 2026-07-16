@@ -5,6 +5,8 @@ from __future__ import annotations
 import dataclasses
 from pathlib import Path
 
+import candidate_variant
+
 from crypto_trade.tournament.risk_policy import boundary_risk_decision, load_risk_policy
 
 POLICY_PATH = Path(__file__).with_name("risk_policy.json")
@@ -13,7 +15,6 @@ COMBINED_PATH = ABLATION_ROOT / "combined.json"
 
 
 POLICY_CASES = (
-    (POLICY_PATH, "team-05-crtr-none-v1", frozenset()),
     (ABLATION_ROOT / "none.json", "team-05-crtr-none-v1", frozenset()),
     (
         ABLATION_ROOT / "volatility_only.json",
@@ -48,6 +49,11 @@ POLICY_CASES = (
         ),
     ),
 )
+
+
+def test_root_policy_is_the_exact_active_candidate_template() -> None:
+    template_path = POLICY_PATH.parent / candidate_variant.ACTIVE_RISK_POLICY_TEMPLATE
+    assert POLICY_PATH.read_bytes() == template_path.read_bytes()
 
 
 def _exact_expected_policy(

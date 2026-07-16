@@ -8,11 +8,14 @@
   "replacement_rule": "A failed, interrupted, or unprofitable neighbor remains in the denominator and cannot be replaced.",
   "selection_rule": "Neighbors are nonselectable stability probes; only the unchanged base can be frozen.",
   "common_fixed_inputs": {
+    "canonical_variant_path": "candidate_variant.py",
     "strategy_seed": 20260801,
-    "risk_policy_path": "risk_ablations/combined.json",
+    "risk_policy_path": "risk_policy.json",
+    "risk_policy_template": "risk_ablations/combined.json",
     "evaluator_cost_outputs": [1.0, 2.0],
     "fold_plan": "walk_forward_plan.json"
   },
+  "materialization_rule": "Before each neighbor registration, the organizer writes that artifact's exact candidate ID, one-axis active_overrides, and combined risk-template declaration into candidate_variant.py, copies risk_ablations/combined.json byte-for-byte to root risk_policy.json, commits the resulting root strategy tree, rederives all hashes, and verifies zero-argument strategy.py:build_strategy exposes that override. The frozen run-window never selects a nested entrypoint or side-path risk policy.",
   "neighbors": [
     {
       "neighbor_id": "team05-crtr-n01-slow-50d",

@@ -4,13 +4,20 @@
   "family_id": "team05-causal-residual-trend-reversal-v1",
   "maximum_planned_material_configurations": 14,
   "common_seed": 20260801,
+  "canonical_runtime_materialization": {
+    "entrypoint": "strategy.py:build_strategy",
+    "variant_path": "candidate_variant.py",
+    "rule": "For every material candidate, commit the exact candidate ID, active_overrides, and active risk-policy template in candidate_variant.py before registration; copy that template byte-for-byte to root risk_policy.json. The frozen run-window always invokes the root strategy.py entrypoint and top-level risk_policy.json. Recompute and bind all hashes after each strategy/risk materialization."
+  },
   "cost_accounting": "Each evaluator policy run emits both base-cost and doubled-cost evidence; doubled costs are not separate material configurations.",
   "registration_rule": "Every activated policy or neighbor requires a separate organizer registration before its result is read; failed and interrupted configurations consume budget.",
+  "risk_materialization_rule": "Before each controlled or neighbor registration, materialize its declared policy bytes at top-level risk_policy.json, commit them with candidate_variant.py, and bind the resulting risk/source hashes; the frozen runner does not select risk_ablations paths directly.",
   "core_stage": {
-    "activation": "first policy run after family registration and A5 freeze",
+    "activation": "first policy run after active A5/A6 authority verification, complete A5 artifact first-add sequence, and accepted family/core registration",
     "cell": {
       "order": 1,
       "candidate_id": "team05-crtr-core-v1",
+      "active_overrides": {},
       "definition": "ablations.json:risk-none",
       "risk_policy_path": "risk_policy.json"
     },
@@ -23,72 +30,92 @@
       {
         "order": 2,
         "candidate_id": "team05-crtr-ab-vol",
-        "definition": "ablations.json:risk-vol"
+        "active_overrides": {},
+        "definition": "ablations.json:risk-vol",
+        "risk_policy_template": "risk_ablations/volatility_only.json"
       },
       {
         "order": 3,
         "candidate_id": "team05-crtr-ab-dd",
-        "definition": "ablations.json:risk-dd"
+        "active_overrides": {},
+        "definition": "ablations.json:risk-dd",
+        "risk_policy_template": "risk_ablations/drawdown_only.json"
       },
       {
         "order": 4,
         "candidate_id": "team05-crtr-ab-stop",
-        "definition": "ablations.json:risk-stop"
+        "active_overrides": {},
+        "definition": "ablations.json:risk-stop",
+        "risk_policy_template": "risk_ablations/position_stop_only.json"
       },
       {
         "order": 5,
         "candidate_id": "team05-crtr-ab-turnover",
-        "definition": "ablations.json:risk-turnover"
+        "active_overrides": {},
+        "definition": "ablations.json:risk-turnover",
+        "risk_policy_template": "risk_ablations/turnover_only.json"
       },
       {
         "order": 6,
         "candidate_id": "team05-crtr-base-v1",
-        "definition": "ablations.json:risk-combined"
+        "active_overrides": {},
+        "definition": "ablations.json:risk-combined",
+        "risk_policy_template": "risk_ablations/combined.json"
       }
     ],
     "promotion_rule": "Only the fixed combined-policy team05-crtr-base-v1 may be promoted, and only after every official and Team-05 non-neighborhood gate passes."
   },
   "neighbor_stage": {
     "activation": "only after the combined-policy base passes every official and Team-05 gate except the neighborhood gates",
+    "risk_policy_template": "risk_ablations/combined.json",
+    "canonical_runtime_risk_policy": "risk_policy.json",
     "cells": [
       {
         "order": 7,
         "candidate_id": "team05-crtr-n01-slow-50d",
+        "active_overrides": {"slow_horizon_days": 50},
         "definition": "neighbors/team05-crtr-n01-slow-50d.json"
       },
       {
         "order": 8,
         "candidate_id": "team05-crtr-n02-slow-70d",
+        "active_overrides": {"slow_horizon_days": 70},
         "definition": "neighbors/team05-crtr-n02-slow-70d.json"
       },
       {
         "order": 9,
         "candidate_id": "team05-crtr-n03-selection-020",
+        "active_overrides": {"selection_fraction": 0.2},
         "definition": "neighbors/team05-crtr-n03-selection-020.json"
       },
       {
         "order": 10,
         "candidate_id": "team05-crtr-n04-selection-030",
+        "active_overrides": {"selection_fraction": 0.3},
         "definition": "neighbors/team05-crtr-n04-selection-030.json"
       },
       {
         "order": 11,
         "candidate_id": "team05-crtr-n05-gross-050",
+        "active_overrides": {"target_gross": 0.5},
         "definition": "neighbors/team05-crtr-n05-gross-050.json"
       },
       {
         "order": 12,
         "candidate_id": "team05-crtr-n06-gross-070",
+        "active_overrides": {"target_gross": 0.7},
         "definition": "neighbors/team05-crtr-n06-gross-070.json"
       },
       {
         "order": 13,
         "candidate_id": "team05-crtr-n07-chop-reversal-015",
+        "active_overrides": {"chop_reversal_weight": 0.15},
         "definition": "neighbors/team05-crtr-n07-chop-reversal-015.json"
       },
       {
         "order": 14,
         "candidate_id": "team05-crtr-n08-chop-reversal-025",
+        "active_overrides": {"chop_reversal_weight": 0.25},
         "definition": "neighbors/team05-crtr-n08-chop-reversal-025.json"
       }
     ]

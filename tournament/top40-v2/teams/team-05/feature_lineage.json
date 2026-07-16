@@ -15,7 +15,7 @@
     },
     {
       "name": "close",
-      "source": "DecisionContext.bars[symbol]['close'] from the frozen Binance USD-M perpetual snapshot",
+      "source": "DecisionContext.bars[symbol]['close'] from the frozen Binance USD-M perpetual snapshot after active A6 pure-crypto certification",
       "event_timestamp": "parent open_time plus the fixed 8h bar duration; the frame index has no time meaning",
       "availability_timestamp": "open_time + 8h",
       "lag": "admit only when open_time + 8h <= decision_time; transaction open is not exposed and execution is at the next eligible open",
@@ -24,11 +24,11 @@
     },
     {
       "name": "eligible_symbols",
-      "source": "DecisionContext.eligible_symbols",
-      "event_timestamp": "organizer weekly point-in-time membership state intersected with executable-open eligibility",
+      "source": "DecisionContext.eligible_symbols supplied by the active A5 entrypoint through delegated A6 pure-crypto enforcement",
+      "event_timestamp": "organizer weekly point-in-time A6-certified native-crypto membership state intersected with executable-open eligibility",
       "availability_timestamp": "decision_time",
       "lag": "organizer-owned point-in-time state",
-      "coverage": "exact supplied membership only",
+      "coverage": "exact supplied membership only; stablecoins, equities/TradFi, indexes, metals, commodities, and every other non-crypto contract are excluded even when Binance lists a perpetual",
       "missing_rule": "empty or fewer than 12 valid symbols requests flat"
     }
   ],

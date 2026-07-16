@@ -28,13 +28,14 @@
     {
       "candidate_role": "eventual-combined-base",
       "candidate_id": "team05-crtr-base-v1",
-      "risk_policy_path": "risk_ablations/combined.json",
+      "risk_policy_path": "risk_policy.json",
+      "risk_policy_template": "risk_ablations/combined.json",
       "evidence_purpose": "full combined-policy non-neighborhood qualification",
       "positive_fold_requirement": "official minimum four of six and Team-05 minimum five of six",
       "artifact_requirement": "a second distinct candidate-specific walk-forward manifest plus six fold declarations and six model artifacts; core artifacts are inadmissible substitutes"
     }
   ],
-  "label_policy": "The strategy has no training label. The prospective A5 diagnostic label is evaluation-only and cannot enter fold state, selection, or targets.",
+  "label_policy": "The strategy has no training label. Team05's prospective use of the active A5 diagnostic is evaluation-only and cannot enter fold state, selection, or targets.",
   "stitching_rule": "Stitch organizer-derived test returns once in fold order; include no training return and permit no gap, overlap, local boundary substitution, or hand-dated fallback.",
   "candidate_generic_fold_templates": [
     {"fold_id": "fold-1", "ordinal": 1, "boundary_source": "REPLACE_WITH_ORGANIZER_DERIVED_FOLD_DECLARATION"},
@@ -51,6 +52,6 @@
     "failure_is_noncompensatory": true
   },
   "qualification_evidence_admissible": false,
-  "admissibility_condition": "For the candidate being evaluated, its accepted registration, exact risk policy, evaluator-derived boundaries, six candidate-specific fold/model/target hashes, and candidate-specific stitched-return hash are materialized and organizer-bound before metrics are recorded.",
+  "admissibility_condition": "For the candidate being evaluated, its accepted registration, exact root risk_policy.json bytes, evaluator-derived boundaries, six candidate-specific fold/model/target hashes, and candidate-specific stitched-return hash are materialized and organizer-bound before metrics are recorded. A risk_ablations path identifies only the immutable template copied to root before registration.",
   "status": "CANDIDATE_GENERIC_DECLARATION_ONLY_TWO_CANDIDATE_INSTANTIATIONS_BOUNDARIES_AND_HASHES_PENDING"
 }

@@ -1,9 +1,10 @@
 # QE verification plan
 
-The two synthetic test modules are intentionally not executed during clean-room authoring. They
-cover score causality, deterministic construction, conservative exposure, explicit flat/hold
-semantics, membership, neighbor overrides, declarative risk scaling, stop triggers, cooldowns,
-and same-boundary reentry blocking.
+The two synthetic test modules were not executed during clean-room authoring or the active-authority
+rebind. This statement does not supersede any separately recorded organizer validation. They cover
+score causality, deterministic construction, conservative exposure, explicit flat/hold semantics,
+membership, neighbor overrides, declarative risk scaling, stop triggers, cooldowns, and
+same-boundary reentry blocking.
 
 ## Team-local synthetic checks
 
@@ -50,3 +51,30 @@ These are evaluator responsibilities and must not be simulated inside team strat
     cumulative trial/compute ledger even on failure or interruption.
 11. Confirm each policy evaluation emits base and doubled costs, the no-control core precedes all
     controls, and the combined full-gate pass precedes all neighbors.
+12. Verify active entrypoint SHA-256
+    `0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4`, A5 integration-freeze
+    commit `d2b95f610722aab65b4e67466b34efeaa3554101`/SHA-256
+    `b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c`, and the delegated A6
+    integration/report authority before any result-bearing command.
+13. Recompute the complete executable set from the final Team05 historical tree. Require the
+    executable-source commit to precede the independent semantic-review commit, then the score
+    manifest commit, then the core registration commit; require exact executable bytes at all
+    three downstream boundaries.
+    The prospective root set is `candidate_variant.py`, `frozen_config.json`, `risk_policy.json`,
+    `strategy.py`, `test_risk_policy_contract.py`, and `test_strategy.py`.
+14. Validate the materialized score manifest against the active A5 schema: exact 72-hour schedule
+    from `2020-01-01T00:00:00Z`, exact 72-hour executable-open label, fold-end purge, 12 minimum
+    pairs, and globally pooled Pearson. Confirm the diagnostic is non-material, does not charge a
+    team trial, and is not an automatic gate.
+15. At the supplied eligibility boundary and every archived replay boundary, require the exact A6
+    certified universe and zero non-crypto leaks. Stablecoins, equities/TradFi, indexes, metals,
+    commodities, and every other non-crypto contract must remain absent even when Binance lists a
+    perpetual.
+16. For every material candidate, verify the committed `candidate_variant.py` ID, overrides, and
+    risk-template declaration match its preregistered cell and that zero-argument
+    `strategy.build_strategy()` exposes exactly those parameters. Verify the declared template was
+    materialized byte-for-byte at root `risk_policy.json`; reject any assumption that the lifecycle
+    selects a side-path policy.
+17. Register the family before computing the core's final source-bundle fingerprint. Recompute the
+    fingerprint only after the family projection and all three canonical A5 artifacts exist, then
+    bind that exact value in the later core registration.

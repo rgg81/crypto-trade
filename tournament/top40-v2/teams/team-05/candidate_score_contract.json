@@ -5,37 +5,41 @@
   "first_candidate_id": "team05-crtr-core-v1",
   "signal_definition_id": "team05-crtr-base-v1",
   "applies_to": "the unchanged CRTR score producer across all declared risk policies and one-axis neighbors",
-  "status": "PROSPECTIVE_BLOCKED_UNTIL_AMENDMENT_0005_FREEZE",
+  "status": "PROSPECTIVE_UNREGISTERED_ACTIVE_A5_A6_AUTHORITY_BOUND",
   "candidate_ordinal_within_family": 1,
   "score_boundary": {
     "producer": "strategy.preconstruction_scores",
-    "hook_import": "crypto_trade.tournament.score_adapter_protocol_v5.score_boundary",
+    "hook_import": "crypto_trade.tournament.score_adapter_protocol_v5.score_boundary exposed as strategy.score_boundary",
     "hook_input": "built-in dict[str,float] with sorted symbol insertion order and finite scores",
     "timing": "after every declared score transform and before score-span checks, asset selection, sleeve construction, or weighting",
-    "identity_requirement": "Amendment 0005 hook must return the same keys and finite float values; strategy construction consumes the returned mapping",
+    "identity_requirement": "The active Amendment 0005 hook must return the same keys and finite float values; strategy construction consumes the returned mapping",
     "score_direction": "higher score predicts higher simple executable-open-to-open return"
   },
   "label": {
-    "name": "forward_3d_simple_executable_open_to_open_return",
+    "name": "manifest-horizon-simple-executable-open-to-open-return-v1",
     "score_time": "decision_time",
-    "entry": "organizer-authoritative executable transaction open used for a target produced at decision_time; the price is never exposed to the strategy",
-    "exit": "first organizer-authoritative executable transaction open at or after entry_time + 3 calendar days",
+    "holding_horizon_hours": 72,
+    "entry": "organizer-authoritative executable open at decision_time; the price is never exposed to the strategy",
+    "exit": "organizer-authoritative executable open at exactly decision_time + 72 hours",
     "formula": "exit_open / entry_open - 1",
     "price_requirements": "both opens must be finite and strictly positive",
     "membership_requirements": "symbol must be in the score map and executable at both endpoints",
     "missing_rule": "omit the symbol-boundary observation; never substitute, carry, fill, or shorten the horizon",
+    "fold_end_rule": "purge the complete score decision when decision_time + 72 hours touches or crosses its frozen fold end",
     "overlap_rule": "labels are diagnostic only; compute each scheduled score boundary independently and do not use labels as strategy inputs"
   },
   "information_coefficient": {
-    "unit": "scheduled score boundary",
-    "paired_universe": "intersection of score-map symbols and valid labels under the label rule",
+    "statistic_id": "globally-pooled-pearson-v1",
+    "unit": "all valid decision-symbol pairs pooled globally and separately within each frozen fold",
+    "paired_universe": "all captured score rows with a valid exact-horizon label after fold-end purging",
     "minimum_pairs": 12,
-    "statistic": "Spearman rank correlation, implemented as Pearson correlation of average ranks",
-    "ties": "exact average ranks for both score and label; symbol text is only a deterministic serialization tie-breaker",
-    "undefined_rule": "omit boundary IC when fewer than 12 pairs or either ranked vector has zero variance",
-    "aggregation": "report the count, arithmetic mean, median, positive fraction, and complete ordered boundary-IC series; no value is a qualification gate unless Amendment 0005 says so"
+    "statistic": "Pearson correlation of raw captured scores and simple forward returns",
+    "undefined_rule": "report null globally or for a fold when fewer than 12 pairs remain or either centered vector has zero variance",
+    "aggregation": "report development pair count and Pearson plus pair count and Pearson for every frozen fold",
+    "qualification_rule": "declared-score diagnostic only; non-material, no trial-budget charge, and never an automatic qualification gate"
   },
   "canonical_score_payload": {
+    "authority": "team-local synthetic byte-invariance audit only; not an A5 evidence artifact or substitute for organizer capture",
     "function": "strategy.candidate_score_payload_bytes",
     "encoding": "UTF-8 JSON plus one LF",
     "json_options": "allow_nan=false, ensure_ascii=true, separators=(',', ':'), sort_keys=true",
@@ -43,5 +47,15 @@
     "invalid_record_rule": "Any malformed nonempty PreconstructionScore map returns empty bytes; it must never be coerced or serialized as a valid-looking empty score artifact.",
     "byte_invariance": "same causal input must be identical under future append/corruption/truncation, bar-map insertion order, and fresh construction"
   },
-  "registration_rule": "Do not register or execute any Team-05 candidate until Amendment 0005 and score_adapter_protocol_v5 are frozen and this contract and its manifest are organizer hash-bound."
+  "active_authority": {
+    "entrypoint_path": "scripts/top40_v2_tournament_score_diagnostics_v5.py",
+    "entrypoint_sha256": "0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4",
+    "amendment_0005_integration_freeze_commit": "d2b95f610722aab65b4e67466b34efeaa3554101",
+    "amendment_0005_integration_freeze_sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c",
+    "amendment_0006_pure_crypto_report_sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
+    "amendment_0006_pure_crypto_policy_sha256": "2c7fb0ff593d06c323517e60df4b28ab9387a2df580b83f82f65ef71c91fc350",
+    "amendment_0006_pure_crypto_report_violations": 0
+  },
+  "universe_rule": "Use only A6-certified native crypto coins/tokens in DecisionContext.eligible_symbols; stablecoins, equities/TradFi, indexes, metals, commodities, and all other non-crypto contracts are forbidden even when listed as perpetuals.",
+  "registration_rule": "Do not register or execute Team05 until the final executable-source manifest, independent semantic review, score manifest, material hashes, tests, and organizer registration are complete under the active A5/A6 authority."
 }

@@ -78,9 +78,20 @@ development index. Team 05 declares no dates. The slices must be contiguous, dis
 and exhaustive; every fold is independently replayed from past-only history and emits only that
 fold's test targets. The rule has no fitted coefficients, global scaler, feature selection, or
 learned ensemble weight, but each fold still requires an exact evaluator-derived boundary and
-hash-bound replay declaration before qualification evidence is admissible. The prospective A5
+hash-bound replay declaration before qualification evidence is admissible. The active A5
 open-to-open label is diagnostic-only and cannot enter state or targets. Exact materialization
 requirements are in `walk_forward_plan.json`.
+
+## Tournament universe authority
+
+Every result-bearing command must use the active A5 entrypoint
+`scripts/top40_v2_tournament_score_diagnostics_v5.py` at
+`0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4`. It delegates ordinary
+tournament execution through the frozen A6 pure-crypto authority. Team05 reads only the supplied
+point-in-time `DecisionContext.eligible_symbols`; it declares no fallback, local allowlist, or
+universe expansion. Only A6-certified native crypto coins/tokens may enter. Stablecoins,
+equities/TradFi, indexes, metals, commodities, and all other non-crypto contracts are excluded even
+if Binance lists them as perpetuals.
 
 ## Hard noncompensatory development gates
 
@@ -110,7 +121,9 @@ least-bad cell.
 ## Fixed risk-control plan
 
 The initial top-level `risk_policy.json` is the no-control policy. The immutable combined policy is
-declared separately in `risk_ablations/combined.json`:
+declared separately in `risk_ablations/combined.json`; after activation, its exact bytes must be
+materialized at top-level `risk_policy.json` before the controlled candidate is committed,
+registered, and run:
 
 - 30-day realized-volatility target of 18%, scale clamped to `[0.35, 1.00]`;
 - drawdown scales 0.75/0.50/0.25/0.00 at 10%/16%/22%/28% drawdown;
@@ -125,7 +138,9 @@ registered trials.
 
 ## Research sequence and stopping rule
 
-1. After the external A5 freeze and family registration, register and run only the no-control core.
+1. After verifying the active A5/A6 authority, completing organizer QR/QE, first-adding the complete
+   executable-source manifest, independent semantic review, and score manifest in strict order,
+   and accepting family/core registration, run only the no-control core.
 2. Activate no risk control unless the core has strictly positive base- and doubled-cost net return
    and Sharpe, at least four positive equal chronological folds, positive bull/bear/chop returns,
    positive long-bull/short-bear/combined-chop roles, and both sleeves meet official activity

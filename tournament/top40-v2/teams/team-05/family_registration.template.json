@@ -28,5 +28,5 @@
     "neighborhood_design": "Base plus exactly eight preregistered one-axis moves listed in parameter_neighborhood.json; no Cartesian grid and no replacement neighbors."
   },
   "selection_metric": "Binary noncompensatory rule: freeze team05-crtr-base-v1 only if every official and Team-05 hard gate, including the full predeclared neighborhood, passes. Neighbors are stability probes and cannot replace the base.",
-  "risk_policy_plan": "Run the top-level no-control policy first. Only after every preregistered broad positive core-alpha minimum passes may four single controls and the fixed combined policy activate. Each of six policy runs emits base and doubled costs. The combined policy in risk_ablations/combined.json must pass all full non-neighborhood gates before any neighbor."
+  "risk_policy_plan": "Run the top-level no-control policy first. Only after every preregistered broad positive core-alpha minimum passes may four single controls and the fixed combined policy activate. Before each controlled registration, copy the declared risk_ablations policy byte-for-byte to top-level risk_policy.json because the frozen lifecycle reads only that path. Each of six policy runs emits base and doubled costs. The combined declaration must pass all full non-neighborhood gates before any neighbor."
 }

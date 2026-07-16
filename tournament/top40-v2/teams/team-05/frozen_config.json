@@ -60,12 +60,29 @@
     "risk_and_strategy_actions_execute": "next available transaction open"
   },
   "score_adapter": {
+    "active_entrypoint_path": "scripts/top40_v2_tournament_score_diagnostics_v5.py",
+    "active_entrypoint_sha256": "0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4",
+    "amendment_0005_integration_freeze_commit": "d2b95f610722aab65b4e67466b34efeaa3554101",
+    "amendment_0005_integration_freeze_sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c",
     "protocol_import": "crypto_trade.tournament.score_adapter_protocol_v5.score_boundary",
+    "protocol_module_sha256": "8f8f5db3be3069cce7c7c0605fb15b31c4f28af7c2e0f2e24d79d861a65ae4ff",
     "boundary": "built-in finite dict[str,float] after all score transforms and before score-span checks or selection",
     "construction_consumes_returned_values": true,
     "candidate_score_contract": "candidate_score_contract.json",
     "candidate_score_manifest": "candidate_score_manifest.template.json",
-    "registration_blocked_until_amendment_0005_frozen": true
+    "executable_source_manifest": "executable_source_manifest.template.json",
+    "semantic_coupling_review": "semantic_coupling_review.template.json",
+    "amendment_0005_authority_active": true,
+    "registration_preconditions_pending": "final Team05 hashes and dependency set, organizer tests, immutable executable-source first-add, independent semantic review first-add, score-manifest first-add, and accepted family/core registration"
+  },
+  "universe_authority": {
+    "amendment_0006_integration_freeze_commit": "ed3af1398543dfee4a50150915dc2e37b3631fc9",
+    "amendment_0006_integration_freeze_sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34",
+    "canonical_report_sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
+    "canonical_report_policy_sha256": "2c7fb0ff593d06c323517e60df4b28ab9387a2df580b83f82f65ef71c91fc350",
+    "canonical_report_violations": 0,
+    "membership_source": "DecisionContext.eligible_symbols supplied by active A5 entrypoint delegated through A6",
+    "rule": "Only certified native crypto coins/tokens; exclude stablecoins, equities/TradFi, indexes, metals, commodities, and every other non-crypto contract even when Binance lists a perpetual."
   },
   "noncompensatory_development_gates": {
     "official_minimum_net_sharpe": 0.75,
@@ -91,9 +108,12 @@
   },
   "initial_risk_policy_path": "risk_policy.json",
   "initial_risk_policy_controls": "none",
-  "combined_risk_policy_path": "risk_ablations/combined.json",
+  "canonical_runtime_risk_policy_path": "risk_policy.json",
+  "combined_risk_policy_template_path": "risk_ablations/combined.json",
+  "candidate_variant_path": "candidate_variant.py",
+  "candidate_materialization_rule": "Before each material commit and registration, candidate_variant.py must contain the exact preregistered candidate ID, overrides, and risk-template declaration; that declared template must be copied byte-for-byte to root risk_policy.json. The canonical lifecycle selects no side paths.",
   "control_activation_gate": "all preregistered broad positive no-control core-alpha minima in ablations.json",
   "neighbor_activation_gate": "combined policy passes every official and Team-05 non-neighborhood gate",
   "selection_rule": "Binary: freeze team05-crtr-base-v1 only if every official and Team-05 gate, including the complete neighborhood, passes. Neighbors are nonselectable stability probes.",
-  "status": "DRAFT_UNREGISTERED_DO_NOT_EVALUATE"
+  "status": "DRAFT_UNREGISTERED_ACTIVE_A5_A6_BOUND_DO_NOT_EVALUATE"
 }

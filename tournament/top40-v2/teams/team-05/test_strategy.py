@@ -12,12 +12,15 @@ import math
 from collections import OrderedDict
 from pathlib import Path
 
+import candidate_variant as candidate_variant_module
 import pandas as pd
 import pytest
 import strategy as strategy_module
 from strategy import (
     BASE_PARAMETERS,
     CANONICAL_SEED,
+    PREREGISTERED_CANDIDATE_OVERRIDES,
+    PREREGISTERED_RISK_POLICY_TEMPLATES,
     build_strategy,
     build_strategy_from_parameters,
     candidate_score_payload_bytes,
@@ -415,6 +418,21 @@ def test_insufficient_or_degenerate_history_fails_closed_to_flat() -> None:
     assert _targets(_context(constant)) == {}
 
 
+def test_every_sparse_scheduled_decision_crosses_the_empty_a5_hook_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, float]] = []
+
+    def recording_boundary(values: dict[str, float]) -> dict[str, float]:
+        calls.append(dict(values))
+        return dict(values)
+
+    monkeypatch.setattr(strategy_module, "score_boundary", recording_boundary)
+    too_small = OrderedDict(list(_frames().items())[:11])
+    assert _targets(_context(too_small)) == {}
+    assert calls == [{}]
+
+
 def test_non_rebalance_boundary_returns_none_not_flat() -> None:
     off_schedule = DECISION + pd.Timedelta(days=1)
     frames = OrderedDict(
@@ -452,19 +470,89 @@ def test_every_declared_neighbor_changes_exactly_its_one_registered_axis(
     artifact_name: str,
     axis: str,
     neighbor_value: int | float,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     artifact = json.loads((TEAM_ROOT / "neighbors" / artifact_name).read_text(encoding="utf-8"))
     expected_override = {axis: neighbor_value}
     assert artifact["one_axis"] == axis
     assert artifact["overrides"] == expected_override
+    assert artifact["canonical_materialization"] == {
+        "active_candidate_id": artifact["neighbor_id"],
+        "active_overrides": expected_override,
+        "active_risk_policy_template": "risk_ablations/combined.json",
+        "path": "candidate_variant.py",
+    }
+    assert PREREGISTERED_CANDIDATE_OVERRIDES[artifact["neighbor_id"]] == expected_override
 
-    neighbor = build_strategy_from_parameters(artifact["overrides"])
+    monkeypatch.setattr(
+        candidate_variant_module,
+        "ACTIVE_CANDIDATE_ID",
+        artifact["canonical_materialization"]["active_candidate_id"],
+    )
+    monkeypatch.setattr(
+        candidate_variant_module,
+        "ACTIVE_OVERRIDES",
+        artifact["canonical_materialization"]["active_overrides"],
+    )
+    monkeypatch.setattr(
+        candidate_variant_module,
+        "ACTIVE_RISK_POLICY_TEMPLATE",
+        artifact["canonical_materialization"]["active_risk_policy_template"],
+    )
+    neighbor = build_strategy()
     changed = {
         field.name: getattr(neighbor.parameters, field.name)
         for field in dataclasses.fields(BASE_PARAMETERS)
         if getattr(neighbor.parameters, field.name) != getattr(BASE_PARAMETERS, field.name)
     }
     assert changed == expected_override
+
+
+def test_canonical_builder_rejects_unregistered_or_mismatched_materialization(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(candidate_variant_module, "ACTIVE_CANDIDATE_ID", "team05-undeclared-v1")
+    with pytest.raises(ValueError, match="not preregistered"):
+        build_strategy()
+
+    monkeypatch.setattr(candidate_variant_module, "ACTIVE_CANDIDATE_ID", "team05-crtr-core-v1")
+    monkeypatch.setattr(candidate_variant_module, "ACTIVE_OVERRIDES", {"target_gross": 0.5})
+    with pytest.raises(ValueError, match="do not match"):
+        build_strategy()
+
+    monkeypatch.setattr(candidate_variant_module, "ACTIVE_OVERRIDES", {})
+    monkeypatch.setattr(
+        candidate_variant_module,
+        "ACTIVE_RISK_POLICY_TEMPLATE",
+        "risk_ablations/combined.json",
+    )
+    with pytest.raises(ValueError, match="risk template does not match"):
+        build_strategy()
+
+
+@pytest.mark.parametrize(
+    "candidate_id",
+    [
+        "team05-crtr-core-v1",
+        "team05-crtr-ab-vol",
+        "team05-crtr-ab-dd",
+        "team05-crtr-ab-stop",
+        "team05-crtr-ab-turnover",
+        "team05-crtr-base-v1",
+    ],
+)
+def test_every_predeclared_base_parameter_cell_uses_canonical_zero_arg_builder(
+    candidate_id: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(candidate_variant_module, "ACTIVE_CANDIDATE_ID", candidate_id)
+    monkeypatch.setattr(candidate_variant_module, "ACTIVE_OVERRIDES", {})
+    monkeypatch.setattr(
+        candidate_variant_module,
+        "ACTIVE_RISK_POLICY_TEMPLATE",
+        PREREGISTERED_RISK_POLICY_TEMPLATES[candidate_id],
+    )
+    assert build_strategy().parameters == BASE_PARAMETERS
 
 
 def test_every_noncanonical_seed_is_rejected() -> None:

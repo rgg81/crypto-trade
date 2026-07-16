@@ -2,18 +2,23 @@
   "timestamp_utc": "REPLACE_WITH_REGISTRATION_TIMESTAMP_Z",
   "team_id": "team-05",
   "family_id": "team05-causal-residual-trend-reversal-v1",
-  "candidate_id": "REPLACE_WITH_PREREGISTERED_CANDIDATE_ID",
+  "candidate_id": "team05-crtr-core-v1",
   "strategy_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
   "source_bundle_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
   "risk_config_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
   "config_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
   "parameters": {
+    "_top40_v2_score_adapter": {
+      "adapter_id": "top40-v2-declared-score-boundary-v1",
+      "manifest_sha256": "REPLACE_WITH_CANONICAL_SCORE_MANIFEST_64_LOWERCASE_HEX",
+      "schema_version": 1
+    },
     "base_candidate_id": "team05-crtr-base-v1",
-    "strategy_parameters": "frozen_config.json or exactly one declared neighbor override",
-    "risk_policy_cell": "REPLACE_WITH_EXACT_ABLATIONS_JSON_TRIAL_SUFFIX_OR_NEIGHBOR_COMBINED",
+    "strategy_parameters": "frozen_config.json",
+    "risk_policy_cell": "ablations.json:risk-none using risk_policy.json",
     "evaluator_cost_outputs": [1.0, 2.0],
     "fold_plan": "walk_forward_plan.json",
-    "activation_precondition": "no-control core first; broad positive core-alpha gate for controls; full combined-policy non-neighborhood gate for neighbors"
+    "activation_precondition": "family registration accepted; active A5/A6 authority verified; executable-source manifest, independent semantic review, and score manifest immutable first-adds accepted in strict order"
   },
   "seed": 20260801,
   "thesis": "CRTR intermediate relative continuation plus direction-conditioned short reversal should support bull-long, bear-short, and combined-chop roles at conservative exposure.",

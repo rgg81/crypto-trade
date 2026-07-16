@@ -3,11 +3,17 @@
   "team_id": "team-05",
   "neighbor_id": "team05-crtr-n06-gross-070",
   "base_candidate_id": "team05-crtr-base-v1",
+  "canonical_materialization": {
+    "active_candidate_id": "team05-crtr-n06-gross-070",
+    "active_overrides": {"target_gross": 0.7},
+    "active_risk_policy_template": "risk_ablations/combined.json",
+    "path": "candidate_variant.py"
+  },
   "one_axis": "target_gross",
   "overrides": {
     "target_gross": 0.70
   },
   "all_other_parameters": "identical to frozen_config.json",
-  "risk_policy": "identical to risk_ablations/combined.json",
+  "risk_policy": "root risk_policy.json materialized byte-for-byte from risk_ablations/combined.json",
   "activation": "only after base hard-gate pass"
 }

@@ -1,24 +1,26 @@
 {
-  "schema_version": 1,
-  "team_id": "team-05",
-  "family_id": "team05-causal-residual-trend-reversal-v1",
+  "adapter_id": "top40-v2-declared-score-boundary-v1",
   "candidate_id": "team05-crtr-core-v1",
-  "signal_definition_id": "team05-crtr-base-v1",
-  "candidate_ordinal_within_family": 1,
-  "amendment_id": "0005",
-  "amendment_frozen_at_utc": "REPLACE_AFTER_AMENDMENT_0005_FREEZE",
-  "score_adapter_protocol_path": "crypto_trade.tournament.score_adapter_protocol_v5",
-  "score_adapter_protocol_sha256": "REPLACE_AFTER_AMENDMENT_0005_FREEZE_WITH_64_LOWERCASE_HEX",
-  "score_contract_path": "candidate_score_contract.json",
-  "score_contract_sha256": "RECOMPUTE_AFTER_REMEDIATION",
-  "strategy_sha256": "RECOMPUTE_AFTER_REMEDIATION",
-  "frozen_config_sha256": "RECOMPUTE_AFTER_REMEDIATION",
-  "first_candidate_score_artifact_path": "REPLACE_WITH_ORGANIZER_CANDIDATE_SCORE_ARTIFACT_PATH",
-  "first_candidate_score_artifact_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
-  "label_artifact_path": "REPLACE_WITH_ORGANIZER_OPEN_TO_OPEN_LABEL_ARTIFACT_PATH",
-  "label_artifact_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
-  "ic_artifact_path": "REPLACE_WITH_ORGANIZER_IC_ARTIFACT_PATH",
-  "ic_artifact_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
-  "byte_invariance_evidence_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
-  "status": "TEMPLATE_REGISTRATION_BLOCKED_UNTIL_A5_FREEZE_AND_HASH_BINDING"
+  "capture_boundary": "candidate-declared-post-transform-pre-selection-weight-cap-risk",
+  "family_id": "team05-causal-residual-trend-reversal-v1",
+  "hook": "strategy.score_boundary",
+  "label": {
+    "executable_price_column": "open",
+    "holding_horizon_hours": 72,
+    "label_id": "manifest-horizon-simple-executable-open-to-open-return-v1",
+    "minimum_pairs": 12,
+    "purge_cross_fold_endpoints": true,
+    "return_definition": "simple-executable-open-to-open",
+    "score_direction": "higher-score-higher-return",
+    "statistic_id": "globally-pooled-pearson-v1"
+  },
+  "schedule_utc": {
+    "anchor_timestamp_utc": "2020-01-01T00:00:00Z",
+    "interval_hours": 72
+  },
+  "schema_version": 1,
+  "score_description": "Final finite CRTR cross-sectional ranking score after volatility normalization, cross-sectional ranking, direction-conditioned reversal blending, alignment discount, reliability scaling, and clipping. The direct A5 hook return is validated and consumed before score-span checks, selection, sleeve weighting, caps, and organizer-owned risk. Higher values declare higher expected 72-hour simple executable-open-to-open returns.",
+  "semantic_coupling_review_sha256": "REPLACE_WITH_CANONICAL_SEMANTIC_REVIEW_64_LOWERCASE_HEX",
+  "stage": "development",
+  "team_id": "team-05"
 }

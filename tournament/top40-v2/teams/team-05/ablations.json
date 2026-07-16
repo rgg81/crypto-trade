@@ -9,6 +9,8 @@
   "signal_parameters": "frozen_config.json",
   "initial_policy": "risk_policy.json",
   "combined_policy": "risk_ablations/combined.json",
+  "canonical_runtime_policy_path": "risk_policy.json",
+  "policy_materialization_rule": "For every controlled material candidate, copy its declared policy_artifact bytes to root risk_policy.json before commit, hash binding, registration, and run; side-path declarations are never selected by the frozen lifecycle.",
   "policy_artifacts": {
     "none": "risk_policy.json",
     "volatility_only": "risk_ablations/volatility_only.json",
@@ -60,7 +62,7 @@
       "candidate_id": "team05-crtr-core-v1",
       "controls": "none",
       "purpose": "uncontrolled core-alpha test and activation gate",
-      "activation": "first and unconditional after family/A5 registration"
+      "activation": "first and unconditional after active A5/A6 verification, required A5 artifact first-adds, and accepted family/core registration"
     },
     {
       "order": 2,

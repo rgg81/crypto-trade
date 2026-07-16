@@ -29,20 +29,50 @@ Immediately after the final score transform and before score-span checks or sele
 `candidate_score_values()` constructs a sorted built-in `dict[str, float]` containing only finite
 scores and directly calls
 `crypto_trade.tournament.score_adapter_protocol_v5.score_boundary`. Portfolio construction
-validates and consumes the values returned by that hook. `candidate_score_payload_bytes()` defines
-the canonical byte representation used by the prospective first-candidate score artifact. The
-runtime dataclass annotations are not trusted as validators: every record field must have its
+validates and consumes the values returned by that hook. `candidate_score_payload_bytes()` is a
+team-local synthetic audit representation for byte-invariance checks; it is not an A5 artifact or
+substitute for A5's captured replay evidence. The runtime dataclass annotations are not trusted as
+validators: every record field must have its
 declared exact runtime type and satisfy the finite/range rules before the hook. Any malformed
 nonempty score map returns `{}` from `candidate_score_values()`, `b""` from
 `candidate_score_payload_bytes()`, and `{}` from construction without coercion or an exception.
 
-The diagnostic label is the simple three-day return from the organizer-authoritative executable
-entry open for the target produced at the score decision to the first executable open at or after
-three calendar days.
-The complete endpoint, missingness, tie, Spearman IC, aggregation, and byte contracts are frozen in
-`candidate_score_contract.json`; organizer binding fields are in
-`candidate_score_manifest.template.json`. Registration remains blocked until Amendment 0005 and
-the v5 protocol module are frozen and hash-bound.
+Amendment 0005 is active through
+`scripts/top40_v2_tournament_score_diagnostics_v5.py` at SHA-256
+`0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4`. The controlling
+integration-freeze commit is `d2b95f610722aab65b4e67466b34efeaa3554101`, and its file SHA-256
+is `b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c`.
+
+The declared diagnostic schedule is every 72 hours from `2020-01-01T00:00:00Z`, matching the
+strategy schedule. Its label is the simple return between the organizer-authoritative executable
+`open` at the score decision and the exact executable `open` 72 hours later. A decision is purged
+when its endpoint touches or crosses the frozen fold end; an absent, nonfinite, or nonpositive
+endpoint omits that symbol-label pair without substitution. The fixed statistic is globally pooled
+Pearson correlation, repeated within each frozen fold, with 12 minimum pairs. It is non-material,
+does not charge the trial budget, and is never an automatic qualification gate.
+
+Only the first no-control core is declared to opt into this candidate-specific A5 diagnostic. The
+unchanged score mechanism may be reused by later preregistered policy/neighbor trials, but they do
+not inherit or reuse the core manifest identity.
+
+The exact A5 score-manifest shape is in `candidate_score_manifest.template.json`. The complete
+acyclic dependency declaration is in `executable_source_manifest.template.json`, and the fixed
+independent attestation shape is in `semantic_coupling_review.template.json`. Those root templates
+are not the canonical A5 artifacts. The organizer must materialize them respectively as:
+
+1. `score-adapters/team05-crtr-core-v1.executable-source-manifest.json`;
+2. `score-adapters/team05-crtr-core-v1.semantic-coupling-review.json`; and
+3. `score-adapters/team05-crtr-core-v1.json`.
+
+They must be canonical pretty JSON and immutable unique first-adds in that order, with the score
+manifest preceding the core registration. All material hashes, byte sizes, reviewer identity, and
+review timestamp remain prospective placeholders. No current Team05 file is a semantic approval,
+registration, diagnostic result, or performance claim.
+
+The active entrypoint delegates ordinary tournament behavior through Amendment 0006. Therefore
+the score and target universe is only the A6-certified point-in-time native crypto universe.
+Stablecoins, equities/TradFi, indexes, metals, commodities, and other non-crypto perpetuals are
+ineligible. Team05 may only consume `context.eligible_symbols` and may never re-expand it.
 
 ## Portfolio adapter
 

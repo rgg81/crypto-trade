@@ -1,0 +1,39 @@
+{
+  "candidate_id": "team05-crtr-core-v1",
+  "family_id": "team05-causal-residual-trend-reversal-v1",
+  "files": [
+    {
+      "path": "candidate_variant.py",
+      "sha256": "REPLACE_WITH_EXACT_64_LOWERCASE_HEX",
+      "size": "REPLACE_WITH_EXACT_BYTE_SIZE_INTEGER"
+    },
+    {
+      "path": "frozen_config.json",
+      "sha256": "REPLACE_WITH_EXACT_64_LOWERCASE_HEX",
+      "size": "REPLACE_WITH_EXACT_BYTE_SIZE_INTEGER"
+    },
+    {
+      "path": "risk_policy.json",
+      "sha256": "REPLACE_WITH_EXACT_64_LOWERCASE_HEX",
+      "size": "REPLACE_WITH_EXACT_BYTE_SIZE_INTEGER"
+    },
+    {
+      "path": "strategy.py",
+      "sha256": "REPLACE_WITH_EXACT_64_LOWERCASE_HEX",
+      "size": "REPLACE_WITH_EXACT_BYTE_SIZE_INTEGER"
+    },
+    {
+      "path": "test_risk_policy_contract.py",
+      "sha256": "REPLACE_WITH_EXACT_64_LOWERCASE_HEX",
+      "size": "REPLACE_WITH_EXACT_BYTE_SIZE_INTEGER"
+    },
+    {
+      "path": "test_strategy.py",
+      "sha256": "REPLACE_WITH_EXACT_64_LOWERCASE_HEX",
+      "size": "REPLACE_WITH_EXACT_BYTE_SIZE_INTEGER"
+    }
+  ],
+  "manifest_kind": "top40-v2-executable-source-manifest-v1",
+  "schema_version": 1,
+  "team_id": "team-05"
+}

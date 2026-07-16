@@ -12,6 +12,7 @@ import math
 import statistics
 from collections.abc import Mapping
 
+import candidate_variant
 import pandas as pd
 
 from crypto_trade.tournament.protocol import DecisionContext, TargetStrategy
@@ -94,6 +95,40 @@ class StrategyParameters:
 
 
 BASE_PARAMETERS = StrategyParameters()
+
+PREREGISTERED_CANDIDATE_OVERRIDES: dict[str, dict[str, object]] = {
+    "team05-crtr-core-v1": {},
+    "team05-crtr-ab-vol": {},
+    "team05-crtr-ab-dd": {},
+    "team05-crtr-ab-stop": {},
+    "team05-crtr-ab-turnover": {},
+    "team05-crtr-base-v1": {},
+    "team05-crtr-n01-slow-50d": {"slow_horizon_days": 50},
+    "team05-crtr-n02-slow-70d": {"slow_horizon_days": 70},
+    "team05-crtr-n03-selection-020": {"selection_fraction": 0.20},
+    "team05-crtr-n04-selection-030": {"selection_fraction": 0.30},
+    "team05-crtr-n05-gross-050": {"target_gross": 0.50},
+    "team05-crtr-n06-gross-070": {"target_gross": 0.70},
+    "team05-crtr-n07-chop-reversal-015": {"chop_reversal_weight": 0.15},
+    "team05-crtr-n08-chop-reversal-025": {"chop_reversal_weight": 0.25},
+}
+
+PREREGISTERED_RISK_POLICY_TEMPLATES: dict[str, str] = {
+    "team05-crtr-core-v1": "risk_ablations/none.json",
+    "team05-crtr-ab-vol": "risk_ablations/volatility_only.json",
+    "team05-crtr-ab-dd": "risk_ablations/drawdown_only.json",
+    "team05-crtr-ab-stop": "risk_ablations/position_stop_only.json",
+    "team05-crtr-ab-turnover": "risk_ablations/turnover_only.json",
+    "team05-crtr-base-v1": "risk_ablations/combined.json",
+    "team05-crtr-n01-slow-50d": "risk_ablations/combined.json",
+    "team05-crtr-n02-slow-70d": "risk_ablations/combined.json",
+    "team05-crtr-n03-selection-020": "risk_ablations/combined.json",
+    "team05-crtr-n04-selection-030": "risk_ablations/combined.json",
+    "team05-crtr-n05-gross-050": "risk_ablations/combined.json",
+    "team05-crtr-n06-gross-070": "risk_ablations/combined.json",
+    "team05-crtr-n07-chop-reversal-015": "risk_ablations/combined.json",
+    "team05-crtr-n08-chop-reversal-025": "risk_ablations/combined.json",
+}
 
 
 @dataclasses.dataclass(frozen=True)
@@ -403,8 +438,9 @@ def candidate_score_values(
 
     The hook receives only a built-in ``dict[str, float]`` after all score transforms and before
     score-span checks, sleeve selection, or weighting.  The returned values are validated and are
-    the values used by portfolio construction.  The hook is prospective until Amendment 0005 and
-    ``score_adapter_protocol_v5`` are frozen by the organizer.
+    the values used by portfolio construction.  Amendment 0005 and
+    ``score_adapter_protocol_v5`` are active; Team05's use remains prospective until the core
+    manifest, semantic review, and registration are organizer-bound.
     """
     if any(type(symbol) is not str or not symbol for symbol in scores):
         return {}
@@ -456,7 +492,7 @@ def candidate_score_values(
 def candidate_score_payload_bytes(
     scores: Mapping[str, PreconstructionScore],
 ) -> bytes:
-    """Canonical prospective A5 bytes, or empty bytes for a malformed nonempty map."""
+    """Canonical Team05 A5 audit bytes, or empty bytes for a malformed nonempty map."""
     values = candidate_score_values(scores)
     if scores and len(values) != len(scores):
         return b""
@@ -529,9 +565,11 @@ def scores_to_target_weights(
     parameters: StrategyParameters = BASE_PARAMETERS,
 ) -> dict[str, float]:
     """Pure, deterministic adapter from preconstruction scores to signed targets."""
+    # A5 observes every scheduled decision, including explicit flat decisions.  The hook must
+    # therefore receive the exact empty/sparse score dictionary before the breadth gate returns.
+    adapted_score_values = candidate_score_values(scores)
     if len(scores) < parameters.minimum_symbols:
         return {}
-    adapted_score_values = candidate_score_values(scores)
     if len(adapted_score_values) != len(scores):
         return {}
     construction_scores = {
@@ -661,5 +699,25 @@ def build_strategy_from_parameters(
 
 
 def build_strategy() -> TargetStrategy:
-    """Canonical evaluator entrypoint for the frozen base candidate."""
-    return build_strategy_from_parameters()
+    """Canonical evaluator entrypoint for the explicitly materialized candidate variant."""
+    if (
+        type(candidate_variant.ACTIVE_CANDIDATE_ID) is not str
+        or not candidate_variant.ACTIVE_CANDIDATE_ID
+    ):
+        raise ValueError("active candidate identifier must be nonempty text")
+    expected_overrides = PREREGISTERED_CANDIDATE_OVERRIDES.get(
+        candidate_variant.ACTIVE_CANDIDATE_ID
+    )
+    if expected_overrides is None:
+        raise ValueError("active candidate is not preregistered")
+    if (
+        not isinstance(candidate_variant.ACTIVE_OVERRIDES, Mapping)
+        or dict(candidate_variant.ACTIVE_OVERRIDES) != expected_overrides
+    ):
+        raise ValueError("active overrides do not match the preregistered candidate")
+    expected_risk_template = PREREGISTERED_RISK_POLICY_TEMPLATES[
+        candidate_variant.ACTIVE_CANDIDATE_ID
+    ]
+    if candidate_variant.ACTIVE_RISK_POLICY_TEMPLATE != expected_risk_template:
+        raise ValueError("active risk template does not match the preregistered candidate")
+    return build_strategy_from_parameters(candidate_variant.ACTIVE_OVERRIDES)

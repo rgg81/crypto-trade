@@ -1,39 +1,107 @@
 {
-  "schema_version": 1,
-  "team_id": "team-05",
-  "binding_scope": "Draft paths only; every byte hash was invalidated by remediation and must be recomputed by the organizer.",
-  "strategy": {"path": "strategy.py", "sha256": "RECOMPUTE_AFTER_REMEDIATION"},
-  "frozen_config": {"path": "frozen_config.json", "sha256": "RECOMPUTE_AFTER_REMEDIATION"},
-  "initial_no_control_policy": {"path": "risk_policy.json", "sha256": "RECOMPUTE_AFTER_REMEDIATION"},
-  "risk_ablation_policies": {
-    "none": "RECOMPUTE_AFTER_REMEDIATION",
-    "volatility_only": "RECOMPUTE_AFTER_REMEDIATION",
-    "drawdown_only": "RECOMPUTE_AFTER_REMEDIATION",
-    "position_stop_only": "RECOMPUTE_AFTER_REMEDIATION",
-    "turnover_only": "RECOMPUTE_AFTER_REMEDIATION",
-    "combined": "RECOMPUTE_AFTER_REMEDIATION"
+  "active_public_authority": {
+    "amendment_0005": {
+      "active_entrypoint_path": "scripts/top40_v2_tournament_score_diagnostics_v5.py",
+      "active_entrypoint_sha256": "0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4",
+      "integration_freeze_commit": "d2b95f610722aab65b4e67466b34efeaa3554101",
+      "integration_freeze_path": "tournament/top40-v2/amendments/0005/integration-freeze.json",
+      "integration_freeze_sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c",
+      "score_adapter_protocol_path": "src/crypto_trade/tournament/score_adapter_protocol_v5.py",
+      "score_adapter_protocol_sha256": "8f8f5db3be3069cce7c7c0605fb15b31c4f28af7c2e0f2e24d79d861a65ae4ff",
+      "status": "active"
+    },
+    "amendment_0006_delegated_pure_crypto": {
+      "canonical_report_bytes": 73777,
+      "canonical_report_policy_sha256": "2c7fb0ff593d06c323517e60df4b28ab9387a2df580b83f82f65ef71c91fc350",
+      "canonical_report_sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
+      "canonical_report_violations": 0,
+      "integration_freeze_commit": "ed3af1398543dfee4a50150915dc2e37b3631fc9",
+      "integration_freeze_path": "tournament/top40-v2/amendments/0006/integration-freeze.json",
+      "integration_freeze_sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34",
+      "rule": "Only certified native crypto coins/tokens are eligible; stablecoins, equities/TradFi, indexes, metals, commodities, and every other non-crypto contract are excluded even when Binance lists a perpetual.",
+      "status": "active-delegated-by-amendment-0005"
+    }
   },
-  "candidate_score_contract": {"path": "candidate_score_contract.json", "sha256": "RECOMPUTE_AFTER_REMEDIATION"},
+  "binding_scope": "Active public A5/A6 authority is exact. All Team05 material bytes and result artifacts remain prospective placeholders and must be computed by the organizer from the final immutable tree.",
+  "candidate_score_contract": {
+    "path": "candidate_score_contract.json",
+    "sha256": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES"
+  },
+  "core_score_adapter_artifacts": {
+    "canonical_executable_source_manifest_path": "tournament/top40-v2/teams/team-05/score-adapters/team05-crtr-core-v1.executable-source-manifest.json",
+    "canonical_score_manifest_path": "tournament/top40-v2/teams/team-05/score-adapters/team05-crtr-core-v1.json",
+    "canonical_semantic_review_path": "tournament/top40-v2/teams/team-05/score-adapters/team05-crtr-core-v1.semantic-coupling-review.json",
+    "materialization_order": [
+      "executable-source-manifest",
+      "independent-semantic-coupling-review",
+      "score-adapter-manifest",
+      "core-trial-registration"
+    ],
+    "sha256": {
+      "executable_source_manifest": "REPLACE_AFTER_CANONICAL_FIRST_ADD",
+      "score_manifest": "REPLACE_AFTER_CANONICAL_FIRST_ADD",
+      "semantic_coupling_review": "REPLACE_AFTER_INDEPENDENT_REVIEW_FIRST_ADD"
+    },
+    "template_paths": {
+      "executable_source_manifest": "executable_source_manifest.template.json",
+      "score_manifest": "candidate_score_manifest.template.json",
+      "semantic_coupling_review": "semantic_coupling_review.template.json"
+    }
+  },
+  "frozen_config": {
+    "path": "frozen_config.json",
+    "sha256": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES"
+  },
+  "candidate_variant": {
+    "path": "candidate_variant.py",
+    "sha256": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
+    "materialization_rule": "Bind the exact preregistered candidate ID, overrides, and risk-policy template at every material candidate commit; zero-argument strategy.py:build_strategy rejects undeclared or mismatched values."
+  },
+  "initial_no_control_policy": {
+    "path": "risk_policy.json",
+    "sha256": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES"
+  },
+  "canonical_runtime_materialization": {
+    "strategy_entrypoint": "strategy.py:build_strategy",
+    "risk_policy_path": "risk_policy.json",
+    "rule": "For controlled and neighbor candidates, copy the selected risk_ablations declaration byte-for-byte to root risk_policy.json before commit, hash binding, registration, and run."
+  },
   "neighbor_parameter_artifacts": {
-    "team05-crtr-n01-slow-50d": "RECOMPUTE_AFTER_REMEDIATION",
-    "team05-crtr-n02-slow-70d": "RECOMPUTE_AFTER_REMEDIATION",
-    "team05-crtr-n03-selection-020": "RECOMPUTE_AFTER_REMEDIATION",
-    "team05-crtr-n04-selection-030": "RECOMPUTE_AFTER_REMEDIATION",
-    "team05-crtr-n05-gross-050": "RECOMPUTE_AFTER_REMEDIATION",
-    "team05-crtr-n06-gross-070": "RECOMPUTE_AFTER_REMEDIATION",
-    "team05-crtr-n07-chop-reversal-015": "RECOMPUTE_AFTER_REMEDIATION",
-    "team05-crtr-n08-chop-reversal-025": "RECOMPUTE_AFTER_REMEDIATION"
+    "team05-crtr-n01-slow-50d": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
+    "team05-crtr-n02-slow-70d": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
+    "team05-crtr-n03-selection-020": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
+    "team05-crtr-n04-selection-030": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
+    "team05-crtr-n05-gross-050": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
+    "team05-crtr-n06-gross-070": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
+    "team05-crtr-n07-chop-reversal-015": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
+    "team05-crtr-n08-chop-reversal-025": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES"
   },
-  "pending": [
-    "amendment_0005_freeze_and_score_adapter_protocol_sha256",
+  "pending_organizer_material": [
+    "complete_executable_source_set_rederived_from_final_historical_team_tree",
+    "exact_team05_file_sha256_and_byte_size_values",
+    "independent_semantic_review_identity_timestamp_findings_and_hash",
+    "score_manifest_hash_and_registration_opt_in",
     "organizer_source_bundle_sha256",
     "dependency_lock_sha256",
-    "all_remediated_team05_file_sha256_values",
     "organizer_equal_fold_derivation_sha256",
     "fold_target_and_model_sha256_values",
     "stitched_daily_returns_sha256",
-    "candidate_score_label_and_ic_sha256_values",
+    "declared_score_diagnostic_artifact_sha256_values",
     "neighbor_daily_returns_sha256_values"
   ],
-  "status": "DRAFT_ALL_PRIOR_HASHES_INVALID_RECOMPUTE_BEFORE_REGISTRATION"
+  "risk_ablation_policies": {
+    "combined": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
+    "drawdown_only": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
+    "none": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
+    "position_stop_only": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
+    "turnover_only": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
+    "volatility_only": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES"
+  },
+  "schema_version": 1,
+  "status": "PROSPECTIVE_UNREGISTERED_ACTIVE_AUTHORITY_BOUND_MATERIAL_HASHES_PENDING",
+  "strategy": {
+    "path": "strategy.py",
+    "sha256": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES"
+  },
+  "team_id": "team-05"
 }
