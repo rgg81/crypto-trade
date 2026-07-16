@@ -6,9 +6,9 @@
     "integration_freeze_sha256": "6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51",
     "pure_crypto_integration_freeze_sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34"
   },
-  "candidate_id": "t06-relative-rank-acceleration-v1-base",
+  "candidate_id": "t06-relative-rank-persistence-v1-base",
   "candidate_materialization": {
-    "active_candidate_id": "t06-relative-rank-acceleration-v1-base",
+    "active_candidate_id": "t06-relative-rank-persistence-v1-base",
     "active_overrides": {},
     "entrypoint": "strategy.py:build_strategy",
     "risk_policy_source_path": "risk_policies/no-control.json",
@@ -16,7 +16,7 @@
     "variant_path": "candidate_variant.py"
   },
   "candidate_registration": {
-    "input_template": "pivot-01/trial-registration.template.json",
+    "input_template": "pivot-02/trial-registration.template.json",
     "status": "prospective-unmaterialized"
   },
   "entrypoint": "strategy.py:build_strategy",
@@ -47,16 +47,16 @@
       "size": "<organizer-fill-exact-byte-size>"
     }
   ],
-  "family_id": "t06-relative-rank-acceleration-v1",
+  "family_id": "t06-relative-rank-persistence-v1",
   "initial_risk_policy": "risk_policy.json",
   "manifest_kind": "top40-v2-team-candidate-materialization-plan-v3",
   "registration_allowed": false,
   "risk_policy_materialization_rule": "Keep risk_policies/no-control.json byte-identical at root risk_policy.json before the candidate commit; every control remains disabled.",
   "schema_version": 3,
   "score_adapter_controls": {
-    "executable_source_manifest_canonical_path": "tournament/top40-v2/teams/team-06/score-adapters/t06-relative-rank-acceleration-v1-base.executable-source-manifest.json",
-    "score_manifest_canonical_path": "tournament/top40-v2/teams/team-06/score-adapters/t06-relative-rank-acceleration-v1-base.json",
-    "semantic_coupling_review_canonical_path": "tournament/top40-v2/teams/team-06/score-adapters/t06-relative-rank-acceleration-v1-base.semantic-coupling-review.json"
+    "executable_source_manifest_canonical_path": "tournament/top40-v2/teams/team-06/score-adapters/t06-relative-rank-persistence-v1-base.executable-source-manifest.json",
+    "score_manifest_canonical_path": "tournament/top40-v2/teams/team-06/score-adapters/t06-relative-rank-persistence-v1-base.json",
+    "semantic_coupling_review_canonical_path": "tournament/top40-v2/teams/team-06/score-adapters/t06-relative-rank-persistence-v1-base.semantic-coupling-review.json"
   },
   "seed": 20260801,
   "source_bundle_sha256": "<organizer-fill-only-after-family-registration-a7-rebind-and-final-control-files-64-hex-sha256>",

@@ -1,6 +1,6 @@
 {
-  "candidate_id": "t06-relative-rank-acceleration-v1-base",
-  "family_id": "t06-relative-rank-acceleration-v1",
+  "candidate_id": "t06-relative-rank-persistence-v1-base",
+  "family_id": "t06-relative-rank-persistence-v1",
   "features": [
     {
       "availability": "decision boundary supplied by organizer",
@@ -10,7 +10,7 @@
       "missing_rule": "naive, pre-epoch, or off-grid timestamp fails flat",
       "raw_fields": ["DecisionContext.decision_time"],
       "source": "neutral tournament protocol",
-      "use": "construct every six exact 8h bars from the Unix epoch and hold between"
+      "use": "construct every twelve exact 8h bars from the Unix epoch and hold between"
     },
     {
       "availability": "Amendment 0006-certified pure-crypto point-in-time membership",
@@ -26,14 +26,14 @@
       "availability": "canonical RangeIndex rows with open_time plus 8h no later than decision_time",
       "event_timestamp": "bars.open_time plus 8h",
       "feature_id": "exact_completed_log_return_panel",
-      "lag": "75 returns from 76 completed closes ending at the decision boundary",
+      "lag": "96 returns from 97 completed closes ending at the decision boundary",
       "missing_rule": "exclude a coin unless exactly one finite positive close exists at every required open time",
       "raw_fields": ["bars.open_time", "bars.close"],
       "source": "organizer-supplied past-closed 8h bars",
       "transform": "natural log of consecutive exact close ratios"
     },
     {
-      "availability": "computed separately at each of 75 completed return timestamps",
+      "availability": "computed separately at each of 96 completed return timestamps",
       "event_timestamp": "inherited completed bar close time",
       "feature_id": "cross_sectional_return_rank",
       "lag": "inherits completed return panel",
@@ -43,22 +43,22 @@
       "transform": "ASCII-stable average-tie rank mapped to [-1,1], removing any common additive crypto return"
     },
     {
-      "availability": "computed at a scheduled decision from each coin's 75 past rank observations",
+      "availability": "computed at a scheduled decision from each coin's 96 past rank observations",
       "event_timestamp": "decision boundary",
-      "feature_id": "relative_rank_acceleration_reversal",
-      "lag": "63-rank baseline followed by disjoint prior-six and recent-six rank windows",
+      "feature_id": "relative_rank_persistence",
+      "lag": "72-rank normalization baseline followed by disjoint prior-12 and recent-12 rank windows",
       "missing_rule": "nonfinite feature excludes the coin; fewer than 24 features fails the decision closed",
       "raw_fields": ["cross_sectional_return_rank"],
       "source": "fixed deterministic transform",
-      "transform": "negative recent-minus-prior mean-rank change divided by max(0.15, baseline sample rank volatility), multiplied by 0.50 plus 0.50 times recent path coherence"
+      "transform": "positive 0.65 standardized recent-minus-prior mean-rank shift plus positive 0.35 standardized recent mean-rank level, multiplied by 0.50 plus 0.50 times recent displacement coherence; denominator is max(0.20, baseline sample rank volatility)"
     },
     {
       "availability": "computed before selection from every valid currently eligible coin",
       "event_timestamp": "decision boundary",
       "feature_id": "preconstruction_score",
-      "lag": "inherits relative-rank acceleration reversal",
+      "lag": "inherits relative-rank persistence",
       "missing_rule": "scheduled failure captures one empty dictionary; nonfinite score is rejected",
-      "raw_fields": ["relative_rank_acceleration_reversal"],
+      "raw_fields": ["relative_rank_persistence"],
       "source": "fixed deterministic transform",
       "transform": "ASCII-stable average-tie rank mapped to [-1,1], then one direct strategy.score_boundary identity call before sleeves, sizing, caps, or risk"
     }

@@ -1,6 +1,6 @@
 {
-  "candidate_id": "t06-relative-rank-acceleration-v1-base",
-  "family_id": "t06-relative-rank-acceleration-v1",
+  "candidate_id": "t06-relative-rank-persistence-v1-base",
+  "family_id": "t06-relative-rank-persistence-v1",
   "neighbors": [],
   "schema_version": 2,
   "status": "not-declared-not-authorized-before-exact-core-pass",

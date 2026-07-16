@@ -1,24 +1,24 @@
 {
   "activation": {
-    "condition": "exact no-control pivot reference passes every PnL and A5 score-evidence gate",
+    "condition": "exact no-control persistence reference passes every PnL and A5 score-evidence gate",
     "status": "dormant-not-materialized-not-authorized"
   },
-  "candidate_id": "t06-relative-rank-acceleration-v1-base",
-  "family_id": "t06-relative-rank-acceleration-v1",
+  "candidate_id": "t06-relative-rank-persistence-v1-base",
+  "family_id": "t06-relative-rank-persistence-v1",
   "planned_causal_questions": [
     {
       "ablation_id": "remove-relative-rank-common-factor-transform",
-      "question": "Does return cross-sectional ranking, rather than raw-return acceleration, create regime invariance?",
+      "question": "Does per-bar cross-sectional ranking, rather than raw-return trend, create regime invariance?",
       "status": "design-only"
     },
     {
-      "ablation_id": "remove-acceleration-use-recent-rank-level",
-      "question": "Does changing relative leadership, rather than its persistent level, carry the reversal effect?",
+      "ablation_id": "remove-current-rank-level-component",
+      "question": "Does established relative leadership add information beyond positive rank displacement?",
       "status": "design-only"
     },
     {
       "ablation_id": "remove-path-coherence",
-      "question": "Does coherent relative-rank displacement distinguish inventory pressure from noise?",
+      "question": "Does coherent relative-rank displacement distinguish persistent diffusion from noisy leadership flips?",
       "status": "design-only"
     }
   ],

@@ -1,10 +1,11 @@
-"""Team 06 relative-rank acceleration reversal pivot.
+"""Team 06 relative-rank persistence pivot.
 
 The strategy uses only organizer-certified, point-in-time pure-crypto membership and completed
 8-hour closes.  At each scheduled decision it converts every cross section of close-to-close
 returns to centered ranks.  This removes the common crypto direction without estimating a market
-portfolio.  It then reverses abrupt changes in each coin's relative rank, rather than fighting a
-persistent trend level or taking a directional market tilt.
+portfolio.  It then follows a slow, coherent blend of relative-rank displacement and current
+relative leadership.  The longer windows and four-day schedule are fixed responses to the
+terminal parent's negative reversal evidence and high cost sensitivity, not an ex-post control.
 
 Every finite final score crosses the organizer-owned prospective score boundary exactly once on
 each scheduled construction, before sleeve selection, sizing, caps, or risk.  The returned score
@@ -26,24 +27,26 @@ from crypto_trade.tournament.score_adapter_protocol_v5 import score_boundary
 
 FROZEN_SEED = 20260801
 BAR_INTERVAL_HOURS = 8
-REBALANCE_INTERVAL_BARS = 6
-BASELINE_RANK_BARS = 63
-PRIOR_RANK_BARS = 6
-RECENT_RANK_BARS = 6
+REBALANCE_INTERVAL_BARS = 12
+BASELINE_RANK_BARS = 72
+PRIOR_RANK_BARS = 12
+RECENT_RANK_BARS = 12
 HISTORY_RETURN_BARS = BASELINE_RANK_BARS + PRIOR_RANK_BARS + RECENT_RANK_BARS
 MINIMUM_VALID_SYMBOLS = 24
 MINIMUM_POSITIONS_PER_SIDE = 8
 SELECTION_NUMERATOR = 1
-SELECTION_DENOMINATOR = 4
-SIDE_BUDGET = 0.24
-MAXIMUM_SYMBOL_EXPOSURE = 0.03
-MINIMUM_RANK_VOLATILITY = 0.15
+SELECTION_DENOMINATOR = 5
+SIDE_BUDGET = 0.20
+MAXIMUM_SYMBOL_EXPOSURE = 0.025
+MINIMUM_RANK_VOLATILITY = 0.20
+ACCELERATION_WEIGHT = 0.65
+LEVEL_WEIGHT = 0.35
 COHERENCE_BASE_WEIGHT = 0.50
 EPSILON = 1e-12
 TOLERANCE = 1e-12
 
-ACTIVE_FAMILY_ID = "t06-relative-rank-acceleration-v1"
-ACTIVE_CANDIDATE_ID = "t06-relative-rank-acceleration-v1-base"
+ACTIVE_FAMILY_ID = "t06-relative-rank-persistence-v1"
+ACTIVE_CANDIDATE_ID = "t06-relative-rank-persistence-v1-base"
 MATERIALIZED_CANDIDATE_OVERRIDES: dict[str, dict[str, object]] = {
     ACTIVE_CANDIDATE_ID: {},
 }
@@ -66,9 +69,9 @@ class _RelativeFeature:
     prior_mean_rank: float
     recent_mean_rank: float
     baseline_rank_volatility: float
-    acceleration: float
+    rank_shift: float
     coherence: float
-    raw_reversal_score: float
+    raw_persistence_score: float
 
 
 @dataclasses.dataclass(frozen=True)
@@ -244,19 +247,24 @@ def _relative_feature(rank_path: Sequence[float]) -> _RelativeFeature | None:
         return None
     prior_mean = math.fsum(prior) / len(prior)
     recent_mean = math.fsum(recent) / len(recent)
-    acceleration = recent_mean - prior_mean
+    rank_shift = recent_mean - prior_mean
     deviations = tuple(value - prior_mean for value in recent)
     absolute_path = math.fsum(abs(value) for value in deviations)
     coherence = (
         0.0 if absolute_path <= EPSILON else min(1.0, abs(math.fsum(deviations)) / absolute_path)
     )
-    standardized = acceleration / max(MINIMUM_RANK_VOLATILITY, baseline_volatility)
-    raw_score = -standardized * (COHERENCE_BASE_WEIGHT + (1.0 - COHERENCE_BASE_WEIGHT) * coherence)
+    denominator = max(MINIMUM_RANK_VOLATILITY, baseline_volatility)
+    standardized_shift = rank_shift / denominator
+    standardized_level = recent_mean / denominator
+    directional_score = ACCELERATION_WEIGHT * standardized_shift + LEVEL_WEIGHT * standardized_level
+    raw_score = directional_score * (
+        COHERENCE_BASE_WEIGHT + (1.0 - COHERENCE_BASE_WEIGHT) * coherence
+    )
     values = (
         prior_mean,
         recent_mean,
         baseline_volatility,
-        acceleration,
+        rank_shift,
         coherence,
         raw_score,
     )
@@ -266,9 +274,9 @@ def _relative_feature(rank_path: Sequence[float]) -> _RelativeFeature | None:
         prior_mean_rank=float(prior_mean),
         recent_mean_rank=float(recent_mean),
         baseline_rank_volatility=float(baseline_volatility),
-        acceleration=float(acceleration),
+        rank_shift=float(rank_shift),
         coherence=float(coherence),
-        raw_reversal_score=float(raw_score),
+        raw_persistence_score=float(raw_score),
     )
 
 
@@ -288,8 +296,8 @@ def _eligible_symbols(context: ContextLike) -> tuple[str, ...] | None:
     return eligible if len(eligible) >= MINIMUM_VALID_SYMBOLS else None
 
 
-class RelativeRankAccelerationStrategy:
-    """Cross-sectional reversal of common-factor-free relative-rank acceleration."""
+class RelativeRankPersistenceStrategy:
+    """Cross-sectional continuation of common-factor-free relative-rank persistence."""
 
     @staticmethod
     def _validate_seed(seed: int) -> None:
@@ -345,7 +353,7 @@ class RelativeRankAccelerationStrategy:
             return None
 
         ranked_scores = _centered_ranks(
-            {symbol: features[symbol].raw_reversal_score for symbol in sorted(features)}
+            {symbol: features[symbol].raw_persistence_score for symbol in sorted(features)}
         )
         if ranked_scores is None:
             return None
@@ -434,7 +442,7 @@ class RelativeRankAccelerationStrategy:
         return {symbol: targets[symbol] for symbol in sorted(targets)}
 
 
-def build_strategy() -> RelativeRankAccelerationStrategy:
+def build_strategy() -> RelativeRankPersistenceStrategy:
     """Canonical zero-argument factory for the exact promoted pivot candidate."""
 
     candidate_id = candidate_variant.ACTIVE_CANDIDATE_ID
@@ -444,4 +452,4 @@ def build_strategy() -> RelativeRankAccelerationStrategy:
         raise ValueError(f"unknown materialized candidate identifier: {candidate_id}")
     if type(overrides) is not dict or overrides != expected:
         raise ValueError(f"active overrides do not match the declaration for {candidate_id}")
-    return RelativeRankAccelerationStrategy()
+    return RelativeRankPersistenceStrategy()

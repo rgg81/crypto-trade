@@ -1,0 +1,26 @@
+{
+  "adapter_id": "top40-v2-declared-score-boundary-v1",
+  "candidate_id": "t06-relative-rank-persistence-v1-base",
+  "capture_boundary": "candidate-declared-post-transform-pre-selection-weight-cap-risk",
+  "family_id": "t06-relative-rank-persistence-v1",
+  "hook": "strategy.score_boundary",
+  "label": {
+    "executable_price_column": "open",
+    "holding_horizon_hours": 96,
+    "label_id": "manifest-horizon-simple-executable-open-to-open-return-v1",
+    "minimum_pairs": 240,
+    "purge_cross_fold_endpoints": true,
+    "return_definition": "simple-executable-open-to-open",
+    "score_direction": "higher-score-higher-return",
+    "statistic_id": "globally-pooled-pearson-v1"
+  },
+  "schedule_utc": {
+    "anchor_timestamp_utc": "1970-01-01T00:00:00Z",
+    "interval_hours": 96
+  },
+  "schema_version": 1,
+  "score_description": "Higher final relative-rank persistence ranks predict higher native-crypto executable open-to-open returns over the exact 96-hour holding interval, before selection, sizing, caps, or risk.",
+  "semantic_coupling_review_sha256": "<organizer-fill-canonical-semantic-review-64-hex-sha256>",
+  "stage": "development",
+  "team_id": "team-06"
+}

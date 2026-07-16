@@ -1,17 +1,19 @@
 {
   "activation": {
-    "condition": "exact no-control pivot reference passes every PnL and A5 score-evidence gate and a new prospective neighborhood is documented before any neighbor registration",
+    "condition": "exact no-control persistence reference passes every PnL and A5 score-evidence gate and a new prospective neighborhood is documented before any neighbor registration",
     "status": "not_declared_not_authorized"
   },
-  "base_candidate_id": "t06-relative-rank-acceleration-v1-base",
+  "base_candidate_id": "t06-relative-rank-persistence-v1-base",
   "base_parameters": {
-    "baseline_rank_bars": 63,
+    "acceleration_weight": 0.65,
+    "baseline_rank_bars": 72,
     "coherence_base_weight": 0.5,
-    "prior_rank_bars": 6,
-    "recent_rank_bars": 6,
-    "selected_fraction_per_side": "1/4"
+    "level_weight": 0.35,
+    "prior_rank_bars": 12,
+    "recent_rank_bars": 12,
+    "selected_fraction_per_side": "1/5"
   },
-  "family_id": "t06-relative-rank-acceleration-v1",
+  "family_id": "t06-relative-rank-persistence-v1",
   "neighbors": [],
   "no_hindsight_rule": "No neighbor is currently declared. A later prospective stability grid may validate but never replace or rescue the exact base.",
   "schema_version": 2,

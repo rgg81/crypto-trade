@@ -16,14 +16,14 @@
   },
   "bar_contract": {
     "availability_rule": "open_time plus 8h no later than decision_time",
-    "exact_history": "one finite positive close at each of 76 required opens",
+    "exact_history": "one finite positive close at each of 97 required opens",
     "index": "RangeIndex",
     "interval_hours": 8,
     "required_columns": ["open_time", "close"]
   },
-  "candidate_id": "t06-relative-rank-acceleration-v1-base",
+  "candidate_id": "t06-relative-rank-persistence-v1-base",
   "candidate_materialization": {
-    "active_candidate_id": "t06-relative-rank-acceleration-v1-base",
+    "active_candidate_id": "t06-relative-rank-persistence-v1-base",
     "active_overrides": {},
     "entrypoint": "strategy.py:build_strategy",
     "risk_policy_destination_path": "risk_policy.json",
@@ -32,32 +32,33 @@
   },
   "control_file_order": [
     {
-      "canonical_path": "score-adapters/t06-relative-rank-acceleration-v1-base.executable-source-manifest.json",
+      "canonical_path": "score-adapters/t06-relative-rank-persistence-v1-base.executable-source-manifest.json",
       "must_precede": "semantic-coupling-review",
-      "template_path": "score-adapters/t06-relative-rank-acceleration-v1-base.executable-source-manifest.template.json"
+      "template_path": "score-adapters/t06-relative-rank-persistence-v1-base.executable-source-manifest.template.json"
     },
     {
-      "canonical_path": "score-adapters/t06-relative-rank-acceleration-v1-base.semantic-coupling-review.json",
+      "canonical_path": "score-adapters/t06-relative-rank-persistence-v1-base.semantic-coupling-review.json",
       "must_precede": "score-adapter-manifest",
-      "template_path": "score-adapters/t06-relative-rank-acceleration-v1-base.semantic-coupling-review.template.json"
+      "template_path": "score-adapters/t06-relative-rank-persistence-v1-base.semantic-coupling-review.template.json"
     },
     {
-      "canonical_path": "score-adapters/t06-relative-rank-acceleration-v1-base.json",
+      "canonical_path": "score-adapters/t06-relative-rank-persistence-v1-base.json",
       "must_precede": "trial-registration",
-      "template_path": "score-adapters/t06-relative-rank-acceleration-v1-base.score-adapter-manifest.template.json"
+      "template_path": "score-adapters/t06-relative-rank-persistence-v1-base.score-adapter-manifest.template.json"
     }
   ],
-  "family_id": "t06-relative-rank-acceleration-v1",
+  "family_id": "t06-relative-rank-persistence-v1",
   "materialization_status": {
+    "a7_package_rebind_completed": true,
     "candidate_hashes_materialized": false,
     "family_registered": false,
-    "independent_semantic_review_completed": false,
+    "independent_semantic_review_completed": true,
     "registration_allowed": false,
     "score_manifest_materialized": false
   },
   "parent_terminal_result": {
-    "candidate_id": "t06-balanced-trend-reversal-v1-base",
-    "material_trial_number": 1,
+    "candidate_id": "t06-relative-rank-acceleration-v1-base",
+    "material_trial_number": 2,
     "status": "failed_no_control_core"
   },
   "pure_crypto_universe_contract": {

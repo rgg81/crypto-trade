@@ -1,4 +1,4 @@
-"""Synthetic causal and construction tests for the Team 06 pivot."""
+"""Synthetic causal and construction tests for the Team 06 persistence pivot."""
 
 from __future__ import annotations
 
@@ -80,9 +80,9 @@ def test_deterministic_finite_broad_dollar_neutral_targets() -> None:
     assert sum(value > 0.0 for value in first.values()) >= 8
     assert sum(value < 0.0 for value in first.values()) >= 8
     assert all(math.isfinite(value) for value in first.values())
-    assert sum(abs(value) for value in first.values()) <= 0.48 + 1e-12
+    assert sum(abs(value) for value in first.values()) <= 2.0 * strategy.SIDE_BUDGET + 1e-12
     assert abs(sum(first.values())) <= 1e-12
-    assert max(abs(value) for value in first.values()) <= 0.03 + 1e-12
+    assert max(abs(value) for value in first.values()) <= strategy.MAXIMUM_SYMBOL_EXPOSURE + 1e-12
 
 
 def test_common_crypto_price_path_is_removed_by_cross_sectional_ranking() -> None:
@@ -112,15 +112,25 @@ def test_common_crypto_price_path_is_removed_by_cross_sectional_ranking() -> Non
     assert _targets(shifted) == expected_targets
 
 
-def test_positive_relative_acceleration_is_reversed() -> None:
+def test_positive_relative_shift_is_followed() -> None:
     baseline = tuple(-0.4 if index % 2 else 0.4 for index in range(strategy.BASELINE_RANK_BARS))
     path = baseline + (-0.5,) * strategy.PRIOR_RANK_BARS + (0.5,) * strategy.RECENT_RANK_BARS
     feature = strategy._relative_feature(path)
 
     assert feature is not None
-    assert feature.acceleration > 0.0
+    assert feature.rank_shift > 0.0
     assert feature.coherence == 1.0
-    assert feature.raw_reversal_score < 0.0
+    assert feature.raw_persistence_score > 0.0
+
+
+def test_persistent_relative_level_contributes_without_acceleration() -> None:
+    baseline = tuple(-0.4 if index % 2 else 0.4 for index in range(strategy.BASELINE_RANK_BARS))
+    path = baseline + (0.5,) * strategy.PRIOR_RANK_BARS + (0.5,) * strategy.RECENT_RANK_BARS
+    feature = strategy._relative_feature(path)
+
+    assert feature is not None
+    assert feature.rank_shift == 0.0
+    assert feature.raw_persistence_score > 0.0
 
 
 def test_future_rows_next_open_funding_and_auxiliary_do_not_change_signal() -> None:
@@ -242,13 +252,24 @@ def test_hold_and_off_grid_decisions_do_not_call_boundary(monkeypatch) -> None:
         return scores
 
     monkeypatch.setattr(strategy, "score_boundary", capture)
-    hold = SimpleNamespace(**vars(base))
-    hold.decision_time = base.decision_time + pd.Timedelta(hours=8)
-    assert strategy.build_strategy().target_weights(hold, seed=strategy.FROZEN_SEED) is None
+    for offset in range(1, strategy.REBALANCE_INTERVAL_BARS):
+        hold = SimpleNamespace(**vars(base))
+        hold.decision_time = base.decision_time + offset * pd.Timedelta(
+            hours=strategy.BAR_INTERVAL_HOURS
+        )
+        assert strategy.build_strategy().target_weights(hold, seed=strategy.FROZEN_SEED) is None
 
     off_grid = SimpleNamespace(**vars(base))
     off_grid.decision_time = base.decision_time + pd.Timedelta(hours=1)
     assert strategy.build_strategy().target_weights(off_grid, seed=strategy.FROZEN_SEED) == {}
+
+    naive = SimpleNamespace(**vars(base))
+    naive.decision_time = base.decision_time.tz_localize(None)
+    assert strategy.build_strategy().target_weights(naive, seed=strategy.FROZEN_SEED) == {}
+
+    pre_epoch = SimpleNamespace(**vars(base))
+    pre_epoch.decision_time = pd.Timestamp(0, unit="ns", tz="UTC") - pd.Timedelta(hours=8)
+    assert strategy.build_strategy().target_weights(pre_epoch, seed=strategy.FROZEN_SEED) == {}
     assert calls == 0
 
 
@@ -293,9 +314,11 @@ def test_frozen_config_matches_executable_constants() -> None:
     assert config["candidate_id"] == strategy.ACTIVE_CANDIDATE_ID
     assert config["seed"] == strategy.FROZEN_SEED
     assert config["parameters"] == {
+        "acceleration_weight": strategy.ACCELERATION_WEIGHT,
         "bar_interval_hours": strategy.BAR_INTERVAL_HOURS,
         "baseline_rank_bars": strategy.BASELINE_RANK_BARS,
         "coherence_base_weight": strategy.COHERENCE_BASE_WEIGHT,
+        "level_weight": strategy.LEVEL_WEIGHT,
         "maximum_symbol_exposure": strategy.MAXIMUM_SYMBOL_EXPOSURE,
         "minimum_positions_per_side": strategy.MINIMUM_POSITIONS_PER_SIDE,
         "minimum_rank_volatility": strategy.MINIMUM_RANK_VOLATILITY,
@@ -303,7 +326,7 @@ def test_frozen_config_matches_executable_constants() -> None:
         "prior_rank_bars": strategy.PRIOR_RANK_BARS,
         "rebalance_interval_bars": strategy.REBALANCE_INTERVAL_BARS,
         "recent_rank_bars": strategy.RECENT_RANK_BARS,
-        "selection_fraction": "1/4",
+        "selection_fraction": "1/5",
         "side_budget": strategy.SIDE_BUDGET,
     }
 

@@ -1,23 +1,23 @@
 {
   "budget_ceiling": {
     "maximum_team_material_configurations": 9,
-    "material_configurations_consumed": 1,
-    "mechanism_pivots_consumed": 0,
+    "material_configurations_consumed": 2,
+    "mechanism_pivots_consumed": 1,
     "mechanism_pivots_drafted_pending_registration": 1,
     "private_tickets_consumed": 0,
     "pivot_reference_material_configurations_planned": 1
   },
-  "candidate_id": "t06-relative-rank-acceleration-v1-base",
+  "candidate_id": "t06-relative-rank-persistence-v1-base",
   "cost_view_rule": "One material run emits both 1x and 2x central-cost views from the same target and fill path; doubled cost is never a second trial.",
-  "family_id": "t06-relative-rank-acceleration-v1",
+  "family_id": "t06-relative-rank-persistence-v1",
   "parent_terminal_evidence": {
-    "candidate_id": "t06-balanced-trend-reversal-v1-base",
-    "family_id": "t06-balanced-trend-reversal-v1",
-    "material_trial_number": 1,
+    "candidate_id": "t06-relative-rank-acceleration-v1-base",
+    "family_id": "t06-relative-rank-acceleration-v1",
+    "material_trial_number": 2,
     "reason": "failed_no_control_core",
     "result_status": "completed"
   },
-  "read_discipline": "Do not read, reinterpret, or use any later controlled or neighboring result to compensate for a failed no-control pivot reference.",
+  "read_discipline": "Do not read, reinterpret, or use any controlled, neighboring, diagnostic, or private result to compensate for a failed no-control persistence reference.",
   "registration_prerequisite": {
     "condition": "Serialized synthetic and organizer validation passes; independent review approves the exact executable set; the new family, A5 executable-source manifest, semantic review, score manifest, source hashes, trial opt-in, and A7 package rebind are materialized in their required order.",
     "status": "pending"
@@ -26,10 +26,10 @@
   "stages": [
     {
       "activation": "initial after every registration prerequisite",
-      "candidate_ids": ["t06-relative-rank-acceleration-v1-base"],
+      "candidate_ids": ["t06-relative-rank-persistence-v1-base"],
       "candidate_materializations": [
         {
-          "active_candidate_id": "t06-relative-rank-acceleration-v1-base",
+          "active_candidate_id": "t06-relative-rank-persistence-v1-base",
           "active_overrides": {},
           "risk_policy_destination_path": "risk_policy.json",
           "risk_policy_source_path": "risk_policies/no-control.json"
@@ -37,15 +37,20 @@
       ],
       "cost_views": [1.0, 2.0],
       "hard_alpha_minima": {
+        "calmar": ">= 0.40",
         "combined_chop_net_return": "> 0",
         "doubled_cost_net_return": "> 0",
-        "doubled_cost_net_sharpe": "> 0",
+        "doubled_cost_net_sharpe": ">= 0.35",
         "long_bull_net_return": "> 0",
+        "maximum_drawdown": "<= 0.30",
         "maximum_positive_pnl_concentration": "<= 0.40",
         "minimum_positive_fold_count": ">= 4 of 6 frozen chronological folds",
         "minimum_positive_quarter_fraction": ">= 0.55",
+        "minimum_positive_regime_sharpe_count": ">= 3",
+        "minimum_trial_adjusted_probability_positive": ">= 0.90",
+        "minimum_worst_regime_sharpe": ">= -0.25",
         "net_return": "> 0",
-        "net_sharpe": "> 0",
+        "net_sharpe": ">= 0.75",
         "required_positive_regime_returns": ["bull", "bear", "chop"],
         "required_positive_regime_sharpes": ["bull", "bear", "chop"],
         "short_bear_net_return": "> 0",
@@ -53,12 +58,12 @@
       },
       "material_configurations": 1,
       "policy_variant": "no-control",
-      "required_outcome": "Every no-control broad-alpha minimum and every separately declared A5 score-evidence gate passes; any failure is terminal for this family.",
-      "stage_id": "pivot-no-control-core"
+      "required_outcome": "Every official central-development gate and every stricter no-control role, regime, sleeve, and concentration minimum passes. Any failure is terminal and suppresses the non-material diagnostic as non-decision-relevant.",
+      "stage_id": "second-pivot-no-control-core"
     },
     {
-      "activation": "only after the no-control material result and non-material A5 diagnostic are both terminal",
-      "candidate_ids": ["t06-relative-rank-acceleration-v1-base"],
+      "activation": "only after the no-control material result passes the complete official central-development gate plus every stricter PnL, regime, role, fold, quarter, sleeve, and concentration gate",
+      "candidate_ids": ["t06-relative-rank-persistence-v1-base"],
       "material_configurations": 0,
       "required_score_evidence": {
         "complete_scheduled_score_coverage": true,
@@ -66,10 +71,10 @@
         "pooled_pearson_ic": "> 0",
         "unavailable_evidence_action": "fail"
       },
-      "required_outcome": "Apply all no-control PnL and score-evidence gates together. Passing permits a separately documented future stability plan; failure stops Team 06 with no control rescue.",
-      "stage_id": "pivot-core-adjudication"
+      "required_outcome": "Passing confirms the core and permits a separately documented future stability plan; failure stops Team 06 with no control rescue.",
+      "stage_id": "second-pivot-score-adjudication"
     }
   ],
   "team_id": "team-06",
-  "terminal_rule": "A failed no-control PnL, regime, role, sleeve, fold, quarter, concentration, coverage, or IC gate rejects the family. No stop, volatility target, drawdown brake, turnover cap, neighbor, or private ticket can compensate."
+  "terminal_rule": "A failed no-control PnL, regime, role, sleeve, fold, quarter, concentration, coverage, or IC gate rejects the family. No stop, volatility target, drawdown brake, turnover cap, neighbor, diagnostic, or private ticket can compensate."
 }
