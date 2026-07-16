@@ -13,13 +13,16 @@ and statistic. Runtime does not prove that the captured dictionary is the model'
 ranking signal, is economically meaningful, or is semantically before selection/weighting/risk.
 A decoy or transient score can satisfy runtime checks. Semantic coupling therefore requires a
 candidate-specific static source review whose exact SHA-256 is in the preregistered manifest. The
-review attests that the direct hook receives the declared ranking signal at the declared boundary;
+review binds an acyclic executable-source manifest listing every registered `.py`, staged strategy
+configuration, and `risk_policy.json`; those bytes are proved at review, manifest, and registration
+commits. The review attests that the direct hook receives the declared ranking signal at the declared boundary;
 it remains nonautomatic evidence, not runtime proof or a qualification gate.
 
 The registration opt-in at `parameters._top40_v2_score_adapter` binds adapter ID
 `top40-v2-declared-score-boundary-v1` and the manifest SHA-256. Derived, immutable paths bind the
-manifest and `<candidate>.semantic-coupling-review.json`; both exact files must be in the manifest
-and registration trees. Source, strategy, risk, seed, config, shared development snapshot,
+manifest, `<candidate>.executable-source-manifest.json`, and
+`<candidate>.semantic-coupling-review.json`; all exact files must be in the manifest and
+registration trees. Source, strategy, risk, seed, config, shared development snapshot,
 archived targets, runner record, registration event, and result event are hash-bound. Registration
 commit/event and result event must be strictly after the activation boundary.
 
@@ -35,13 +38,23 @@ path; callers supply only team and candidate. The engine stages bounded single-l
 mode-0700 directory behind an internally generated capability. After replay, the canonical state
 lock is acquired and exact config, research phase, state bytes, journal head/count, and candidate
 authority are reverified. Artifacts plus `terminal-result.json` are then published by one atomic
-directory rename. A retry validates and returns an exact complete transaction; partial or extra
+dirfd-based Linux `RENAME_NOREPLACE`. The frozen A2 facade receives only its exact four-field
+outcome; the staging capability crosses through a trusted closure and is removed after any A2 or
+final-state rejection. A retry validates and returns an exact complete transaction; partial or extra
 canonical files fail closed. Failed runs publish only a terminal result in the same transaction.
 
 Freeze authority requires a strict implementation → independent-review → freeze commit order,
 unique immutable review/freeze first-adds, exact reviewed implementation and review bytes in the
 freeze tree, and the exact activation journal count/head in that tree. The draft SHA-pins parent
-modules/entrypoint and checks callable identities before and after execution.
+modules/entrypoint and checks callable identities before and after execution. It also pins the
+active Amendment 0006 implementation, pure-crypto audit module, entrypoint, freeze,
+integration-freeze, strict ancestry, and activation journal, and requires the exact canonical A6
+pure-crypto audit before and after every A5 lifecycle operation.
+
+Publication assumes the tournament process controls its own Unix UID. A hostile process running as
+the same UID can mutate files outside the lifecycle lock; such writers are out of scope. Even then,
+`RENAME_NOREPLACE` prevents this lifecycle from silently replacing a raced destination, and every
+existing transaction is fully revalidated before it can be returned.
 
 The draft entrypoint is `scripts/top40_v2_amendment_0005_draft.py`. It is not wired into the active
 runner. Execution remains disabled until a new independent approval and immutable freeze exist.

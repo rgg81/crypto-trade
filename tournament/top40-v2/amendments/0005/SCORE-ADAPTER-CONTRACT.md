@@ -17,6 +17,14 @@ finite built-in dictionary bytes, eligibility, mutation, replay, and target equi
 distinguish the operative ranking signal from a decoy/transient dictionary. A hash-bound static
 source review must separately approve that semantic claim.
 
+Before review, the candidate creates the derived canonical
+`<candidate>.executable-source-manifest.json`. It lists, in sorted order, every model-executable
+Python file, staged strategy configuration, and `risk_policy.json`, with exact byte size and
+SHA-256. It excludes the score manifest, semantic review, and itself, so its hash is acyclic. The
+semantic review binds its canonical path and SHA-256. A5 proves every listed byte in the semantic
+review, score-manifest, and registration commits and re-derives the same complete executable set
+from the historical registered tree before replay.
+
 The registration contains exactly:
 
 ```json
@@ -38,11 +46,12 @@ open-to-open label/statistic semantics, holding horizon, minimum pairs, score de
 
 The derived review is
 `tournament/top40-v2/teams/<team>/score-adapters/<candidate>.semantic-coupling-review.json`. Its
-canonical fixed attestation binds team/family/candidate, registered strategy SHA-256, hook,
+canonical fixed attestation binds team/family/candidate, registered strategy SHA-256, the complete
+executable-source manifest path/SHA-256, hook,
 declared boundary, reviewer/time, approval, five static findings (including no decoy/transient path
 found), and the explicit limitation `static-review-attestation-not-runtime-semantic-proof`.
 
-Both files are canonical pretty JSON, unique immutable first-adds, and exact bytes in the required
+All three control files are canonical pretty JSON, unique immutable first-adds, and exact bytes in the required
 historical trees. The manifest schedule interval and holding horizon are multiples of eight hours
 from 8 through 168. Labels use the executable open at `t` and `t + horizon`; endpoints touching or
 crossing a fold end are purged. Pearson is globally pooled and repeated in each frozen fold.

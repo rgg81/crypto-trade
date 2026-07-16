@@ -24,7 +24,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from pathlib import Path
 from typing import Any, BinaryIO
 
@@ -59,6 +59,7 @@ from crypto_trade.tournament.top40_v2 import LoadedV2Config
 from crypto_trade.tournament.top40_v2 import load_config as load_v2_config
 
 DIAGNOSTIC_KIND = "top40-v2-development-declared-score-diagnostic-v1"
+EXECUTABLE_SOURCE_MANIFEST_KIND = "top40-v2-executable-source-manifest-v1"
 LABEL_ID = "manifest-horizon-simple-executable-open-to-open-return-v1"
 STATISTIC_ID = "globally-pooled-pearson-v1"
 STAGE = "development"
@@ -172,6 +173,9 @@ class DevelopmentScoreDiagnosticRequest:
     score_manifest_path: str
     score_manifest_sha256: str
     score_manifest_commit: str
+    executable_source_manifest_path: str
+    executable_source_manifest_sha256: str
+    executable_source_manifest_commit: str
     semantic_coupling_review_path: str
     semantic_coupling_review_sha256: str
     semantic_coupling_review_commit: str
@@ -188,6 +192,8 @@ class DevelopmentScoreDiagnosticRequest:
 class HistoricalSourceBinding:
     registration_commit: str
     score_manifest_commit: str
+    executable_source_manifest_commit: str
+    executable_source_manifest_sha256: str
     source_tree_manifest_sha256: str
 
 
@@ -370,6 +376,129 @@ def parse_score_adapter_manifest(
     )
 
 
+def parse_executable_source_manifest(
+    payload: bytes,
+    *,
+    expected_team_id: str | None = None,
+    expected_family_id: str | None = None,
+    expected_candidate_id: str | None = None,
+) -> Mapping[str, Any]:
+    """Validate the acyclic manifest of every candidate-executable source dependency."""
+
+    raw = strict_json_object(payload, "executable-source manifest")
+    if _pretty_json_bytes(raw) != payload or set(raw) != {
+        "schema_version",
+        "manifest_kind",
+        "team_id",
+        "family_id",
+        "candidate_id",
+        "files",
+    }:
+        raise ValueError("executable-source manifest has invalid keys or encoding")
+    if raw["schema_version"] != 1 or raw["manifest_kind"] != EXECUTABLE_SOURCE_MANIFEST_KIND:
+        raise ValueError("executable-source manifest identity is invalid")
+    for field, expected in (
+        ("team_id", expected_team_id),
+        ("family_id", expected_family_id),
+        ("candidate_id", expected_candidate_id),
+    ):
+        value = raw[field]
+        if (
+            type(value) is not str
+            or _IDENTIFIER.fullmatch(value) is None
+            or (field == "team_id" and value not in _ELIGIBLE_TEAMS)
+            or (expected is not None and value != expected)
+        ):
+            raise ValueError(f"executable-source manifest {field} is invalid")
+    files = raw["files"]
+    if not isinstance(files, list) or not files:
+        raise ValueError("executable-source manifest must list executable dependencies")
+    paths: list[str] = []
+    for entry in files:
+        if not isinstance(entry, Mapping) or set(entry) != {"path", "sha256", "size"}:
+            raise ValueError("executable-source manifest file entry is invalid")
+        relative = entry["path"]
+        digest = entry["sha256"]
+        size = entry["size"]
+        if (
+            type(relative) is not str
+            or safe_relative(relative, "executable-source path") != relative
+            or relative.startswith("score-adapters/")
+            or type(digest) is not str
+            or len(digest) != 64
+            or any(character not in "0123456789abcdef" for character in digest)
+            or type(size) is not int
+            or size < 0
+            or size > 2 * 1024 * 1024
+        ):
+            raise ValueError("executable-source manifest file binding is invalid")
+        name = Path(relative).name
+        if not (
+            relative.endswith(".py")
+            or name
+            in {
+                "frozen_config.json",
+                "strategy_config.json",
+                "strategy_config.toml",
+                "strategy_config.yaml",
+                "strategy_config.yml",
+            }
+            or relative == "risk_policy.json"
+        ):
+            raise ValueError("executable-source manifest lists a nonexecutable dependency")
+        paths.append(relative)
+    if paths != sorted(paths) or len(paths) != len(set(paths)):
+        raise ValueError("executable-source manifest paths must be unique and sorted")
+    if "strategy.py" not in paths or "risk_policy.json" not in paths:
+        raise ValueError("executable-source manifest lacks strategy or risk policy")
+    return raw
+
+
+def executable_source_entries(files: Any) -> list[dict[str, object]]:
+    """Derive the acyclic executable subset from the frozen complete team-tree listing."""
+
+    entries = [
+        {"path": item.relative, "sha256": item.sha256, "size": item.size}
+        for item in files
+        if item.staged or item.relative == "risk_policy.json"
+    ]
+    if not entries or [entry["path"] for entry in entries] != sorted(
+        entry["path"] for entry in entries
+    ):
+        raise ValueError("derived executable-source manifest is empty or noncanonical")
+    return entries
+
+
+def verify_executable_sources_at_commit(
+    root: Path,
+    commit: str,
+    team_id: str,
+    executable_manifest: Mapping[str, Any],
+    *,
+    label: str,
+) -> None:
+    """Prove every listed executable byte at one immutable candidate-history boundary."""
+
+    prefix = TOP40_V2_LAYOUT.team_root(team_id)
+    for entry in executable_manifest["files"]:
+        payload = git_bytes(
+            root,
+            "show",
+            f"{commit}:{prefix}/{entry['path']}",
+            label=f"{label} executable dependency {entry['path']}",
+        )
+        if len(payload) != entry["size"] or sha256_bytes(payload) != entry["sha256"]:
+            raise ValueError(f"{label} executable dependency differs from source manifest")
+    with tempfile.TemporaryDirectory(prefix="top40-v2-executable-source-audit-") as raw:
+        team_root = Path(raw) / "team"
+        _A1_MATERIALIZE_TREE(root, commit, team_id, team_root)
+        complete_entries = executable_source_entries(runner_v2._team_tree_files(team_root))
+        if executable_manifest["files"] != complete_entries:
+            raise ValueError(
+                f"{label} executable dependency set is incomplete or differs from manifest"
+            )
+
+
 def parse_semantic_coupling_review(
     payload: bytes,
     *,
@@ -377,6 +506,8 @@ def parse_semantic_coupling_review(
     expected_family_id: str,
     expected_candidate_id: str,
     expected_strategy_sha256: str,
+    expected_executable_source_manifest_path: str,
+    expected_executable_source_manifest_sha256: str,
 ) -> Mapping[str, Any]:
     """Validate the preregistered human/static-review attestation.
 
@@ -392,6 +523,8 @@ def parse_semantic_coupling_review(
         "family_id",
         "candidate_id",
         "strategy_sha256",
+        "executable_source_manifest_path",
+        "executable_source_manifest_sha256",
         "hook",
         "declared_capture_boundary",
         "decision",
@@ -415,6 +548,8 @@ def parse_semantic_coupling_review(
         or raw["family_id"] != expected_family_id
         or raw["candidate_id"] != expected_candidate_id
         or raw["strategy_sha256"] != expected_strategy_sha256
+        or raw["executable_source_manifest_path"] != expected_executable_source_manifest_path
+        or raw["executable_source_manifest_sha256"] != expected_executable_source_manifest_sha256
         or raw["hook"] != HOOK_QUALNAME
         or raw["declared_capture_boundary"] != CAPTURE_BOUNDARY
         or raw["decision"] != "approve"
@@ -439,6 +574,10 @@ def _request_paths(request: DevelopmentScoreDiagnosticRequest) -> None:
     expected_manifest = (
         f"{TOP40_V2_LAYOUT.team_root(request.team_id)}/score-adapters/{request.candidate_id}.json"
     )
+    expected_executable_source_manifest = (
+        f"{TOP40_V2_LAYOUT.team_root(request.team_id)}/score-adapters/"
+        f"{request.candidate_id}.executable-source-manifest.json"
+    )
     expected_semantic_review = (
         f"{TOP40_V2_LAYOUT.team_root(request.team_id)}/score-adapters/"
         f"{request.candidate_id}.semantic-coupling-review.json"
@@ -454,6 +593,7 @@ def _request_paths(request: DevelopmentScoreDiagnosticRequest) -> None:
     if (
         request.registration_input_path != expected_registration
         or request.score_manifest_path != expected_manifest
+        or request.executable_source_manifest_path != expected_executable_source_manifest
         or request.semantic_coupling_review_path != expected_semantic_review
         or request.development_target_path != expected_target
         or request.runner_record_path != expected_runner
@@ -538,6 +678,36 @@ def materialized_historical_source(
         expected_family_id=request.family_id,
         expected_candidate_id=request.candidate_id,
     )
+    _source_relative, _source_path, source_manifest_bytes, _source_stat = read_repo_file(
+        root_path,
+        request.executable_source_manifest_path,
+        "executable-source manifest",
+        maximum_bytes=1024 * 1024,
+        require_single_link=True,
+    )
+    if sha256_bytes(source_manifest_bytes) != request.executable_source_manifest_sha256:
+        raise ValueError("executable-source manifest differs from reservation")
+    source_manifest_commit = unique_first_add_commit(
+        root_path, request.executable_source_manifest_path, source_manifest_bytes
+    )
+    if source_manifest_commit != request.executable_source_manifest_commit:
+        raise ValueError("executable-source manifest first-add commit differs from reservation")
+    executable_manifest = parse_executable_source_manifest(
+        source_manifest_bytes,
+        expected_team_id=request.team_id,
+        expected_family_id=request.family_id,
+        expected_candidate_id=request.candidate_id,
+    )
+    if (
+        git_bytes(
+            root_path,
+            "show",
+            f"{registration_commit}:{request.executable_source_manifest_path}",
+            label="executable-source manifest at registration",
+        )
+        != source_manifest_bytes
+    ):
+        raise ValueError("registration tree lacks the exact executable-source manifest")
     _review_relative, _review_path, review_bytes, _review_stat = read_repo_file(
         root_path,
         request.semantic_coupling_review_path,
@@ -570,7 +740,21 @@ def materialized_historical_source(
         expected_family_id=request.family_id,
         expected_candidate_id=request.candidate_id,
         expected_strategy_sha256=request.strategy_sha256,
+        expected_executable_source_manifest_path=request.executable_source_manifest_path,
+        expected_executable_source_manifest_sha256=request.executable_source_manifest_sha256,
     )
+    for commit, label in (
+        (review_commit, "semantic-review tree"),
+        (manifest_commit, "score-manifest tree"),
+        (registration_commit, "registration tree"),
+    ):
+        verify_executable_sources_at_commit(
+            root_path,
+            commit,
+            request.team_id,
+            executable_manifest,
+            label=label,
+        )
 
     with tempfile.TemporaryDirectory(
         prefix=f"top40-v2-development-score-source-{request.team_id}-"
@@ -581,16 +765,26 @@ def materialized_historical_source(
         entrypoint = team_root / "strategy.py"
         risk_path = team_root / "risk_policy.json"
         historical_manifest = team_root / "score-adapters" / f"{request.candidate_id}.json"
+        historical_source_manifest = (
+            team_root / "score-adapters" / f"{request.candidate_id}.executable-source-manifest.json"
+        )
         historical_review = (
             team_root / "score-adapters" / f"{request.candidate_id}.semantic-coupling-review.json"
         )
         if any(
             path.is_symlink() or not path.is_file()
-            for path in (entrypoint, risk_path, historical_manifest, historical_review)
+            for path in (
+                entrypoint,
+                risk_path,
+                historical_manifest,
+                historical_source_manifest,
+                historical_review,
+            )
         ):
             raise ValueError("historical source tree lacks required regular files")
         if (
             historical_manifest.read_bytes() != manifest_bytes
+            or historical_source_manifest.read_bytes() != source_manifest_bytes
             or historical_review.read_bytes() != review_bytes
         ):
             raise ValueError("historical source tree contains different diagnostic bindings")
@@ -598,16 +792,23 @@ def materialized_historical_source(
         entries = [
             {"path": item.relative, "sha256": item.sha256, "size": item.size} for item in files
         ]
+        executable_entries = executable_source_entries(files)
         if (
             sha256_bytes(runner_v2._stable_file_bytes(entrypoint)) != request.strategy_sha256
             or sha256_bytes(runner_v2._stable_file_bytes(risk_path)) != request.risk_policy_sha256
             or runner_v2._team_tree_fingerprint(files) != request.source_bundle_sha256
         ):
             raise ValueError("registration commit does not reconstruct registered source hashes")
+        if executable_manifest["files"] != executable_entries:
+            raise ValueError(
+                "executable-source manifest differs from the complete registered executable set"
+            )
         yield _MaterializedSource(
             HistoricalSourceBinding(
                 registration_commit=registration_commit,
                 score_manifest_commit=manifest_commit,
+                executable_source_manifest_commit=source_manifest_commit,
+                executable_source_manifest_sha256=request.executable_source_manifest_sha256,
                 source_tree_manifest_sha256=sha256_bytes(_canonical_json_bytes(entries)),
             ),
             team_root,
@@ -1090,30 +1291,7 @@ def validate_staged_artifacts(
     *,
     completed: bool,
 ) -> tuple[Path, Mapping[str, str]]:
-    if set(capability) != {"capability", "staging_path"}:
-        raise ValueError("declared-score staging capability has invalid keys")
-    token = capability["capability"]
-    if (
-        type(token) is not str
-        or len(token) != 64
-        or any(character not in "0123456789abcdef" for character in token)
-    ):
-        raise ValueError("declared-score staging capability is invalid")
-    expected = (
-        Path(_evidence_relative(request)).parent / f".{request.candidate_id}.{token}.staged"
-    ).as_posix()
-    if capability["staging_path"] != expected:
-        raise ValueError("declared-score staging path is not internally derived")
-    stage = root / expected
-    _safe_directory_chain(root, stage.parent)
-    info = os.lstat(stage)
-    if (
-        not os.path.isdir(stage)
-        or os.path.islink(stage)
-        or info.st_uid != os.geteuid()
-        or info.st_mode & 0o077
-    ):
-        raise ValueError("declared-score staging directory is unsafe")
+    stage = staging_path_from_capability(root, request, capability)
     expected_names = set(REQUIRED_ARTIFACT_NAMES) if completed else set()
     if {entry.name for entry in os.scandir(stage)} != expected_names:
         raise ValueError("declared-score staged artifact set differs")
@@ -1141,6 +1319,55 @@ def validate_staged_artifacts(
             os.close(descriptor)
         hashes[f"{_evidence_relative(request)}/{name}"] = sha256_bytes(payload)
     return stage, hashes
+
+
+def staging_path_from_capability(
+    root: Path,
+    request: DevelopmentScoreDiagnosticRequest,
+    capability: Mapping[str, str],
+) -> Path:
+    """Resolve only the internally derived unguessable staging capability."""
+
+    if set(capability) != {"capability", "staging_path"}:
+        raise ValueError("declared-score staging capability has invalid keys")
+    token = capability["capability"]
+    if (
+        type(token) is not str
+        or len(token) != 64
+        or any(character not in "0123456789abcdef" for character in token)
+    ):
+        raise ValueError("declared-score staging capability is invalid")
+    expected = (
+        Path(_evidence_relative(request)).parent / f".{request.candidate_id}.{token}.staged"
+    ).as_posix()
+    if capability["staging_path"] != expected:
+        raise ValueError("declared-score staging path is not internally derived")
+    stage = root / expected
+    _safe_directory_chain(root, stage.parent)
+    info = os.lstat(stage)
+    if (
+        not os.path.isdir(stage)
+        or os.path.islink(stage)
+        or info.st_uid != os.geteuid()
+        or info.st_mode & 0o077
+    ):
+        raise ValueError("declared-score staging directory is unsafe")
+    return stage
+
+
+def discard_staged_artifacts(
+    root: Path,
+    request: DevelopmentScoreDiagnosticRequest,
+    capability: Mapping[str, str],
+) -> None:
+    """Remove only a validated staging capability after facade or final-state rejection."""
+
+    try:
+        stage = staging_path_from_capability(root, request, capability)
+    except FileNotFoundError:
+        return
+    shutil.rmtree(stage)
+    fsync_directory(stage.parent)
 
 
 def run_development_score_diagnostic(
@@ -1269,6 +1496,12 @@ def run_development_score_diagnostic(
             "reservation_sha256": request.reservation_sha256,
             "score_manifest_sha256": request.score_manifest_sha256,
             "score_manifest_commit": request.score_manifest_commit,
+            "executable_source_manifest_sha256": (
+                historical.binding.executable_source_manifest_sha256
+            ),
+            "executable_source_manifest_commit": (
+                historical.binding.executable_source_manifest_commit
+            ),
             "semantic_coupling_review_sha256": request.semantic_coupling_review_sha256,
             "semantic_coupling_review_commit": request.semantic_coupling_review_commit,
             "registration_sha256": request.registration_sha256,
@@ -1314,8 +1547,12 @@ def run_reserved_development_score_diagnostic(
     *,
     root: Path,
     request: DevelopmentScoreDiagnosticRequest,
+    staged_artifact_sink: Callable[[Mapping[str, str]], None],
 ) -> Mapping[str, Any]:
-    """A2-compatible boundary with no caller-selected stage, data, or output path."""
+    """Return exact frozen-A2 fields while exporting staging through a trusted closure."""
+
+    if not callable(staged_artifact_sink):
+        raise TypeError("staged_artifact_sink must be callable")
 
     usage = _resource_snapshot()
     root_path = Path(root).resolve()
@@ -1344,4 +1581,9 @@ def run_reserved_development_score_diagnostic(
             "organizer_wall_clock_hours": wall_hours,
         }
     capability = stage_diagnostic_artifacts(root_path, request, artifacts)
-    return {**outcome, "staged_artifacts": capability}
+    try:
+        staged_artifact_sink(capability)
+    except BaseException:
+        discard_staged_artifacts(root_path, request, capability)
+        raise
+    return outcome

@@ -1,5 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crypto-trade.invalid/schemas/top40-v2/amendments/0005/score-adapter-manifest.schema.json",
   "additionalProperties": false,
   "properties": {
     "adapter_id": {"const": "top40-v2-declared-score-boundary-v1"},

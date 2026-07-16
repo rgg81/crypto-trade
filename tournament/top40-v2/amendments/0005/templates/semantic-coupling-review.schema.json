@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crypto-trade.invalid/schemas/top40-v2/amendments/0005/semantic-coupling-review.schema.json",
+  "additionalProperties": false,
+  "properties": {
+    "candidate_id": {"pattern": "^[a-z0-9][a-z0-9._-]{0,127}$", "type": "string"},
+    "decision": {"const": "approve"},
+    "declared_capture_boundary": {"const": "candidate-declared-post-transform-pre-selection-weight-cap-risk"},
+    "executable_source_manifest_path": {"pattern": "^tournament/top40-v2/teams/team-(04|05|06|07|08|09|10)/score-adapters/[a-z0-9][a-z0-9._-]{0,127}\\.executable-source-manifest\\.json$", "type": "string"},
+    "executable_source_manifest_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
+    "family_id": {"pattern": "^[a-z0-9][a-z0-9._-]{0,127}$", "type": "string"},
+    "findings": {
+      "additionalProperties": false,
+      "properties": {
+        "direct_hook_call_found": {"const": true},
+        "hook_after_declared_score_transform": {"const": true},
+        "hook_before_selection_weight_caps_and_risk": {"const": true},
+        "no_decoy_or_transient_score_path_found": {"const": true},
+        "score_object_is_declared_model_ranking_signal": {"const": true}
+      },
+      "required": ["direct_hook_call_found", "score_object_is_declared_model_ranking_signal", "hook_after_declared_score_transform", "hook_before_selection_weight_caps_and_risk", "no_decoy_or_transient_score_path_found"],
+      "type": "object"
+    },
+    "hook": {"const": "strategy.score_boundary"},
+    "review_kind": {"const": "top40-v2-score-semantic-coupling-static-review-v1"},
+    "reviewed_at_utc": {"format": "date-time", "pattern": "Z$", "type": "string"},
+    "reviewer_id": {"maxLength": 4000, "minLength": 1, "pattern": "^\\S(?:[\\s\\S]*\\S)?$", "type": "string"},
+    "runtime_proof_limit": {"const": "static-review-attestation-not-runtime-semantic-proof"},
+    "schema_version": {"const": 1},
+    "strategy_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
+    "team_id": {"enum": ["team-04", "team-05", "team-06", "team-07", "team-08", "team-09", "team-10"]}
+  },
+  "required": ["schema_version", "review_kind", "team_id", "family_id", "candidate_id", "strategy_sha256", "executable_source_manifest_path", "executable_source_manifest_sha256", "hook", "declared_capture_boundary", "decision", "reviewer_id", "reviewed_at_utc", "findings", "runtime_proof_limit"],
+  "title": "Top40 V2 semantic-coupling static review",
+  "type": "object"
+}

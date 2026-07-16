@@ -1,5 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crypto-trade.invalid/schemas/top40-v2/amendments/0005/amendment-freeze.schema.json",
   "additionalProperties": false,
   "properties": {
     "activation_journal": {
@@ -16,8 +17,8 @@
     "draft_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
     "frozen_at_utc": {"pattern": "Z$", "type": "string"},
     "implementation_commit": {"pattern": "^[0-9a-f]{40}$", "type": "string"},
-    "implementation_files": {"$ref": "amendment-review.schema.json#/$defs/implementationFiles"},
-    "parent_authorities": {"$ref": "amendment-review.schema.json#/$defs/parentAuthorities"},
+    "implementation_files": {"$ref": "https://crypto-trade.invalid/schemas/top40-v2/amendments/0005/amendment-review.schema.json#/$defs/implementationFiles"},
+    "parent_authorities": {"$ref": "https://crypto-trade.invalid/schemas/top40-v2/amendments/0005/amendment-review.schema.json#/$defs/parentAuthorities"},
     "review_path": {"const": "tournament/top40-v2/amendments/0005/REVIEW.json"},
     "review_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
     "schema_version": {"const": 1},

@@ -1,5 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crypto-trade.invalid/schemas/top40-v2/amendments/0005/development-score-diagnostic-reservation.schema.json",
   "additionalProperties": false,
   "$defs": {
     "sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
@@ -19,6 +20,9 @@
     "diagnostic_id": {"type": "string"},
     "diagnostic_kind": {"const": "top40-v2-development-declared-score-diagnostic-v1"},
     "event_type": {"const": "development_score_diagnostic_reserved"},
+    "executable_source_manifest_commit": {"$ref": "#/$defs/commit"},
+    "executable_source_manifest_path": {"type": "string"},
+    "executable_source_manifest_sha256": {"$ref": "#/$defs/sha256"},
     "family_id": {"$ref": "#/$defs/identifier"},
     "non_material": {"const": true},
     "registration_commit": {"$ref": "#/$defs/commit"},
@@ -56,6 +60,8 @@
     "registration_event_sequence", "trial_result_record_sha256", "trial_result_event_sequence",
     "strategy_sha256", "risk_policy_sha256", "source_bundle_sha256", "candidate_seed",
     "config_sha256", "score_manifest_path", "score_manifest_sha256", "score_manifest_commit",
+    "executable_source_manifest_path", "executable_source_manifest_sha256",
+    "executable_source_manifest_commit",
     "semantic_coupling_review_path", "semantic_coupling_review_sha256",
     "semantic_coupling_review_commit", "snapshot_manifest_path", "snapshot_manifest_sha256",
     "development_target_path", "development_target_sha256", "runner_record_path",

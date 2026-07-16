@@ -8,9 +8,40 @@ import pytest
 from crypto_trade.tournament.amendment_integrity_v2 import pretty_json_bytes
 from crypto_trade.tournament.development_score_diagnostics_v5 import (
     label_score_panel,
+    parse_executable_source_manifest,
     parse_score_adapter_manifest,
     parse_semantic_coupling_review,
 )
+
+EXECUTABLE_SOURCE_MANIFEST_PATH = (
+    "tournament/top40-v2/teams/team-04/score-adapters/candidate-04.executable-source-manifest.json"
+)
+
+
+def test_executable_source_manifest_is_acyclic_and_complete() -> None:
+    payload = pretty_json_bytes(
+        {
+            "schema_version": 1,
+            "manifest_kind": "top40-v2-executable-source-manifest-v1",
+            "team_id": "team-04",
+            "family_id": "family-04",
+            "candidate_id": "candidate-04",
+            "files": [
+                {"path": "risk_policy.json", "sha256": "a" * 64, "size": 10},
+                {"path": "strategy.py", "sha256": "b" * 64, "size": 20},
+            ],
+        }
+    )
+    parsed = parse_executable_source_manifest(
+        payload,
+        expected_team_id="team-04",
+        expected_family_id="family-04",
+        expected_candidate_id="candidate-04",
+    )
+    assert [entry["path"] for entry in parsed["files"]] == [
+        "risk_policy.json",
+        "strategy.py",
+    ]
 
 
 def _manifest(*, horizon: int = 48) -> bytes:
@@ -100,6 +131,8 @@ def test_static_review_is_hash_bindable_but_explicitly_not_runtime_proof() -> No
             "family_id": "family-04",
             "candidate_id": "candidate-04",
             "strategy_sha256": "a" * 64,
+            "executable_source_manifest_path": EXECUTABLE_SOURCE_MANIFEST_PATH,
+            "executable_source_manifest_sha256": "b" * 64,
             "hook": "strategy.score_boundary",
             "declared_capture_boundary": (
                 "candidate-declared-post-transform-pre-selection-weight-cap-risk"
@@ -123,6 +156,8 @@ def test_static_review_is_hash_bindable_but_explicitly_not_runtime_proof() -> No
         expected_family_id="family-04",
         expected_candidate_id="candidate-04",
         expected_strategy_sha256="a" * 64,
+        expected_executable_source_manifest_path=EXECUTABLE_SOURCE_MANIFEST_PATH,
+        expected_executable_source_manifest_sha256="b" * 64,
     )
     assert parsed["runtime_proof_limit"].endswith("not-runtime-semantic-proof")
     with pytest.raises(ValueError, match="binding"):
@@ -132,4 +167,6 @@ def test_static_review_is_hash_bindable_but_explicitly_not_runtime_proof() -> No
             expected_family_id="family-04",
             expected_candidate_id="candidate-04",
             expected_strategy_sha256="b" * 64,
+            expected_executable_source_manifest_path=EXECUTABLE_SOURCE_MANIFEST_PATH,
+            expected_executable_source_manifest_sha256="b" * 64,
         )

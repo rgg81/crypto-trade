@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crypto-trade.invalid/schemas/top40-v2/amendments/0005/executable-source-manifest.schema.json",
+  "additionalProperties": false,
+  "properties": {
+    "candidate_id": {"pattern": "^[a-z0-9][a-z0-9._-]{0,127}$", "type": "string"},
+    "family_id": {"pattern": "^[a-z0-9][a-z0-9._-]{0,127}$", "type": "string"},
+    "files": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "anyOf": [
+              {"pattern": "^(?!score-adapters/)(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+\\.py$", "type": "string"},
+              {"const": "risk_policy.json"},
+              {"pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?:.+/)?(?:frozen_config\\.json|strategy_config\\.(?:json|toml|yaml|yml))$", "type": "string"}
+            ]
+          },
+          "sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
+          "size": {"maximum": 2097152, "minimum": 0, "type": "integer"}
+        },
+        "required": ["path", "sha256", "size"],
+        "type": "object"
+      },
+      "minItems": 2,
+      "type": "array"
+    },
+    "manifest_kind": {"const": "top40-v2-executable-source-manifest-v1"},
+    "schema_version": {"const": 1},
+    "team_id": {"enum": ["team-04", "team-05", "team-06", "team-07", "team-08", "team-09", "team-10"]}
+  },
+  "required": ["schema_version", "manifest_kind", "team_id", "family_id", "candidate_id", "files"],
+  "title": "Top40 V2 acyclic executable-source manifest",
+  "type": "object"
+}

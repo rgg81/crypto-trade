@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import contextlib
+import ctypes
+import errno
 import fcntl
 import math
 import os
@@ -16,8 +18,10 @@ from pathlib import Path
 from typing import Any
 
 from crypto_trade.tournament import (
+    amendment_0006_v2,
     amendment_v2,
     development_score_diagnostics_v5,
+    pure_crypto_universe_v6,
     runner_schema3_compat_v4,
     score_diagnostic_compat_v2,
     score_diagnostics_v2,
@@ -69,6 +73,9 @@ _AUTHORITY_KEYS = {
     "score_manifest_path",
     "score_manifest_sha256",
     "score_manifest_commit",
+    "executable_source_manifest_path",
+    "executable_source_manifest_sha256",
+    "executable_source_manifest_commit",
     "semantic_coupling_review_path",
     "semantic_coupling_review_sha256",
     "semantic_coupling_review_commit",
@@ -98,7 +105,37 @@ PARENT_AUTHORITIES = {
     "amendment_0004_active_entrypoint_sha256": (
         "6031937952a29a1a226a778cd1bcfc2c9869559ab30465bdbebe6292c6a88377"
     ),
+    "amendment_0006_final_implementation_commit": ("49dd8978c161fb75b9a78efaead5f847f589e7f1"),
+    "amendment_0006_wrapper_module_sha256": (
+        "5f5187ef431ca89077f21ada09139fe3b3ada62afeb1fa0f3ce957c6ba5933b1"
+    ),
+    "amendment_0006_pure_crypto_module_sha256": (
+        "fc93c0f26dcbf6304abe028736693ab2bee7430a56c14a8547defff472008192"
+    ),
+    "amendment_0006_active_entrypoint_sha256": (
+        "a9197dc2f83d4415f1aa4c098546e21e010cb99e754580de96c3e339cc927641"
+    ),
+    "amendment_0006_freeze_sha256": (
+        "e8cc34251ba0eb558015a02b96f15e884eee05006f41ea0b32ce6510376a76db"
+    ),
+    "amendment_0006_freeze_commit": "8e7577d510bbdd4839650800037e0d0e744d038b",
+    "amendment_0006_integration_freeze_sha256": (
+        "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34"
+    ),
+    "amendment_0006_integration_freeze_commit": ("ed3af1398543dfee4a50150915dc2e37b3631fc9"),
 }
+
+A6_ACTIVE_ENTRYPOINT_PATH = "scripts/top40_v2_tournament_pure_crypto_v6.py"
+A6_WRAPPER_MODULE_PATH = "src/crypto_trade/tournament/amendment_0006_v2.py"
+A6_PURE_MODULE_PATH = "src/crypto_trade/tournament/pure_crypto_universe_v6.py"
+A6_FREEZE_PATH = "tournament/top40-v2/amendments/0006/freeze.json"
+A6_INTEGRATION_FREEZE_PATH = "tournament/top40-v2/amendments/0006/integration-freeze.json"
+A6_ACTIVATION_JOURNAL_RECORD_COUNT = 25
+A6_ACTIVATION_JOURNAL_HEAD_SHA256 = (
+    "2ebf302de21ced25bb299803be5aad2fb717c378b556853835b0c2a8ec4f328a"
+)
+A6_CANONICAL_AUDIT_SHA256 = "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b"
+A6_CANONICAL_AUDIT_SIZE = 73_777
 
 IMPLEMENTATION_FILE_PATHS = (
     "scripts/top40_v2_amendment_0005_draft.py",
@@ -118,7 +155,9 @@ IMPLEMENTATION_FILE_PATHS = (
     f"{AMENDMENT_ROOT}/templates/amendment-review.schema.json",
     f"{AMENDMENT_ROOT}/templates/development-score-diagnostic-reservation.schema.json",
     f"{AMENDMENT_ROOT}/templates/development-score-diagnostic-result.schema.json",
+    f"{AMENDMENT_ROOT}/templates/executable-source-manifest.schema.json",
     f"{AMENDMENT_ROOT}/templates/score-adapter-manifest.schema.json",
+    f"{AMENDMENT_ROOT}/templates/semantic-coupling-review.schema.json",
 )
 
 _A1_MODULE = score_diagnostics_v2
@@ -129,6 +168,14 @@ _A2_RUN = _A2_MODULE.run_score_diagnostic_with_schema3_compatibility
 _A4_MODULE = runner_schema3_compat_v4
 _A4_RUN = _A4_MODULE.run
 _A4_VERIFY = _A4_MODULE._verify_amendment_authorities
+_A6_MODULE = amendment_0006_v2
+_A6_RUN = _A6_MODULE.run
+_A6_MAIN = _A6_MODULE.main
+_A6_VERIFY = _A6_MODULE.verify_parent_authorities
+_A6_PURE_MODULE = pure_crypto_universe_v6
+_A6_PURE_AUDIT = _A6_PURE_MODULE.audit_pure_crypto_universe
+_A6_REPORT_BYTES = _A6_PURE_MODULE.audit_report_bytes
+_A6_REPORT_SHA256 = _A6_PURE_MODULE.audit_report_sha256
 
 _SHA = re.compile(r"[0-9a-f]{64}")
 _COMMIT = re.compile(r"[0-9a-f]{40}")
@@ -218,6 +265,146 @@ def verify_parent_authorities(root: str | Path) -> None:
         raise Amendment0005Error("Amendment 0004 active entrypoint bytes changed")
     development_score_diagnostics_v5.verify_frozen_science_helper_identities()
     _A4_VERIFY()
+
+    expected_a6_path = (root_path / A6_WRAPPER_MODULE_PATH).resolve()
+    expected_pure_path = (root_path / A6_PURE_MODULE_PATH).resolve()
+    if (
+        Path(_A6_MODULE.__file__).resolve() != expected_a6_path
+        or Path(_A6_PURE_MODULE.__file__).resolve() != expected_pure_path
+    ):
+        raise Amendment0005Error("loaded Amendment 0006 module path differs from repository")
+    a6_bindings = (
+        (
+            A6_WRAPPER_MODULE_PATH,
+            PARENT_AUTHORITIES["amendment_0006_wrapper_module_sha256"],
+            5_866,
+            "Amendment 0006 wrapper module",
+        ),
+        (
+            A6_PURE_MODULE_PATH,
+            PARENT_AUTHORITIES["amendment_0006_pure_crypto_module_sha256"],
+            34_031,
+            "Amendment 0006 pure-crypto module",
+        ),
+        (
+            A6_ACTIVE_ENTRYPOINT_PATH,
+            PARENT_AUTHORITIES["amendment_0006_active_entrypoint_sha256"],
+            244,
+            "Amendment 0006 active entrypoint",
+        ),
+        (
+            A6_FREEZE_PATH,
+            PARENT_AUTHORITIES["amendment_0006_freeze_sha256"],
+            2_023,
+            "Amendment 0006 freeze",
+        ),
+        (
+            A6_INTEGRATION_FREEZE_PATH,
+            PARENT_AUTHORITIES["amendment_0006_integration_freeze_sha256"],
+            2_044,
+            "Amendment 0006 integration freeze",
+        ),
+    )
+    a6_bytes: dict[str, bytes] = {}
+    for relative, expected_hash, expected_size, label in a6_bindings:
+        payload = _regular_bytes(root_path / relative, label, maximum_bytes=expected_size)
+        if len(payload) != expected_size or sha256_bytes(payload) != expected_hash:
+            raise Amendment0005Error(f"{label} bytes changed")
+        a6_bytes[relative] = payload
+    if (
+        _A6_MODULE.run is not _A6_RUN
+        or _A6_MODULE.main is not _A6_MAIN
+        or _A6_MODULE.verify_parent_authorities is not _A6_VERIFY
+        or _A6_PURE_MODULE.audit_pure_crypto_universe is not _A6_PURE_AUDIT
+        or _A6_PURE_MODULE.audit_report_bytes is not _A6_REPORT_BYTES
+        or _A6_PURE_MODULE.audit_report_sha256 is not _A6_REPORT_SHA256
+    ):
+        raise Amendment0005Error("Amendment 0006 callable identity changed")
+    _A6_VERIFY(root_path)
+
+    implementation_commit = PARENT_AUTHORITIES["amendment_0006_final_implementation_commit"]
+    freeze_commit = unique_first_add_commit(root_path, A6_FREEZE_PATH, a6_bytes[A6_FREEZE_PATH])
+    integration_commit = unique_first_add_commit(
+        root_path, A6_INTEGRATION_FREEZE_PATH, a6_bytes[A6_INTEGRATION_FREEZE_PATH]
+    )
+    if (
+        freeze_commit != PARENT_AUTHORITIES["amendment_0006_freeze_commit"]
+        or integration_commit != PARENT_AUTHORITIES["amendment_0006_integration_freeze_commit"]
+    ):
+        raise Amendment0005Error("Amendment 0006 freeze commit binding changed")
+    _require_strict_ancestor(
+        root_path, implementation_commit, freeze_commit, "A6 implementation/freeze"
+    )
+    _require_strict_ancestor(root_path, freeze_commit, integration_commit, "A6 freeze/integration")
+    for relative in (A6_WRAPPER_MODULE_PATH, A6_PURE_MODULE_PATH, A6_ACTIVE_ENTRYPOINT_PATH):
+        if (
+            git_bytes(
+                root_path,
+                "show",
+                f"{implementation_commit}:{relative}",
+                label=f"Amendment 0006 implementation file {relative}",
+            )
+            != a6_bytes[relative]
+        ):
+            raise Amendment0005Error("Amendment 0006 implementation tree differs")
+    for commit, relative in (
+        (freeze_commit, A6_FREEZE_PATH),
+        (integration_commit, A6_INTEGRATION_FREEZE_PATH),
+    ):
+        if (
+            git_bytes(
+                root_path,
+                "show",
+                f"{commit}:{relative}",
+                label=f"Amendment 0006 authority file {relative}",
+            )
+            != a6_bytes[relative]
+        ):
+            raise Amendment0005Error("Amendment 0006 authority tree differs")
+    journal_bytes = git_bytes(
+        root_path,
+        "show",
+        f"{integration_commit}:{TOP40_V2_LAYOUT.organizer_journal_path}",
+        label="Amendment 0006 activation journal",
+    )
+    journal_lines = journal_bytes.splitlines()
+    if len(journal_lines) != A6_ACTIVATION_JOURNAL_RECORD_COUNT:
+        raise Amendment0005Error("Amendment 0006 activation journal count differs")
+    journal_head = strict_json_object(journal_lines[-1], "Amendment 0006 journal head")
+    if (
+        journal_head.get("sequence") != A6_ACTIVATION_JOURNAL_RECORD_COUNT - 1
+        or journal_head.get("record_sha256") != A6_ACTIVATION_JOURNAL_HEAD_SHA256
+    ):
+        raise Amendment0005Error("Amendment 0006 activation journal head differs")
+
+
+def _verified_pure_crypto_audit(root: Path) -> bytes:
+    """Run the exact active A6 audit and return its canonical report bytes."""
+
+    verify_parent_authorities(root)
+    report = _A6_REPORT_BYTES(root)
+    if len(report) != A6_CANONICAL_AUDIT_SIZE or sha256_bytes(report) != A6_CANONICAL_AUDIT_SHA256:
+        raise Amendment0005Error("Amendment 0006 canonical pure-crypto audit differs")
+    if (
+        _A6_PURE_MODULE.audit_pure_crypto_universe is not _A6_PURE_AUDIT
+        or _A6_PURE_MODULE.audit_report_bytes is not _A6_REPORT_BYTES
+        or _A6_PURE_MODULE.audit_report_sha256 is not _A6_REPORT_SHA256
+    ):
+        raise Amendment0005Error("Amendment 0006 audit callable identity changed")
+    return report
+
+
+@contextlib.contextmanager
+def _pure_crypto_audit_guard(root: Path) -> Iterator[None]:
+    """Require the exact A6 pure-crypto report before and after one A5 lifecycle operation."""
+
+    before = _verified_pure_crypto_audit(root)
+    try:
+        yield
+    finally:
+        after = _verified_pure_crypto_audit(root)
+        if after != before:
+            raise Amendment0005Error("pure-crypto audit changed during Amendment 0005 operation")
 
 
 def _read_pretty_json(root: Path, relative: str, label: str) -> tuple[Mapping[str, Any], bytes]:
@@ -361,6 +548,12 @@ def _load_freeze(root: Path) -> tuple[Mapping[str, Any], bytes, str]:
     ):
         raise Amendment0005Error("Amendment 0005 activation journal is invalid")
     freeze_commit = unique_first_add_commit(root, FREEZE_PATH, payload)
+    _require_strict_ancestor(
+        root,
+        PARENT_AUTHORITIES["amendment_0006_integration_freeze_commit"],
+        implementation_commit,
+        "A6 integration/A5 implementation",
+    )
     _require_strict_ancestor(root, implementation_commit, review_commit, "implementation/review")
     _require_strict_ancestor(root, review_commit, freeze_commit, "review/freeze")
     for relative in (*IMPLEMENTATION_FILE_PATHS, REVIEW_PATH):
@@ -413,29 +606,29 @@ def _load_freeze(root: Path) -> tuple[Mapping[str, Any], bytes, str]:
 
 def amendment_status(root: str | Path) -> Mapping[str, Any]:
     root_path = Path(root).resolve()
-    verify_parent_authorities(root_path)
-    _draft, draft_bytes = _load_draft(root_path)
-    freeze_path = root_path / FREEZE_PATH
-    if not freeze_path.exists() and not freeze_path.is_symlink():
+    with _pure_crypto_audit_guard(root_path):
+        _draft, draft_bytes = _load_draft(root_path)
+        freeze_path = root_path / FREEZE_PATH
+        if not freeze_path.exists() and not freeze_path.is_symlink():
+            return {
+                "amendment_id": AMENDMENT_ID,
+                "status": "draft",
+                "execution_enabled": False,
+                "draft_sha256": sha256_bytes(draft_bytes),
+                "eligible_teams": list(ELIGIBLE_TEAMS),
+                "stage": "development",
+            }
+        freeze, freeze_bytes, freeze_commit = _load_freeze(root_path)
         return {
             "amendment_id": AMENDMENT_ID,
-            "status": "draft",
-            "execution_enabled": False,
-            "draft_sha256": sha256_bytes(draft_bytes),
+            "status": "frozen",
+            "execution_enabled": True,
+            "freeze_sha256": sha256_bytes(freeze_bytes),
+            "freeze_commit": freeze_commit,
+            "activation_journal": freeze["activation_journal"],
             "eligible_teams": list(ELIGIBLE_TEAMS),
             "stage": "development",
         }
-    freeze, freeze_bytes, freeze_commit = _load_freeze(root_path)
-    return {
-        "amendment_id": AMENDMENT_ID,
-        "status": "frozen",
-        "execution_enabled": True,
-        "freeze_sha256": sha256_bytes(freeze_bytes),
-        "freeze_commit": freeze_commit,
-        "activation_journal": freeze["activation_journal"],
-        "eligible_teams": list(ELIGIBLE_TEAMS),
-        "stage": "development",
-    }
 
 
 @contextlib.contextmanager
@@ -517,6 +710,10 @@ def _candidate_paths(team_id: str, candidate_id: str) -> Mapping[str, str]:
         "score_manifest_path": (
             f"{TOP40_V2_LAYOUT.team_root(team_id)}/score-adapters/{candidate_id}.json"
         ),
+        "executable_source_manifest_path": (
+            f"{TOP40_V2_LAYOUT.team_root(team_id)}/score-adapters/"
+            f"{candidate_id}.executable-source-manifest.json"
+        ),
         "semantic_coupling_review_path": (
             f"{TOP40_V2_LAYOUT.team_root(team_id)}/score-adapters/"
             f"{candidate_id}.semantic-coupling-review.json"
@@ -548,6 +745,12 @@ def _candidate_authority(
         raise Amendment0005Error("candidate team is not in active research")
     activation = freeze["activation_journal"]
     activation_count = int(activation["record_count"])
+    if (
+        len(journal.records) < A6_ACTIVATION_JOURNAL_RECORD_COUNT
+        or journal.records[A6_ACTIVATION_JOURNAL_RECORD_COUNT - 1]["record_sha256"]
+        != A6_ACTIVATION_JOURNAL_HEAD_SHA256
+    ):
+        raise Amendment0005Error("current journal does not extend Amendment 0006 activation")
     if (
         len(journal.records) < activation_count
         or journal.records[activation_count - 1]["record_sha256"] != activation["head_sha256"]
@@ -631,6 +834,42 @@ def _candidate_authority(
     ):
         raise Amendment0005Error("registration tree lacks exact preregistered manifest")
 
+    executable_relative = paths["executable_source_manifest_path"]
+    _source_relative, _source_path, executable_manifest_bytes, _source_stat = read_repo_file(
+        root,
+        executable_relative,
+        "candidate executable-source manifest",
+        maximum_bytes=1024 * 1024,
+        require_single_link=True,
+    )
+    executable_manifest_sha = sha256_bytes(executable_manifest_bytes)
+    executable_manifest = development_score_diagnostics_v5.parse_executable_source_manifest(
+        executable_manifest_bytes,
+        expected_team_id=team_id,
+        expected_family_id=str(registration["family_id"]),
+        expected_candidate_id=candidate_id,
+    )
+    executable_manifest_commit = unique_first_add_commit(
+        root, executable_relative, executable_manifest_bytes
+    )
+    _require_ancestor(
+        root, executable_manifest_commit, manifest_commit, "executable source/score manifest"
+    )
+    for commit, label in (
+        (manifest_commit, "manifest tree"),
+        (registration_commit, "registration tree"),
+    ):
+        if (
+            git_bytes(
+                root,
+                "show",
+                f"{commit}:{executable_relative}",
+                label=f"executable-source manifest in {label}",
+            )
+            != executable_manifest_bytes
+        ):
+            raise Amendment0005Error(f"{label} lacks the exact executable-source manifest")
+
     semantic_relative = paths["semantic_coupling_review_path"]
     _review_relative, _review_path, semantic_review_bytes, _review_stat = read_repo_file(
         root,
@@ -648,9 +887,27 @@ def _candidate_authority(
         expected_family_id=str(registration["family_id"]),
         expected_candidate_id=candidate_id,
         expected_strategy_sha256=str(registration["strategy_sha256"]),
+        expected_executable_source_manifest_path=executable_relative,
+        expected_executable_source_manifest_sha256=executable_manifest_sha,
     )
     semantic_review_commit = unique_first_add_commit(root, semantic_relative, semantic_review_bytes)
+    _require_ancestor(
+        root,
+        executable_manifest_commit,
+        semantic_review_commit,
+        "executable source/semantic review",
+    )
     _require_ancestor(root, semantic_review_commit, manifest_commit, "semantic review/manifest")
+    if (
+        git_bytes(
+            root,
+            "show",
+            f"{semantic_review_commit}:{executable_relative}",
+            label="executable-source manifest in semantic-review tree",
+        )
+        != executable_manifest_bytes
+    ):
+        raise Amendment0005Error("semantic-review tree lacks the exact executable-source manifest")
     for commit, label in (
         (manifest_commit, "manifest tree"),
         (registration_commit, "registration tree"),
@@ -665,6 +922,18 @@ def _candidate_authority(
             != semantic_review_bytes
         ):
             raise Amendment0005Error(f"{label} lacks the exact semantic-coupling static review")
+    for commit, label in (
+        (semantic_review_commit, "semantic-review tree"),
+        (manifest_commit, "score-manifest tree"),
+        (registration_commit, "registration tree"),
+    ):
+        development_score_diagnostics_v5.verify_executable_sources_at_commit(
+            root,
+            commit,
+            team_id,
+            executable_manifest,
+            label=label,
+        )
 
     artifacts = result.get("artifact_hashes")
     if not isinstance(artifacts, Mapping):
@@ -736,6 +1005,9 @@ def _candidate_authority(
         "score_manifest_path": paths["score_manifest_path"],
         "score_manifest_sha256": manifest_sha,
         "score_manifest_commit": manifest_commit,
+        "executable_source_manifest_path": executable_relative,
+        "executable_source_manifest_sha256": executable_manifest_sha,
+        "executable_source_manifest_commit": executable_manifest_commit,
         "semantic_coupling_review_path": semantic_relative,
         "semantic_coupling_review_sha256": semantic_review_sha,
         "semantic_coupling_review_commit": semantic_review_commit,
@@ -772,6 +1044,66 @@ def _ensure_safe_directory_chain(root: Path, directory: Path) -> None:
     development_score_diagnostics_v5._safe_directory_chain(root, directory)
 
 
+def _rename_directory_noreplace(stage: Path, destination: Path) -> bool:
+    """Atomically publish one sibling directory without ever replacing a destination."""
+
+    if stage.parent != destination.parent or "/" in stage.name or "/" in destination.name:
+        raise Amendment0005Error("declared-score publication paths are not sibling names")
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+    descriptor = os.open(stage.parent, flags)
+    try:
+        parent_info = os.fstat(descriptor)
+        source_info = os.stat(stage.name, dir_fd=descriptor, follow_symlinks=False)
+        if (
+            not stat.S_ISDIR(parent_info.st_mode)
+            or parent_info.st_uid != os.geteuid()
+            or not stat.S_ISDIR(source_info.st_mode)
+            or source_info.st_uid != os.geteuid()
+            or source_info.st_mode & 0o077
+        ):
+            raise Amendment0005Error("declared-score publication directory is unsafe")
+        try:
+            renameat2 = ctypes.CDLL(None, use_errno=True).renameat2
+        except AttributeError as exc:
+            raise Amendment0005Error(
+                "dirfd RENAME_NOREPLACE is unavailable; publication is disabled"
+            ) from exc
+        renameat2.argtypes = (
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_uint,
+        )
+        renameat2.restype = ctypes.c_int
+        ctypes.set_errno(0)
+        result = renameat2(
+            descriptor,
+            os.fsencode(stage.name),
+            descriptor,
+            os.fsencode(destination.name),
+            1,  # Linux RENAME_NOREPLACE
+        )
+        if result != 0:
+            error = ctypes.get_errno()
+            if error == errno.EEXIST:
+                return False
+            if error in {errno.ENOSYS, errno.EINVAL, errno.ENOTSUP}:
+                raise Amendment0005Error(
+                    "kernel RENAME_NOREPLACE is unavailable; publication is disabled"
+                )
+            raise OSError(error, os.strerror(error), destination)
+        os.fsync(descriptor)
+        return True
+    finally:
+        os.close(descriptor)
+
+
 def _load_existing_transaction(
     root: Path,
     paths: Mapping[str, str],
@@ -798,6 +1130,7 @@ def _load_existing_transaction(
         "candidate_id",
         "reservation_sha256",
         "authority_sha256",
+        "executable_source_manifest_sha256",
         "semantic_coupling_review_sha256",
         "status",
         "failure_reason",
@@ -826,6 +1159,8 @@ def _load_existing_transaction(
         or result["reservation_sha256"] != reservation["reservation_sha256"]
         or result["authority_sha256"]
         != sha256_bytes(pretty_json_bytes({key: reservation[key] for key in _AUTHORITY_KEYS}))
+        or result["executable_source_manifest_sha256"]
+        != reservation["executable_source_manifest_sha256"]
         or result["semantic_coupling_review_sha256"]
         != reservation["semantic_coupling_review_sha256"]
         or result["declared_score_diagnostic_only"] is not True
@@ -874,6 +1209,8 @@ def _load_existing_transaction(
         )
         if (
             summary.get("reservation_sha256") != reservation["reservation_sha256"]
+            or summary.get("executable_source_manifest_sha256")
+            != reservation["executable_source_manifest_sha256"]
             or summary.get("semantic_coupling_review_sha256")
             != reservation["semantic_coupling_review_sha256"]
             or result["statistics"] != summary.get("statistics")
@@ -896,7 +1233,7 @@ def reserve_development_score_diagnostic(
 ) -> Mapping[str, Any]:
     root_path = Path(root).resolve()
     config = load_config(root_path / TOP40_V2_LAYOUT.config_path)
-    with _execution_lock(root_path):
+    with _execution_lock(root_path), _pure_crypto_audit_guard(root_path):
         authority, paths = _candidate_authority(root_path, config, team_id, candidate_id)
         for key in ("reservation_path", "result_path", "evidence_dir"):
             path = root_path / paths[key]
@@ -964,6 +1301,7 @@ def _load_reservation(root: Path, relative: str) -> tuple[Mapping[str, Any], byt
     for key in (
         "registration_commit",
         "score_manifest_commit",
+        "executable_source_manifest_commit",
         "semantic_coupling_review_commit",
         "amendment_freeze_commit",
     ):
@@ -1003,6 +1341,9 @@ def _request(
         score_manifest_path=str(reservation["score_manifest_path"]),
         score_manifest_sha256=str(reservation["score_manifest_sha256"]),
         score_manifest_commit=str(reservation["score_manifest_commit"]),
+        executable_source_manifest_path=str(reservation["executable_source_manifest_path"]),
+        executable_source_manifest_sha256=str(reservation["executable_source_manifest_sha256"]),
+        executable_source_manifest_commit=str(reservation["executable_source_manifest_commit"]),
         semantic_coupling_review_path=str(reservation["semantic_coupling_review_path"]),
         semantic_coupling_review_sha256=str(reservation["semantic_coupling_review_sha256"]),
         semantic_coupling_review_commit=str(reservation["semantic_coupling_review_commit"]),
@@ -1016,6 +1357,47 @@ def _request(
     )
 
 
+def _run_through_frozen_a2(
+    root: Path,
+    request: development_score_diagnostics_v5.DevelopmentScoreDiagnosticRequest,
+) -> tuple[Mapping[str, Any], Mapping[str, str]]:
+    """Bridge private staging through a closure while A2 sees only its exact four fields."""
+
+    staged: list[Mapping[str, str]] = []
+
+    def capture_staged_artifacts(capability: Mapping[str, str]) -> None:
+        if staged:
+            development_score_diagnostics_v5.discard_staged_artifacts(root, request, capability)
+            raise Amendment0005Error("declared-score runner exported staging more than once")
+        staged.append(dict(capability))
+
+    try:
+        outcome = _A2_RUN(
+            root=root,
+            runner_call=lambda: (
+                development_score_diagnostics_v5.run_reserved_development_score_diagnostic(
+                    root=root,
+                    request=request,
+                    staged_artifact_sink=capture_staged_artifacts,
+                )
+            ),
+        )
+        if set(outcome) != {
+            "status",
+            "failure_reason",
+            "organizer_cpu_hours",
+            "organizer_wall_clock_hours",
+        }:
+            raise Amendment0005Error("frozen A2 returned an invalid outcome field set")
+        if len(staged) != 1:
+            raise Amendment0005Error("declared-score runner did not export one staging capability")
+        return outcome, staged[0]
+    except BaseException:
+        if staged:
+            development_score_diagnostics_v5.discard_staged_artifacts(root, request, staged[0])
+        raise
+
+
 def run_development_score_diagnostic(
     root: str | Path,
     team_id: str,
@@ -1023,7 +1405,7 @@ def run_development_score_diagnostic(
 ) -> Mapping[str, Any]:
     root_path = Path(root).resolve()
     config = load_config(root_path / TOP40_V2_LAYOUT.config_path)
-    with _execution_lock(root_path):
+    with _execution_lock(root_path), _pure_crypto_audit_guard(root_path):
         paths = _candidate_paths(team_id, candidate_id)
         reservation, reservation_bytes = _load_reservation(root_path, paths["reservation_path"])
         if (
@@ -1044,37 +1426,18 @@ def run_development_score_diagnostic(
         require_no_git_history(root_path, paths["result_path"])
         verify_parent_authorities(root_path)
         request = _request(reservation)
-        outcome = _A2_RUN(
-            root=root_path,
-            runner_call=lambda: (
-                development_score_diagnostics_v5.run_reserved_development_score_diagnostic(
-                    root=root_path,
-                    request=request,
-                )
-            ),
-        )
-        verify_parent_authorities(root_path)
-        if set(outcome) != {
-            "status",
-            "failure_reason",
-            "organizer_cpu_hours",
-            "organizer_wall_clock_hours",
-            "staged_artifacts",
-        }:
-            raise Amendment0005Error("declared-score runner returned invalid keys")
-        for field in ("organizer_cpu_hours", "organizer_wall_clock_hours"):
-            value = outcome[field]
-            if (
-                isinstance(value, bool)
-                or not isinstance(value, (int, float))
-                or not math.isfinite(value)
-                or value < 0
-            ):
-                raise Amendment0005Error("declared-score runner accounting is invalid")
-        completed = outcome["status"] == "completed"
-        stage, artifacts = development_score_diagnostics_v5.validate_staged_artifacts(
-            root_path, request, outcome["staged_artifacts"], completed=completed
-        )
+        outcome, staged_artifacts = _run_through_frozen_a2(root_path, request)
+        try:
+            verify_parent_authorities(root_path)
+            completed = outcome["status"] == "completed"
+            stage, artifacts = development_score_diagnostics_v5.validate_staged_artifacts(
+                root_path, request, staged_artifacts, completed=completed
+            )
+        except BaseException:
+            development_score_diagnostics_v5.discard_staged_artifacts(
+                root_path, request, staged_artifacts
+            )
+            raise
         try:
             summary: Mapping[str, Any] | None = None
             if completed:
@@ -1084,6 +1447,8 @@ def run_development_score_diagnostic(
                 )
                 if (
                     summary.get("reservation_sha256") != reservation["reservation_sha256"]
+                    or summary.get("executable_source_manifest_sha256")
+                    != reservation["executable_source_manifest_sha256"]
                     or summary.get("semantic_coupling_review_sha256")
                     != reservation["semantic_coupling_review_sha256"]
                 ):
@@ -1101,6 +1466,9 @@ def run_development_score_diagnostic(
                 "candidate_id": candidate_id,
                 "reservation_sha256": reservation["reservation_sha256"],
                 "authority_sha256": authority_sha,
+                "executable_source_manifest_sha256": reservation[
+                    "executable_source_manifest_sha256"
+                ],
                 "semantic_coupling_review_sha256": reservation["semantic_coupling_review_sha256"],
                 "status": outcome["status"],
                 "failure_reason": outcome["failure_reason"],
@@ -1134,8 +1502,8 @@ def run_development_score_diagnostic(
                     existing = _load_existing_transaction(root_path, paths, reservation)
                     return existing
                 _ensure_safe_directory_chain(root_path, evidence_dir.parent)
-                os.rename(stage, evidence_dir)
-                development_score_diagnostics_v5.fsync_directory(evidence_dir.parent)
+                if not _rename_directory_noreplace(stage, evidence_dir):
+                    return _load_existing_transaction(root_path, paths, reservation)
                 return _load_existing_transaction(root_path, paths, reservation)
         finally:
             if stage.exists():
