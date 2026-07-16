@@ -1,6 +1,10 @@
 {
-  "drawdown_brakes": [],
-  "policy_id": "team-08-risk-none",
+  "drawdown_brakes": [
+    {"drawdown": 0.1, "gross_scale": 0.75},
+    {"drawdown": 0.18, "gross_scale": 0.45},
+    {"drawdown": 0.26, "gross_scale": 0.0}
+  ],
+  "policy_id": "team-08-risk-drawdown",
   "position_stop": {"cooldown_bars": 6, "enabled": false, "loss_fraction": 0.075},
   "same_boundary_reentry": false,
   "schema_version": 1,

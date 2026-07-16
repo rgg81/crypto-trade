@@ -1,5 +1,6 @@
 {
   "base_candidate_id": "vdr-core-candidate-001",
+  "activation_rule": "Neighbors remain dormant until the no-control core passes every broad positive activation minimum and the selected controlled/base candidate passes all non-neighborhood development gates.",
   "base_parameters_file": "frozen_config.json",
   "declaration_status": "prospective-unregistered-unevaluated",
   "materialization_rule": "Merge each override into strategy_parameters without changing any other byte-level input; then preregister and run each neighbor independently before reading its result.",

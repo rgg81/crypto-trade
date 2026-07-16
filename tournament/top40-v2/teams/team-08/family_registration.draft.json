@@ -75,8 +75,8 @@
     ]
   },
   "parent_family_id": null,
-  "registered_at_utc": "2026-07-16T00:00:00Z",
-  "risk_policy_plan": "Use the combined policy in the center candidate, then preregister six additional configurations: no-control, volatility-target-only, drawdown-only, position-stop-only, time-stop-only, and turnover-only. The complete seven-policy matrix runs at ordinary and doubled costs, but combined is not counted twice; advance a control only for a declared failure mode and no new frozen-gate failure.",
+  "registered_at_utc": "REPLACE_WITH_ACTUAL_REGISTRATION_TIMESTAMP_Z",
+  "risk_policy_plan": "Run the center first with root no-control risk_policy.json. Volatility-target-only, drawdown-only, position-stop-only, time-stop-only, turnover-only, and combined policies remain dormant unless that core has positive base- and doubled-cost return/Sharpe, at least four positive folds, positive bull/bear/chop returns, positive long-bull/short-bear/combined-chop attribution, and active sleeves. Controls cannot rescue failure. Before any later policy commit, registration, and run, copy its immutable risk_policies template byte-for-byte to root risk_policy.json because the frozen lifecycle reads only that path.",
   "schema_version": 1,
   "selection_metric": "First require every non-compensatory development gate. Among passers, maximize the minimum bull/bear/chop net Sharpe, then doubled-cost Sharpe, then minimize drawdown and one-way turnover.",
   "team_id": "team-08"

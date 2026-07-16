@@ -7,13 +7,15 @@ Status: **planned; none of these checks has been executed by this draft**
 1. Confirm all changes are confined to `teams/team-08` and both organizer projection ledgers retain
    their original bytes.
 2. Validate every JSON document parses with duplicate-key rejection.
-3. Validate `family_registration.draft.json` and the trial template against the exact frozen public
-   schemas. Reject sentinel hashes at the materialization step even though they are syntactically
-   schema-compatible.
+3. Replace both unmistakable timestamp placeholders with actual lifecycle timestamps, then validate
+   `family_registration.draft.json` and the trial template against the exact frozen public schemas.
+   Reject sentinel hashes at materialization even though they are syntactically schema-compatible.
 4. Validate every full policy in `risk_ablations.json` and `risk_policy.json` through the public
    strict risk-policy parser.
 5. Bind the active Amendment 0005 superset and require its delegated Amendment 0006 pure-crypto
    preflight for every later command.
+6. Require root `risk_policy.json` to be byte-identical to `risk_policies/no-control.json` for the
+   first material candidate. The lifecycle never selects `risk_policies/` directly.
 
 ## 2. Strategy static review
 
@@ -76,6 +78,10 @@ These checks belong to the organizer because team code cannot price or execute t
    entrypoint before any material run; do not append `families.jsonl` manually.
 2. Materialize actual source/config/risk hashes into a trial registration, validate exact schema,
    and register it before reading a result.
+   The first risk hash must bind the no-control root bytes. Run this core first and require positive
+   base- and doubled-cost return/Sharpe, at least four positive folds, positive bull/bear/chop
+   returns, positive long-bull/short-bear/combined-chop attribution, and active sleeves before any
+   control. Controls cannot rescue failure.
 3. Run six declared chronological development folds. A fixed-rule fold artifact must bind its
    training cutoff, test interval, exact source/config hashes, and a no-learned-state declaration.
 4. Store a stitched daily-return artifact derived only from fold test predictions. Fixed slices of
@@ -86,6 +92,9 @@ These checks belong to the organizer because team code cannot price or execute t
    daily-return series before invoking the stability gate.
 7. Advance only if every frozen development gate passes. Never freeze a negative or gate-failing
    candidate as a submission.
+8. For every later policy, copy its immutable `risk_policies/` template byte-for-byte to root
+   `risk_policy.json` before commit, registration, and execution, then recompute all risk/source
+   bindings.
 
 ## 6. Review disposition
 

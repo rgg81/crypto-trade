@@ -1,7 +1,7 @@
 {
   "candidate_id": "vdr-core-candidate-001",
   "config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-  "falsifier": "The candidate is rejected if any frozen development gate fails, if its declared neighborhood is an isolated peak, or if compression and dispersion-switch ablations do not support the proposed interaction.",
+  "falsifier": "This first material trial is the no-control core. Reject it and prohibit every risk-overlay activation if base- or doubled-cost return/Sharpe is nonpositive, fewer than four folds are positive, bull/bear/chop return or long-bull/short-bear/combined-chop attribution is nonpositive, either sleeve is inactive, any other frozen development gate fails, its declared neighborhood is an isolated peak, or compression and dispersion-switch ablations do not support the proposed interaction.",
   "family_id": "volatility-dispersion-release-v1",
   "parameters": {
     "compression_ratio_ceiling": 0.86,
@@ -27,6 +27,6 @@
   "source_bundle_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
   "strategy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
   "team_id": "team-08",
-  "thesis": "Compression-conditioned residual releases should continue when crypto cross-sectional dispersion expands and converge when dispersion stays subdued, producing distinct long, short, and chop roles after costs.",
-  "timestamp_utc": "2026-07-16T00:00:00Z"
+  "thesis": "Without risk-overlay assistance, compression-conditioned residual releases should continue when crypto cross-sectional dispersion expands and converge when dispersion stays subdued, producing active long, short, and chop roles after ordinary and doubled costs.",
+  "timestamp_utc": "REPLACE_WITH_ACTUAL_REGISTRATION_TIMESTAMP_Z"
 }

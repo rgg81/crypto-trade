@@ -102,32 +102,44 @@ The lexicographic rule is declared before results to prevent an attractive aggre
 from compensating for a weak market condition. If nothing passes, continue within budget, make a
 documented mechanism pivot, or record DNF; never submit the least-bad model.
 
+The first material trial is the unchanged core signal with the top-level no-control
+`risk_policy.json`. Before any volatility, drawdown, position-stop, time-stop, turnover, or combined
+policy may be registered, that core must have strictly positive return and Sharpe at both ordinary
+and doubled costs, at least four positive folds, positive bull/bear/chop returns, positive
+long-bull, short-bear, and combined-chop attribution, and active long and short sleeves. Controls
+cannot rescue a negative or otherwise failed core. Failure permits only a separately preregistered
+mechanism revision/pivot or DNF, whose own no-control core must restart the sequence.
+
 ## Trial allocation
 
 The prospective initial-family allocation is capped at 21 material configurations:
 
-- one default candidate using the combined policy;
+- one default candidate using the no-control root policy;
 - eight single-axis/local parameter neighbors;
 - five mechanism ablations;
-- six additional risk-policy configurations (no-control and five individual controls), each at
+- six additional risk-policy configurations (five individual controls plus combined), each at
   base and doubled cost inside its registered run; and
 - one reserved confirmation rerun, used only after a candidate passes all visible gates.
 
-`risk_ablations.json` contains seven policies because it also repeats the combined policy for a
-complete comparison matrix. That combined policy is field-for-field identical to the default
-candidate's policy and is not counted a second time: `1 + 8 + 5 + 6 + 1 = 21`.
+`risk_ablations.json` contains seven policies because it also repeats the no-control policy for a
+complete comparison matrix. That no-control policy is byte-identical to the default candidate's
+root policy and is not counted a second time: `1 + 8 + 5 + 6 + 1 = 21`.
 
 Every configuration is registered before execution. The empty organizer-owned ledgers remain
 untouched by this draft. A failed or interrupted run still consumes its trial and resource budget.
 
 ## Risk hypothesis
 
-The combined risk policy targets 35% annualized portfolio volatility without leverage, applies
+The core initially has no risk overlay. Only after its broad positive activation gate passes may
+the combined risk policy be materialized at root. It targets 35% annualized portfolio volatility
+without leverage, applies
 graduated brakes at 10%, 18%, and 26% drawdown, closes a position after a 7.5% boundary-confirmed
 loss, times out holdings after 18 bars, and caps one-way turnover at 0.45. Stops and timeouts carry
 cooldowns and cannot reopen on the same boundary. These controls are hypotheses, not assumed
 improvements. `risk_ablations.json` declares no-control, each individual control, and combined
-policies; every one must be measured at ordinary and doubled costs.
+policies; every activated policy must be copied from its immutable template to root
+`risk_policy.json` before commit, registration, and run, and must be measured at ordinary and
+doubled costs. The lifecycle never selects a side-path template.
 
 ## Advance, revise, or stop
 
@@ -139,3 +151,6 @@ policies; every one must be measured at ordinary and doubled costs.
   majority of folds.
 - **DNF:** no family clears the gate within the cumulative budget, or any causal/reproducibility
   boundary cannot be demonstrated.
+
+A control is never a valid **Revise** action for a failed no-control core. Any such revision is a new
+mechanism candidate and must begin with a separately registered no-control trial.

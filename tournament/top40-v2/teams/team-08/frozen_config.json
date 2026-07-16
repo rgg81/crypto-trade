@@ -30,6 +30,13 @@
     "integration_freeze_sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34",
     "status": "active-upstream-authority"
   },
+  "risk_policy_contract": {
+    "combined_template": "risk_policies/combined.json",
+    "first_material_trial": "no-control core; controls remain dormant until every broad positive core-alpha activation minimum passes",
+    "no_control_template": "risk_policies/no-control.json",
+    "root_path": "risk_policy.json",
+    "root_materialization_rule": "The lifecycle reads only root risk_policy.json. Copy any later immutable risk_policies template byte-for-byte to root before commit, registration, and run; controls cannot rescue a failed core."
+  },
   "schema_version": 1,
   "seed": 20260801,
   "status": "prospective-default-not-tournament-frozen",

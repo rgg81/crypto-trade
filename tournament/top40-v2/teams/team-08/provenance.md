@@ -30,6 +30,13 @@ Only the clean-room public materials authorized by the team brief were used:
 No snapshot rows were opened by Team 08. No development evaluator, lifecycle command, test suite,
 Python process, private window, or final-OOS process was run while authoring this package.
 
+The first executable risk state is the no-control top-level `risk_policy.json`, byte-identical to
+`risk_policies/no-control.json`. Single-control and combined files are immutable source
+declarations, not runtime selectors. They remain dormant unless the no-control core passes every
+broad positive activation minimum; controls cannot rescue failure. Before a later policy candidate
+is committed, registered, or run, the selected template must be copied byte-for-byte to root
+`risk_policy.json` and every affected hash recomputed.
+
 ## Software and runtime lineage
 
 `strategy.py` is self-contained and uses only Python's standard library plus NumPy and pandas,
@@ -58,8 +65,8 @@ from the frozen metadata authority.
 `families.jsonl` and `experiments.jsonl` are preserved exactly as organizer projections. The files
 named `*.draft.json` or `*.template.json` are non-authoritative authoring aids. Sentinel all-zero
 hashes in the trial template must be replaced by actual SHA-256 values before registration. The
-family draft's timestamp is an authorship placeholder and must be replaced with the actual
-registration event time. Creating these files does not register a family or candidate.
+family and trial timestamp placeholders must be replaced with their actual registration event
+times. Creating these files does not register a family or candidate.
 
 `frozen_config.json` freezes the team's prospective default only; it is not a tournament candidate
 freeze and contains no result-derived choice. Source, configuration, risk policy, dependency,

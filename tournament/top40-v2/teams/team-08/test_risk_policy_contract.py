@@ -14,10 +14,39 @@ from crypto_trade.tournament.risk_policy import (
 )
 
 TEAM_DIR = Path(__file__).resolve().parent
+ROOT_POLICY = TEAM_DIR / "risk_policy.json"
+NO_CONTROL_TEMPLATE = TEAM_DIR / "risk_policies" / "no-control.json"
+COMBINED_TEMPLATE = TEAM_DIR / "risk_policies" / "combined.json"
 
 
-def test_combined_policy_parses_and_enables_declared_controls() -> None:
-    policy = load_risk_policy(TEAM_DIR / "risk_policy.json")
+def test_root_policy_is_byte_exact_no_control() -> None:
+    assert ROOT_POLICY.read_bytes() == NO_CONTROL_TEMPLATE.read_bytes()
+    policy = load_risk_policy(ROOT_POLICY)
+    assert not policy.enabled
+    assert policy.policy_id == "team-08-risk-none"
+
+
+def test_risk_plan_requires_broad_positive_core_before_controls() -> None:
+    plan = json.loads((TEAM_DIR / "risk_ablations.json").read_text(encoding="utf-8"))
+    assert plan["policies"][0]["template_path"] == "risk_policies/no-control.json"
+    assert plan["policies"][-1]["template_path"] == "risk_policies/combined.json"
+    assert plan["core_alpha_activation_gate"] == {
+        "applies_to": "vdr-core-candidate-001 with root risk_policy.json in its no-control state",
+        "base_cost_net_return_strictly_positive": True,
+        "base_cost_net_sharpe_strictly_positive": True,
+        "both_sleeves_meet_activity_floors": True,
+        "combined_chop_attribution_strictly_positive": True,
+        "doubled_cost_net_return_strictly_positive": True,
+        "doubled_cost_net_sharpe_strictly_positive": True,
+        "long_bull_attribution_strictly_positive": True,
+        "minimum_positive_folds": 4,
+        "required_positive_return_regimes": ["bull", "bear", "chop"],
+        "short_bear_attribution_strictly_positive": True,
+    }
+
+
+def test_combined_template_parses_and_enables_declared_controls() -> None:
+    policy = load_risk_policy(COMBINED_TEMPLATE)
     assert policy.enabled
     assert policy.policy_id == "team-08-vdr-combined"
     assert policy.volatility_target.enabled
@@ -35,11 +64,15 @@ def test_every_risk_ablation_is_a_complete_strict_policy() -> None:
     assert document["cost_multipliers_for_every_policy"] == [1.0, 2.0]
     assert not parsed[0].enabled
     assert parsed[-1].policy_id == "team-08-vdr-combined"
-    combined = json.loads((TEAM_DIR / "risk_policy.json").read_text(encoding="utf-8"))
-    assert document["policies"][-1]["policy"] == combined
+    for item in document["policies"]:
+        template = json.loads((TEAM_DIR / item["template_path"]).read_text(encoding="utf-8"))
+        assert item["policy"] == template
+    assert document["policies"][0]["policy"] == json.loads(
+        ROOT_POLICY.read_text(encoding="utf-8")
+    )
 
 
-def test_material_configuration_accounting_counts_combined_policy_once() -> None:
+def test_material_configuration_accounting_counts_no_control_core_once() -> None:
     risk = json.loads((TEAM_DIR / "risk_ablations.json").read_text(encoding="utf-8"))
     neighborhood = json.loads(
         (TEAM_DIR / "parameter_neighborhood.json").read_text(encoding="utf-8")
@@ -48,8 +81,12 @@ def test_material_configuration_accounting_counts_combined_policy_once() -> None
     accounting = risk["material_configuration_accounting"]
     assert len(risk["policies"]) == accounting["matrix_policy_count"] == 7
     assert accounting["additional_policy_configurations"] == 6
-    center_policy_id = "team-08-vdr-combined"
-    assert sum(item["policy"]["policy_id"] == center_policy_id for item in risk["policies"]) == 1
+    assert accounting["center_candidate_uses_no_control_policy"] is True
+    center_policy_id = "team-08-risk-none"
+    assert (
+        sum(item["policy"]["policy_id"] == center_policy_id for item in risk["policies"])
+        == 1
+    )
     assert (
         sum(item["policy"]["policy_id"] != center_policy_id for item in risk["policies"])
         == accounting["additional_policy_configurations"]
@@ -69,12 +106,12 @@ def test_material_configuration_accounting_counts_combined_policy_once() -> None
     [(0.0, 1.0), (0.099, 1.0), (0.1, 0.75), (0.18, 0.45), (0.26, 0.0)],
 )
 def test_drawdown_brakes_are_graduated(drawdown: float, expected: float) -> None:
-    policy = load_risk_policy(TEAM_DIR / "risk_policy.json")
+    policy = load_risk_policy(COMBINED_TEMPLATE)
     assert drawdown_gross_scale(policy, drawdown) == expected
 
 
 def test_volatility_target_never_leverages_and_fails_conservatively_without_history() -> None:
-    policy = load_risk_policy(TEAM_DIR / "risk_policy.json")
+    policy = load_risk_policy(COMBINED_TEMPLATE)
     assert volatility_gross_scale(policy, None) == 0.25
     assert volatility_gross_scale(policy, 0.20) == 1.0
     assert volatility_gross_scale(policy, 0.70) == pytest.approx(0.5)
@@ -82,7 +119,7 @@ def test_volatility_target_never_leverages_and_fails_conservatively_without_hist
 
 
 def test_stops_timeouts_cooldowns_and_same_boundary_reentry_are_deterministic() -> None:
-    policy = load_risk_policy(TEAM_DIR / "risk_policy.json")
+    policy = load_risk_policy(COMBINED_TEMPLATE)
     decision = boundary_risk_decision(
         policy,
         current_drawdown=0.19,
@@ -106,7 +143,7 @@ def test_stops_timeouts_cooldowns_and_same_boundary_reentry_are_deterministic() 
 
 
 def test_boundary_decision_is_instruction_only_and_contains_no_fill_price() -> None:
-    policy = load_risk_policy(TEAM_DIR / "risk_policy.json")
+    policy = load_risk_policy(COMBINED_TEMPLATE)
     decision = boundary_risk_decision(
         policy,
         current_drawdown=0.0,

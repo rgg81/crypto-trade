@@ -20,6 +20,8 @@ strategy_module = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = strategy_module
 SPEC.loader.exec_module(strategy_module)
 
+DEFAULT_DECISION = pd.Timestamp(year=2022, month=6, day=1, tz="UTC")
+
 
 def _symbols(count: int = 20) -> tuple[str, ...]:
     return tuple(f"C{index:02d}USDT" for index in range(count))
@@ -71,7 +73,7 @@ def _context(
     bars: int = 80,
 ) -> SimpleNamespace:
     if decision_time is None:
-        decision_time = pd.Timestamp("2022-06-01T00:00:00Z")
+        decision_time = DEFAULT_DECISION
     if symbols is None:
         symbols = _symbols()
     frames = {
@@ -239,7 +241,7 @@ def test_point_in_time_membership_removal_cannot_leave_old_targets() -> None:
 
 
 def test_non_rebalance_boundary_returns_none_after_validation() -> None:
-    context = _context(decision_time=pd.Timestamp("2022-06-01T08:00:00Z"))
+    context = _context(decision_time=DEFAULT_DECISION + pd.Timedelta(hours=8))
     assert strategy_module.build_strategy().target_weights(context, seed=20260801) is None
     first_symbol = context.eligible_symbols[0]
     bad = context.bars[first_symbol].copy()

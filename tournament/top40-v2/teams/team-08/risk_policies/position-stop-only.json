@@ -1,7 +1,7 @@
 {
   "drawdown_brakes": [],
-  "policy_id": "team-08-risk-none",
-  "position_stop": {"cooldown_bars": 6, "enabled": false, "loss_fraction": 0.075},
+  "policy_id": "team-08-risk-position-stop",
+  "position_stop": {"cooldown_bars": 6, "enabled": true, "loss_fraction": 0.075},
   "same_boundary_reentry": false,
   "schema_version": 1,
   "side_scaling": {"long_scale": 1.0, "short_scale": 1.0},

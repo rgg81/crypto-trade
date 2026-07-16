@@ -1,5 +1,18 @@
 {
   "candidate_id": "vdr-core-candidate-001",
+  "core_alpha_activation_gate": {
+    "applies_to": "vdr-core-candidate-001 with root risk_policy.json in its no-control state",
+    "base_cost_net_return_strictly_positive": true,
+    "base_cost_net_sharpe_strictly_positive": true,
+    "both_sleeves_meet_activity_floors": true,
+    "combined_chop_attribution_strictly_positive": true,
+    "doubled_cost_net_return_strictly_positive": true,
+    "doubled_cost_net_sharpe_strictly_positive": true,
+    "long_bull_attribution_strictly_positive": true,
+    "minimum_positive_folds": 4,
+    "required_positive_return_regimes": ["bull", "bear", "chop"],
+    "short_bear_attribution_strictly_positive": true
+  },
   "cost_multipliers_for_every_policy": [
     1.0,
     2.0
@@ -7,15 +20,17 @@
   "declaration_status": "prospective-unregistered-unevaluated",
   "material_configuration_accounting": {
     "additional_policy_configurations": 6,
-    "center_candidate_uses_combined_policy": true,
+    "center_candidate_uses_no_control_policy": true,
     "matrix_policy_count": 7,
-    "reason_combined_is_not_counted_twice": "The risk-combined policy is field-for-field identical to risk_policy.json used by the one center candidate; the other six matrix rows are additional material configurations.",
+    "reason_no_control_is_not_counted_twice": "The risk-none policy is byte-identical to root risk_policy.json used by the one center candidate; the five individual controls and combined policy are six additional material configurations.",
     "total_initial_family_configurations": 21
   },
+  "policy_materialization_rule": "The frozen lifecycle reads only root risk_policy.json. The no-control core runs first. After it passes every core-alpha activation minimum, copy any selected immutable risk_policies template byte-for-byte to root risk_policy.json before commit, registration, and run, then recompute every risk and source binding. Controls cannot rescue a failed core.",
   "policies": [
     {
       "ablation_id": "risk-none",
       "declared_failure_mode": "Signal-only control used to establish whether any overlay adds value after costs.",
+      "template_path": "risk_policies/no-control.json",
       "policy": {
         "drawdown_brakes": [],
         "policy_id": "team-08-risk-none",
@@ -51,6 +66,7 @@
     {
       "ablation_id": "risk-volatility-only",
       "declared_failure_mode": "Reduce exposure during sustained high realized portfolio volatility without levering quiet periods.",
+      "template_path": "risk_policies/volatility-only.json",
       "policy": {
         "drawdown_brakes": [],
         "policy_id": "team-08-risk-volatility",
@@ -86,6 +102,7 @@
     {
       "ablation_id": "risk-drawdown-only",
       "declared_failure_mode": "Limit portfolio-level path dependence after cumulative losses.",
+      "template_path": "risk_policies/drawdown-only.json",
       "policy": {
         "drawdown_brakes": [
           {
@@ -134,6 +151,7 @@
     {
       "ablation_id": "risk-position-stop-only",
       "declared_failure_mode": "Exit failed releases whose carried position has lost 7.5% at a known close boundary.",
+      "template_path": "risk_policies/position-stop-only.json",
       "policy": {
         "drawdown_brakes": [],
         "policy_id": "team-08-risk-position-stop",
@@ -169,6 +187,7 @@
     {
       "ablation_id": "risk-time-stop-only",
       "declared_failure_mode": "Remove stale holdings after six days when the expected release has not resolved through ordinary rebalancing.",
+      "template_path": "risk_policies/time-stop-only.json",
       "policy": {
         "drawdown_brakes": [],
         "policy_id": "team-08-risk-time-stop",
@@ -204,6 +223,7 @@
     {
       "ablation_id": "risk-turnover-only",
       "declared_failure_mode": "Bound next-open churn and participation demand from daily cross-sectional rank changes.",
+      "template_path": "risk_policies/turnover-only.json",
       "policy": {
         "drawdown_brakes": [],
         "policy_id": "team-08-risk-turnover",
@@ -239,6 +259,7 @@
     {
       "ablation_id": "risk-combined",
       "declared_failure_mode": "Jointly address volatility, cumulative loss, failed/stale releases, and excessive turnover; reject if interaction costs outweigh those controls.",
+      "template_path": "risk_policies/combined.json",
       "policy": {
         "drawdown_brakes": [
           {
@@ -291,7 +312,16 @@
     "max_drawdown",
     "tail_loss",
     "turnover",
+    "positive_fold_count",
+    "bull_net_return",
+    "bear_net_return",
+    "chop_net_return",
     "regime_returns",
+    "long_bull_net_return",
+    "short_bear_net_return",
+    "combined_chop_net_return",
+    "long_mean_gross_exposure",
+    "short_mean_gross_exposure",
     "long_short_attribution",
     "stop_count",
     "time_stop_count",
@@ -302,6 +332,6 @@
     "same_boundary_reentry_prevented_count"
   ],
   "schema_version": 1,
-  "selection_rule": "A control may enter the frozen candidate only if it improves its declared failure mode, does not create any new frozen-gate failure, and remains acceptable at doubled costs.",
+  "selection_rule": "No control may be registered until the no-control core passes every broad positive activation minimum. A later control may enter the frozen candidate only if it improves its declared failure mode, does not create any new frozen-gate failure, and remains acceptable at doubled costs. Controls cannot rescue a negative or otherwise failed core.",
   "team_id": "team-08"
 }
