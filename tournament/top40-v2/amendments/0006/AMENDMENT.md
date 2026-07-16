@@ -98,8 +98,8 @@ independent review before freeze.
 0004 runner, obtains the pure-crypto report, delegates the command, repeats both verifications
 after success, failure, or interruption, and requires the two report byte strings to be identical.
 It also SHA-pins the audit-module bytes and captures every audit callable identity used by the
-wrapper. `scripts/top40_v2_tournament_v6_candidate.py` is the additive entrypoint candidate; the
-historical active path does not import it yet.
+wrapper. `scripts/top40_v2_tournament_pure_crypto_v6.py` is the additive entrypoint candidate;
+the historical active path does not import it yet.
 
 Amendment 0004 may atomically publish a legitimate result before the wrapper reaches its post-run
 check. Amendment 0006 does not claim it can roll back that publication. Safety relies on the exact
