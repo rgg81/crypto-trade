@@ -1,0 +1,23 @@
+{
+  "candidate_id": "t07-market-state-relative-ensemble-v1-base",
+  "decision": "approve",
+  "declared_capture_boundary": "candidate-declared-post-transform-pre-selection-weight-cap-risk",
+  "executable_source_manifest_path": "tournament/top40-v2/teams/team-07/score-adapters/t07-market-state-relative-ensemble-v1-base.executable-source-manifest.json",
+  "executable_source_manifest_sha256": "eaef2ea2f8e890e5dd7fa902f495beab99e2b93418e7c7bbef7c374d926e6840",
+  "family_id": "t07-market-state-relative-ensemble-v1",
+  "findings": {
+    "direct_hook_call_found": true,
+    "hook_after_declared_score_transform": true,
+    "hook_before_selection_weight_caps_and_risk": true,
+    "no_decoy_or_transient_score_path_found": true,
+    "score_object_is_declared_model_ranking_signal": true
+  },
+  "hook": "strategy.score_boundary",
+  "review_kind": "top40-v2-score-semantic-coupling-static-review-v1",
+  "reviewed_at_utc": "2026-07-16T19:43:36Z",
+  "reviewer_id": "team07-static-reviewer",
+  "runtime_proof_limit": "static-review-attestation-not-runtime-semantic-proof",
+  "schema_version": 1,
+  "strategy_sha256": "d4bad60615eee4be283e146fbde8bae6d1c782df48f62027ad05559c34563de2",
+  "team_id": "team-07"
+}
