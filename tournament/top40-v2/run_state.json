@@ -52,7 +52,7 @@
   "critic_lock": null,
   "final_oos_lock": null,
   "finalist_cohort_lock": null,
-  "legacy_projection_sha256": "fda321c062201e3236f0a240342c27fd979bb6533307a808c6351f15d95b58b2",
+  "legacy_projection_sha256": "280576b83dc284e8ca2fef222fe41c0010eba843795acd03daef65ed0ed616da",
   "legacy_state_sha256": "8c858495fde6ddde203124a055e40ebad5d8d5a684cd20f0e55f6c88f7360b07",
   "objective_lock": null,
   "organizer_audit": {
@@ -195,13 +195,13 @@
       "trial_count": 3
     },
     "team-08": {
-      "active_family_id": "t08-compressed-shock-recoil-v1",
+      "active_family_id": "t08-volatility-scaled-rank-persistence-v1",
       "canonical_result": null,
       "development_assessment": null,
       "dnf": null,
-      "family_count": 2,
+      "family_count": 3,
       "finalist_freeze": null,
-      "pivot_count": 1,
+      "pivot_count": 2,
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,

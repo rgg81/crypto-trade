@@ -1,0 +1,43 @@
+{
+  "economic_thesis": "Persistent coin-specific leadership and weakness that agree across 21-, 63-, and 126-bar horizons should continue over the next week. Per-bar median residualization removes common crypto direction, horizon disagreement is penalized, and excessive recent volatility is shrunk rather than rewarded.",
+  "expected_regime_roles": {
+    "bear": "Own persistent relative-resilience leaders and short persistent laggards with zero target market exposure.",
+    "bull": "Own persistent relative leaders and short relative laggards while exact neutrality prevents a common bull bet.",
+    "chop": "Multi-horizon agreement and volatility shrinkage should reject transient single-window moves.",
+    "long_sleeve": "Own the highest returned volatility-scaled persistence ranks.",
+    "short_sleeve": "Short the lowest returned volatility-scaled persistence ranks.",
+    "stress": "A broad weekly 0.36-gross neutral book and 0.025 symbol cap limit scale; profitability remains empirical."
+  },
+  "family_id": "t08-volatility-scaled-rank-persistence-v1",
+  "falsifier": "Reject if the exact no-control core misses net Sharpe 0.75, positive annualized return, Calmar 0.40, drawdown at most 0.30, doubled-cost Sharpe 0.35 and positive return, trial-adjusted probability 0.90, four profitable folds, positive-quarter fraction 0.55, worst-regime Sharpe -0.25, three positive regime Sharpes, positive bull/bear/chop return and Sharpe, positive long-bull/short-bear/combined-chop attribution, either sleeve floor (0.01 exposure, 0.10 active fraction, 0.01 mean exposure, 1000 USDT notional), concentration 0.40, complete A5 coverage, positive pooled IC, or four positive fold ICs. After those non-neighborhood gates pass, require 0.70 profitable neighbors and median neighbor Sharpe 0.50. Controls, neighbors, ablations, private data, and sign inversion cannot rescue failure.",
+  "mechanism": "Weekly, median-residualize 126 completed pure-crypto 8-hour returns per bar; volatility-scale continuation over 21, 63, and 126 bars; require at least two horizon signs, shrink disagreement and excessive recent volatility; final-rank once at A5; construct an equal-dollar 0.36-gross exact-neutral book.",
+  "parameter_ranges": {
+    "bar_interval_hours": [8],
+    "baseline_volatility_bars": [105],
+    "disagreement_power": [1.5, 2.0, 2.5],
+    "gross_target": [0.36],
+    "history_return_bars": [126],
+    "horizon_saturation_z": [2.5, 3.0, 3.5],
+    "maximum_symbol_exposure": [0.025],
+    "medium_horizon_bars": [56, 63, 70],
+    "medium_horizon_weight": [0.3],
+    "minimum_agreeing_horizons": [2],
+    "minimum_positions_per_side": [8],
+    "minimum_valid_symbols": [24],
+    "rebalance_interval_bars": [21],
+    "recent_volatility_bars": [21],
+    "risk_policy_variants": ["no-control"],
+    "seed": [20260801],
+    "selected_fraction_per_side": ["1/5"],
+    "short_horizon_bars": [18, 21, 24],
+    "short_horizon_weight": [0.5],
+    "slow_horizon_bars": [126],
+    "slow_horizon_weight": [0.2]
+  },
+  "parent_family_id": "t08-compressed-shock-recoil-v1",
+  "registered_at_utc": "2026-07-16T22:58:18Z",
+  "risk_policy_plan": "Run the exact disabled no-control core first. Only after all non-neighborhood gates pass may declared neighbors run for stability; only after the full gate may controls, private data, or submission activate.",
+  "schema_version": 1,
+  "selection_metric": "Every gate is noncompensatory.",
+  "team_id": "team-08"
+}
