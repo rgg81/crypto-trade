@@ -52,7 +52,7 @@
   "critic_lock": null,
   "final_oos_lock": null,
   "finalist_cohort_lock": null,
-  "legacy_projection_sha256": "773c9c6838e3ff3b761e13f29be551483f45d926f723b3d04ce2d2535f5f90ad",
+  "legacy_projection_sha256": "f5a011f6f1df46f881186c7c8cbf7e73c069cfd78bfc46bbec7e5fb1fd90a19f",
   "legacy_state_sha256": "8c858495fde6ddde203124a055e40ebad5d8d5a684cd20f0e55f6c88f7360b07",
   "objective_lock": null,
   "organizer_audit": {
@@ -96,13 +96,13 @@
       "trial_count": 4
     },
     "team-02": {
-      "active_family_id": "team-02-directional-auction-absorption-v1",
+      "active_family_id": "team-02-funding-inventory-relaxation-v1",
       "canonical_result": null,
       "development_assessment": null,
       "dnf": null,
-      "family_count": 2,
+      "family_count": 3,
       "finalist_freeze": null,
-      "pivot_count": 1,
+      "pivot_count": 2,
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
