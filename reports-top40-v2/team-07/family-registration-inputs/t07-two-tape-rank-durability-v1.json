@@ -1,0 +1,70 @@
+{
+  "economic_thesis": "Coins that persistently lead or lag the pure-crypto cross-section on both common-market up and down bars exhibit durable relative strength or weakness; requiring agreement across three time blocks should preserve that spread through bull, bear, and chop while a weekly neutral book controls cost at the mechanism level.",
+  "expected_regime_roles": {
+    "bear": "The neutral book owns coins with durable relative resilience on down as well as up bars and shorts persistent laggards without requiring a market-direction forecast.",
+    "bull": "The long sleeve owns persistent cross-tape relative leaders and the short sleeve retains persistent laggards while net exposure remains zero.",
+    "chop": "Three-block agreement and cross-tape shrinkage suppress transient one-window winners, reversal noise, and tape-dependent rankings.",
+    "long_sleeve": "Owns the highest returned durability ranks, requiring sustained peer outperformance across market directions and time blocks.",
+    "short_sleeve": "Shorts the lowest returned durability ranks, requiring sustained peer underperformance across market directions and time blocks.",
+    "stress": "Per-bar ranks, smaller-magnitude cross-tape scoring, broad neutral sleeves, 0.36 gross, and a 0.025 coin cap limit scale and beta concentration; profitability remains an empirical gate."
+  },
+  "falsifier": "Reject if this exact no-control core fails any official central-development threshold: net Sharpe at least 0.75, positive annualized return, Calmar at least 0.40, maximum drawdown at most 0.30, doubled-cost Sharpe at least 0.35, positive doubled-cost return, trial-adjusted probability positive at least 0.90, four profitable folds, positive-quarter fraction at least 0.55, worst-regime Sharpe at least -0.25, and at least three positive regime Sharpes; or fails any stricter bull, bear, chop, role, sleeve, concentration, A5 coverage, or score-IC gate. Controls, neighbors, and private data cannot rescue it.",
+  "family_id": "t07-two-tape-rank-durability-v1",
+  "mechanism": "Every seven days, rank each eligible coin's return on each of 126 completed 8-hour bars. Reward relative leaders and laggards whose mean ranks agree across common-market up/down tapes and across three non-overlapping 42-bar blocks; shrink tape disagreement and time dispersion; final-rank once at A5; then construct a broad, equal-dollar, exactly neutral long/short book from only the returned scores.",
+  "parameter_ranges": {
+    "bar_interval_hours": [
+      8
+    ],
+    "block_core_weight": [
+      0.3
+    ],
+    "cross_tape_disagreement_shrink": [
+      0.15
+    ],
+    "gross_target": [
+      0.36
+    ],
+    "history_return_bars": [
+      126
+    ],
+    "maximum_symbol_exposure": [
+      0.025
+    ],
+    "minimum_positions_per_side": [
+      8
+    ],
+    "minimum_tape_bars": [
+      18
+    ],
+    "minimum_valid_symbols": [
+      24
+    ],
+    "rebalance_interval_bars": [
+      21
+    ],
+    "risk_policy_variants": [
+      "no-control"
+    ],
+    "seed": [
+      20260801
+    ],
+    "selected_fraction_per_side": [
+      "1/5"
+    ],
+    "tape_core_weight": [
+      0.7
+    ],
+    "time_block_bars": [
+      42
+    ],
+    "time_block_count": [
+      3
+    ]
+  },
+  "parent_family_id": "t07-market-state-relative-ensemble-v1",
+  "registered_at_utc": "2026-07-16T20:50:57Z",
+  "risk_policy_plan": "Run only the exact disabled no-control second-pivot reference first. No risk control, stop, neighbor, diagnostic, or private ticket is authorized unless that reference passes the complete official central-development gate and every stricter broad alpha, regime, role, fold, quarter, sleeve, concentration, score-IC, and coverage gate. Controls cannot repair a failed mechanism.",
+  "schema_version": 1,
+  "selection_metric": "Noncompensatory eligibility first: the complete official central-development gate and every stricter no-control and score-evidence gate must pass. No controlled or neighboring result can substitute for the exact reference.",
+  "team_id": "team-07"
+}
