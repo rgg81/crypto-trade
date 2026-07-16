@@ -1,0 +1,23 @@
+{
+  "candidate_id": "team-04-pard-reference-001",
+  "decision": "approve",
+  "declared_capture_boundary": "candidate-declared-post-transform-pre-selection-weight-cap-risk",
+  "executable_source_manifest_path": "tournament/top40-v2/teams/team-04/score-adapters/team-04-pard-reference-001.executable-source-manifest.json",
+  "executable_source_manifest_sha256": "62ee973430146a6d83f02fa2c0b424dd9666fbc8be45c4b3352b1ab0ee6bf803",
+  "family_id": "team-04-path-adaptive-relative-dynamics-v1",
+  "findings": {
+    "direct_hook_call_found": true,
+    "hook_after_declared_score_transform": true,
+    "hook_before_selection_weight_caps_and_risk": true,
+    "no_decoy_or_transient_score_path_found": true,
+    "score_object_is_declared_model_ranking_signal": true
+  },
+  "hook": "strategy.score_boundary",
+  "review_kind": "top40-v2-score-semantic-coupling-static-review-v1",
+  "reviewed_at_utc": "2026-07-16T23:37:14Z",
+  "reviewer_id": "codex-team04-pard-static-reviewer-20260717",
+  "runtime_proof_limit": "static-review-attestation-not-runtime-semantic-proof",
+  "schema_version": 1,
+  "strategy_sha256": "97517891669b6298542b6bc4c7fc64b1c8e68717933505b6d39251db3d7fb08b",
+  "team_id": "team-04"
+}
