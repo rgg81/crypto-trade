@@ -1,44 +1,66 @@
 {
-  "a5_freeze": {
-    "frozen_at_utc": "<organizer-fill-a5-freeze-timestamp-Z>",
-    "organizer_freeze_record_sha256": "<organizer-fill-a5-freeze-record-64-hex-sha256>",
-    "status": "blocked-pending-organizer-freeze"
+  "active_authority": {
+    "entrypoint_path": "scripts/top40_v2_tournament_score_diagnostics_v5.py",
+    "entrypoint_sha256": "0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4",
+    "integration_freeze_commit": "d2b95f610722aab65b4e67466b34efeaa3554101",
+    "integration_freeze_sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c",
+    "pure_crypto_integration_freeze_sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34"
   },
-  "artifacts": [
+  "candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "candidate_materialization": {
+    "active_candidate_id": "t06-balanced-trend-reversal-v1-base",
+    "active_overrides": {},
+    "entrypoint": "strategy.py:build_strategy",
+    "risk_policy_source_path": "risk_policies/no-control.json",
+    "runtime_risk_policy_path": "risk_policy.json",
+    "variant_path": "candidate_variant.py"
+  },
+  "candidate_registration": {
+    "input_path": "reports-top40-v2/team-06/registration-inputs/t06-balanced-trend-reversal-v1-base.json",
+    "score_adapter_opt_in_template": "score_adapter_opt_in.template.json",
+    "status": "prospective-unmaterialized"
+  },
+  "entrypoint": "strategy.py:build_strategy",
+  "executable_source_files": [
     {
-      "path": "strategy.py",
-      "sha256": "<organizer-fill-final-strategy-64-hex-sha256>"
+      "path": "candidate_variant.py",
+      "sha256": "<organizer-fill-final-64-hex-sha256>",
+      "size": "<organizer-fill-exact-byte-size>"
     },
     {
       "path": "frozen_config.json",
-      "sha256": "<organizer-fill-final-config-64-hex-sha256>"
+      "sha256": "<organizer-fill-final-64-hex-sha256>",
+      "size": "<organizer-fill-exact-byte-size>"
     },
     {
       "path": "risk_policy.json",
-      "role": "initial-no-control-policy",
-      "sha256": "<organizer-fill-final-no-control-policy-64-hex-sha256>"
+      "sha256": "<organizer-fill-final-64-hex-sha256>",
+      "size": "<organizer-fill-exact-byte-size>"
     },
     {
-      "path": "risk_policies/combined.json",
-      "role": "conditional-combined-policy",
-      "sha256": "<organizer-fill-final-combined-policy-64-hex-sha256>"
+      "path": "strategy.py",
+      "sha256": "<organizer-fill-final-64-hex-sha256>",
+      "size": "<organizer-fill-exact-byte-size>"
     },
     {
-      "path": "feature_lineage.json",
-      "sha256": "<organizer-fill-final-feature-lineage-64-hex-sha256>"
-    },
-    {
-      "path": "candidate_contract.template.json",
-      "sha256": "<organizer-fill-frozen-candidate-contract-64-hex-sha256>"
+      "path": "test_strategy.py",
+      "sha256": "<organizer-fill-final-64-hex-sha256>",
+      "size": "<organizer-fill-exact-byte-size>"
     }
   ],
-  "candidate_id": "t06-balanced-trend-reversal-v1-base",
-  "entrypoint": "strategy.py:build_strategy",
   "family_id": "t06-balanced-trend-reversal-v1",
   "initial_risk_policy": "risk_policy.json",
+  "manifest_kind": "top40-v2-team-candidate-materialization-plan-v2",
   "registration_allowed": false,
-  "schema_version": 1,
+  "risk_policy_materialization_rule": "Copy risk_policies/no-control.json byte-for-byte to root risk_policy.json before the candidate commit; registration and execution bind only that root file.",
+  "schema_version": 2,
+  "score_adapter_controls": {
+    "executable_source_manifest_canonical_path": "tournament/top40-v2/teams/team-06/score-adapters/t06-balanced-trend-reversal-v1-base.executable-source-manifest.json",
+    "score_manifest_canonical_path": "tournament/top40-v2/teams/team-06/score-adapters/t06-balanced-trend-reversal-v1-base.json",
+    "semantic_coupling_review_canonical_path": "tournament/top40-v2/teams/team-06/score-adapters/t06-balanced-trend-reversal-v1-base.semantic-coupling-review.json"
+  },
   "seed": 20260801,
-  "source_bundle_sha256": "<organizer-fill-after-a5-freeze-64-hex-sha256>",
-  "team_id": "team-06"
+  "source_bundle_sha256": "<organizer-fill-only-after-final-control-files-64-hex-sha256>",
+  "team_id": "team-06",
+  "template_only": true
 }

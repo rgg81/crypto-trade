@@ -2,15 +2,29 @@
   "activation": "only-after-combined-full-gate-pass",
   "base_candidate_id": "t06-balanced-trend-reversal-v1-combined",
   "candidate_id": "t06-balanced-trend-reversal-v1-n04-select30",
+  "canonical_materialization": {
+    "active_candidate_id": "t06-balanced-trend-reversal-v1-n04-select30",
+    "active_overrides": {
+      "selection_fraction": 0.3
+    },
+    "entrypoint": "strategy.py:build_strategy",
+    "rule": "Write the exact ID and overrides to root candidate_variant.py, copy the declared combined policy byte-for-byte to root risk_policy.json, commit, rederive all hashes, register, and run that historical commit.",
+    "variant_path": "candidate_variant.py"
+  },
   "changed_parameter": "selection_fraction",
-  "entrypoint": "neighbors/n04_select30_strategy.py:build_strategy",
+  "entrypoint": "strategy.py:build_strategy",
   "family_id": "t06-balanced-trend-reversal-v1",
   "neighbor_id": "n04-select30",
   "parameters": {
     "selection_fraction": 0.3,
     "slow_lookback_bars": 90
   },
-  "risk_policy_path": "risk_policies/combined.json",
+  "risk_policy_materialization": {
+    "destination_path": "risk_policy.json",
+    "mode": "byte-for-byte-before-commit-registration-and-run",
+    "source_path": "risk_policies/combined.json"
+  },
+  "risk_policy_path": "risk_policy.json",
   "schema_version": 1,
   "team_id": "team-06"
 }

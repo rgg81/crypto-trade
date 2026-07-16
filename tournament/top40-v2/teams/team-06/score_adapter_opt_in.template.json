@@ -1,0 +1,7 @@
+{
+  "_top40_v2_score_adapter": {
+    "adapter_id": "top40-v2-declared-score-boundary-v1",
+    "manifest_sha256": "<organizer-fill-canonical-score-manifest-64-hex-sha256>",
+    "schema_version": 1
+  }
+}

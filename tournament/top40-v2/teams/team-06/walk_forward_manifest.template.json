@@ -1,59 +1,86 @@
 {
-  "candidate_id": "<organizer-fill-registered-candidate-id>",
-  "evidence_class": "organizer-derived-equal-chronological-slices",
-  "fold_declaration_path": "folds/fold_declaration.template.json",
-  "fold_declaration_sha256": "<organizer-fill-after-equal-slice-derivation-64-hex-sha256>",
+  "a5_diagnostic_contract": {
+    "automatic_qualification_gate": false,
+    "diagnostic_kind": "top40-v2-development-declared-score-diagnostic-v1",
+    "fold_assignment": "exact active-A5 half-open F1-F6",
+    "label_endpoint_rule": "purge when t + holding_horizon_hours >= fold_end_exclusive",
+    "non_material": true
+  },
+  "active_authority": {
+    "entrypoint_sha256": "0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4",
+    "integration_freeze_commit": "d2b95f610722aab65b4e67466b34efeaa3554101",
+    "integration_freeze_sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c",
+    "pure_crypto_integration_freeze_sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34"
+  },
+  "candidate_id": "t06-balanced-trend-reversal-v1-base",
   "folds": [
     {
-      "fold_id": "fold-1",
-      "model_artifact_path": "<organizer-fill-produced-fold-artifact-path>",
-      "model_artifact_sha256": "<organizer-fill-produced-fold-artifact-64-hex-sha256>",
-      "test_end_inclusive": "<organizer-derive-from-equal-slice-rule>",
-      "test_start": "<organizer-derive-from-equal-slice-rule>",
-      "training_end_inclusive": "<organizer-derive-from-causal-history-before-test-start>"
+      "end_exclusive_utc": "2020-09-01T00:00:00Z",
+      "fold_id": "F1",
+      "start_inclusive_utc": "2020-02-03T00:00:00Z"
     },
     {
-      "fold_id": "fold-2",
-      "model_artifact_path": "<organizer-fill-produced-fold-artifact-path>",
-      "model_artifact_sha256": "<organizer-fill-produced-fold-artifact-64-hex-sha256>",
-      "test_end_inclusive": "<organizer-derive-from-equal-slice-rule>",
-      "test_start": "<organizer-derive-from-equal-slice-rule>",
-      "training_end_inclusive": "<organizer-derive-from-causal-history-before-test-start>"
+      "end_exclusive_utc": "2021-04-01T00:00:00Z",
+      "fold_id": "F2",
+      "start_inclusive_utc": "2020-09-01T00:00:00Z"
     },
     {
-      "fold_id": "fold-3",
-      "model_artifact_path": "<organizer-fill-produced-fold-artifact-path>",
-      "model_artifact_sha256": "<organizer-fill-produced-fold-artifact-64-hex-sha256>",
-      "test_end_inclusive": "<organizer-derive-from-equal-slice-rule>",
-      "test_start": "<organizer-derive-from-equal-slice-rule>",
-      "training_end_inclusive": "<organizer-derive-from-causal-history-before-test-start>"
+      "end_exclusive_utc": "2021-11-01T00:00:00Z",
+      "fold_id": "F3",
+      "start_inclusive_utc": "2021-04-01T00:00:00Z"
     },
     {
-      "fold_id": "fold-4",
-      "model_artifact_path": "<organizer-fill-produced-fold-artifact-path>",
-      "model_artifact_sha256": "<organizer-fill-produced-fold-artifact-64-hex-sha256>",
-      "test_end_inclusive": "<organizer-derive-from-equal-slice-rule>",
-      "test_start": "<organizer-derive-from-equal-slice-rule>",
-      "training_end_inclusive": "<organizer-derive-from-causal-history-before-test-start>"
+      "end_exclusive_utc": "2022-06-01T00:00:00Z",
+      "fold_id": "F4",
+      "start_inclusive_utc": "2021-11-01T00:00:00Z"
     },
     {
-      "fold_id": "fold-5",
-      "model_artifact_path": "<organizer-fill-produced-fold-artifact-path>",
-      "model_artifact_sha256": "<organizer-fill-produced-fold-artifact-64-hex-sha256>",
-      "test_end_inclusive": "<organizer-derive-from-equal-slice-rule>",
-      "test_start": "<organizer-derive-from-equal-slice-rule>",
-      "training_end_inclusive": "<organizer-derive-from-causal-history-before-test-start>"
+      "end_exclusive_utc": "2023-01-01T00:00:00Z",
+      "fold_id": "F5",
+      "start_inclusive_utc": "2022-06-01T00:00:00Z"
     },
     {
-      "fold_id": "fold-6",
-      "model_artifact_path": "<organizer-fill-produced-fold-artifact-path>",
-      "model_artifact_sha256": "<organizer-fill-produced-fold-artifact-64-hex-sha256>",
-      "test_end_inclusive": "<organizer-derive-from-equal-slice-rule>",
-      "test_start": "<organizer-derive-from-equal-slice-rule>",
-      "training_end_inclusive": "<organizer-derive-from-causal-history-before-test-start>"
+      "end_exclusive_utc": "2023-07-01T00:00:00Z",
+      "fold_id": "F6",
+      "start_inclusive_utc": "2023-01-01T00:00:00Z"
     }
   ],
-  "schema_version": 2,
-  "stitched_daily_returns_sha256": "<organizer-fill-after-development-run-64-hex-sha256>",
-  "team_id": "team-06"
+  "label": {
+    "executable_price_column": "open",
+    "holding_horizon_hours": 24,
+    "label_id": "manifest-horizon-simple-executable-open-to-open-return-v1",
+    "minimum_pairs": 100,
+    "return_definition": "simple-executable-open-to-open",
+    "score_direction": "higher-score-higher-return",
+    "statistic_id": "globally-pooled-pearson-v1"
+  },
+  "produced_artifacts": {
+    "diagnostic_summary_path": "reports-top40-v2/team-06/development-score-diagnostics/t06-balanced-trend-reversal-v1-base/diagnostic-summary.json",
+    "diagnostic_summary_sha256": "<organizer-fill-only-after-a5-completed-result-64-hex-sha256>",
+    "labeled_score_panel_path": "reports-top40-v2/team-06/development-score-diagnostics/t06-balanced-trend-reversal-v1-base/labeled-score-panel.parquet",
+    "labeled_score_panel_sha256": "<organizer-fill-only-after-a5-completed-result-64-hex-sha256>",
+    "terminal_result_path": "reports-top40-v2/team-06/development-score-diagnostics/t06-balanced-trend-reversal-v1-base/terminal-result.json",
+    "terminal_result_sha256": "<organizer-fill-only-after-a5-terminal-publication-64-hex-sha256>"
+  },
+  "schedule_utc": {
+    "anchor_timestamp_utc": "2020-02-03T00:00:00Z",
+    "interval_hours": 24
+  },
+  "schema_version": 3,
+  "score_manifest_path": "tournament/top40-v2/teams/team-06/score-adapters/t06-balanced-trend-reversal-v1-base.json",
+  "statistics_fields": [
+    "development_pair_count",
+    "development_pearson",
+    "fold_pair_counts",
+    "fold_pearson",
+    "holding_horizon_hours",
+    "label_id",
+    "minimum_pairs",
+    "purged_fold_boundary_decision_count",
+    "qualification_gate",
+    "statistic_id",
+    "unavailable_symbol_label_count"
+  ],
+  "team_id": "team-06",
+  "template_only": true
 }

@@ -1,8 +1,25 @@
 {
-  "a5_freeze": {
-    "candidate_manifest_path": "candidate_manifest.template.json",
-    "capture_replay_record_sha256": "<organizer-fill-a5-capture-replay-record-64-hex-sha256>",
-    "status": "blocked-pending-organizer-freeze"
+  "active_authority": {
+    "amendment_0005_integration_freeze": {
+      "commit": "d2b95f610722aab65b4e67466b34efeaa3554101",
+      "path": "tournament/top40-v2/amendments/0005/integration-freeze.json",
+      "sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c"
+    },
+    "delegated_amendment_0006_integration_freeze": {
+      "commit": "ed3af1398543dfee4a50150915dc2e37b3631fc9",
+      "path": "tournament/top40-v2/amendments/0006/integration-freeze.json",
+      "sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34"
+    },
+    "entrypoint": {
+      "path": "scripts/top40_v2_tournament_score_diagnostics_v5.py",
+      "sha256": "0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4"
+    },
+    "pure_crypto_audit": {
+      "bytes": 73777,
+      "policy_sha256": "2c7fb0ff593d06c323517e60df4b28ab9387a2df580b83f82f65ef71c91fc350",
+      "sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
+      "violations": 0
+    }
   },
   "bar_contract": {
     "availability_rule": "open_time + 8h <= decision_time",
@@ -13,26 +30,62 @@
       "close"
     ]
   },
-  "byte_invariance": {
-    "candidate_bundle_sha256_after_capture": "<organizer-fill-64-hex-sha256>",
-    "candidate_bundle_sha256_before_capture": "<organizer-fill-64-hex-sha256>",
-    "required_relation": "before == after",
-    "strategy_sha256_after_capture": "<organizer-fill-64-hex-sha256>",
-    "strategy_sha256_before_capture": "<organizer-fill-64-hex-sha256>"
-  },
   "candidate_id": "t06-balanced-trend-reversal-v1-base",
-  "registration_allowed": false,
-  "schema_version": 1,
+  "candidate_materialization": {
+    "active_candidate_id": "t06-balanced-trend-reversal-v1-base",
+    "active_overrides": {},
+    "entrypoint": "strategy.py:build_strategy",
+    "risk_policy_destination_path": "risk_policy.json",
+    "risk_policy_source_path": "risk_policies/no-control.json",
+    "rule": "Materialize and commit the exact root candidate_variant.py and root risk_policy.json bytes before deriving hashes, A5 controls, registration, or execution.",
+    "variant_path": "candidate_variant.py"
+  },
+  "control_file_order": [
+    {
+      "canonical_path": "score-adapters/t06-balanced-trend-reversal-v1-base.executable-source-manifest.json",
+      "must_precede": "semantic-coupling-review",
+      "template_path": "score-adapters/t06-balanced-trend-reversal-v1-base.executable-source-manifest.template.json"
+    },
+    {
+      "canonical_path": "score-adapters/t06-balanced-trend-reversal-v1-base.semantic-coupling-review.json",
+      "must_precede": "score-adapter-manifest",
+      "template_path": "score-adapters/t06-balanced-trend-reversal-v1-base.semantic-coupling-review.template.json"
+    },
+    {
+      "canonical_path": "score-adapters/t06-balanced-trend-reversal-v1-base.json",
+      "must_precede": "trial-registration",
+      "template_path": "score-adapters/t06-balanced-trend-reversal-v1-base.score-adapter-manifest.template.json"
+    }
+  ],
+  "family_id": "t06-balanced-trend-reversal-v1",
+  "materialization_status": {
+    "candidate_hashes_materialized": false,
+    "independent_semantic_review_completed": false,
+    "registration_allowed": false,
+    "score_manifest_materialized": false
+  },
+  "pure_crypto_universe_contract": {
+    "accepted": "organizer-certified native crypto coins and tokens only",
+    "excluded": [
+      "stablecoins",
+      "TradFi and equity contracts",
+      "commodities and metals",
+      "indexes"
+    ],
+    "symbol_text_heuristics_by_strategy": false
+  },
+  "schema_version": 2,
   "score_adapter": {
-    "adapter_id": "top40-v2-preconstruction-score-boundary-v1",
-    "call_count_per_construction": 1,
-    "capture_boundary": "post-transform-pre-selection-weight-cap-risk",
+    "adapter_id": "top40-v2-declared-score-boundary-v1",
+    "call_count_per_scheduled_construction": 1,
+    "capture_boundary": "candidate-declared-post-transform-pre-selection-weight-cap-risk",
     "direct_import": "from crypto_trade.tournament.score_adapter_protocol_v5 import score_boundary",
+    "hook": "strategy.score_boundary",
     "input": "finite built-in dict[str, float] containing every valid candidate score",
-    "local_binding": "strategy.score_boundary",
     "returned_values_drive_construction": true,
-    "selection_or_sizing_before_call": false
+    "runtime_semantic_proof": false
   },
   "seed": 20260801,
-  "team_id": "team-06"
+  "team_id": "team-06",
+  "template_only": true
 }

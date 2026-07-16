@@ -9,8 +9,16 @@
     "selection_fraction": 0.25,
     "slow_lookback_bars": 90
   },
+  "canonical_runtime_materialization": {
+    "entrypoint": "strategy.py:build_strategy",
+    "risk_policy_destination_path": "risk_policy.json",
+    "risk_policy_source_path": "risk_policies/combined.json",
+    "variant_path": "candidate_variant.py"
+  },
   "family_id": "t06-balanced-trend-reversal-v1",
-  "risk_policy_path": "risk_policies/combined.json",
+  "materialization_rule": "Before each neighbor registration, write that neighbor artifact's exact active_candidate_id and active_overrides to root candidate_variant.py and copy risk_policies/combined.json byte-for-byte to root risk_policy.json. Commit those root bytes, rederive all candidate/A5/source/risk hashes, then register and run the historical commit through zero-argument strategy.py:build_strategy. The frozen lifecycle never selects a nested entrypoint or nested risk path.",
+  "risk_policy_path": "risk_policy.json",
+  "risk_policy_template_path": "risk_policies/combined.json",
   "neighbors": [
     {
       "base_value": 90,

@@ -1,0 +1,31 @@
+{
+  "artifact_hashes": {
+    "reports-top40-v2/team-06/development-score-diagnostics/t06-balanced-trend-reversal-v1-base/diagnostic-summary.json": "<organizer-fill-64-hex-sha256>",
+    "reports-top40-v2/team-06/development-score-diagnostics/t06-balanced-trend-reversal-v1-base/labeled-score-panel.parquet": "<organizer-fill-64-hex-sha256>",
+    "reports-top40-v2/team-06/development-score-diagnostics/t06-balanced-trend-reversal-v1-base/replay-1-scores.parquet": "<organizer-fill-64-hex-sha256>",
+    "reports-top40-v2/team-06/development-score-diagnostics/t06-balanced-trend-reversal-v1-base/replay-1-targets.parquet": "<organizer-fill-64-hex-sha256>",
+    "reports-top40-v2/team-06/development-score-diagnostics/t06-balanced-trend-reversal-v1-base/replay-2-scores.parquet": "<organizer-fill-64-hex-sha256>",
+    "reports-top40-v2/team-06/development-score-diagnostics/t06-balanced-trend-reversal-v1-base/replay-2-targets.parquet": "<organizer-fill-64-hex-sha256>"
+  },
+  "authority_sha256": "<organizer-fill-reservation-authority-64-hex-sha256>",
+  "automatic_qualification_gate": false,
+  "candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "charges_team_trial_budget": false,
+  "declared_score_diagnostic_only": true,
+  "diagnostic_id": "development-score-team-06-t06-balanced-trend-reversal-v1-base",
+  "diagnostic_kind": "top40-v2-development-declared-score-diagnostic-v1",
+  "event_type": "development_score_diagnostic_recorded",
+  "executable_source_manifest_sha256": "<organizer-fill-canonical-executable-source-manifest-64-hex-sha256>",
+  "failure_reason": "<organizer-fill-null-for-completed-or-bounded-reason>",
+  "non_material": true,
+  "organizer_cpu_hours": "<organizer-fill-nonnegative-number>",
+  "organizer_wall_clock_hours": "<organizer-fill-nonnegative-number>",
+  "reservation_sha256": "<organizer-fill-canonical-reservation-64-hex-sha256>",
+  "result_sha256": "<organizer-fill-self-hash-over-core-64-hex-sha256>",
+  "schema_version": 1,
+  "semantic_coupling_review_sha256": "<organizer-fill-canonical-semantic-review-64-hex-sha256>",
+  "stage": "development",
+  "statistics": "<organizer-fill-a5-statistics-object-for-completed-or-null>",
+  "status": "<organizer-fill-completed-failed-or-interrupted>",
+  "team_id": "team-06"
+}

@@ -4,19 +4,33 @@
     "mechanism_pivots_consumed": 0,
     "private_tickets_consumed": 0
   },
+  "canonical_runtime_materialization": {
+    "entrypoint": "strategy.py:build_strategy",
+    "risk_policy_path": "risk_policy.json",
+    "rule": "Before every material registration, write the declared active candidate ID and exact overrides to candidate_variant.py and copy the declared policy template byte-for-byte to root risk_policy.json. Commit those bytes and rederive all source, strategy, risk, and A5 hashes before registration; execute the historical registration commit.",
+    "variant_path": "candidate_variant.py"
+  },
   "cost_view_rule": "Every material run emits both 1x and 2x central-cost views from the same frozen target/fill path; the 2x view is never a trial or material configuration.",
   "family_id": "t06-balanced-trend-reversal-v1",
   "read_discipline": "Within each activated batch, register every material trial before running any and read results only after the full batch is terminal.",
   "registration_prerequisite": {
-    "condition": "Organizer completes the A5 candidate-manifest and candidate-contract freeze, replaces every A5 placeholder from authoritative bytes, and confirms byte invariance.",
-    "status": "blocked-pending-a5-freeze"
+    "condition": "Organizer materializes the complete A5 executable-source manifest, obtains the independent semantic-coupling review, materializes the score manifest, and installs its exact SHA-256 in the nested registration opt-in while the active A5/A6 authority remains exact.",
+    "status": "active-authority-bound-materialization-pending"
   },
   "schema_version": 2,
   "stages": [
     {
-      "activation": "initial, but only after A5 freeze",
+      "activation": "initial, but only after A5 control-file materialization and independent semantic review",
       "candidate_ids": [
         "t06-balanced-trend-reversal-v1-base"
+      ],
+      "candidate_materializations": [
+        {
+          "active_candidate_id": "t06-balanced-trend-reversal-v1-base",
+          "active_overrides": {},
+          "risk_policy_destination_path": "risk_policy.json",
+          "risk_policy_source_path": "risk_policies/no-control.json"
+        }
       ],
       "cost_views": [
         1.0,
@@ -29,7 +43,7 @@
         "long_bull_net_return": "> 0",
         "maximum_positive_pnl_concentration": "<= 0.40",
         "minimum_mean_side_exposure": ">= 0.01",
-        "minimum_positive_fold_count": ">= 4 of 6 organizer-derived equal chronological slices",
+        "minimum_positive_fold_count": ">= 4 of 6 frozen A5 chronological folds",
         "minimum_positive_quarter_fraction": ">= 0.55",
         "minimum_side_active_bar_fraction": ">= 0.10",
         "minimum_side_executed_notional_usdt": ">= 1000",
@@ -45,6 +59,7 @@
       },
       "material_configurations": 1,
       "policy_path": "risk_policy.json",
+      "policy_template_path": "risk_policies/no-control.json",
       "policy_variant": "no-control",
       "required_outcome": "Every broad no-control alpha minimum passes; any failure is terminal for this family because controls may not create or rescue negative core alpha.",
       "stage_id": "no-control-core"
@@ -57,17 +72,44 @@
         "t06-balanced-trend-reversal-v1-ablation-turnover-only",
         "t06-balanced-trend-reversal-v1-combined"
       ],
+      "candidate_materializations": [
+        {
+          "active_candidate_id": "t06-balanced-trend-reversal-v1-ablation-volatility-only",
+          "active_overrides": {},
+          "risk_policy_destination_path": "risk_policy.json",
+          "risk_policy_source_path": "risk_policies/volatility-only.json"
+        },
+        {
+          "active_candidate_id": "t06-balanced-trend-reversal-v1-ablation-drawdown-only",
+          "active_overrides": {},
+          "risk_policy_destination_path": "risk_policy.json",
+          "risk_policy_source_path": "risk_policies/drawdown-only.json"
+        },
+        {
+          "active_candidate_id": "t06-balanced-trend-reversal-v1-ablation-turnover-only",
+          "active_overrides": {},
+          "risk_policy_destination_path": "risk_policy.json",
+          "risk_policy_source_path": "risk_policies/turnover-only.json"
+        },
+        {
+          "active_candidate_id": "t06-balanced-trend-reversal-v1-combined",
+          "active_overrides": {},
+          "risk_policy_destination_path": "risk_policy.json",
+          "risk_policy_source_path": "risk_policies/combined.json"
+        }
+      ],
       "cost_views_per_run": [
         1.0,
         2.0
       ],
       "material_configurations": 4,
-      "policy_paths": [
+      "policy_template_paths": [
         "risk_policies/volatility-only.json",
         "risk_policies/drawdown-only.json",
         "risk_policies/turnover-only.json",
         "risk_policies/combined.json"
       ],
+      "runtime_policy_path": "risk_policy.json",
       "required_outcome": "Read all four together for fixed attribution only; do not select a policy and do not use any controlled result to cure a failed no-control core gate.",
       "stage_id": "fixed-control-batch"
     },
@@ -88,12 +130,47 @@
         "t06-balanced-trend-reversal-v1-n03-select20",
         "t06-balanced-trend-reversal-v1-n04-select30"
       ],
+      "candidate_materializations": [
+        {
+          "active_candidate_id": "t06-balanced-trend-reversal-v1-n01-slow84",
+          "active_overrides": {
+            "slow_lookback_bars": 84
+          },
+          "risk_policy_destination_path": "risk_policy.json",
+          "risk_policy_source_path": "risk_policies/combined.json"
+        },
+        {
+          "active_candidate_id": "t06-balanced-trend-reversal-v1-n02-slow96",
+          "active_overrides": {
+            "slow_lookback_bars": 96
+          },
+          "risk_policy_destination_path": "risk_policy.json",
+          "risk_policy_source_path": "risk_policies/combined.json"
+        },
+        {
+          "active_candidate_id": "t06-balanced-trend-reversal-v1-n03-select20",
+          "active_overrides": {
+            "selection_fraction": 0.2
+          },
+          "risk_policy_destination_path": "risk_policy.json",
+          "risk_policy_source_path": "risk_policies/combined.json"
+        },
+        {
+          "active_candidate_id": "t06-balanced-trend-reversal-v1-n04-select30",
+          "active_overrides": {
+            "selection_fraction": 0.3
+          },
+          "risk_policy_destination_path": "risk_policy.json",
+          "risk_policy_source_path": "risk_policies/combined.json"
+        }
+      ],
       "cost_views_per_run": [
         1.0,
         2.0
       ],
       "material_configurations": 4,
-      "policy_path": "risk_policies/combined.json",
+      "policy_path": "risk_policy.json",
+      "policy_template_path": "risk_policies/combined.json",
       "required_outcome": "At least 3/4 neighbors are profitable and median Sharpe is >= 0.50; the combined base remains the only qualification candidate.",
       "stage_id": "combined-policy-neighborhood"
     }

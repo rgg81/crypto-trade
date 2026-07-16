@@ -5,6 +5,12 @@
     "status": "dormant"
   },
   "candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "canonical_runtime_materialization": {
+    "entrypoint": "strategy.py:build_strategy",
+    "risk_policy_path": "risk_policy.json",
+    "rule": "For each activated material candidate, commit its exact ID and overrides in root candidate_variant.py and copy the selected policy template byte-for-byte to root risk_policy.json before hashing, registration, and execution.",
+    "variant_path": "candidate_variant.py"
+  },
   "cost_view_contract": {
     "multipliers": [
       1.0,
@@ -15,48 +21,57 @@
   "family_id": "t06-balanced-trend-reversal-v1",
   "policy_variants": [
     {
+      "active_overrides": {},
       "candidate_id": "t06-balanced-trend-reversal-v1-base",
       "controls_enabled": [],
       "material_configuration": true,
       "policy_path": "risk_policy.json",
+      "policy_template_path": "risk_policies/no-control.json",
       "role": "initial uncontrolled signal core; must pass before any controlled trial is activated",
       "run_stage": "no-control-core",
       "variant_id": "no-control"
     },
     {
+      "active_overrides": {},
       "candidate_id": "t06-balanced-trend-reversal-v1-ablation-volatility-only",
       "controls_enabled": [
         "volatility_target"
       ],
       "material_configuration": true,
-      "policy_path": "risk_policies/volatility-only.json",
+      "policy_path": "risk_policy.json",
+      "policy_template_path": "risk_policies/volatility-only.json",
       "role": "attribute volatility and tail scaling",
       "run_stage": "fixed-control-batch",
       "variant_id": "volatility-only"
     },
     {
+      "active_overrides": {},
       "candidate_id": "t06-balanced-trend-reversal-v1-ablation-drawdown-only",
       "controls_enabled": [
         "drawdown_brakes"
       ],
       "material_configuration": true,
-      "policy_path": "risk_policies/drawdown-only.json",
+      "policy_path": "risk_policy.json",
+      "policy_template_path": "risk_policies/drawdown-only.json",
       "role": "attribute peak-to-trough containment",
       "run_stage": "fixed-control-batch",
       "variant_id": "drawdown-only"
     },
     {
+      "active_overrides": {},
       "candidate_id": "t06-balanced-trend-reversal-v1-ablation-turnover-only",
       "controls_enabled": [
         "turnover_limit"
       ],
       "material_configuration": true,
-      "policy_path": "risk_policies/turnover-only.json",
+      "policy_path": "risk_policy.json",
+      "policy_template_path": "risk_policies/turnover-only.json",
       "role": "attribute churn and cost containment",
       "run_stage": "fixed-control-batch",
       "variant_id": "turnover-only"
     },
     {
+      "active_overrides": {},
       "candidate_id": "t06-balanced-trend-reversal-v1-combined",
       "controls_enabled": [
         "volatility_target",
@@ -64,7 +79,8 @@
         "turnover_limit"
       ],
       "material_configuration": true,
-      "policy_path": "risk_policies/combined.json",
+      "policy_path": "risk_policy.json",
+      "policy_template_path": "risk_policies/combined.json",
       "role": "predeclared combined policy and only candidate assessed against full qualification gates",
       "run_stage": "fixed-control-batch",
       "variant_id": "combined"

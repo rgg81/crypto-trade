@@ -84,8 +84,6 @@
     ]
   },
   "parent_family_id": null,
-  "registration_blocker": "Do not register until the organizer completes the A5 candidate-manifest and candidate-contract freeze and replaces all A5 sentinels from authoritative bytes.",
-  "registration_status": "blocked-pending-a5-freeze",
   "registered_at_utc": "<organizer-assigned-registration-timestamp-Z>",
   "risk_policy_parameter_ranges": {
     "drawdown_brakes": [
@@ -156,15 +154,7 @@
       0.3
     ]
   },
-  "risk_policy_plan": "Run the top-level no-control policy first and require every positive broad-alpha minimum. Only after it passes, run the three single controls and the separately frozen combined policy as one preregistered batch. Controls cannot rescue negative core alpha. Apply full qualification gates to combined, then activate combined-policy neighbors.",
   "schema_version": 1,
-  "score_boundary_contract": {
-    "adapter_id": "top40-v2-preconstruction-score-boundary-v1",
-    "call_count_per_construction": 1,
-    "capture_boundary": "post-transform-pre-selection-weight-cap-risk",
-    "input": "finite built-in dict[str, float]",
-    "returned_values_drive_construction": true
-  },
   "seed_range": [
     20260801
   ],

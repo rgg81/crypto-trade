@@ -17,10 +17,10 @@ import math
 from collections.abc import Mapping, Sequence
 from typing import Any, Protocol
 
+import candidate_variant
 import pandas as pd
 
 from crypto_trade.tournament.score_adapter_protocol_v5 import score_boundary
-
 
 FROZEN_SEED = 20260801
 BAR_INTERVAL_HOURS = 8
@@ -45,6 +45,18 @@ CHOP_TREND_MIX = 0.35
 DIRECTIONAL_TREND_MIX = 0.80
 DIRECTION_FULL_SCALE_RETURN = 0.15
 VOLATILITY_SCORE_PENALTY = 0.10
+
+MATERIALIZED_CANDIDATE_OVERRIDES: dict[str, dict[str, object]] = {
+    "t06-balanced-trend-reversal-v1-base": {},
+    "t06-balanced-trend-reversal-v1-ablation-volatility-only": {},
+    "t06-balanced-trend-reversal-v1-ablation-drawdown-only": {},
+    "t06-balanced-trend-reversal-v1-ablation-turnover-only": {},
+    "t06-balanced-trend-reversal-v1-combined": {},
+    "t06-balanced-trend-reversal-v1-n01-slow84": {"slow_lookback_bars": 84},
+    "t06-balanced-trend-reversal-v1-n02-slow96": {"slow_lookback_bars": 96},
+    "t06-balanced-trend-reversal-v1-n03-select20": {"selection_fraction": 0.20},
+    "t06-balanced-trend-reversal-v1-n04-select30": {"selection_fraction": 0.30},
+}
 
 
 class ContextLike(Protocol):
@@ -121,9 +133,7 @@ def _closed_close_values(
     open_times = _datetime_values(frame["open_time"])
     close_times = open_times + pd.Timedelta(hours=BAR_INTERVAL_HOURS)
     closes = pd.to_numeric(frame["close"], errors="coerce").reset_index(drop=True)
-    table = pd.DataFrame(
-        {"open_time": open_times, "close_time": close_times, "close": closes}
-    )
+    table = pd.DataFrame({"open_time": open_times, "close_time": close_times, "close": closes})
     table = table.loc[
         table["open_time"].notna()
         & table["close_time"].notna()
@@ -163,9 +173,7 @@ def _sample_annualized_volatility(values: Sequence[float]) -> float | None:
     return annualized if math.isfinite(annualized) else None
 
 
-def _raw_features(
-    values: Sequence[float], *, slow_lookback_bars: int
-) -> _RawFeatures | None:
+def _raw_features(values: Sequence[float], *, slow_lookback_bars: int) -> _RawFeatures | None:
     required = slow_lookback_bars + MOMENTUM_LAG_BARS + 1
     if len(values) < required:
         return None
@@ -242,9 +250,7 @@ class BalancedTrendReversalStrategy:
             or slow_lookback_bars <= FAST_LOOKBACK_BARS
         ):
             raise ValueError("slow_lookback_bars must be an integer above fast lookback")
-        if isinstance(selection_fraction, bool) or not isinstance(
-            selection_fraction, (int, float)
-        ):
+        if isinstance(selection_fraction, bool) or not isinstance(selection_fraction, (int, float)):
             raise ValueError("selection_fraction must be numeric")
         if not math.isfinite(selection_fraction) or not 0.0 < selection_fraction < 0.5:
             raise ValueError("selection_fraction must be finite and in (0, 0.5)")
@@ -278,9 +284,7 @@ class BalancedTrendReversalStrategy:
             closed = _closed_close_values(frame, decision_time)
             if closed is None:
                 continue
-            feature = _raw_features(
-                closed[0], slow_lookback_bars=self._slow_lookback_bars
-            )
+            feature = _raw_features(closed[0], slow_lookback_bars=self._slow_lookback_bars)
             if feature is not None:
                 features[symbol] = feature
 
@@ -289,21 +293,13 @@ class BalancedTrendReversalStrategy:
 
         slow_rank = _centered_ranks({key: value.slow for key, value in features.items()})
         fast_rank = _centered_ranks({key: value.fast for key, value in features.items()})
-        reversal_rank = _centered_ranks(
-            {key: value.reversal for key, value in features.items()}
-        )
+        reversal_rank = _centered_ranks({key: value.reversal for key, value in features.items()})
         volatility_rank = _centered_ranks(
             {key: value.annualized_volatility for key, value in features.items()}
         )
-        market_slow_return = _median(
-            [value.unscaled_slow_return for value in features.values()]
-        )
-        direction_strength = _clip(
-            abs(market_slow_return) / DIRECTION_FULL_SCALE_RETURN, 0.0, 1.0
-        )
-        trend_mix = CHOP_TREND_MIX + direction_strength * (
-            DIRECTIONAL_TREND_MIX - CHOP_TREND_MIX
-        )
+        market_slow_return = _median([value.unscaled_slow_return for value in features.values()])
+        direction_strength = _clip(abs(market_slow_return) / DIRECTION_FULL_SCALE_RETURN, 0.0, 1.0)
+        trend_mix = CHOP_TREND_MIX + direction_strength * (DIRECTIONAL_TREND_MIX - CHOP_TREND_MIX)
 
         scores: list[tuple[str, float]] = []
         for symbol in sorted(features):
@@ -347,17 +343,13 @@ class BalancedTrendReversalStrategy:
             raise ValueError("score_boundary returned a non-finite or non-numeric score")
         return bounded_scores
 
-    def preconstruction_scores(
-        self, context: ContextLike, *, seed: int
-    ) -> Mapping[str, float]:
+    def preconstruction_scores(self, context: ContextLike, *, seed: int) -> Mapping[str, float]:
         """Organizer-facing public boundary; no selection has happened yet."""
 
         snapshot = self.preconstruction_snapshot(context, seed=seed)
         return self._apply_public_score_boundary(snapshot)
 
-    def target_weights(
-        self, context: ContextLike, *, seed: int
-    ) -> Mapping[str, float] | None:
+    def target_weights(self, context: ContextLike, *, seed: int) -> Mapping[str, float] | None:
         self._validate_seed(seed)
         decision_time = _utc_timestamp(context.decision_time)
         if (
@@ -403,9 +395,23 @@ class BalancedTrendReversalStrategy:
 
 
 def build_strategy() -> BalancedTrendReversalStrategy:
-    """Canonical factory; the organizer normally calls it without arguments."""
+    """Canonical root factory for the explicitly materialized candidate variant."""
 
-    return BalancedTrendReversalStrategy()
+    candidate_id = candidate_variant.ACTIVE_CANDIDATE_ID
+    overrides = candidate_variant.ACTIVE_OVERRIDES
+    if type(candidate_id) is not str or not candidate_id:
+        raise ValueError("active candidate identifier must be nonempty text")
+    if type(overrides) is not dict:
+        raise ValueError("active candidate overrides must be a built-in dictionary")
+    expected = MATERIALIZED_CANDIDATE_OVERRIDES.get(candidate_id)
+    if expected is None:
+        raise ValueError(f"unknown materialized candidate identifier: {candidate_id}")
+    if set(overrides) != set(expected) or any(
+        type(overrides[name]) is not type(value) or overrides[name] != value
+        for name, value in expected.items()
+    ):
+        raise ValueError(f"active overrides do not match the declaration for {candidate_id}")
+    return build_parameterized_strategy(**overrides)
 
 
 def build_parameterized_strategy(
@@ -413,7 +419,7 @@ def build_parameterized_strategy(
     slow_lookback_bars: int = SLOW_LOOKBACK_BARS,
     selection_fraction: float = SELECTION_FRACTION,
 ) -> BalancedTrendReversalStrategy:
-    """Explicit constructor used only by preregistered byte-distinct neighbor wrappers."""
+    """Construct a validated variant selected by the canonical root factory."""
 
     return BalancedTrendReversalStrategy(
         slow_lookback_bars=slow_lookback_bars,

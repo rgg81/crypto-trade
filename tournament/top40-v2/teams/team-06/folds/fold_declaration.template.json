@@ -1,53 +1,42 @@
 {
-  "candidate_id": "<organizer-fill-registered-candidate-id>",
+  "candidate_id": "t06-balanced-trend-reversal-v1-base",
   "derivation": {
-    "boundary_source": "organizer canonical visible-development observation boundaries from tournament/top40-v2/config.toml",
+    "authority": "crypto_trade.tournament.development_score_diagnostics_v5.FOLDS",
     "fold_count": 6,
-    "method": "Enumerate the organizer-owned visible-development observation boundaries in strictly increasing order; let q,r = divmod(count,6); assign q+1 consecutive boundaries to each of the first r folds and q to each remaining fold.",
-    "requirements": [
-      "folds are chronological, contiguous, nonoverlapping, and exhaustive",
-      "fold lengths differ by at most one organizer observation boundary",
-      "each fold test start is the boundary immediately after its training end",
-      "no Team06-authored calendar boundary overrides organizer derivation"
-    ]
+    "interval_semantics": "start-inclusive-end-exclusive",
+    "label_endpoint_purge": "purge when label_end >= fold_end",
+    "method": "Use the exact active Amendment 0005 F1-F6 constants without Team06-authored date changes."
   },
-  "evidence_class": "organizer-derived-equal-chronological-slices",
   "folds": [
     {
-      "fold_id": "fold-1",
-      "test_end_inclusive": "<organizer-derive-from-equal-slice-rule>",
-      "test_start": "<organizer-derive-from-equal-slice-rule>",
-      "training_end_inclusive": "<organizer-derive-from-causal-history-before-test-start>"
+      "end_exclusive_utc": "2020-09-01T00:00:00Z",
+      "fold_id": "F1",
+      "start_inclusive_utc": "2020-02-03T00:00:00Z"
     },
     {
-      "fold_id": "fold-2",
-      "test_end_inclusive": "<organizer-derive-from-equal-slice-rule>",
-      "test_start": "<organizer-derive-from-equal-slice-rule>",
-      "training_end_inclusive": "<organizer-derive-from-causal-history-before-test-start>"
+      "end_exclusive_utc": "2021-04-01T00:00:00Z",
+      "fold_id": "F2",
+      "start_inclusive_utc": "2020-09-01T00:00:00Z"
     },
     {
-      "fold_id": "fold-3",
-      "test_end_inclusive": "<organizer-derive-from-equal-slice-rule>",
-      "test_start": "<organizer-derive-from-equal-slice-rule>",
-      "training_end_inclusive": "<organizer-derive-from-causal-history-before-test-start>"
+      "end_exclusive_utc": "2021-11-01T00:00:00Z",
+      "fold_id": "F3",
+      "start_inclusive_utc": "2021-04-01T00:00:00Z"
     },
     {
-      "fold_id": "fold-4",
-      "test_end_inclusive": "<organizer-derive-from-equal-slice-rule>",
-      "test_start": "<organizer-derive-from-equal-slice-rule>",
-      "training_end_inclusive": "<organizer-derive-from-causal-history-before-test-start>"
+      "end_exclusive_utc": "2022-06-01T00:00:00Z",
+      "fold_id": "F4",
+      "start_inclusive_utc": "2021-11-01T00:00:00Z"
     },
     {
-      "fold_id": "fold-5",
-      "test_end_inclusive": "<organizer-derive-from-equal-slice-rule>",
-      "test_start": "<organizer-derive-from-equal-slice-rule>",
-      "training_end_inclusive": "<organizer-derive-from-causal-history-before-test-start>"
+      "end_exclusive_utc": "2023-01-01T00:00:00Z",
+      "fold_id": "F5",
+      "start_inclusive_utc": "2022-06-01T00:00:00Z"
     },
     {
-      "fold_id": "fold-6",
-      "test_end_inclusive": "<organizer-derive-from-equal-slice-rule>",
-      "test_start": "<organizer-derive-from-equal-slice-rule>",
-      "training_end_inclusive": "<organizer-derive-from-causal-history-before-test-start>"
+      "end_exclusive_utc": "2023-07-01T00:00:00Z",
+      "fold_id": "F6",
+      "start_inclusive_utc": "2023-01-01T00:00:00Z"
     }
   ],
   "fit": {
@@ -55,9 +44,9 @@
     "learned_preprocessing": false,
     "learned_state": false,
     "procedure": "fresh strategy instance with frozen source, exact material parameters, policy, and seed",
-    "purge_or_embargo": "not applicable because no forward label exists"
+    "purge_or_embargo": "only the A5 diagnostic label endpoint purge applies"
   },
-  "schema_version": 1,
+  "schema_version": 2,
   "seed": 20260801,
   "team_id": "team-06"
 }

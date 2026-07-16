@@ -1,4 +1,17 @@
 {
+  "active_authority": {
+    "entrypoint_path": "scripts/top40_v2_tournament_score_diagnostics_v5.py",
+    "entrypoint_sha256": "0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4",
+    "integration_freeze_commit": "d2b95f610722aab65b4e67466b34efeaa3554101",
+    "integration_freeze_sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c",
+    "pure_crypto_integration_freeze_sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34"
+  },
+  "candidate_materialization": {
+    "initial_active_candidate_id": "t06-balanced-trend-reversal-v1-base",
+    "initial_active_overrides": {},
+    "rule": "Root candidate_variant.py is the sole candidate-specific selector; it is updated, committed, and hash-bound before each registration, and zero-argument strategy.py:build_strategy validates and consumes it.",
+    "variant_path": "candidate_variant.py"
+  },
   "candidate_id": "t06-balanced-trend-reversal-v1-base",
   "data_contract": {
     "bar_interval": "8h",
@@ -9,7 +22,7 @@
     ],
     "close_availability": "open_time_plus_8h_lte_decision_time",
     "funding_used_by_strategy": false,
-    "membership": "context.eligible_symbols_at_decision",
+    "membership": "amendment_0006_certified_pure_crypto_context.eligible_symbols_at_decision",
     "maximum_staleness_hours": 16,
     "minimum_valid_symbols": 12,
     "runtime_artifacts": "none"
@@ -29,7 +42,6 @@
     "maximum_symbol_exposure": 0.07,
     "minimum_positions_per_side": 4,
     "minimum_valid_symbols": 12,
-    "minimum_positions_per_side": 4,
     "momentum_lag_bars": 3,
     "rebalance_hour_utc": 0,
     "reversal_lookback_bars": 6,
@@ -48,9 +60,9 @@
     "sizing": "equal_weight_per_side_subject_to_0.07_symbol_cap"
   },
   "preconstruction_boundary": {
-    "adapter_id": "top40-v2-preconstruction-score-boundary-v1",
-    "call_count_per_construction": 1,
-    "capture_boundary": "post-transform-pre-selection-weight-cap-risk",
+    "adapter_id": "top40-v2-declared-score-boundary-v1",
+    "call_count_per_scheduled_construction": 1,
+    "capture_boundary": "candidate-declared-post-transform-pre-selection-weight-cap-risk",
     "input_contract": "finite_builtin_dict_str_float",
     "local_binding": "strategy.score_boundary",
     "public_methods": [
@@ -61,8 +73,9 @@
     "selection_weight_cap_or_risk_before_boundary": false,
     "shared_hook_import": "crypto_trade.tournament.score_adapter_protocol_v5.score_boundary"
   },
-  "registration_blocker": "A5 organizer candidate-manifest and contract freeze is incomplete",
-  "combined_risk_policy_path": "risk_policies/combined.json",
+  "registration_blocker": "A5 executable-source manifest, independent semantic review, score manifest, and exact registration opt-in are not materialized",
+  "combined_risk_policy_template_path": "risk_policies/combined.json",
+  "risk_materialization_rule": "Copy the selected risk_policies template byte-for-byte to top-level risk_policy.json before commit, registration, and run; the lifecycle reads only the root path.",
   "risk_policy_path": "risk_policy.json",
   "schema_version": 1,
   "seed": 20260801,

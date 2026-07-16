@@ -14,7 +14,7 @@
       "use": "rebalance only at 00:00 UTC; non-rebalance boundaries return None"
     },
     {
-      "availability": "organizer point-in-time membership intersected with executable next-open availability",
+      "availability": "Amendment 0006-certified pure-crypto point-in-time membership intersected with executable next-open availability",
       "event_timestamp": "current decision boundary",
       "feature_id": "eligible_universe",
       "lag": "membership state supplied at boundary",
@@ -22,7 +22,7 @@
       "raw_fields": [
         "DecisionContext.eligible_symbols"
       ],
-      "source": "neutral tournament protocol",
+      "source": "active A5 dispatcher delegated to Amendment 0006 pure-crypto universe authority",
       "use": "preconstruction candidate set only"
     },
     {
@@ -116,7 +116,11 @@
     "private qualifier data",
     "final OOS data",
     "full-window learned transforms",
-    "timestamp-to-target tables"
+    "timestamp-to-target tables",
+    "stablecoin contracts",
+    "TradFi or equity contracts",
+    "commodity or metal contracts",
+    "index contracts"
   ],
   "labels": {
     "embargo_bars": 0,

@@ -20,11 +20,11 @@ from crypto_trade.tournament.score_adapter_protocol_v5 import (
     score_boundary as public_score_boundary,
 )
 
-
 TEAM_DIR = Path(__file__).resolve().parent
 if str(TEAM_DIR) not in sys.path:
     sys.path.insert(0, str(TEAM_DIR))
 
+import candidate_variant  # noqa: E402
 import strategy  # noqa: E402
 
 
@@ -132,9 +132,7 @@ def test_only_canonical_rangeindex_open_time_frames_are_admitted() -> None:
         symbol: frame.set_index("open_time") for symbol, frame in context.bars.items()
     }
 
-    assert strategy.build_strategy().target_weights(
-        noncanonical, seed=strategy.FROZEN_SEED
-    ) == {}
+    assert strategy.build_strategy().target_weights(noncanonical, seed=strategy.FROZEN_SEED) == {}
 
 
 def test_point_in_time_membership_is_the_only_candidate_set() -> None:
@@ -166,9 +164,7 @@ def test_next_open_auxiliary_funding_and_cost_like_fields_cannot_change_signal()
         }
     )
     mutated.auxiliary = {
-        "costs": pd.DataFrame(
-            {"taker_fee_bps": [5.0, 10.0], "slippage_bps": [2.5, 5.0]}
-        )
+        "costs": pd.DataFrame({"taker_fee_bps": [5.0, 10.0], "slippage_bps": [2.5, 5.0]})
     }
 
     assert _targets(mutated) == expected
@@ -179,9 +175,11 @@ def test_direct_public_score_boundary_is_called_once_at_the_declared_boundary(
 ) -> None:
     context = _synthetic_context()
     assert strategy.score_boundary is public_score_boundary
-    expected_scores = strategy.build_strategy().preconstruction_snapshot(
-        context, seed=strategy.FROZEN_SEED
-    ).score_map()
+    expected_scores = (
+        strategy.build_strategy()
+        .preconstruction_snapshot(context, seed=strategy.FROZEN_SEED)
+        .score_map()
+    )
     observed: list[dict[str, float]] = []
 
     def capture(scores):
@@ -219,6 +217,7 @@ def test_score_boundary_returned_values_drive_construction(monkeypatch) -> None:
 def test_score_capture_does_not_change_frozen_candidate_bytes(monkeypatch) -> None:
     context = _synthetic_context()
     frozen_paths = (
+        TEAM_DIR / "candidate_variant.py",
         TEAM_DIR / "strategy.py",
         TEAM_DIR / "frozen_config.json",
         TEAM_DIR / "risk_policy.json",
@@ -241,12 +240,7 @@ def test_score_capture_does_not_change_frozen_candidate_bytes(monkeypatch) -> No
 
 def test_non_rebalance_holds_and_insufficient_universe_requests_flat() -> None:
     off_schedule = _synthetic_context(decision_time="2023-06-30T08:00:00Z")
-    assert (
-        strategy.build_strategy().target_weights(
-            off_schedule, seed=strategy.FROZEN_SEED
-        )
-        is None
-    )
+    assert strategy.build_strategy().target_weights(off_schedule, seed=strategy.FROZEN_SEED) is None
 
     too_small = _synthetic_context(symbol_count=11)
     assert strategy.build_strategy().target_weights(too_small, seed=strategy.FROZEN_SEED) == {}
@@ -262,6 +256,135 @@ def test_wrong_seed_is_rejected_and_clean_instances_reproduce() -> None:
     assert clean_a.target_weights(context, seed=strategy.FROZEN_SEED) == clean_b.target_weights(
         context, seed=strategy.FROZEN_SEED
     )
+
+
+@pytest.mark.parametrize(
+    ("candidate_id", "overrides", "expected_slow", "expected_selection"),
+    [
+        ("t06-balanced-trend-reversal-v1-base", {}, 90, 0.25),
+        ("t06-balanced-trend-reversal-v1-ablation-volatility-only", {}, 90, 0.25),
+        ("t06-balanced-trend-reversal-v1-ablation-drawdown-only", {}, 90, 0.25),
+        ("t06-balanced-trend-reversal-v1-ablation-turnover-only", {}, 90, 0.25),
+        ("t06-balanced-trend-reversal-v1-combined", {}, 90, 0.25),
+        (
+            "t06-balanced-trend-reversal-v1-n01-slow84",
+            {"slow_lookback_bars": 84},
+            84,
+            0.25,
+        ),
+        (
+            "t06-balanced-trend-reversal-v1-n02-slow96",
+            {"slow_lookback_bars": 96},
+            96,
+            0.25,
+        ),
+        (
+            "t06-balanced-trend-reversal-v1-n03-select20",
+            {"selection_fraction": 0.20},
+            90,
+            0.20,
+        ),
+        (
+            "t06-balanced-trend-reversal-v1-n04-select30",
+            {"selection_fraction": 0.30},
+            90,
+            0.30,
+        ),
+    ],
+)
+def test_zero_argument_root_factory_consumes_exact_materialized_variant(
+    monkeypatch, candidate_id, overrides, expected_slow, expected_selection
+) -> None:
+    monkeypatch.setattr(candidate_variant, "ACTIVE_CANDIDATE_ID", candidate_id)
+    monkeypatch.setattr(candidate_variant, "ACTIVE_OVERRIDES", overrides)
+
+    built = strategy.build_strategy()
+
+    assert built._slow_lookback_bars == expected_slow
+    assert built._selection_fraction == expected_selection
+
+
+def test_zero_argument_root_factory_rejects_variant_declaration_mismatch(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        candidate_variant,
+        "ACTIVE_CANDIDATE_ID",
+        "t06-balanced-trend-reversal-v1-n01-slow84",
+    )
+    monkeypatch.setattr(candidate_variant, "ACTIVE_OVERRIDES", {})
+
+    with pytest.raises(ValueError, match="do not match"):
+        strategy.build_strategy()
+
+
+def test_trial_and_neighbor_declarations_materialize_only_root_runtime_paths() -> None:
+    plan = json.loads((TEAM_DIR / "trial_plan.json").read_text(encoding="utf-8"))
+    materializations = []
+    for stage in plan["stages"]:
+        if stage["material_configurations"] == 0:
+            continue
+        declared = stage["candidate_materializations"]
+        assert stage["candidate_ids"] == [item["active_candidate_id"] for item in declared]
+        assert stage["material_configurations"] == len(declared)
+        materializations.extend(declared)
+
+    assert len(materializations) == plan["budget_ceiling"]["maximum_material_configurations"]
+    assert {
+        item["active_candidate_id"]: item["active_overrides"] for item in materializations
+    } == strategy.MATERIALIZED_CANDIDATE_OVERRIDES
+    assert all(
+        item["risk_policy_destination_path"] == "risk_policy.json"
+        and item["risk_policy_source_path"].startswith("risk_policies/")
+        for item in materializations
+    )
+
+    for path in sorted((TEAM_DIR / "neighbors").glob("*.json")):
+        declaration = json.loads(path.read_text(encoding="utf-8"))
+        materialization = declaration["canonical_materialization"]
+        assert declaration["entrypoint"] == "strategy.py:build_strategy"
+        assert materialization["variant_path"] == "candidate_variant.py"
+        assert materialization["active_candidate_id"] == declaration["candidate_id"]
+        assert (
+            materialization["active_overrides"]
+            == strategy.MATERIALIZED_CANDIDATE_OVERRIDES[declaration["candidate_id"]]
+        )
+        assert declaration["risk_policy_path"] == "risk_policy.json"
+        assert declaration["risk_policy_materialization"] == {
+            "destination_path": "risk_policy.json",
+            "mode": "byte-for-byte-before-commit-registration-and-run",
+            "source_path": "risk_policies/combined.json",
+        }
+
+
+def test_a5_source_manifest_is_complete_for_root_materialization() -> None:
+    manifest = json.loads(
+        (
+            TEAM_DIR
+            / "score-adapters"
+            / "t06-balanced-trend-reversal-v1-base.executable-source-manifest.template.json"
+        ).read_text(encoding="utf-8")
+    )
+    expected_paths = sorted(
+        [
+            *(str(path.relative_to(TEAM_DIR)) for path in TEAM_DIR.rglob("*.py")),
+            "frozen_config.json",
+            "risk_policy.json",
+        ]
+    )
+
+    assert [item["path"] for item in manifest["files"]] == expected_paths
+
+    plan = json.loads((TEAM_DIR / "trial_plan.json").read_text(encoding="utf-8"))
+    selected = next(
+        materialization
+        for stage in plan["stages"]
+        for materialization in stage.get("candidate_materializations", [])
+        if materialization["active_candidate_id"] == candidate_variant.ACTIVE_CANDIDATE_ID
+    )
+    assert (TEAM_DIR / "risk_policy.json").read_bytes() == (
+        TEAM_DIR / selected["risk_policy_source_path"]
+    ).read_bytes()
 
 
 def test_frozen_config_and_declarative_risk_boundary_match_source() -> None:

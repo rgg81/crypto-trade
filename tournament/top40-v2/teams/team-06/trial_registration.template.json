@@ -1,18 +1,13 @@
 {
   "candidate_id": "t06-balanced-trend-reversal-v1-base",
-  "candidate_contract_sha256": "<organizer-fill-after-a5-freeze-64-hex-sha256>",
-  "candidate_manifest_sha256": "<organizer-fill-after-a5-freeze-64-hex-sha256>",
-  "config_sha256": "<organizer-fill-frozen-config-64-hex-sha256>",
-  "cost_views": {
-    "multipliers": [
-      1.0,
-      2.0
-    ],
-    "one_material_run": true
-  },
   "falsifier": "Any failed preregistered no-control broad-alpha minimum rejects this family before controls; a single-control, combined-control, doubled-cost view, or neighbor cannot compensate.",
   "family_id": "t06-balanced-trend-reversal-v1",
   "parameters": {
+    "_top40_v2_score_adapter": {
+      "adapter_id": "top40-v2-declared-score-boundary-v1",
+      "manifest_sha256": "<organizer-fill-canonical-score-manifest-64-hex-sha256>",
+      "schema_version": 1
+    },
     "annualization_bars": 1095,
     "bar_interval_hours": 8,
     "base_gross_exposure": 0.48,
@@ -36,12 +31,9 @@
     "volatility_lookback_bars": 60,
     "volatility_score_penalty": 0.1
   },
-  "registration_blocker": "A5 candidate-manifest and candidate-contract freeze incomplete; this template must not be registered while any A5 sentinel remains.",
-  "registration_status": "blocked-pending-a5-freeze",
-  "risk_config_sha256": "<organizer-fill-risk-policy-64-hex-sha256>",
+  "risk_config_sha256": "<organizer-fill-final-no-control-risk-policy-64-hex-sha256>",
   "risk_parameters": {
     "drawdown_brakes": [],
-    "policy_path": "risk_policy.json",
     "position_stop": {
       "cooldown_bars": 3,
       "enabled": false,
@@ -61,7 +53,6 @@
       "enabled": false,
       "maximum_one_way_turnover": 0.18
     },
-    "variant": "no-control",
     "volatility_target": {
       "annualized_target": 0.18,
       "enabled": false,
@@ -70,10 +61,11 @@
       "minimum_scale": 0.3
     }
   },
+  "schema_version": 1,
   "seed": 20260801,
-  "source_bundle_sha256": "<organizer-fill-source-bundle-64-hex-sha256>",
-  "strategy_sha256": "<organizer-fill-strategy-64-hex-sha256>",
+  "source_bundle_sha256": "<organizer-fill-final-source-bundle-64-hex-sha256>",
+  "strategy_sha256": "<organizer-fill-final-strategy-64-hex-sha256>",
   "team_id": "team-06",
-  "thesis": "Before any control is allowed, the fixed balanced trend/reversal rule should exhibit positive broad alpha at base and doubled cost across aggregate, chronological-slice, regime, role, sleeve, and concentration readouts with conservative exposure.",
+  "thesis": "Before any control is allowed, the fixed balanced trend/reversal rule should exhibit positive broad alpha at base and doubled cost across aggregate, frozen chronological-fold, regime, role, sleeve, and concentration readouts with conservative exposure.",
   "timestamp_utc": "<organizer-assigned-registration-timestamp-Z>"
 }
