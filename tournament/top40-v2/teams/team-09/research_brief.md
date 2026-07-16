@@ -76,9 +76,9 @@ follow-up or at most two mechanism pivots:
 - 8 confirmatory reruns or preregistered simplifications selected only after a written review.
 
 The 31 count does not grant permission to batch or inspect results before registration. Every
-material configuration must be registered through the active Amendment-0006 entrypoint before
-its result is read. The six risk policies count as six, not twelve: base and doubled costs are
-paired outputs of the same organizer run.
+material configuration must be registered through the active Amendment 0005 superset entrypoint,
+which preserves the A6 preflight, before its result is read. The six risk policies count as six,
+not twelve: base and doubled costs are paired outputs of the same organizer run.
 
 ## Selection rule
 

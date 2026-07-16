@@ -12,7 +12,8 @@ Status: **planned; none of these checks has been executed by this draft**
    schema-compatible.
 4. Validate every full policy in `risk_ablations.json` and `risk_policy.json` through the public
    strict risk-policy parser.
-5. Bind active Amendment 0006 and require its pure-crypto preflight for every later command.
+5. Bind the active Amendment 0005 superset and require its delegated Amendment 0006 pure-crypto
+   preflight for every later command.
 
 ## 2. Strategy static review
 
@@ -71,8 +72,8 @@ These checks belong to the organizer because team code cannot price or execute t
 
 ## 5. Research lifecycle checks
 
-1. Replace the family draft timestamp and submit it through the active pure-crypto entrypoint before
-   any material run; do not append `families.jsonl` manually.
+1. Replace the family draft timestamp and submit it through the active Amendment 0005 superset
+   entrypoint before any material run; do not append `families.jsonl` manually.
 2. Materialize actual source/config/risk hashes into a trial registration, validate exact schema,
    and register it before reading a result.
 3. Run six declared chronological development folds. A fixed-rule fold artifact must bind its

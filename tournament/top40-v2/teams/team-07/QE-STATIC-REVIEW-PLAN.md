@@ -13,7 +13,8 @@ No GO decision has been made. Before family or trial registration, an independen
 6. run formatting/lint plus the focused strategy and risk-policy tests serially;
 7. run the official clean sandbox twice and require identical target/artifact hashes;
 8. validate family and trial inputs against the frozen schemas after replacing every sentinel;
-9. register before any evaluator run through the active Amendment 0006 entrypoint; and
+9. register before any evaluator run through the active Amendment 0005 superset entrypoint, which
+   delegates through Amendment 0006; and
 10. require canonical OOF, doubled-cost, regime, role, concentration, and neighbor evidence before
     QR acceptance.
 
@@ -21,4 +22,3 @@ Static review must separately verify organizer semantics: funding on carried pos
 decision at a known boundary, next-open reductions, ordinary costs and shared participation,
 strategy gate after risk, and no same-boundary reopening. Team code does not implement those
 steps.
-

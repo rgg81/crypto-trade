@@ -1,4 +1,10 @@
 {
+  "active_command_authority": {
+    "entrypoint": "scripts/top40_v2_tournament_score_diagnostics_v5.py",
+    "entrypoint_sha256": "0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4",
+    "integration_freeze_commit": "d2b95f610722aab65b4e67466b34efeaa3554101",
+    "integration_freeze_sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c"
+  },
   "candidate_id": "vdr-core-candidate-001",
   "data_contract": {
     "bar_interval_hours": 8,
@@ -16,12 +22,13 @@
   },
   "family_id": "volatility-dispersion-release-v1",
   "pure_crypto_authority": {
-    "active_entrypoint": "scripts/top40_v2_tournament_pure_crypto_v6.py",
-    "active_entrypoint_sha256": "a9197dc2f83d4415f1aa4c098546e21e010cb99e754580de96c3e339cc927641",
+    "audited_entrypoint": "scripts/top40_v2_tournament_pure_crypto_v6.py",
+    "audited_entrypoint_sha256": "a9197dc2f83d4415f1aa4c098546e21e010cb99e754580de96c3e339cc927641",
     "amendment_id": "top40-v2-amendment-0006-pure-crypto-universe",
     "canonical_report_sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
     "integration_freeze": "tournament/top40-v2/amendments/0006/integration-freeze.json",
-    "status": "active"
+    "integration_freeze_sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34",
+    "status": "active-upstream-authority"
   },
   "schema_version": 1,
   "seed": 20260801,

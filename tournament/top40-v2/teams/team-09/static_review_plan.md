@@ -9,9 +9,9 @@ not substitute performance judgment for contract review.
 ## Required review
 
 1. Confirm the package is confined to `tournament/top40-v2/teams/team-09`, ledgers are empty, and
-   the bootstrap says `A6_ACTIVE_PROSPECTIVE_UNREGISTERED`.
-2. Confirm every future command is pinned to the active Amendment-0006 pure-crypto entrypoint and
-   no ineligible asset classification can enter through team code.
+   the bootstrap says `A5_A6_ACTIVE_PROSPECTIVE_UNREGISTERED`.
+2. Confirm every future command is pinned to the active Amendment 0005 superset entrypoint, that it
+   delegates through Amendment 0006, and no ineligible asset classification can enter team code.
 3. Match every `StrategyConfig` field and value to `frozen_config.json` and the complete trial
    template. Check every declared family range and neighbor is feasible under `validate()`.
 4. Trace each feature to past-only context data. Check exact eight-hour price adjacency, latest

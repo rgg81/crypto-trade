@@ -73,10 +73,10 @@ unexpected auxiliary inputs cause a hard error. A symbol with too little contigu
 omitted. If fewer than twelve symbols remain, or if either sleeve lacks five qualifying names, the
 strategy requests a flat book.
 
-The active Amendment 0006 pure-crypto preflight is the universe authority. Team code intentionally
-does not guess asset class from ticker substrings; the wrapper certifies contract metadata before
-the context can be supplied. The strategy still validates exact uppercase `*USDT` syntax and the
-point-in-time membership/key equality.
+The Amendment 0006 pure-crypto preflight is the universe authority. Team code intentionally does
+not guess asset class from ticker substrings; the active Amendment 0005 superset delegates through
+that wrapper before the context can be supplied. The strategy still validates exact uppercase
+`*USDT` syntax and the point-in-time membership/key equality.
 
 No parameter is learned from a whole evaluation window. The initial candidate is a deterministic
 fixed rule. Chronological fold artifacts will bind the same rule plus each fold cutoff, and all

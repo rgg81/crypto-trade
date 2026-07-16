@@ -22,7 +22,10 @@ Authorship state as delivered:
 - strategy.py contains no network, subprocess, filesystem read/write, fitted historical constant,
   timestamp-target table, or evaluator-state dependency.
 
-Amendment 0006 integration-freeze requires all future Team07 commands to use
-scripts/top40_v2_tournament_pure_crypto_v6.py. Any result produced through a historical or draft
-entrypoint is outside this package's authority.
-
+Amendment 0006 remains the exact pure-crypto universe authority. Its entrypoint is now
+superseded-unchanged by the reviewed Amendment 0005 superset. All future Team07 commands must use
+`scripts/top40_v2_tournament_score_diagnostics_v5.py` (SHA-256
+`0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4`), bound by A5
+integration-freeze commit `d2b95f610722aab65b4e67466b34efeaa3554101` and SHA-256
+`b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c`. Any result produced
+through a historical or draft entrypoint is outside this package's authority.

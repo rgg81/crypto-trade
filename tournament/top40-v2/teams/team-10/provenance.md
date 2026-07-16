@@ -31,6 +31,7 @@ preregistration replace them.
 
 Before any measurement, an organizer must perform the static review, bind the complete executable
 source set, replace every template sentinel, register the family, and register the exact trial through
-the active A6 entrypoint. Before any qualification claim, the six chronological fold artifacts,
+the active A5 superset entrypoint, which preserves the A6 pure-crypto preflight. Before any
+qualification claim, the six chronological fold artifacts,
 stitched returns, and all neighbor returns must be centrally produced and hash bound. The private
 ticket remains one-shot and final OOS remains sealed.

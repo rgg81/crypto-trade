@@ -18,9 +18,11 @@ point-in-time `eligible_symbols` views. It does not read snapshot files directly
 ## Pure-crypto authority
 
 All future lifecycle and result-bearing commands must use
-`scripts/top40_v2_tournament_pure_crypto_v6.py`, SHA-256
-`a9197dc2f83d4415f1aa4c098546e21e010cb99e754580de96c3e339cc927641`.
-Amendment 0006's active integration freeze records canonical pure-crypto report SHA-256
+`scripts/top40_v2_tournament_score_diagnostics_v5.py`, SHA-256
+`0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4`. Its A5
+integration-freeze commit is `d2b95f610722aab65b4e67466b34efeaa3554101`, with SHA-256
+`b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c`. It delegates ordinary
+commands through Amendment 0006, whose integration freeze records canonical pure-crypto report SHA-256
 `b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b` and policy SHA-256
 `2c7fb0ff593d06c323517e60df4b28ab9387a2df580b83f82f65ef71c91fc350`.
 Only native-crypto assets certified by that authority are in scope. A Binance perpetual listing
@@ -39,8 +41,7 @@ self-contained in `strategy.py`; it was not copied from a historical or competin
 Executable strategy dependencies are Python standard library modules `dataclasses`, `math`,
 `numbers`, and `collections.abc`, plus organizer-provided `numpy` and `pandas`. `build_strategy()`
 performs no I/O. Strategy execution uses no network, subprocess, filesystem, credentials,
-environment data,
-repository discovery, opaque fitted state, or unseeded randomness. The strategy returns target
+environment data, repository discovery, opaque fitted state, or unseeded randomness. The strategy returns target
 weights only. The central evaluator exclusively owns fills, fees, slippage, funding cashflows,
 participation, positions, equity, entry basis, delistings, and risk actions.
 

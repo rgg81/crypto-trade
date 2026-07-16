@@ -33,9 +33,9 @@ Funding timestamps must be strictly before the boundary. The liquid-leader set, 
 moments, scaling, ranks, and trend are recomputed from that past-only view. No future row,
 evaluator state, fill, PnL, private window, or external file is consumed.
 
-The organizer's active Amendment 0006 entrypoint is the sole universe authority. Team code trusts
-eligible_symbols and does not create a competing symbol classifier; every result-bearing command
-must therefore use the frozen pure-crypto wrapper.
+Amendment 0006 is the sole universe authority. Team code trusts `eligible_symbols` and does not
+create a competing symbol classifier. Every result-bearing command must use the active Amendment
+0005 superset entrypoint, which preserves the exact frozen A6 pure-crypto preflight.
 
 ## Center candidate
 

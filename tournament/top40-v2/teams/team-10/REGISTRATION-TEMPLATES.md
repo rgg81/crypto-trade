@@ -7,7 +7,7 @@ lifecycle command unchanged.
 After independent static review, the organizer must materialize and hash the complete executable
 source set, exact config, exact strategy, and exact risk policy. It must replace every sentinel and
 register the family before registering the first material trial through
-`scripts/top40_v2_tournament_pure_crypto_v6.py`.
+`scripts/top40_v2_tournament_score_diagnostics_v5.py`.
 
 The walk-forward and parameter-neighborhood manifest templates may be materialized only from
 centrally produced artifacts after the exact candidate is frozen. Template paths do not claim that
