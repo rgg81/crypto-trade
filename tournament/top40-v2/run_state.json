@@ -52,7 +52,7 @@
   "critic_lock": null,
   "final_oos_lock": null,
   "finalist_cohort_lock": null,
-  "legacy_projection_sha256": "58281609f96cf28275c0fae70b4b3f123d600988effa1530083d065b030b8b9f",
+  "legacy_projection_sha256": "7df929a8b6ff256c80974d72b654abe589a2a3069c1171deac2a757b9be2c38d",
   "legacy_state_sha256": "8c858495fde6ddde203124a055e40ebad5d8d5a684cd20f0e55f6c88f7360b07",
   "objective_lock": null,
   "organizer_audit": {
@@ -142,14 +142,19 @@
       "active_family_id": "team-04-path-adaptive-relative-dynamics-v1",
       "canonical_result": null,
       "development_assessment": null,
-      "dnf": null,
+      "dnf": {
+        "previous_status": "researching",
+        "reason": "All three no-control mechanism families failed the visible-development stop rule; PARD was decisively negative across aggregate, doubled-cost, quarter, drawdown, and every regime-Sharpe gate, both permitted mechanism pivots are consumed, and controls or neighbors cannot rescue the core.",
+        "reason_code": "withdrawn",
+        "recorded_at_utc": "2026-07-16T23:56:08.285788+00:00"
+      },
       "family_count": 3,
       "finalist_freeze": null,
       "pivot_count": 2,
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
-      "status": "researching",
+      "status": "dnf",
       "trial_count": 3
     },
     "team-05": {
