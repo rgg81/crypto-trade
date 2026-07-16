@@ -1,0 +1,39 @@
+{
+  "candidate_id": "vdr-core-candidate-001",
+  "family_id": "volatility-dispersion-release-v1",
+  "files": [
+    {
+      "path": "candidate_variant.py",
+      "sha256": "7dead778dbf80936a86f5197e79b22729760ff320f1a75a0f31650fd7369801c",
+      "size": 169
+    },
+    {
+      "path": "frozen_config.json",
+      "sha256": "5608f9737a35722fea163d416449e2afa5a9a88771cd5c73e3ae8b27316e3a17",
+      "size": 4147
+    },
+    {
+      "path": "risk_policy.json",
+      "sha256": "8db76eb8d59fbef6473d2a2cd98bbba68c8e53d8d78284284ec06db54b8fa5d6",
+      "size": 580
+    },
+    {
+      "path": "strategy.py",
+      "sha256": "42dc347a18466187d262aeaf251785cfeb27759ed15a6490a42e0be97e405ef6",
+      "size": 20396
+    },
+    {
+      "path": "test_risk_policy_contract.py",
+      "sha256": "c74014b4bfb3957a720eb1281f931b1a074511ec3d4d5c31af500585c1401cd2",
+      "size": 7136
+    },
+    {
+      "path": "test_strategy.py",
+      "sha256": "9f02ef48ba0f3d4d9ecbb2ad6fe850bf603e569d7a6d3aa2939d8182879ce8dc",
+      "size": 14295
+    }
+  ],
+  "manifest_kind": "top40-v2-executable-source-manifest-v1",
+  "schema_version": 1,
+  "team_id": "team-08"
+}
