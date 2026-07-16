@@ -1,0 +1,34 @@
+{
+  "candidate_id": "t06-balanced-trend-reversal-v1-base",
+  "family_id": "t06-balanced-trend-reversal-v1",
+  "files": [
+    {
+      "path": "candidate_variant.py",
+      "sha256": "055a7d00a7908e2ae880606273dac9b9233e557710aaa8577d12b0bf32d4d91c",
+      "size": 175
+    },
+    {
+      "path": "frozen_config.json",
+      "sha256": "b40b6ce9a3ba94e65cd4ec49c0dd3d5fa9466642f328ab2bf75e511aba6e176b",
+      "size": 3934
+    },
+    {
+      "path": "risk_policy.json",
+      "sha256": "7671efed25b8f9130e8f06fb9dbe44b5735e1cd2f23fd8c20e9dcc1a6b61c30b",
+      "size": 637
+    },
+    {
+      "path": "strategy.py",
+      "sha256": "ead419349cef8983549ad3d1f98af89354d4fba818357637170f3ca48dbe1022",
+      "size": 16535
+    },
+    {
+      "path": "test_strategy.py",
+      "sha256": "f16885d309a4198c802b245f798b55e8561b9b0ae569c9330f32271f524cd08f",
+      "size": 16567
+    }
+  ],
+  "manifest_kind": "top40-v2-executable-source-manifest-v1",
+  "schema_version": 1,
+  "team_id": "team-06"
+}
