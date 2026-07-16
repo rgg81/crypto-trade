@@ -1,38 +1,27 @@
-# Team07 provenance
+# Team 07 pivot provenance
 
-This family was developed independently in the Team07 V2 namespace from the tournament charter,
-methodology, public templates, neutral strategy/risk interfaces, and frozen Amendment 0006
-pure-crypto authority. No V1 strategy/result, other V2 team, private-qualifier record, final-OOS
-data, leaderboard, organizer journal/state, or Amendment 0005 diagnostic was inspected.
+The mechanism pivot was created after reading Team 07's own visible-development no-control result.
+That result is retained unchanged in `experiments.jsonl` and its reports. No private qualifier or
+final OOS datum was used. The new family uses only generic time-series trend, cross-sectional
+ranking, short-horizon reversal, and funding-carry ideas under the tournament's public strategy,
+risk, A5 score, A6 pure-crypto, and A7 runtime contracts.
 
-The economic starting point is the generic market-microstructure idea that price discovery occurs
-first in more liquid instruments and propagates to related instruments with heterogeneous delay.
-Team07's implementation is original for this tournament: a dynamic liquidity leader basket,
-contemporaneous-beta residualization, nonnegative lag-response estimate, residual overshoot term,
-funding crowding conditioner, cross-sectional two-sided ranks, and bounded directional side tilt.
+The parent `shock-diffusion-v1` thesis is explicitly abandoned rather than tuned. The pivot removes
+liquidity leaders, lag-beta estimation, one-shock diffusion, 0.80 gross, and daily turnover. It
+introduces a median common market state, multi-horizon residual trend/reversal blend, a score-level
+directional offset, broader 48-hour construction, and new family/candidate identities.
 
-Authorship state as delivered:
+Authorship state at handoff:
 
-- families.jsonl and experiments.jsonl remain organizer-owned empty ledgers;
-- no registration, evaluator, lifecycle, test, Python, or git command was run by the clean-room
-  authoring agent;
-- no performance number, qualification claim, or schema-validation claim is made;
-- zero hashes and the epoch timestamp in registration templates are explicit sentinels and must be
-  materialized from frozen bytes immediately before organizer registration;
-- strategy.py contains no network, subprocess, filesystem read/write, fitted historical constant,
-  timestamp-target table, or evaluator-state dependency.
+- no organizer journal, state, report, or Amendment 0007 file was edited;
+- no evaluator, lifecycle, test, Python, or git command was run by the pivot authoring agent;
+- no performance claim is made for the new family;
+- registration timestamps, hashes, reviews, and score controls remain explicit organizer
+  sentinels/templates;
+- root `risk_policy.json` was not changed and retains every control disabled; and
+- `strategy.py` contains no network, subprocess, filesystem read/write, fitted historical
+  constant, timestamp-target table, position/PnL input, or evaluator-state dependency.
 
-The first executable risk state is the no-control top-level `risk_policy.json`, byte-identical to
-`risk_policies/no-control.json`. The combined and single-control files are immutable declarations,
-not runtime selectors. They remain dormant unless the no-control core passes every broad positive
-activation minimum; controls cannot rescue failure. Before any later policy candidate is committed,
-registered, or run, its selected template must be copied byte-for-byte to root `risk_policy.json`
-and every affected hash recomputed.
-
-Amendment 0006 remains the exact pure-crypto universe authority. Its entrypoint is now
-superseded-unchanged by the reviewed Amendment 0005 superset. All future Team07 commands must use
-`scripts/top40_v2_tournament_score_diagnostics_v5.py` (SHA-256
-`0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4`), bound by A5
-integration-freeze commit `d2b95f610722aab65b4e67466b34efeaa3554101` and SHA-256
-`b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c`. Any result produced
-through a historical or draft entrypoint is outside this package's authority.
+All future result-bearing commands require the exact active Amendment 0007 entrypoint. The
+organizer completed the A7 rebind from the terminal parent identities to the reviewed pivot
+identities after author handoff.

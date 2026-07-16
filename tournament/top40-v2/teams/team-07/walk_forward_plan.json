@@ -1,25 +1,48 @@
 {
-  "candidate_id": "team07-shock-diffusion-center-v1",
-  "evidence_class": "declared-retrained-out-of-fold",
+  "candidate_id": "t07-market-state-relative-ensemble-v1-base",
+  "evidence_class": "declared-deterministic-no-fit-out-of-fold",
   "folds": [
-    {"fold_id": "fold-1", "test_end_inclusive": "2020-12-31", "test_start": "2020-08-01", "training_end_inclusive": "2020-07-30"},
-    {"fold_id": "fold-2", "test_end_inclusive": "2021-05-31", "test_start": "2021-01-01", "training_end_inclusive": "2020-12-30"},
-    {"fold_id": "fold-3", "test_end_inclusive": "2021-10-31", "test_start": "2021-06-01", "training_end_inclusive": "2021-05-30"},
-    {"fold_id": "fold-4", "test_end_inclusive": "2022-03-31", "test_start": "2021-11-01", "training_end_inclusive": "2021-10-30"},
-    {"fold_id": "fold-5", "test_end_inclusive": "2022-09-30", "test_start": "2022-04-01", "training_end_inclusive": "2022-03-30"},
-    {"fold_id": "fold-6", "test_end_inclusive": "2023-06-30", "test_start": "2022-10-01", "training_end_inclusive": "2022-09-29"}
+    {
+      "end_exclusive_utc": "2020-09-01T00:00:00Z",
+      "fold_id": "F1",
+      "start_inclusive_utc": "2020-02-03T00:00:00Z"
+    },
+    {
+      "end_exclusive_utc": "2021-04-01T00:00:00Z",
+      "fold_id": "F2",
+      "start_inclusive_utc": "2020-09-01T00:00:00Z"
+    },
+    {
+      "end_exclusive_utc": "2021-11-01T00:00:00Z",
+      "fold_id": "F3",
+      "start_inclusive_utc": "2021-04-01T00:00:00Z"
+    },
+    {
+      "end_exclusive_utc": "2022-06-01T00:00:00Z",
+      "fold_id": "F4",
+      "start_inclusive_utc": "2021-11-01T00:00:00Z"
+    },
+    {
+      "end_exclusive_utc": "2023-01-01T00:00:00Z",
+      "fold_id": "F5",
+      "start_inclusive_utc": "2022-06-01T00:00:00Z"
+    },
+    {
+      "end_exclusive_utc": "2023-07-01T00:00:00Z",
+      "fold_id": "F6",
+      "start_inclusive_utc": "2023-01-01T00:00:00Z"
+    }
   ],
-  "label_horizon": "next 8h open-to-open evaluator return",
-  "model_update_rule": "Prequential rolling refit at each decision using only completed bars then available; later observations within a test fold may update later predictions but never earlier ones.",
-  "purge_and_embargo": "One full UTC day between declared initial-training end and test start, exceeding the one-bar label overlap.",
+  "label_horizon": "next 48h executable open-to-open return aligned to the six-bar decision schedule",
+  "model_update_rule": "No fitted parameter or training estimate; every decision recomputes frozen rolling transforms from then-completed inputs.",
+  "purge_and_embargo": "Use exact A5 start-inclusive/end-exclusive F1-F6 intervals and purge score/label pairs whose 48-hour label endpoint reaches or crosses a fold end.",
   "qualification_evidence_requirements": [
-    "canonical fold model or deterministic no-fit declaration hashes",
-    "per-fold target and return artifact paths and SHA-256 values",
+    "deterministic no-fit declaration and hashes",
+    "per-fold target score and return artifact paths and SHA-256 values",
     "stitched out-of-fold return artifact path and SHA-256",
-    "exact registration, strategy, source-bundle, risk, config, and snapshot hashes"
+    "exact registration strategy source-bundle risk config snapshot and A5 manifest hashes"
   ],
-  "schema_version": 1,
-  "status": "prospective-plan-not-qualification-evidence",
-  "stitching_rule": "Organizer concatenates only canonical test predictions in fold order; warmup before fold-1 is never scored.",
+  "schema_version": 2,
+  "status": "prospective_plan_not_qualification_evidence",
   "team_id": "team-07"
 }

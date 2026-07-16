@@ -1,84 +1,65 @@
-# Team07 research brief: liquid-leader shock diffusion
+# Team 07 pivot 01: market-state and relative-opportunity ensemble
 
-Status: prospective clean-room family; no trial registered and no performance measured.
+Status: implemented and serially validated as a prospective no-control mechanism pivot;
+unregistered and unevaluated.
 
-## Mechanism and thesis
+## Why the original family is terminal
 
-Information reaches the most liquid crypto perpetuals first, then diffuses unevenly through the
-rest of the point-in-time Top-40. At each daily rebalance, the strategy forms a trailing-liquidity
-leader basket, estimates each coin's delayed response after removing its contemporaneous market
-beta, and forecasts the next interval from the last closed leader shock. A small idiosyncratic
-reversal term handles overshoot, and past funding is a secondary crowding/carry conditioner.
+The exact no-control `team07-shock-diffusion-center-v1` result falsified shock diffusion as a
+tradable core. Net Sharpe was -0.9886, annualized return was -27.12%, doubled-cost Sharpe was
+-2.0220, and maximum drawdown was 70.49%. Bull, bear, and chop Sharpe were all negative (-1.0801,
+-2.9340, and -1.7135); stress Sharpe was +1.0084. Because the broad core-alpha gate failed,
+controls, parameter neighbors, and lead-lag ablations are not activated and cannot repair it.
 
-The portfolio is cross-sectional and two-sided. It buys the strongest under-reactions and sells
-the weakest or over-reacting names. A slow leader-basket trend changes long versus short gross
-within a 16% net cap; it never disables either sleeve.
+## New mechanism
+
+The pivot does not estimate delayed reaction to liquid leaders. Every 48 hours it builds a robust
+common crypto return from the cross-sectional median of each completed 8-hour return. Fast
+21-bar and slow 126-bar normalized trends plus 21-bar sign breadth form a bounded common market
+state. That common forecast is intended to supply positive long net exposure in persistent bull
+conditions and negative net exposure in persistent bear conditions while both sleeves remain
+active.
+
+For relative selection, every coin is residualized against the same-bar median return. The
+strategy combines 21- and 63-bar residual trend with three-bar residual reversal. The trend share
+rises only when fast and slow common trends agree; when they do not, the blend shifts toward
+short-horizon reversal. A small negative trailing-funding rank favors receiving rather than paying
+crowded carry. The relative blend is rank-transformed for robustness.
+
+The final captured score is the centered relative rank plus a common market-state offset. Its
+cross-sectional order selects the long and short sleeves, and its mean determines their net tilt.
+Consequently the exact dictionary returned from the A5 score boundary is the sole signal object
+used in construction. Gross is fixed at 0.48, net is bounded at 0.20, each side has at least eight
+names, and each name is capped at 0.04. These are construction limits, not retrospective risk
+controls.
 
 ## Expected regime roles
 
-- Bull: positive slow trend gives the long sleeve more gross; positive leader shocks favor
-  under-reacting followers. Long-bull attribution should be positive.
-- Bear: negative trend gives the short sleeve more gross; negative shocks favor shorting delayed
-  followers. Short-bear attribution should be positive.
-- Chop: side gross is nearly balanced; residual reversal and funding crowding are expected to
-  monetize dispersion after two-way shocks.
-- Stress: shocks are winsorized, the organizer volatility target scales gross down, drawdown
-  brakes de-risk, and per-position stops impose cooldowns. Flat or modest stress return is
-  acceptable only if drawdown and tail gates pass.
+- Bull: aligned fast/slow common trend and broad positive participation raise long gross; relative
+  medium/slow strength ranks select leaders while the short sleeve remains active.
+- Bear: aligned negative common trend raises short gross; relative weakness ranks select laggards
+  for the short sleeve while the long sleeve remains active.
+- Chop: fast/slow disagreement suppresses directional net and shifts relative scoring toward
+  three-bar reversal and funding carry.
+- Stress: the median market path, bounded trend transforms, broad sleeves, and coin caps reduce
+  outlier dependence, but stress profitability and drawdown remain empirical gates.
 
-## Causal construction
+## Causal and universe boundary
 
-Only candles with open_time plus eight hours no later than the decision boundary are accepted.
-Funding timestamps must be strictly before the boundary. The liquid-leader set, regression
-moments, scaling, ranks, and trend are recomputed from that past-only view. No future row,
-evaluator state, fill, PnL, private window, or external file is consumed.
+The strategy accepts exactly 190 completed close observations at exact 8-hour opens to form 189
+returns. All transforms use those rows only. Funding events must be strictly earlier than the
+decision timestamp. Future bars, bar high/low/open, auxiliary data, positions, fills, equity, PnL,
+drawdown, evaluator actions, and private data are unused. Amendment 0006 supplies the only eligible
+pure-crypto universe; Team 07 performs no symbol classification.
 
-Amendment 0006 is the sole universe authority. Team code trusts `eligible_symbols` and does not
-create a competing symbol classifier. Every result-bearing command must use the active Amendment
-0005 superset entrypoint, which preserves the exact frozen A6 pure-crypto preflight.
+## Falsifier and tournament discipline
 
-## Center candidate
+The new no-control reference is rejected if aggregate return or Sharpe is nonpositive at ordinary
+or doubled costs; bull, bear, or chop return/Sharpe is nonpositive; long-bull, short-bear, or
+combined-chop attribution is nonpositive; fewer than four folds or 55% of quarters are profitable;
+either sleeve is inactive; A5 score coverage or IC gates fail; or positive PnL concentration
+exceeds 40%. No negative candidate is eligible for controls or submission.
 
-The declared center uses 189 bars of history, 126 minimum observations, a 20% liquid leader set
-with at least four leaders, one daily rebalance, 80% target gross, 16% maximum directional net,
-9% per-name cap, 12% idiosyncratic reversal, 6x funding carry, and six or more names per sleeve.
-The exact declaration is in frozen_config.json.
-
-## Falsifiers and decision rule
-
-Reject or pivot before private qualification if any of these holds on stitched six-fold OOF
-development evidence:
-
-1. net Sharpe is below 0.75, annualized return is nonpositive, or doubled-cost Sharpe is below
-   0.35;
-2. fewer than four folds or 55% of quarters are positive;
-3. bull, bear, or chop net return is nonpositive, fewer than three regime Sharpes are positive,
-   or worst-regime Sharpe is below -0.25;
-4. long-bull, short-bear, or combined-chop attribution is nonpositive;
-5. propagation ablation is no worse than the complete signal, meaning the lead-lag thesis is not
-   doing useful work;
-6. fewer than 70% of declared neighbors are profitable, neighbor median Sharpe is below 0.50, or
-   positive PnL concentration exceeds 40%; or
-7. controls improve headline Sharpe only through unacceptable turnover, inactive sleeves, or a
-   single fold/regime.
-
-No least-bad negative candidate is a submission. A failure triggers a documented simplification,
-one of at most two pivots, or DNF within the shared 80-trial budget.
-
-The first material trial is the unchanged center signal with the top-level no-control
-`risk_policy.json`. Before any volatility, drawdown, position-stop, turnover, or combined policy
-may be registered, that core must have strictly positive return and Sharpe at both ordinary and
-doubled costs, at least four positive folds, positive bull/bear/chop returns, positive long-bull,
-short-bear, and combined-chop attribution, and active long and short sleeves. Controls cannot rescue
-a negative or otherwise failed core. Such a failure permits only a separately preregistered
-mechanism revision/pivot or DNF, whose own no-control core must start the sequence again.
-
-## Planned trial allocation
-
-Reserve 1 no-control center trial, 6 mechanism/feature ablations, 10 parameter-neighborhood trials,
-5 additional risk-policy trials (four single controls plus combined, activated only after the
-no-control core gate; each policy automatically produces base- and doubled-cost outputs), and up to
-8 confirmatory/fold-diagnostic trials: 30
-planned material configurations. The remaining 50 are contingency capacity and are not
-authorization to search
-until something looks good. Every material run is preregistered first.
+Only after the exact reference passes every broad gate may separately preregistered mechanism
+ablations, neighbors, or risk-control trials be considered. A failed pivot reference triggers the
+remaining documented mechanism pivot or DNF, never a stop-loss or drawdown overlay rescue.

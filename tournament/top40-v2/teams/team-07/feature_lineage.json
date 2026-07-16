@@ -1,48 +1,46 @@
 {
   "features": [
     {
-      "availability": "open_time + 8h <= decision_time",
-      "event_timestamp": "open_time + 8h",
+      "availability": "open_time_plus_8h_lte_decision_time",
+      "event_timestamp": "open_time_plus_8h",
       "field": "bars.close",
-      "lag": "latest completed 8h candle",
-      "missing_rule": "exclude symbol; flat if fewer than 16 valid symbols",
-      "source": "organizer-authorized Binance USD-M snapshot",
+      "lag": "190 exact completed 8h closes forming 189 returns",
+      "missing_rule": "exclude symbol; flat if fewer than 24 valid pure-crypto symbols remain",
+      "source": "organizer-authorized point-in-time Binance USD-M pure-crypto snapshot",
       "transforms": [
         "log close-to-close return",
-        "liquid-leader equal-weight return",
-        "contemporaneous beta residual",
-        "one-bar lag response",
-        "idiosyncratic reversal",
-        "126-bar leader trend"
+        "same-bar cross-sectional median common return",
+        "21-bar and 126-bar bounded common trend",
+        "21-bar common sign breadth",
+        "same-bar median-residual return",
+        "3-bar residual reversal",
+        "21-bar and 63-bar residual trend",
+        "63-bar residual volatility normalization",
+        "deterministic centered cross-sectional ranks"
       ]
     },
     {
-      "availability": "same completed candle boundary",
-      "event_timestamp": "open_time + 8h",
-      "field": "bars.quote_volume",
-      "lag": "90 completed 8h candles",
-      "missing_rule": "exclude nonfinite/nonpositive-liquidity symbol",
-      "source": "organizer-authorized Binance USD-M snapshot",
-      "transforms": ["trailing median", "descending leader selection"]
-    },
-    {
-      "availability": "funding_time < decision_time",
+      "availability": "funding_time_strictly_before_decision_time",
       "event_timestamp": "funding_time",
       "field": "funding.funding_rate",
-      "lag": "21 most recent published events",
-      "missing_rule": "zero carry conditioner when no past row exists",
-      "source": "organizer-authorized actual Binance funding rows",
-      "transforms": ["per-symbol trailing mean", "negative carry forecast"]
+      "lag": "21 most recent strictly past events per symbol",
+      "missing_rule": "zero carry input for a symbol with no past event; fail closed on malformed or noncausal rows",
+      "source": "organizer-authorized Binance funding rows",
+      "transforms": [
+        "negative trailing mean",
+        "deterministic centered cross-sectional rank"
+      ]
     }
   ],
   "forbidden_or_unused_fields": [
-    "bar high/low for signal or stop fills",
-    "current executable open",
-    "future membership",
+    "bar open/high/low or quote volume for signal construction",
+    "current executable open or future membership",
+    "auxiliary data",
     "positions, fills, equity, PnL, drawdown, or evaluator actions",
     "private qualifier or final OOS data"
   ],
-  "model_refit": "all moments, leaders, ranks, and trend are recomputed at each daily decision from past-only rolling rows",
-  "schema_version": 1,
+  "model_refit": "all market paths, residual features, funding carry, and ranks are recomputed at each scheduled decision from past-only rows",
+  "parent_terminal_family_id": "shock-diffusion-v1",
+  "schema_version": 2,
   "team_id": "team-07"
 }

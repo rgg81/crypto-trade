@@ -1,44 +1,40 @@
 {
-  "family_id": "shock-diffusion-v1",
-  "activation_rule": "The no-control center trial is the first material run. Mechanism ablations may be registered only after that result is read; risk overlays remain separately blocked unless every broad positive no-control core-alpha minimum passes.",
+  "activation_rule": "The new no-control reference must run first and pass every broad alpha, cost, regime, role, fold, quarter, sleeve, A5 score, and concentration gate. A failed reference terminates the family; none of these drafts may search for a rescue.",
+  "family_id": "t07-market-state-relative-ensemble-v1",
   "material_trials": [
     {
-      "candidate_id": "team07-shock-diffusion-center-v1",
+      "candidate_id": "t07-market-state-relative-ensemble-v1-base",
       "change_from_center": {},
-      "purpose": "center candidate"
+      "purpose": "exact no-control pivot reference"
     },
     {
-      "candidate_id": "team07-ablate-diffusion-v1",
-      "change_from_center": {"diffusion_multiplier": 0.0},
-      "purpose": "falsify the core delayed-shock mechanism"
-    },
-    {
-      "candidate_id": "team07-ablate-reversion-v1",
-      "change_from_center": {"idiosyncratic_reversion": 0.0},
-      "purpose": "measure the chop/overshoot component"
-    },
-    {
-      "candidate_id": "team07-ablate-funding-v1",
-      "change_from_center": {"funding_carry_multiplier": 0.0},
-      "purpose": "measure secondary crowding/carry value"
-    },
-    {
-      "candidate_id": "team07-ablate-side-tilt-v1",
+      "candidate_id": "t07-market-state-relative-ensemble-v1-no-net-tilt",
       "change_from_center": {"maximum_directional_net": 0.0},
-      "purpose": "measure bull/bear directional role allocation"
+      "purpose": "measure the common market-state contribution to bull and bear construction"
     },
     {
-      "candidate_id": "team07-ablate-leader-selection-v1",
-      "change_from_center": {"leader_fraction": 0.5},
-      "purpose": "test whether liquid price discovery matters versus a broad market basket"
+      "candidate_id": "t07-market-state-relative-ensemble-v1-fixed-blend",
+      "change_from_center": {"relative_trend_state_weight": 0.0},
+      "purpose": "measure whether causal market-state adaptation improves regime breadth"
     },
     {
-      "candidate_id": "team07-ablate-cadence-v1",
-      "change_from_center": {"rebalance_every_bars": 1},
-      "purpose": "measure whether daily cadence is a cost-aware choice"
+      "candidate_id": "t07-market-state-relative-ensemble-v1-no-carry",
+      "change_from_center": {"funding_carry_weight": 0.0},
+      "purpose": "measure incremental past-funding carry value"
+    },
+    {
+      "candidate_id": "t07-market-state-relative-ensemble-v1-fast-common-only",
+      "change_from_center": {"market_fast_weight": 0.9, "market_slow_weight": 0.0},
+      "purpose": "test whether slow common trend prevents fast whipsaw"
+    },
+    {
+      "candidate_id": "t07-market-state-relative-ensemble-v1-slow-common-only",
+      "change_from_center": {"market_fast_weight": 0.0, "market_slow_weight": 0.9},
+      "purpose": "test whether fast common trend improves reversal timing"
     }
   ],
-  "registration_rule": "Each row is a separate material configuration and must be registered before execution.",
-  "schema_version": 1,
+  "parent_family_terminal": "shock-diffusion-v1",
+  "registration_rule": "Every activated row requires a separately materialized source identity and preregistration before execution.",
+  "schema_version": 2,
   "team_id": "team-07"
 }

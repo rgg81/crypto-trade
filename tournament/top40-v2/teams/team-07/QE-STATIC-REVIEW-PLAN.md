@@ -1,32 +1,28 @@
-# Team07 QE and static review plan
+# Team 07 pivot QE and static review plan
 
-No GO decision has been made. Before family or trial registration, an independent reviewer should:
+The independent static review issued a conditional GO and its three packaging blockers were
+corrected. Before new-family or pivot-trial registration, the organizer should complete the
+remaining freeze sequence:
 
-1. verify every changed byte is inside Team07 and confirm the two organizer ledgers were not
-   edited;
-2. compare StrategyConfig with frozen_config.json and every material trial declaration;
-3. inspect every feature timestamp and prove bars close by the boundary and funding is strictly
-   earlier;
-4. confirm no high/low intrabar value, current executable open, file, network, subprocess, PnL,
-   position, private, or OOS datum can affect a target;
-5. verify daily cadence, eligible-only finite targets, gross/net/name caps, and both sleeves;
-6. run formatting/lint plus the focused strategy and risk-policy tests serially;
-7. run the official clean sandbox twice and require identical target/artifact hashes;
-8. validate family and trial inputs against the frozen schemas after replacing every sentinel;
-9. register before any evaluator run through the active Amendment 0005 superset entrypoint, which
-   delegates through Amendment 0006; and
-10. require canonical OOF, doubled-cost, regime, role, concentration, and neighbor evidence before
-    QR acceptance.
+1. verify every changed byte is under Team 07 and confirm families/experiments journals, reports,
+   organizer state, and Amendment 0007 files were not edited;
+2. compare every executable constant with `frozen_config.json` and the active trial draft;
+3. prove the exact 190-close history and strictly-past funding rules are causal;
+4. confirm future bars, current executable open, high/low, auxiliary fields, files, network,
+   subprocess, positions, PnL, evaluator state, private data, and OOS data cannot affect targets;
+5. verify the median common path, market-state offset, relative blend, A5 call, captured-score mean
+   net tilt, selection, gross/net/name caps, and active sleeves;
+6. prove the public score boundary is called exactly once on scheduled construction, after the
+   final score transform and before selection, sizing, caps, or organizer risk;
+7. run formatting/lint, focused strategy/risk tests, JSON parsing, and source fingerprinting
+   serially;
+8. run the official clean sandbox twice and require identical target and artifact hashes;
+9. materialize and validate family, executable-source, semantic-review, score, and trial controls;
+10. use A7 `pivot-team`, confirm the completed A7 identity rebind, then preregister material trial
+    2 before any evaluator run; and
+11. require positive ordinary/doubled-cost, bull/bear/chop, role, fold, quarter, sleeve,
+    concentration, A5 coverage, and IC evidence before any risk overlay or qualification step.
 
-Before the first registration, require top-level `risk_policy.json` to be byte-identical to
-`risk_policies/no-control.json`; the frozen lifecycle never selects a side path. Run and read this
-no-control center first. Require strictly positive base- and doubled-cost return/Sharpe, at least
-four positive folds, positive bull/bear/chop returns, positive long-bull, short-bear, and
-combined-chop attribution, and active sleeves before any control. A failed core cannot be rescued
-by a control. For each later policy, copy its immutable template byte-for-byte to root
-`risk_policy.json` before commit, registration, and execution, then recompute all bindings.
-
-Static review must separately verify organizer semantics: funding on carried positions, risk
-decision at a known boundary, next-open reductions, ordinary costs and shared participation,
-strategy gate after risk, and no same-boundary reopening. Team code does not implement those
-steps.
+The top-level `risk_policy.json` must remain byte-identical to `risk_policies/no-control.json` for
+the pivot reference. A failed core cannot be rescued by volatility targeting, stops, brakes, or
+turnover controls.

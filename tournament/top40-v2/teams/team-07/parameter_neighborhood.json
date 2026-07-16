@@ -1,28 +1,30 @@
 {
-  "candidate_id": "team07-shock-diffusion-center-v1",
-  "activation_rule": "Neighbors are dormant until the no-control core has passed every broad positive activation minimum and the selected controlled/base candidate passes all non-neighborhood development gates.",
+  "activation_rule": "Dormant until the exact no-control pivot reference passes every broad positive activation minimum and the complete candidate passes all non-neighborhood development gates.",
+  "candidate_id": "t07-market-state-relative-ensemble-v1-base",
   "center": {
-    "funding_carry_multiplier": 6.0,
-    "idiosyncratic_reversion": 0.12,
-    "leader_fraction": 0.2,
-    "lookback_bars": 189,
-    "maximum_directional_net": 0.16,
-    "minimum_observations": 126
+    "funding_carry_weight": 0.15,
+    "market_fast_bars": 21,
+    "market_slow_bars": 126,
+    "maximum_directional_net": 0.2,
+    "rebalance_interval_bars": 6,
+    "relative_trend_base_weight": 0.35,
+    "relative_trend_state_weight": 0.45,
+    "short_reversal_bars": 3
   },
   "neighbors": [
-    {"changes": {"lookback_bars": 162, "minimum_observations": 108}, "neighbor_id": "lookback-162"},
-    {"changes": {"lookback_bars": 216, "minimum_observations": 126}, "neighbor_id": "lookback-216"},
-    {"changes": {"leader_fraction": 0.15}, "neighbor_id": "leaders-15pct"},
-    {"changes": {"leader_fraction": 0.25}, "neighbor_id": "leaders-25pct"},
-    {"changes": {"idiosyncratic_reversion": 0.08}, "neighbor_id": "reversion-08"},
-    {"changes": {"idiosyncratic_reversion": 0.16}, "neighbor_id": "reversion-16"},
-    {"changes": {"funding_carry_multiplier": 3.0}, "neighbor_id": "funding-3"},
-    {"changes": {"funding_carry_multiplier": 9.0}, "neighbor_id": "funding-9"},
-    {"changes": {"maximum_directional_net": 0.12}, "neighbor_id": "net-12"},
-    {"changes": {"maximum_directional_net": 0.2}, "neighbor_id": "net-20"}
+    {"changes": {"market_fast_bars": 18}, "neighbor_id": "market-fast-18"},
+    {"changes": {"market_fast_bars": 24}, "neighbor_id": "market-fast-24"},
+    {"changes": {"market_slow_bars": 105}, "neighbor_id": "market-slow-105"},
+    {"changes": {"market_slow_bars": 147}, "neighbor_id": "market-slow-147"},
+    {"changes": {"maximum_directional_net": 0.16}, "neighbor_id": "net-16"},
+    {"changes": {"maximum_directional_net": 0.24}, "neighbor_id": "net-24"},
+    {"changes": {"relative_trend_base_weight": 0.3, "relative_trend_state_weight": 0.4}, "neighbor_id": "more-reversal"},
+    {"changes": {"relative_trend_base_weight": 0.4, "relative_trend_state_weight": 0.4}, "neighbor_id": "more-trend"},
+    {"changes": {"funding_carry_weight": 0.1}, "neighbor_id": "carry-10"},
+    {"changes": {"funding_carry_weight": 0.2}, "neighbor_id": "carry-20"}
   ],
-  "selection_rule": "Freeze the center only if at least 70% of all declared neighbors are profitable, neighbor median Sharpe is at least 0.50, and no isolated point drives selection.",
-  "schema_version": 1,
-  "status": "prospective-plan-not-qualification-evidence",
+  "schema_version": 2,
+  "selection_rule": "Freeze only if at least 70% of all declared neighbors are profitable, neighbor median Sharpe is at least 0.50, and no isolated point drives selection.",
+  "status": "prospective_dormant_not_performance_evidence",
   "team_id": "team-07"
 }

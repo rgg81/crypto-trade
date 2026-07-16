@@ -1,227 +1,335 @@
+"""Synthetic causal and construction tests for the Team 07 mechanism pivot."""
+
 from __future__ import annotations
 
-import dataclasses
-import importlib.util
 import json
 import math
 import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-import numpy as np
 import pandas as pd
-import pandas.testing as pdt
 import pytest
 
+from crypto_trade.tournament.score_adapter_protocol_v5 import (
+    score_boundary as public_score_boundary,
+)
+
 TEAM_DIR = Path(__file__).resolve().parent
-SPEC = importlib.util.spec_from_file_location("team07_strategy", TEAM_DIR / "strategy.py")
-assert SPEC is not None and SPEC.loader is not None
-MODULE = importlib.util.module_from_spec(SPEC)
-sys.modules[SPEC.name] = MODULE
-SPEC.loader.exec_module(MODULE)
+if str(TEAM_DIR) not in sys.path:
+    sys.path.insert(0, str(TEAM_DIR))
 
-DEFAULT_DECISION = pd.Timestamp(year=2021, month=4, day=1, tz="UTC")
+import candidate_variant  # noqa: E402
+import strategy  # noqa: E402
+
+DEFAULT_DECISION = pd.Timestamp(0, unit="ns", tz="UTC") + pd.Timedelta(days=24000)
 
 
-def _context(*, periods: int = 220, decision: pd.Timestamp = DEFAULT_DECISION):
-    decision_time = pd.Timestamp(decision)
-    times = pd.date_range(end=decision_time - pd.Timedelta(hours=8), periods=periods, freq="8h")
-    index = np.arange(periods, dtype=float)
-    leader = 0.010 * np.sin(index / 5.0) + 0.006 * np.cos(index / 13.0)
-    symbols = tuple(f"C{i:02d}USDT" for i in range(20))
+def _synthetic_context(
+    *,
+    decision_time: pd.Timestamp = DEFAULT_DECISION,
+    symbol_count: int = 28,
+    common_drift: float = 0.0008,
+):
+    decision = pd.Timestamp(decision_time)
+    periods = strategy.HISTORY_RETURN_BARS + 1
+    open_times = pd.date_range(
+        end=decision - pd.Timedelta(hours=strategy.BAR_INTERVAL_HOURS),
+        periods=periods,
+        freq="8h",
+        tz="UTC",
+    )
     bars: dict[str, pd.DataFrame] = {}
-    for number, symbol in enumerate(symbols):
-        lag_beta = 0.10 + 0.025 * number
-        contemporaneous = 0.65 + 0.01 * (number % 4)
-        idiosyncratic = 0.0025 * np.sin(index / (3.0 + number / 8.0) + number)
-        log_return = contemporaneous * leader + lag_beta * np.roll(leader, 1) + idiosyncratic
-        log_return[0] = idiosyncratic[0]
-        close = (50.0 + number) * np.exp(np.cumsum(log_return))
+    center = (symbol_count - 1) / 2.0
+    for symbol_index in range(symbol_count):
+        symbol = f"C{symbol_index:02d}USDT"
+        loading = (symbol_index - center) / max(1.0, center)
+        closes = [100.0 + symbol_index]
+        for return_index in range(strategy.HISTORY_RETURN_BARS):
+            common = common_drift + 0.0012 * math.sin(return_index / 11.0)
+            relative = 0.0007 * math.sin(return_index / 7.0 + symbol_index * 0.53)
+            if return_index >= strategy.HISTORY_RETURN_BARS - strategy.SLOW_TREND_BARS:
+                relative += 0.00045 * loading
+            if return_index >= strategy.HISTORY_RETURN_BARS - strategy.SHORT_REVERSAL_BARS:
+                relative += 0.0012 * loading
+            closes.append(closes[-1] * math.exp(common + relative))
         bars[symbol] = pd.DataFrame(
             {
-                "open_time": times,
-                "symbol": symbol,
-                "open": close * 0.999,
-                "high": close * 1.002,
-                "low": close * 0.998,
-                "close": close,
-                "quote_volume": np.full(periods, 10_000_000.0 - number * 200_000.0),
+                "open_time": open_times,
+                "close": closes,
+                "quote_volume": [10_000_000.0 - symbol_index * 10_000.0] * periods,
             }
         )
-    funding = pd.DataFrame(columns=["funding_time", "symbol", "funding_rate", "mark_price"])
     return SimpleNamespace(
-        decision_time=decision_time,
+        decision_time=decision,
         bars=bars,
-        funding=funding,
+        funding=pd.DataFrame(columns=["funding_time", "symbol", "funding_rate"]),
         auxiliary={},
-        eligible_symbols=symbols,
+        eligible_symbols=tuple(sorted(bars)),
     )
 
 
-def test_strategy_is_deterministic_finite_and_two_sided() -> None:
-    context = _context()
-    first = MODULE.build_strategy().target_weights(context, seed=20260801)
-    second = MODULE.build_strategy().target_weights(context, seed=20260801)
+def _targets(context):
+    result = strategy.build_strategy().target_weights(context, seed=strategy.FROZEN_SEED)
+    assert result is not None
+    return dict(result)
+
+
+def test_deterministic_finite_broad_two_sided_targets() -> None:
+    context = _synthetic_context()
+    first = _targets(context)
+    second = _targets(context)
+
     assert first == second
     assert first
-    assert set(first).issubset(context.eligible_symbols)
+    assert list(first) == sorted(first)
+    assert sum(value > 0.0 for value in first.values()) >= 8
+    assert sum(value < 0.0 for value in first.values()) >= 8
     assert all(math.isfinite(value) for value in first.values())
-    assert any(value > 0 for value in first.values())
-    assert any(value < 0 for value in first.values())
-    assert sum(abs(value) for value in first.values()) <= 0.80 + 1e-9
-    assert abs(sum(first.values())) <= 0.16 + 1e-9
-    assert max(abs(value) for value in first.values()) <= 0.09 + 1e-9
+    assert abs(sum(abs(value) for value in first.values()) - strategy.GROSS_TARGET) <= 1e-10
+    assert abs(sum(first.values())) <= strategy.MAXIMUM_DIRECTIONAL_NET + 1e-10
+    assert max(abs(value) for value in first.values()) <= strategy.MAXIMUM_SYMBOL_EXPOSURE + 1e-10
 
 
-def test_inputs_are_not_mutated() -> None:
-    context = _context()
-    copies = {symbol: frame.copy(deep=True) for symbol, frame in context.bars.items()}
-    MODULE.build_strategy().target_weights(context, seed=20260801)
-    for symbol, expected in copies.items():
-        pdt.assert_frame_equal(context.bars[symbol], expected)
+def test_common_market_state_changes_directional_side_budget() -> None:
+    bull = _targets(_synthetic_context(common_drift=0.0015))
+    bear = _targets(_synthetic_context(common_drift=-0.0015))
+
+    assert sum(bull.values()) > 0.0
+    assert sum(bear.values()) < 0.0
+    assert any(value > 0.0 for value in bull.values())
+    assert any(value < 0.0 for value in bull.values())
+    assert any(value > 0.0 for value in bear.values())
+    assert any(value < 0.0 for value in bear.values())
 
 
-def test_future_bar_is_rejected_fail_closed() -> None:
-    context = _context()
-    symbol = context.eligible_symbols[0]
-    future = context.bars[symbol].iloc[[-1]].copy()
-    future["open_time"] = context.decision_time
-    future["close"] = 1e100
-    context.bars[symbol] = pd.concat([context.bars[symbol], future], ignore_index=True)
-    with pytest.raises(ValueError, match="not closed"):
-        MODULE.build_strategy().target_weights(context, seed=20260801)
+def test_short_residual_shock_has_a_reversal_forecast() -> None:
+    market = (0.0,) * strategy.HISTORY_RETURN_BARS
+    asset = (0.0,) * (strategy.HISTORY_RETURN_BARS - 3) + (0.01, 0.01, 0.01)
+    feature = strategy._relative_feature(asset, market)
+
+    assert feature is not None
+    assert feature.short_reversal < 0.0
+    assert feature.medium_trend > 0.0
+    assert feature.slow_trend > 0.0
 
 
-def test_corrupt_past_and_duplicate_timestamp_are_rejected() -> None:
-    context = _context()
-    symbol = context.eligible_symbols[0]
-    context.bars[symbol].loc[10, "close"] = np.inf
-    with pytest.raises(ValueError, match="invalid|non-finite"):
-        MODULE.build_strategy().target_weights(context, seed=20260801)
+def test_future_rows_and_unused_fields_do_not_change_targets() -> None:
+    base = _synthetic_context()
+    expected = _targets(base)
+    changed = SimpleNamespace(**vars(base))
+    changed.bars = {}
+    for symbol, frame in base.bars.items():
+        mutated = frame.copy()
+        mutated["open"] = [1.0e12 if index % 2 else 1.0e-12 for index in range(len(mutated))]
+        mutated["high"] = 1.0e15
+        mutated["low"] = 1.0e-15
+        future = pd.DataFrame(
+            {
+                "open_time": [base.decision_time, base.decision_time + pd.Timedelta(hours=8)],
+                "close": [1.0e12, 1.0e-12],
+                "open": [1.0e-12, 1.0e12],
+                "high": [1.0e15, 1.0e15],
+                "low": [1.0e-15, 1.0e-15],
+            }
+        )
+        changed.bars[symbol] = pd.concat([mutated, future], ignore_index=True)
+    changed.auxiliary = {"unused": pd.DataFrame({"value": [1.0e12]})}
 
-    context = _context()
-    symbol = context.eligible_symbols[0]
-    duplicate = context.bars[symbol].iloc[[-1]].copy()
-    context.bars[symbol] = pd.concat([context.bars[symbol], duplicate], ignore_index=True)
-    with pytest.raises(ValueError, match="duplicate"):
-        MODULE.build_strategy().target_weights(context, seed=20260801)
-
-
-def test_append_and_future_corruption_invariance_after_authorized_truncation() -> None:
-    base = _context()
-    reference = MODULE.build_strategy().target_weights(base, seed=20260801)
-    for magnitude in (1e-100, 1e100):
-        altered = _context()
-        for symbol, frame in altered.bars.items():
-            future = frame.iloc[[-1]].copy()
-            future["open_time"] = altered.decision_time + pd.Timedelta(hours=8)
-            future["close"] = magnitude
-            full = pd.concat([frame, future], ignore_index=True)
-            close_time = pd.to_datetime(full["open_time"], utc=True) + pd.Timedelta(hours=8)
-            altered.bars[symbol] = full.loc[close_time <= altered.decision_time].copy()
-        assert MODULE.build_strategy().target_weights(altered, seed=20260801) == reference
+    assert _targets(changed) == expected
 
 
-def test_insufficient_history_requests_flat() -> None:
-    context = _context(periods=80)
-    assert MODULE.build_strategy().target_weights(context, seed=20260801) == {}
+def test_exact_history_failure_flattens() -> None:
+    context = _synthetic_context()
+    context.bars = {symbol: frame.iloc[:-1].copy() for symbol, frame in context.bars.items()}
+    assert _targets(context) == {}
+
+    duplicate = _synthetic_context()
+    duplicate.bars = {
+        symbol: pd.concat([frame, frame.iloc[[-1]]], ignore_index=True)
+        for symbol, frame in duplicate.bars.items()
+    }
+    assert _targets(duplicate) == {}
 
 
-def test_non_rebalance_boundary_holds() -> None:
-    context = _context(decision=DEFAULT_DECISION + pd.Timedelta(hours=8))
-    assert MODULE.build_strategy().target_weights(context, seed=20260801) is None
-
-
-def test_funding_at_or_after_boundary_is_rejected() -> None:
-    context = _context()
+def test_funding_must_be_strictly_past() -> None:
+    context = _synthetic_context()
     context.funding = pd.DataFrame(
         {
             "funding_time": [context.decision_time],
             "symbol": [context.eligible_symbols[0]],
             "funding_rate": [0.0001],
-            "mark_price": [100.0],
         }
     )
-    with pytest.raises(ValueError, match="unavailable"):
-        MODULE.build_strategy().target_weights(context, seed=20260801)
+    assert _targets(context) == {}
 
 
-def test_full_eligible_funding_accepts_an_underhistory_new_member() -> None:
-    context = _context()
-    new_symbol = "NEWUSDT"
-    new_frame = context.bars[context.eligible_symbols[-1]].tail(100).copy()
-    new_frame["symbol"] = new_symbol
-    context.bars[new_symbol] = new_frame
-    context.eligible_symbols = (*context.eligible_symbols, new_symbol)
+def test_past_funding_enters_with_carry_direction() -> None:
+    context = _synthetic_context()
+    positive = context.eligible_symbols[0]
+    negative = context.eligible_symbols[-1]
     context.funding = pd.DataFrame(
         {
             "funding_time": [
                 context.decision_time - pd.Timedelta(hours=16),
-                context.decision_time - pd.Timedelta(hours=8),
+                context.decision_time - pd.Timedelta(hours=16),
             ],
-            "symbol": [context.eligible_symbols[0], new_symbol],
-            "funding_rate": [0.0002, -0.0003],
-            "mark_price": [100.0, 10.0],
+            "symbol": [positive, negative],
+            "funding_rate": [0.001, -0.001],
         }
     )
-    targets = MODULE.build_strategy().target_weights(context, seed=20260801)
-    assert targets and new_symbol not in targets
-    carry = MODULE._past_funding_carry(
+    carry = strategy._past_funding_carry(
         context.funding,
-        context.decision_time,
-        set(context.eligible_symbols),
-        21,
+        decision_time=context.decision_time,
+        eligible=set(context.eligible_symbols),
     )
-    assert carry[context.eligible_symbols[0]] > 0
-    assert carry[new_symbol] < 0
+
+    assert carry is not None
+    assert carry[positive] < 0.0
+    assert carry[negative] > 0.0
 
 
-def test_missing_bar_does_not_compress_time_and_stale_leaders_flatten() -> None:
-    context = _context()
-    symbol = context.eligible_symbols[0]
-    missing_time = pd.Timestamp(context.bars[symbol].iloc[101]["open_time"])
-    context.bars[symbol] = context.bars[symbol].drop(index=100).reset_index(drop=True)
-    returns, _liquidity = MODULE._closed_returns_and_liquidity(
-        context.bars[symbol], context.decision_time, MODULE.StrategyConfig()
+def test_point_in_time_membership_is_the_only_candidate_set() -> None:
+    context = _synthetic_context(symbol_count=32)
+    excluded = set(sorted(context.bars)[-5:])
+    context.eligible_symbols = tuple(sorted(set(context.bars) - excluded))
+    targets = _targets(context)
+
+    assert targets
+    assert set(targets).issubset(set(context.eligible_symbols))
+    assert not excluded & set(targets)
+
+
+def test_boundary_is_called_once_before_selection_and_side_sizing(monkeypatch) -> None:
+    context = _synthetic_context()
+    assert strategy.score_boundary is public_score_boundary
+    snapshot = strategy.build_strategy().preconstruction_snapshot(
+        context,
+        seed=strategy.FROZEN_SEED,
     )
-    assert pd.isna(returns.loc[missing_time])
+    assert snapshot is not None
+    expected = snapshot.score_map()
+    observed: list[dict[str, float]] = []
 
-    stale = _context()
-    for stale_symbol, frame in stale.bars.items():
-        stale.bars[stale_symbol] = frame.iloc[:-1].copy()
-    assert MODULE.build_strategy().target_weights(stale, seed=20260801) == {}
+    def capture(scores):
+        observed.append(dict(scores))
+        return scores
 
+    monkeypatch.setattr(strategy, "score_boundary", capture)
+    targets = strategy.build_strategy().target_weights(context, seed=strategy.FROZEN_SEED)
 
-def test_declared_neighbors_validate_and_produce_feasible_two_sided_targets() -> None:
-    neighborhood = json.loads((TEAM_DIR / "parameter_neighborhood.json").read_text())
-    center = MODULE.StrategyConfig()
-    context = _context(periods=260)
-    for neighbor in neighborhood["neighbors"]:
-        config = dataclasses.replace(center, **neighbor["changes"])
-        targets = MODULE.ShockDiffusionStrategy(config).target_weights(context, seed=20260801)
-        assert targets, neighbor["neighbor_id"]
-        assert any(value > 0 for value in targets.values())
-        assert any(value < 0 for value in targets.values())
+    assert targets
+    assert observed == [expected]
 
 
-def test_input_order_is_not_scientific_information() -> None:
-    baseline = _context()
-    expected = MODULE.build_strategy().target_weights(baseline, seed=20260801)
-    permuted = _context()
-    permuted.eligible_symbols = tuple(reversed(permuted.eligible_symbols))
-    permuted.bars = dict(reversed(tuple(permuted.bars.items())))
-    assert MODULE.build_strategy().target_weights(permuted, seed=20260801) == expected
+def test_scheduled_failure_captures_one_empty_dictionary(monkeypatch) -> None:
+    context = _synthetic_context(symbol_count=strategy.MINIMUM_VALID_SYMBOLS - 1)
+    observed = []
+
+    def capture(scores):
+        observed.append(scores)
+        return scores
+
+    monkeypatch.setattr(strategy, "score_boundary", capture)
+    assert _targets(context) == {}
+    assert observed == [{}]
 
 
-def test_configuration_rejects_a_trend_window_shorter_than_required_history() -> None:
-    with pytest.raises(ValueError, match="trend window"):
-        MODULE.StrategyConfig(trend_bars=125).validate()
+def test_hold_and_off_grid_decisions_do_not_call_boundary(monkeypatch) -> None:
+    base = _synthetic_context()
+    calls = 0
+
+    def capture(scores):
+        nonlocal calls
+        calls += 1
+        return scores
+
+    monkeypatch.setattr(strategy, "score_boundary", capture)
+    hold = SimpleNamespace(**vars(base))
+    hold.decision_time = base.decision_time + pd.Timedelta(hours=8)
+    assert strategy.build_strategy().target_weights(hold, seed=strategy.FROZEN_SEED) is None
+
+    off_grid = SimpleNamespace(**vars(base))
+    off_grid.decision_time = base.decision_time + pd.Timedelta(hours=1)
+    assert strategy.build_strategy().target_weights(off_grid, seed=strategy.FROZEN_SEED) == {}
+    assert calls == 0
 
 
-def test_seed_and_context_membership_are_bound() -> None:
-    context = _context()
-    with pytest.raises(ValueError, match="seed"):
-        MODULE.build_strategy().target_weights(context, seed=1)
-    del context.bars[context.eligible_symbols[0]]
-    with pytest.raises(ValueError, match="exactly match"):
-        MODULE.build_strategy().target_weights(context, seed=20260801)
+def test_boundary_returned_scores_drive_selection_and_direction(monkeypatch) -> None:
+    context = _synthetic_context(common_drift=0.0015)
+    baseline = _targets(context)
+    calls = 0
+
+    def invert(scores):
+        nonlocal calls
+        calls += 1
+        for symbol in scores:
+            scores[symbol] = -scores[symbol]
+        return scores
+
+    monkeypatch.setattr(strategy, "score_boundary", invert)
+    inverted = strategy.build_strategy().target_weights(context, seed=strategy.FROZEN_SEED)
+
+    assert calls == 1
+    assert inverted
+    assert dict(inverted) != baseline
+    assert sum(inverted.values()) < 0.0 < sum(baseline.values())
+
+
+def test_wrong_seed_and_candidate_identity_are_rejected(monkeypatch) -> None:
+    context = _synthetic_context()
+    with pytest.raises(ValueError, match="frozen seed"):
+        strategy.build_strategy().target_weights(context, seed=strategy.FROZEN_SEED + 1)
+
+    monkeypatch.setattr(candidate_variant, "ACTIVE_CANDIDATE_ID", "unknown-pivot")
+    with pytest.raises(ValueError, match="unknown materialized"):
+        strategy.build_strategy()
+
+
+def test_active_candidate_has_no_hidden_parameter_override(monkeypatch) -> None:
+    monkeypatch.setattr(candidate_variant, "ACTIVE_OVERRIDES", {"gross_target": 0.40})
+    with pytest.raises(ValueError, match="do not match"):
+        strategy.build_strategy()
+
+
+def test_frozen_config_matches_executable_constants() -> None:
+    config = json.loads((TEAM_DIR / "frozen_config.json").read_text(encoding="utf-8"))
+    assert config["family_id"] == strategy.ACTIVE_FAMILY_ID
+    assert config["candidate_id"] == strategy.ACTIVE_CANDIDATE_ID
+    assert config["seed"] == strategy.FROZEN_SEED
+    assert config["parameters"] == {
+        "bar_interval_hours": strategy.BAR_INTERVAL_HOURS,
+        "funding_carry_weight": strategy.FUNDING_CARRY_WEIGHT,
+        "funding_lookback_events": strategy.FUNDING_LOOKBACK_EVENTS,
+        "gross_target": strategy.GROSS_TARGET,
+        "history_return_bars": strategy.HISTORY_RETURN_BARS,
+        "market_breadth_weight": strategy.MARKET_BREADTH_WEIGHT,
+        "market_fast_bars": strategy.MARKET_FAST_BARS,
+        "market_fast_weight": strategy.MARKET_FAST_WEIGHT,
+        "market_score_offset": strategy.MARKET_SCORE_OFFSET,
+        "market_slow_bars": strategy.MARKET_SLOW_BARS,
+        "market_slow_weight": strategy.MARKET_SLOW_WEIGHT,
+        "market_trend_z_scale": strategy.MARKET_TREND_Z_SCALE,
+        "maximum_directional_net": strategy.MAXIMUM_DIRECTIONAL_NET,
+        "maximum_symbol_exposure": strategy.MAXIMUM_SYMBOL_EXPOSURE,
+        "medium_relative_trend_weight": strategy.MEDIUM_RELATIVE_TREND_WEIGHT,
+        "medium_trend_bars": strategy.MEDIUM_TREND_BARS,
+        "minimum_positions_per_side": strategy.MINIMUM_POSITIONS_PER_SIDE,
+        "minimum_return_volatility": strategy.MINIMUM_RETURN_VOLATILITY,
+        "minimum_valid_symbols": strategy.MINIMUM_VALID_SYMBOLS,
+        "rebalance_interval_bars": strategy.REBALANCE_INTERVAL_BARS,
+        "relative_trend_base_weight": strategy.RELATIVE_TREND_BASE_WEIGHT,
+        "relative_trend_state_weight": strategy.RELATIVE_TREND_STATE_WEIGHT,
+        "selected_fraction_per_side": "1/4",
+        "short_reversal_bars": strategy.SHORT_REVERSAL_BARS,
+        "slow_relative_trend_weight": strategy.SLOW_RELATIVE_TREND_WEIGHT,
+        "slow_trend_bars": strategy.SLOW_TREND_BARS,
+        "volatility_bars": strategy.VOLATILITY_BARS,
+    }
+
+    risk = json.loads((TEAM_DIR / "risk_policy.json").read_text(encoding="utf-8"))
+    assert risk["drawdown_brakes"] == []
+    assert risk["position_stop"]["enabled"] is False
+    assert risk["time_stop"]["enabled"] is False
+    assert risk["turnover_limit"]["enabled"] is False
+    assert risk["volatility_target"]["enabled"] is False

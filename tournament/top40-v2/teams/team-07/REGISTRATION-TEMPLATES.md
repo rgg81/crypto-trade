@@ -1,16 +1,25 @@
-# Registration template use
+# Team 07 pivot registration drafts
 
-The family and trial templates contain exactly the keys accepted by the frozen public schemas.
-They are drafts, not registrations. Before submission, replace the epoch timestamp with the actual
-UTC registration time and replace every all-zero SHA-256 sentinel with a hash computed from the
-final frozen bytes. Do not add notes or status fields to either JSON object. Validate the
-materialized objects, then use `scripts/top40_v2_tournament_score_diagnostics_v5.py`, the active
-A5 superset entrypoint that preserves the A6 pure-crypto preflight. The organizer, not Team07,
-appends families.jsonl and experiments.jsonl.
+The root family and trial JSON files and their copies under `pivot-01/` are drafts, not
+registrations. Their epoch timestamps and all-zero hashes are sentinels. Materialize them only from
+the final reviewed bytes, after canonical A5 controls exist and before using the active Amendment
+0007 entrypoint.
 
-The first trial template is exclusively the center signal with the no-control bytes at root
-`risk_policy.json`. Verify those bytes are identical to `risk_policies/no-control.json` before
-computing `risk_config_sha256`. Do not register a controlled policy unless the completed core has
-passed every broad positive activation minimum. A controlled candidate must first have its selected
-immutable template copied byte-for-byte to root `risk_policy.json`, committed, and re-hashed; the
-lifecycle never reads `risk_policies/` directly.
+The organizer must register `t07-market-state-relative-ensemble-v1` with the `pivot-team` command,
+parent `shock-diffusion-v1`, and prospective material trial number 2. The parent result remains in
+the immutable ledgers; these drafts do not edit or reinterpret it.
+
+Before trial registration:
+
+- require root `risk_policy.json` to be byte-identical to `risk_policies/no-control.json`;
+- materialize and freeze the executable-source manifest;
+- obtain an independent semantic-coupling approval;
+- add and hash the canonical 48-hour score manifest;
+- fill the score adapter hash in the trial parameters;
+- fill exact strategy, source-bundle, risk, config, and timestamp values;
+- retain the paired `schema_version: 2` and `event_type: trial_registration` fields; and
+- confirm the completed Team 07 A7 authority rebind names the new family/candidate.
+
+`pivot-01/control-activation.template.json` deliberately contains no authorization. It may become
+evidence only after the completed no-control pivot result makes every listed gate true. Controls
+cannot rescue either the terminal parent or a failed pivot core.

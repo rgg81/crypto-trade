@@ -10,13 +10,13 @@
   },
   "amendment_id": "top40-v2-amendment-0007-frozen-worker-a5-protocol-preload",
   "binding_kind": "top40-v2-a7-execution-authority-v1",
-  "candidate_id": "team07-shock-diffusion-center-v1",
+  "candidate_id": "t07-market-state-relative-ensemble-v1-base",
   "delegated_amendment_0005_integration": {
     "commit": "d2b95f610722aab65b4e67466b34efeaa3554101",
     "path": "tournament/top40-v2/amendments/0005/integration-freeze.json",
     "sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c"
   },
-  "family_id": "shock-diffusion-v1",
+  "family_id": "t07-market-state-relative-ensemble-v1",
   "integration_freeze": {
     "commit": "c8b917ca49306d5200a4e08848e73ff6f5a18bf3",
     "path": "tournament/top40-v2/amendments/0007/integration-freeze.json",

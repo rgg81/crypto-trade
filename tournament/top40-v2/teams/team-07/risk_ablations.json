@@ -1,6 +1,6 @@
 {
   "core_alpha_activation_gate": {
-    "applies_to": "team07-shock-diffusion-center-v1 with root risk_policy.json in its no-control state",
+    "applies_to": "t07-market-state-relative-ensemble-v1-base with root risk_policy.json in its exact no-control state",
     "base_cost_net_return_strictly_positive": true,
     "base_cost_net_sharpe_strictly_positive": true,
     "both_sleeves_meet_activity_floors": true,
@@ -13,30 +13,13 @@
     "short_bear_attribution_strictly_positive": true
   },
   "cost_multipliers": [1.0, 2.0],
-  "execution_order": "Run and read the no-control root core first. No single or combined control may be registered or run unless every core-alpha activation minimum passes. Controls cannot rescue a failed or negative core; failure requires a separately preregistered mechanism revision, pivot, or DNF.",
-  "metrics_required": [
-    "annualized_return",
-    "net_sharpe",
-    "maximum_drawdown",
-    "tail_loss",
-    "turnover",
-    "positive_fold_count",
-    "bull_net_return",
-    "bear_net_return",
-    "chop_net_return",
-    "regime_metrics",
-    "long_bull_attribution",
-    "short_bear_attribution",
-    "combined_chop_attribution",
-    "long_mean_gross_exposure",
-    "short_mean_gross_exposure",
-    "long_short_attribution",
-    "stop_and_brake_counts",
-    "cooldown_time",
-    "requested_risk_notional",
-    "filled_risk_notional",
-    "same_boundary_reentry_preventions"
-  ],
+  "execution_order": "Run and read the pivot no-control core first. No control may be registered or run unless every core-alpha activation minimum passes. Controls cannot rescue this pivot or the terminal shock-diffusion parent.",
+  "parent_failure": {
+    "candidate_id": "team07-shock-diffusion-center-v1",
+    "controls_activated": false,
+    "family_id": "shock-diffusion-v1",
+    "terminal": true
+  },
   "policies": [
     "risk_policy.json",
     "risk_policies/volatility-only.json",
@@ -45,8 +28,7 @@
     "risk_policies/turnover-only.json",
     "risk_policies/combined.json"
   ],
-  "policy_materialization_rule": "The frozen lifecycle reads only root risk_policy.json. For every later policy candidate, copy the selected immutable risk_policies template byte-for-byte to root risk_policy.json before the candidate commit, registration, and run; then recompute every risk and source binding.",
-  "registration_rule": "The root no-control core is the first material preregistration. After it passes every activation minimum, each of the five later policy templates is one separate material preregistration; the frozen runner emits ordinary and doubled-cost results together for that policy.",
-  "schema_version": 1,
+  "policy_materialization_rule": "The lifecycle reads only root risk_policy.json. After a broad pivot-core pass, copy one selected immutable template byte-for-byte to root before commit, registration, and run; recompute every binding.",
+  "schema_version": 2,
   "team_id": "team-07"
 }

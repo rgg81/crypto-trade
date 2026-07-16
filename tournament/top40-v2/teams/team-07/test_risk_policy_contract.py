@@ -16,8 +16,8 @@ def test_risk_plan_starts_with_root_no_control_and_defers_combined() -> None:
     assert plan["policies"][-1] == "risk_policies/combined.json"
     assert plan["core_alpha_activation_gate"] == {
         "applies_to": (
-            "team07-shock-diffusion-center-v1 with root risk_policy.json "
-            "in its no-control state"
+            "t07-market-state-relative-ensemble-v1-base with root "
+            "risk_policy.json in its exact no-control state"
         ),
         "base_cost_net_return_strictly_positive": True,
         "base_cost_net_sharpe_strictly_positive": True,

@@ -1,0 +1,21 @@
+{
+  "candidate_id": "t07-market-state-relative-ensemble-v1-base",
+  "controls_authorized": false,
+  "family_id": "t07-market-state-relative-ensemble-v1",
+  "gate_values": {
+    "base_return_positive": null,
+    "base_sharpe_positive": null,
+    "bull_bear_chop_returns_positive": null,
+    "combined_chop_attribution_positive": null,
+    "double_cost_return_positive": null,
+    "double_cost_sharpe_positive": null,
+    "long_bull_attribution_positive": null,
+    "minimum_four_positive_folds": null,
+    "short_bear_attribution_positive": null,
+    "sleeves_active": null
+  },
+  "required_decision": "All gate values must be true on the immutable no-control reference before an organizer may create a separately preregistered control candidate.",
+  "schema_version": 1,
+  "status": "prospective_draft_not_evidence",
+  "team_id": "team-07"
+}
