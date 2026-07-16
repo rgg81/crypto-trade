@@ -52,7 +52,7 @@
   "critic_lock": null,
   "final_oos_lock": null,
   "finalist_cohort_lock": null,
-  "legacy_projection_sha256": "527cfabfdad354f33c17a0bc76d4100f512cf663ccdc5c21aea7ab199a4a9b44",
+  "legacy_projection_sha256": "28aa5ae2949797a86fa81fda34d6baf0a3210377f35101c1bec5ade8f02cf778",
   "legacy_state_sha256": "8c858495fde6ddde203124a055e40ebad5d8d5a684cd20f0e55f6c88f7360b07",
   "objective_lock": null,
   "organizer_audit": {
@@ -181,13 +181,13 @@
       "trial_count": 2
     },
     "team-07": {
-      "active_family_id": "shock-diffusion-v1",
+      "active_family_id": "t07-market-state-relative-ensemble-v1",
       "canonical_result": null,
       "development_assessment": null,
       "dnf": null,
-      "family_count": 1,
+      "family_count": 2,
       "finalist_freeze": null,
-      "pivot_count": 0,
+      "pivot_count": 1,
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
