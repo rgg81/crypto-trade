@@ -1,0 +1,107 @@
+{
+  "candidate_id": "t07-two-tape-rank-durability-v1-base",
+  "decision": "terminal_no_control_core_failed_complete_development_gate",
+  "diagnostic_class": "organizer_read_only_post_result_diagnostic_not_qualification_evidence",
+  "family_id": "t07-two-tape-rank-durability-v1",
+  "gates": {
+    "aggregate": {
+      "annualized_return": {
+        "observed": 0.11385400886282504,
+        "passed": true,
+        "threshold": 0.0
+      },
+      "calmar": {
+        "observed": 1.0100477147338127,
+        "passed": true,
+        "threshold": 0.4
+      },
+      "double_cost_sharpe": {
+        "observed": 0.919400173865222,
+        "passed": true,
+        "threshold": 0.35
+      },
+      "maximum_drawdown": {
+        "observed": 0.112721416228173,
+        "passed": true,
+        "threshold": 0.3
+      },
+      "net_sharpe": {
+        "observed": 1.019403099046629,
+        "passed": true,
+        "threshold": 0.75
+      },
+      "positive_quarter_fraction": {
+        "observed": 0.7142857142857143,
+        "passed": true,
+        "threshold": 0.55
+      },
+      "trial_adjusted_probability_positive": {
+        "observed": 0.8437252751361186,
+        "passed": false,
+        "threshold": 0.9,
+        "trial_count": 3
+      }
+    },
+    "folds": {
+      "minimum_positive_folds": 4,
+      "observed_positive_folds": 5,
+      "passed": true,
+      "returns": {
+        "fold-1": 0.03315501789524622,
+        "fold-2": 0.14058605981496997,
+        "fold-3": 0.12407635661711458,
+        "fold-4": -0.015189795566970643,
+        "fold-5": 0.0834501103649794,
+        "fold-6": 0.021763055445110258
+      }
+    },
+    "regimes": {
+      "bear_net_return": 0.001515257130324521,
+      "bull_net_return": 0.2031196207104815,
+      "chop_net_return": 0.15020236796755193,
+      "passed": true,
+      "positive_sharpe_count": 4,
+      "worst_sharpe": 0.07000458174379083
+    },
+    "roles": {
+      "combined_chop_net_return": 0.15020236796755193,
+      "long_bull_net_return": 0.2381473641454004,
+      "passed": false,
+      "short_bear_net_return": -0.004865501117478896
+    },
+    "sleeves": {
+      "long": {
+        "active_bar_fraction": 0.9413183279742765,
+        "executed_notional_usdt": 3083595.449393519,
+        "mean_gross_exposure": 0.16907839910399275,
+        "passed": true
+      },
+      "passed": true,
+      "short": {
+        "active_bar_fraction": 0.9413183279742765,
+        "executed_notional_usdt": 3291265.3604444466,
+        "mean_gross_exposure": 0.1644005266577009,
+        "passed": true
+      }
+    },
+    "stability_without_parameter_neighbors": {
+      "maximum_positive_pnl_concentration": {
+        "observed": 0.34882229728222786,
+        "passed": true,
+        "threshold": 0.4
+      },
+      "parameter_neighbors_materialized": false
+    }
+  },
+  "governance": {
+    "controls_allowed_to_rescue": false,
+    "mechanism_pivots_consumed": 2,
+    "parameter_neighborhood_activation_allowed": false,
+    "reason": "The preregistered falsifier rejects the no-control family when any central or role gate fails. The final permitted mechanism pivot fails the trial-adjusted-probability and short-bear-role gates, so controls and neighborhood searches remain dormant."
+  },
+  "observed_at_utc": "2026-07-16T21:14:49Z",
+  "runner_record_path": "reports-top40-v2/team-07/qualification-attempts/t07-two-tape-rank-durability-v1-base.runner-record.json",
+  "runner_record_sha256": "f4b774a7c2bd215922a5eb65990b7927934c10c9e5ac7f7d8d67e44fc98916a8",
+  "schema_version": 1,
+  "team_id": "team-07"
+}
