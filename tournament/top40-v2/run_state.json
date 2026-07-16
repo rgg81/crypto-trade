@@ -1,12 +1,12 @@
 {
   "administrative_hold": {
-    "active": true,
+    "active": false,
     "baseline_research_deadline_utc": "2026-08-01T18:00:00Z",
-    "cumulative_toll_microseconds": 0,
-    "effective_research_deadline_utc": "2026-08-01T18:00:00Z",
-    "hold_duration_microseconds": null,
+    "cumulative_toll_microseconds": 16709037669,
+    "effective_research_deadline_utc": "2026-08-01T22:38:29.037669Z",
+    "hold_duration_microseconds": 16709037669,
     "reason": "Pause result-bearing tournament work after discovering that the frozen worker did not expose the preregistered pre-construction score required for Team01 score-IC evidence.",
-    "resumed_at_utc": null,
+    "resumed_at_utc": "2026-07-16T04:13:17.037669Z",
     "started_at_utc": "2026-07-15T23:34:48Z"
   },
   "amendment": {
@@ -20,9 +20,9 @@
     },
     "chain": {
       "genesis_sha256": "461df44d2cd06bd68023880eb8f1d36a67dc52c04ed5009805cc9dcbe7548bb6",
-      "head_sha256": "2fb84e4711e840d0b41ad563a83ef0a3a7a176b8d74dcbc750ce474644cfd200",
+      "head_sha256": "34ed67c9d12f693472d55c5bfc7f431470caa58449eb12bc13bee682a3573418",
       "path": "tournament/top40-v2/amendments/0001/chain.jsonl",
-      "record_count": 2
+      "record_count": 3
     },
     "draft_path": "tournament/top40-v2/amendments/0001/draft.json",
     "draft_sha256": "33e0059311b48c00e9f0525d525a5c6ec1f25092fda79e17fd946cac8824759d",
