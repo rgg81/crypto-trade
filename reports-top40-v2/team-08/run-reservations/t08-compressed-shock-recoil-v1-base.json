@@ -1,0 +1,15 @@
+{
+  "candidate_id": "t08-compressed-shock-recoil-v1-base",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "organizer_journal_head_sha256": "32ce2e0465754c6eac2b28e97aeaef41816ffc1c1ab27186763bfb8e49f66b62",
+  "private_attempt_number": null,
+  "registration_sha256": "d6bab7d0b3127547c6f00955c50e6f42a3d0b0247b6a94e7f51333c8889d6a61",
+  "reserved_at_utc": "2026-07-16T22:26:09.176837+00:00",
+  "risk_policy_sha256": "8db76eb8d59fbef6473d2a2cd98bbba68c8e53d8d78284284ec06db54b8fa5d6",
+  "schema_version": 1,
+  "source_bundle_sha256": "58e4eef4f9b70227ae698c999d352138fc6f9f39b6ff06d01680a59eb74da2f3",
+  "stage": "development",
+  "strategy_sha256": "883ff191364d76febb1d070135236e9a245a4c4af9eb7139cbc2d06a55019d30",
+  "team_id": "team-08",
+  "tournament": "quant-portfolio-blind-top40-v2"
+}

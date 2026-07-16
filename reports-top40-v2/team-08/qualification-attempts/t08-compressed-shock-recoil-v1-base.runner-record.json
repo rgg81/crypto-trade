@@ -1,0 +1,76 @@
+{
+  "artifact_sha256": {
+    "daily_returns": "ef2c20264452a23fbf0c0ec37df2345870e82a39ce4ee9c8705de315788eb085",
+    "double_cost_daily_returns": "65f993c558a4966e27e920c355c555fd866e16990e6e02893fb1845bcf3226e0",
+    "double_cost_evaluator_returns": "2b258dc23b1c2d3e2193f889a2a99018a47dc74e90367d2c38d488120685677e",
+    "evaluator_returns": "e9649ab1ecdb904ca949cec729a537744d318bfaee39d5bfa82f2c0f8a002873",
+    "events": "48dbc58feea84246d6a208f26a3769e7a065395026e6b3cfa3a7cc2cc6dd7895",
+    "positions": "afae6cd912755fa823bd64909797b1df8c60b71a09e15d3cf0305860b1ad4ac7",
+    "targets": "c75a0864cd0e54090e36b09ad6f08b66cb43ab508535255e450822052f91751d",
+    "trades": "f8f6b460c790698ca0429032d0fedc57c6523d65862c5db6079252adc7a5013a"
+  },
+  "artifact_sizes": {
+    "daily_returns": 32502,
+    "double_cost_daily_returns": 32526,
+    "double_cost_evaluator_returns": 1128436,
+    "evaluator_returns": 1112458,
+    "events": 2250446,
+    "positions": 469173,
+    "targets": 156060,
+    "trades": 437644
+  },
+  "artifacts": {
+    "daily_returns": "reports-top40-v2/team-08/development/daily_returns.csv",
+    "double_cost_daily_returns": "reports-top40-v2/team-08/development/double_cost_daily_returns.csv",
+    "double_cost_evaluator_returns": "reports-top40-v2/team-08/development/double_cost_bar_returns.csv",
+    "evaluator_returns": "reports-top40-v2/team-08/development/bar_returns.csv",
+    "events": "reports-top40-v2/team-08/development/events.parquet",
+    "positions": "reports-top40-v2/team-08/development/positions.parquet",
+    "targets": "reports-top40-v2/team-08/development/targets.parquet",
+    "trades": "reports-top40-v2/team-08/development/trades.csv"
+  },
+  "confidence_intervals": {
+    "double_cost_sharpe_95": [
+      -2.278669289832835,
+      -0.4103779364713338
+    ],
+    "net_sharpe_95": [
+      -2.0884938082555906,
+      -0.21114615041171245
+    ]
+  },
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "data_manifest_sha256": "077eb036d262befec80f7013084fe6906859f7c3bbe2f8c193c9d9ec68e367c3",
+  "decision_count": 3732,
+  "double_cost_sharpe": -1.3483780074458105,
+  "entrypoint": "tournament/top40-v2/teams/team-08/strategy.py",
+  "event_count": 73768,
+  "output_dir": "reports-top40-v2/team-08/development",
+  "regime_sharpe": {
+    "bear": -2.2157562670188184,
+    "bull": -0.833786866344814,
+    "chop": -0.5548496699470463,
+    "stress": -1.4296380467318894
+  },
+  "risk_policy_sha256": "8db76eb8d59fbef6473d2a2cd98bbba68c8e53d8d78284284ec06db54b8fa5d6",
+  "scored_window": {
+    "end": "2023-06-30",
+    "metrics": {
+      "annualized_return": -0.08782724155887656,
+      "calmar": -0.2809071166546279,
+      "max_drawdown": 0.3126558081006511,
+      "net_sharpe": -1.1608303981951267,
+      "net_sortino": -1.5005368683824358,
+      "positive_quarter_fraction": 0.2857142857142857
+    },
+    "start": "2020-02-03"
+  },
+  "seeds": [
+    20260801
+  ],
+  "source_bundle_sha256": "58e4eef4f9b70227ae698c999d352138fc6f9f39b6ff06d01680a59eb74da2f3",
+  "stage": "development",
+  "strategy_sha256": "883ff191364d76febb1d070135236e9a245a4c4af9eb7139cbc2d06a55019d30",
+  "team_id": "team-08",
+  "trade_count": 2952
+}
