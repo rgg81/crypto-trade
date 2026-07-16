@@ -1,0 +1,15 @@
+{
+  "candidate_id": "t07-market-state-relative-ensemble-v1-base",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "organizer_journal_head_sha256": "659227d674ddbfbc73fa96f42115496a6213c5f2e3f666eb1dfb8b06e279875a",
+  "private_attempt_number": null,
+  "registration_sha256": "c4842d40cde68e04129465c139d7e50b8b655ac0d4078cc97e2478d241d37bed",
+  "reserved_at_utc": "2026-07-16T19:49:37.593823+00:00",
+  "risk_policy_sha256": "d3b918f600f2b548b6a2c8dc44a3077b7b34d8c911ecc6e9c776eada8ad77b6c",
+  "schema_version": 1,
+  "source_bundle_sha256": "bff04776cb555636988bfbc2cc010f3dda86728eac14ce8f0c99f41a5edfad48",
+  "stage": "development",
+  "strategy_sha256": "d4bad60615eee4be283e146fbde8bae6d1c782df48f62027ad05559c34563de2",
+  "team_id": "team-07",
+  "tournament": "quant-portfolio-blind-top40-v2"
+}
