@@ -1,0 +1,33 @@
+{
+  "config": {
+    "apply_funding": true,
+    "cost_mult": 1.0,
+    "exclude": [
+      "PAYPUSDT"
+    ]
+  },
+  "is_replay_identical": null,
+  "label": "ex-PAYPUSDT",
+  "metrics": {
+    "ann_turnover": 29.35908207461816,
+    "maxdd": -0.20534404067273115,
+    "mean_gross": 1.0,
+    "mean_net": 0.021778138468794086,
+    "median_names_long": 33.0,
+    "median_names_short": 31.0,
+    "n_months": 24,
+    "regime_sharpe": {
+      "bear": NaN,
+      "bull": -0.2286366643252408,
+      "chop": NaN
+    },
+    "sharpe": -0.6128767261779828,
+    "total_return": -0.1613813177557587
+  },
+  "schema": 1,
+  "team_id": "team-03",
+  "window": {
+    "hi_exclusive": "2026-07-01",
+    "lo": "2024-07-01"
+  }
+}

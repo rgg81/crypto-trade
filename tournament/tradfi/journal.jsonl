@@ -49,3 +49,36 @@
 {"event": "family_registration", "family_id": "t06-vix-regime-books-v1", "reason": "AMENDMENT per Critic BLOCK-PENDING-FIX: approval line omitted by orchestrator at pivot time (grant journaled 01:46:50Z, choice reported and QE dispatched, line never written); Critic verified team chronology airtight (all family artifacts postdate grant); appended as journaled amendment per charter \u00a713", "status": "approved", "summary": "VIX-conditional regime books (calm 12-1 momentum / stressed 10d reversal, hysteresis switch)", "team_id": "team-06", "ts": "2026-07-17T02:38:00+00:00"}
 {"event": "amendment", "n": 1, "ts": "2026-07-17T02:38:01+00:00", "what": "registry approval line for t06-vix-regime-books-v1 appended post-freeze per Critic BLOCK-PENDING-FIX; orchestrator-side omission; team-06 tree untouched; verdict lifts to PASS"}
 {"event": "stage1_leaderboard", "failures": [], "finalists": ["team-10", "team-06", "team-09", "team-03"], "teams": ["team-01", "team-02", "team-03", "team-04", "team-05", "team-06", "team-07", "team-09", "team-10"], "ts": "2026-07-17T02:38:58+00:00"}
+{"apply_funding": true, "cost_mult": 1.0, "event": "holdout_run", "exclude": [], "label": "canonical", "team_id": "team-10", "ts": "2026-07-17T02:39:17+00:00"}
+{"event": "holdout_result", "is_replay_identical": true, "label": "canonical", "maxdd": -0.09397128074129801, "sharpe": 2.1526679948736556, "team_id": "team-10", "ts": "2026-07-17T02:39:18+00:00"}
+{"apply_funding": true, "cost_mult": 1.0, "event": "holdout_run", "exclude": [], "label": "canonical", "team_id": "team-06", "ts": "2026-07-17T02:39:19+00:00"}
+{"event": "holdout_result", "is_replay_identical": true, "label": "canonical", "maxdd": -0.08271985098621437, "sharpe": 1.721413135594277, "team_id": "team-06", "ts": "2026-07-17T02:39:21+00:00"}
+{"apply_funding": true, "cost_mult": 1.0, "event": "holdout_run", "exclude": [], "label": "canonical", "team_id": "team-09", "ts": "2026-07-17T02:39:21+00:00"}
+{"event": "holdout_result", "is_replay_identical": true, "label": "canonical", "maxdd": -0.09331613883927381, "sharpe": 2.0951279974311654, "team_id": "team-09", "ts": "2026-07-17T02:39:22+00:00"}
+{"apply_funding": true, "cost_mult": 1.0, "event": "holdout_run", "exclude": [], "label": "canonical", "team_id": "team-03", "ts": "2026-07-17T02:39:23+00:00"}
+{"event": "holdout_result", "is_replay_identical": true, "label": "canonical", "maxdd": -0.20722215330989846, "sharpe": -0.6618188993906114, "team_id": "team-03", "ts": "2026-07-17T02:39:24+00:00"}
+{"apply_funding": false, "cost_mult": 1.0, "event": "holdout_run", "exclude": [], "label": "nofunding", "team_id": "team-10", "ts": "2026-07-17T02:39:40+00:00"}
+{"event": "holdout_result", "is_replay_identical": true, "label": "nofunding", "maxdd": -0.09397128074129801, "sharpe": 2.1642574073995133, "team_id": "team-10", "ts": "2026-07-17T02:39:42+00:00"}
+{"apply_funding": true, "cost_mult": 2.0, "event": "holdout_run", "exclude": [], "label": "cost2x", "team_id": "team-10", "ts": "2026-07-17T02:39:42+00:00"}
+{"event": "holdout_result", "is_replay_identical": null, "label": "cost2x", "maxdd": -0.09488971153572434, "sharpe": 2.101491372504631, "team_id": "team-10", "ts": "2026-07-17T02:39:43+00:00"}
+{"apply_funding": true, "cost_mult": 1.0, "event": "holdout_run", "exclude": ["PAYPUSDT"], "label": "ex-PAYPUSDT", "team_id": "team-10", "ts": "2026-07-17T02:39:44+00:00"}
+{"event": "holdout_result", "is_replay_identical": null, "label": "ex-PAYPUSDT", "maxdd": -0.09223434036141165, "sharpe": 2.0783928661710536, "team_id": "team-10", "ts": "2026-07-17T02:39:45+00:00"}
+{"apply_funding": false, "cost_mult": 1.0, "event": "holdout_run", "exclude": [], "label": "nofunding", "team_id": "team-06", "ts": "2026-07-17T02:39:45+00:00"}
+{"event": "holdout_result", "is_replay_identical": true, "label": "nofunding", "maxdd": -0.08271985098621437, "sharpe": 1.7313578265891154, "team_id": "team-06", "ts": "2026-07-17T02:39:47+00:00"}
+{"apply_funding": true, "cost_mult": 2.0, "event": "holdout_run", "exclude": [], "label": "cost2x", "team_id": "team-06", "ts": "2026-07-17T02:39:47+00:00"}
+{"event": "holdout_result", "is_replay_identical": null, "label": "cost2x", "maxdd": -0.08394242651699213, "sharpe": 1.6274192075590652, "team_id": "team-06", "ts": "2026-07-17T02:39:48+00:00"}
+{"apply_funding": true, "cost_mult": 1.0, "event": "holdout_run", "exclude": ["PAYPUSDT"], "label": "ex-PAYPUSDT", "team_id": "team-06", "ts": "2026-07-17T02:39:49+00:00"}
+{"event": "holdout_result", "is_replay_identical": null, "label": "ex-PAYPUSDT", "maxdd": -0.07895771143004537, "sharpe": 1.688749750005989, "team_id": "team-06", "ts": "2026-07-17T02:39:50+00:00"}
+{"apply_funding": false, "cost_mult": 1.0, "event": "holdout_run", "exclude": [], "label": "nofunding", "team_id": "team-09", "ts": "2026-07-17T02:39:51+00:00"}
+{"event": "holdout_result", "is_replay_identical": true, "label": "nofunding", "maxdd": -0.09331613883927381, "sharpe": 2.1001021467943666, "team_id": "team-09", "ts": "2026-07-17T02:39:52+00:00"}
+{"apply_funding": true, "cost_mult": 2.0, "event": "holdout_run", "exclude": [], "label": "cost2x", "team_id": "team-09", "ts": "2026-07-17T02:39:52+00:00"}
+{"event": "holdout_result", "is_replay_identical": null, "label": "cost2x", "maxdd": -0.0937561839155675, "sharpe": 2.0810518788474646, "team_id": "team-09", "ts": "2026-07-17T02:39:54+00:00"}
+{"apply_funding": true, "cost_mult": 1.0, "event": "holdout_run", "exclude": ["PAYPUSDT"], "label": "ex-PAYPUSDT", "team_id": "team-09", "ts": "2026-07-17T02:39:54+00:00"}
+{"event": "holdout_result", "is_replay_identical": null, "label": "ex-PAYPUSDT", "maxdd": -0.09635421310057612, "sharpe": 2.0687132762907114, "team_id": "team-09", "ts": "2026-07-17T02:39:55+00:00"}
+{"apply_funding": false, "cost_mult": 1.0, "event": "holdout_run", "exclude": [], "label": "nofunding", "team_id": "team-03", "ts": "2026-07-17T02:39:56+00:00"}
+{"event": "holdout_result", "is_replay_identical": true, "label": "nofunding", "maxdd": -0.20602302442614295, "sharpe": -0.6441153604196039, "team_id": "team-03", "ts": "2026-07-17T02:39:57+00:00"}
+{"apply_funding": true, "cost_mult": 2.0, "event": "holdout_run", "exclude": [], "label": "cost2x", "team_id": "team-03", "ts": "2026-07-17T02:39:57+00:00"}
+{"event": "holdout_result", "is_replay_identical": null, "label": "cost2x", "maxdd": -0.23951836241331792, "sharpe": -0.8559599290721887, "team_id": "team-03", "ts": "2026-07-17T02:39:58+00:00"}
+{"apply_funding": true, "cost_mult": 1.0, "event": "holdout_run", "exclude": ["PAYPUSDT"], "label": "ex-PAYPUSDT", "team_id": "team-03", "ts": "2026-07-17T02:39:59+00:00"}
+{"event": "holdout_result", "is_replay_identical": null, "label": "ex-PAYPUSDT", "maxdd": -0.20534404067273115, "sharpe": -0.6128767261779828, "team_id": "team-03", "ts": "2026-07-17T02:40:00+00:00"}
+{"event": "stage2_report", "ts": "2026-07-17T02:40:00+00:00", "winner": "team-10"}
