@@ -1,0 +1,66 @@
+{
+  "amendment_id": "top40-v2-amendment-0008-team05-infrastructure-replacement",
+  "authorization": {
+    "candidate_id": "team05-crtr-core-v2-infra-r1",
+    "existing_family_id": "team05-causal-residual-trend-reversal-v1",
+    "failed_candidate_id": "team05-crtr-core-v2",
+    "maximum_replacement_runs": 1,
+    "new_family_or_pivot_authorized": false,
+    "stage": "development",
+    "team_id": "team-05"
+  },
+  "budget_and_history": {
+    "budget_refund_authorized": false,
+    "failed_v2_remains_charged": true,
+    "failed_v2_remains_immutable": true,
+    "replacement_material_trial_number": 2,
+    "terminal_replacement_replay_authorized": false
+  },
+  "drafted_at_utc": "2026-07-17T02:56:48Z",
+  "failure_evidence": {
+    "artifact_hashes_empty": true,
+    "cpu_hours": 0.0004992790838888888,
+    "failure_reason": "StrategyExecutionError: ModuleNotFoundError: No module named 'crypto_trade.tournament.score_adapter_protocol_v5'",
+    "metrics_summary_empty": true,
+    "organizer_registration_record_sha256": "5d4b00663128fe0aec307ef0a6a532c052b7a84a5d53fae2c685b7f974444701",
+    "organizer_registration_sequence": 25,
+    "organizer_result_record_sha256": "15e4d3453ee1fdaae0a4f1439f8a5bf57c4cf16c99fa73ff9992c29fa64aa09f",
+    "organizer_result_sequence": 26,
+    "registration_event_sha256": "c4727f39271d9cde42935de53d34a0d1ce5f4e7cfeca2db9b282d9a8bc0488c9",
+    "registration_input_sha256": "a1d3535e033f656e0f8dd3e62046f8b4b6488688d79ecbd97c9770f89282e08c",
+    "reservation_sha256": "94ad47e6899207eaa5e245720555eeb204858320f6866177304feca5a49b0ea7",
+    "result_event_sha256": "4fe7e3d84b41899b84513d67f17db215d6b59c165cbd379bd598fc2f3f21d5a2",
+    "wall_clock_hours": 0.0003490867155616999
+  },
+  "journal_prefix_at_draft": {
+    "head_sha256": "fd0bc861a74c6c895f796bccebec44b913dba0814550f97215fdbadeb98ae6fd",
+    "record_count": 61
+  },
+  "parent_authorities": {
+    "amendment_0006_integration_freeze_sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34",
+    "amendment_0007_active_entrypoint_sha256": "8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9",
+    "amendment_0007_integration_freeze_commit": "c8b917ca49306d5200a4e08848e73ff6f5a18bf3",
+    "amendment_0007_integration_freeze_sha256": "6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51",
+    "pure_crypto_policy_sha256": "2c7fb0ff593d06c323517e60df4b28ab9387a2df580b83f82f65ef71c91fc350",
+    "pure_crypto_report_sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
+    "pure_crypto_required_violations": 0
+  },
+  "replacement_invariants": {
+    "a5_first_add_order": [
+      "executable-source-manifest",
+      "independent-semantic-coupling-review",
+      "score-adapter-manifest",
+      "trial-registration"
+    ],
+    "candidate_identity_and_required_bindings_may_change": true,
+    "controls_neighbors_or_private_data_may_rescue_failed_core": false,
+    "economic_thesis_unchanged": true,
+    "family_id_unchanged": true,
+    "model_parameters_unchanged": true,
+    "risk_policy_bytes_unchanged": true,
+    "score_schedule_and_label_unchanged": true,
+    "signal_and_portfolio_math_unchanged": true
+  },
+  "schema_version": 1,
+  "status": "draft-independent-review-and-freeze-required"
+}
