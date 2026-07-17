@@ -1,0 +1,15 @@
+{
+  "candidate_id": "team09-fcpc-center-v1",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "organizer_journal_head_sha256": "b703092bcf7ce14e9f4c5f19d451269ca0fd72a676a4fb9461239885708bac9e",
+  "private_attempt_number": null,
+  "registration_sha256": "e384f401717b5ce291b71129161dddbea46543490d5e11182c04f28f49bf61ae",
+  "reserved_at_utc": "2026-07-17T00:15:00.399630+00:00",
+  "risk_policy_sha256": "f75a2e05cda7ba87a865527f7c95c03a734c1398e8be251f50074ad00163875e",
+  "schema_version": 1,
+  "source_bundle_sha256": "532e98c12b61232ee04ac444ce99a1573a11d6f60b10a759751e38017b0188c5",
+  "stage": "development",
+  "strategy_sha256": "6d69e10c4536a5277175cb825f6acb72fd15e1d78dd7fd0fb5924a42e82c9cc5",
+  "team_id": "team-09",
+  "tournament": "quant-portfolio-blind-top40-v2"
+}
