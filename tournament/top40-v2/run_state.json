@@ -52,7 +52,7 @@
   "critic_lock": null,
   "final_oos_lock": null,
   "finalist_cohort_lock": null,
-  "legacy_projection_sha256": "e7bad06eebe953547f6ca4c6c49c0d19cb3e8d48a07a247a49cfc59eff03dda5",
+  "legacy_projection_sha256": "611ca995c4efde58c6fcc26b02bf8a1086d72e16f49687cefbdafcc3674e8449",
   "legacy_state_sha256": "8c858495fde6ddde203124a055e40ebad5d8d5a684cd20f0e55f6c88f7360b07",
   "objective_lock": null,
   "organizer_audit": {
@@ -222,14 +222,19 @@
       "active_family_id": "team09-defensive-residual-persistence-v1",
       "canonical_result": null,
       "development_assessment": null,
-      "dnf": null,
+      "dnf": {
+        "previous_status": "researching",
+        "reason": "Final pivot-02 failed non-compensatory all-conditions gates: bear Sharpe -0.304945 and stress Sharpe -0.367078 despite positive aggregate IS; no controls, neighbors, or further pivot may rescue it.",
+        "reason_code": "withdrawn",
+        "recorded_at_utc": "2026-07-17T02:20:51.706692+00:00"
+      },
       "family_count": 3,
       "finalist_freeze": null,
       "pivot_count": 2,
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
-      "status": "researching",
+      "status": "dnf",
       "trial_count": 3
     },
     "team-10": {
