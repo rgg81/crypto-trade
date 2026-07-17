@@ -1,0 +1,8 @@
+{"event": "snapshot_built", "files_sha256": "f02c86bc5ef7f9b331803cc8e4300d46e508230a46847f8c7a014b885ecddbe0", "n_files": 66, "ts": "2026-07-17T00:51:48+00:00"}
+{"event": "teams_initialized", "teams": ["team-01", "team-02", "team-03", "team-04", "team-05", "team-06", "team-07", "team-08", "team-09", "team-10"], "ts": "2026-07-17T00:51:49+00:00"}
+{"event": "team_frozen", "family_id": "scratch-ref-v1", "n_sources": 1, "sharpe_1x": 0.4237331271415717, "team_id": "scratch-ref", "ts": "2026-07-17T00:52:47+00:00"}
+{"event": "stage1_leaderboard", "failures": [], "finalists": ["scratch-ref"], "teams": ["scratch-ref"], "ts": "2026-07-17T00:52:48+00:00"}
+{"apply_funding": true, "cost_mult": 1.0, "event": "holdout_run", "exclude": [], "label": "canonical", "team_id": "scratch-ref", "ts": "2026-07-17T00:52:56+00:00"}
+{"event": "holdout_result", "is_replay_identical": true, "label": "canonical", "maxdd": -0.08348964684380233, "sharpe": 2.189275807894343, "team_id": "scratch-ref", "ts": "2026-07-17T00:52:57+00:00"}
+{"event": "phase0_dry_run_complete", "note": "scratch-ref passed team-run/audit/freeze/leaderboard/run-holdout; scratch-leak FAILED audit as designed; scratch dirs deleted; prior journal lines with team scratch-* were the dry-run", "ts": "2026-07-17T00:53:23+00:00"}
+{"event": "phase0_data_note", "note": "Yahoo vintage 2026-07-17: incumbent iter-016 IS gate shows 0.7276 vs confirmed 0.7291 (vendor re-adjustment drift, tradfi-track concern, not tournament); tournament canon = frozen data_is snapshot f02c86bc", "ts": "2026-07-17T00:53:23+00:00"}

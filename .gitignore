@@ -80,3 +80,7 @@ notebooks/.ipynb_checkpoints/
 !.claude/commands/
 !.claude/skills/
 !.claude/agents/
+
+# tradfi-cup-01 tournament: the frozen IS snapshot stays on disk; integrity is
+# anchored by the committed MANIFEST.sha256.json (verify re-hashes every load).
+tournament/tradfi/data_is/

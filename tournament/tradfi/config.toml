@@ -1,0 +1,85 @@
+schema_version = 1
+name = "tradfi-cup-01"
+branch = "portfolio-tradfi_v2"
+teams = [
+  "team-01", "team-02", "team-03", "team-04", "team-05",
+  "team-06", "team-07", "team-08", "team-09", "team-10",
+]
+
+[paths]
+tournament_root = "tournament/tradfi"
+snapshot_dir = "tournament/tradfi/data_is"
+manifest = "tournament/tradfi/MANIFEST.sha256.json"
+evaluator_pkg = "analysis/portfolio/tradfi/tournament"
+
+[data]
+source = "yahoo-total-return-daily"
+universe = "universe_tradfi.SECTOR_MAP intersected with IS-history availability"
+aux = ["VIX"]
+calendar = "us-trading-day-252"
+holdout_tail_source = "binance-perp-splice-plus-funding"
+
+[splits]
+is_start = "2010-01-01"
+is_end_inclusive = "2024-06-30"
+holdout_start = "2024-07-01"
+holdout_end_inclusive = "2026-06-30"
+holdout_visibility = "orchestrator-only-single-run"
+team_holdout_views = 0
+
+[execution]
+decide_at = "close[t]"
+fill_at = "open[t+1]"
+cost_side_bps = 6.0
+double_cost_multiplier = 2.0
+annual_target_vol = 0.15
+max_leverage = 5.0
+per_name_cap = 0.10
+net_cap = 0.25
+gross_target = 1.0
+min_median_names_per_side = 5
+
+[interface]
+entrypoint = "build_raw_weights"
+panels = ["open", "high", "low", "close", "volume"]
+aux_keys = ["vix", "sector_map", "seed"]
+seed = 20260717
+
+[harness]
+n_truncations = 8
+fixed_truncations = ["2020-03-20", "panel-midpoint", "last-but-one-bar"]
+checks = ["static-scan", "determinism", "truncated-replay", "future-corruption", "same-bar"]
+
+[research_budget]
+max_material_experiments_per_team = 40
+max_family_pivots_per_team = 1
+append_only_experiment_log_required = true
+
+[stage1]
+gate = "critic-pass-required"
+rank_metric = "net_is_sharpe_1x"
+tiebreakers = ["net_is_sharpe_2x", "max_drawdown_less_negative"]
+advance_count = 4
+block_pending_fix_rounds = 1
+
+[stage2]
+metric = "net_holdout_sharpe_funding_on"
+apply_funding = true
+sensitivities = ["no_funding", "cost_2x", "exclude_PAYPUSDT"]
+
+[integrity]
+dq_codes = [
+  "data-boundary-violation",
+  "prohibited-path-access",
+  "network-access",
+  "post-freeze-mutation",
+  "reproduction-failure",
+  "family-misrepresentation",
+]
+performance_failure_is_not_dq = true
+
+[deployment]
+paper_desk = "second-instance"
+db_path = "data/tradfi_tournament_paper.db"
+equity_csv = "data/tradfi_tournament_equity.csv"
+launcher = "run_tradfi_tournament_paper.py"
