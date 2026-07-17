@@ -1,0 +1,34 @@
+{
+  "candidate_id": "t10-fpu-core-v1",
+  "family_id": "t10-funding-pressure-unwind-v1",
+  "files": [
+    {
+      "path": "frozen_config.json",
+      "sha256": "76d47a8e8041698ea4f3cda90de8e04559cc1adb460f505f34a04ab5a848cb04",
+      "size": 6041
+    },
+    {
+      "path": "risk_policy.json",
+      "sha256": "77a354d3afb387a8c855d92e29a0326d435687094fb73c263cedd1aa2a9cbda3",
+      "size": 580
+    },
+    {
+      "path": "strategy.py",
+      "sha256": "c1713a216bced76f15275427bdc60804eb5e1c882b7364436bc4ad12cab78604",
+      "size": 20362
+    },
+    {
+      "path": "test_risk_policy_contract.py",
+      "sha256": "4bfe8c688bacd1814f6486d0cc9671fafb1c88d0ab6cd69a922ad7b02f5d069f",
+      "size": 12149
+    },
+    {
+      "path": "test_strategy.py",
+      "sha256": "306b5e1a213ee28d365d3de915e32520dab2f58f11c9d9889a62b9c9f01e620d",
+      "size": 15880
+    }
+  ],
+  "manifest_kind": "top40-v2-executable-source-manifest-v1",
+  "schema_version": 1,
+  "team_id": "team-10"
+}
