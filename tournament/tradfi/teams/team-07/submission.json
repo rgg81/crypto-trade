@@ -1,0 +1,46 @@
+{
+  "family_id": "t07-overnight-tugofwar-v1",
+  "frozen_at_utc": "2026-07-17T02:01:11+00:00",
+  "harness": "PASS",
+  "net_is_csv_sha256": "676d2a4d908b04d016da4a0af99bc81174a02ee0b4af837038e38f8affcffbe0",
+  "reported": {
+    "1x": {
+      "ann_turnover": 3.8874611181288348,
+      "maxdd": -0.3497940349655483,
+      "mean_gross": 1.0,
+      "mean_net": 0.0004954102549571672,
+      "median_names_long": 24.0,
+      "median_names_short": 24.0,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bear": -1.3065203782072974,
+        "bull": 0.7373504884673816,
+        "chop": 0.22785649410157352
+      },
+      "sharpe": 0.44780065218805115,
+      "total_return": 1.3009468509292113
+    },
+    "2x": {
+      "ann_turnover": 3.8874611181288348,
+      "maxdd": -0.35507087868576304,
+      "mean_gross": 1.0,
+      "mean_net": 0.0004954102549571672,
+      "median_names_long": 24.0,
+      "median_names_short": 24.0,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bear": -1.3419673494656432,
+        "bull": 0.7097100186234998,
+        "chop": 0.1887732961763353
+      },
+      "sharpe": 0.417076087873868,
+      "total_return": 1.1455710397199956
+    }
+  },
+  "schema": 1,
+  "sources_sha256": {
+    "strategy.py": "1b96a4fca450ffa182f633573b8679e566ba3aaf32c7357bcd54c825e259bad2",
+    "test_strategy.py": "07fba6df0cf20954f94d8bc05bb6442f77d36be3372d5e2539862a33cf702968"
+  },
+  "team_id": "team-07"
+}

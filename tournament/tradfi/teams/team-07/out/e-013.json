@@ -1,0 +1,45 @@
+{
+  "id": "e-013",
+  "config": {
+    "construct": "ON",
+    "W": 252,
+    "standardize": "raw",
+    "xform": "rank",
+    "weighting": "linear",
+    "ema_halflife": 0,
+    "sector_neutral": false,
+    "skip": 21
+  },
+  "metrics_1x": {
+    "sharpe": 0.2569824856906489,
+    "maxdd": -0.3578008681471716,
+    "ann_turnover": 12.82887763196633,
+    "total_return": 0.4847726291032455,
+    "n_months": 174,
+    "regime_sharpe": {
+      "bull": 0.545325428791234,
+      "bear": -1.0859816708119843,
+      "chop": -0.10432328468672791
+    },
+    "median_names_long": 24.0,
+    "median_names_short": 24.0,
+    "mean_gross": 1.0,
+    "mean_net": 4.570098644944563e-17
+  },
+  "metrics_2x": {
+    "sharpe": 0.15485605714542455,
+    "maxdd": -0.37517567739084157,
+    "ann_turnover": 12.82887763196633,
+    "total_return": 0.18208533942688532,
+    "n_months": 174,
+    "regime_sharpe": {
+      "bull": 0.45255453064158163,
+      "bear": -1.1953145788585973,
+      "chop": -0.23505088431542343
+    },
+    "median_names_long": 24.0,
+    "median_names_short": 24.0,
+    "mean_gross": 1.0,
+    "mean_net": 4.570098644944563e-17
+  }
+}
