@@ -1,0 +1,34 @@
+{
+  "candidate_id": "team09-ccf-pivot01-v1",
+  "family_id": "team09-conditional-carry-fragility-v1",
+  "files": [
+    {
+      "path": "frozen_config.json",
+      "sha256": "930d98d35916ea2de028e18f3cb5b94e2898a303af7dc2ad855520347fc5ce13",
+      "size": 3635
+    },
+    {
+      "path": "risk_policy.json",
+      "sha256": "f75a2e05cda7ba87a865527f7c95c03a734c1398e8be251f50074ad00163875e",
+      "size": 577
+    },
+    {
+      "path": "strategy.py",
+      "sha256": "5f869a9cb2b4f7d45322f0a723a76f7232b16ccb51bb7a82b3e0c7721f010b18",
+      "size": 25979
+    },
+    {
+      "path": "tests/test_risk_policies.py",
+      "sha256": "5ba9637bdb7934f0d60796eaeafbb53916e02141a1f28b6b3b34df607e5dc0b2",
+      "size": 3896
+    },
+    {
+      "path": "tests/test_strategy.py",
+      "sha256": "c0b80ae27c2fa7aae659453b83c3298bad07ff1f255268f73feccb7cb7dd4e5e",
+      "size": 20202
+    }
+  ],
+  "manifest_kind": "top40-v2-executable-source-manifest-v1",
+  "schema_version": 1,
+  "team_id": "team-09"
+}
