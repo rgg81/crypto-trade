@@ -1,0 +1,50 @@
+{
+  "candidate_id": "t10-rtre-core-v1",
+  "center_risk_state": "team-10-no-control",
+  "declaration": {
+    "all_neighbor_ids_and_one_axis_values_fixed_before_center_result": true,
+    "declared_neighbor_count": 12,
+    "parameter_declaration_path": "tournament/top40-v2/teams/team-10/parameter_neighborhood.json",
+    "result_fields_permitted_in_declaration": false
+  },
+  "family_id": "t10-residual-trend-reversion-ensemble-v1",
+  "noncircular_rules": {
+    "all_twelve_neighbors_registered_before_first_neighbor_result": true,
+    "center_cannot_qualify_until_complete_neighbor_aggregation_passes": true,
+    "failed_center_action": "do-not-run-neighbors; separately-preregistered-mechanism-pivot-or-dnf",
+    "neighbor_definition_changes_after_center_result": false,
+    "neighbor_subset_selection_after_any_neighbor_result": false,
+    "neighbor_trials_use_same_no_control_risk_bytes_as_center": true,
+    "policy_mismatched_neighbor_evidence_reusable_for_controlled_candidate": false
+  },
+  "schema_version": 1,
+  "stages": [
+    {
+      "stage_id": "stage-0-freeze-declarations",
+      "terminal_condition": "All 12 IDs, one-axis overrides, common center parameters, fold plan, no-control risk state, and materialization recipe are frozen before reading the center result."
+    },
+    {
+      "stage_id": "stage-1-run-no-control-center",
+      "terminal_condition": "The registered center passes every no-control activation threshold in qualification_thresholds.json; otherwise stop without running neighbors."
+    },
+    {
+      "stage_id": "stage-2-materialize-review-register-all",
+      "terminal_condition": "Every predeclared neighbor has separate executable strategy/config bytes, complete source manifest, semantic review, and registration; all 12 registrations precede the first neighbor result."
+    },
+    {
+      "stage_id": "stage-3-run-all-neighbors",
+      "terminal_condition": "All 12 registered neighbors are evaluated chronologically with identical folds, seed rule, no-control risk bytes, and paired base/doubled costs; no early stopping or subset replacement is allowed."
+    },
+    {
+      "stage_id": "stage-4-aggregate-once",
+      "terminal_condition": "The organizer binds every parameter and daily-return artifact and computes profitable fraction, median Sharpe, and positive-PnL concentration once for qualification."
+    }
+  ],
+  "status": "prospective_unregistered_no_results",
+  "team_id": "team-10",
+  "thresholds": {
+    "maximum_positive_pnl_concentration": 0.4,
+    "minimum_neighbor_median_sharpe": 0.5,
+    "minimum_profitable_neighbor_fraction": 0.7
+  }
+}

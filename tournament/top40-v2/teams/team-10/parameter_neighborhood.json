@@ -1,5 +1,5 @@
 {
-  "activation_rule": "Neighbors remain dormant until the no-control core passes every broad positive activation minimum and the selected controlled/base candidate passes all non-neighborhood development gates.",
+  "activation_rule": "All neighbor definitions are frozen before the center result. Execution remains dormant until the no-control center passes every numeric activation threshold and official non-neighbor gate. Then all 12 neighbors must be materialized, reviewed, and registered before the first neighbor result; the center cannot qualify until complete aggregation passes.",
   "candidate_id": "t10-rtre-core-v1",
   "center_parameters": {
     "efficiency_lower": 0.12,
@@ -36,11 +36,12 @@
   ],
   "rules": {
     "all_other_parameters": "identical to center_parameters",
-    "evaluation": "Each neighbor is a separate preregistered material configuration evaluated chronologically with the same six-fold plan and paired base/doubled costs.",
+    "evaluation": "Each neighbor is a separate preregistered material configuration evaluated chronologically with the same six-fold plan, no-control risk bytes, and paired base/doubled costs. All 12 registrations precede every neighbor result.",
     "executable_materialization": "The zero-argument builder exposes only center defaults. Before neighbor registration, materialize the declared one-axis value into hash-bound executable strategy/config bytes and prove the canonical builder exposes it; this JSON declaration alone does not change runtime behavior.",
     "minimum_neighbor_median_sharpe": 0.5,
     "minimum_profitable_fraction": 0.7,
-    "selection": "The neighborhood is diagnostic only and may not be searched after seeing its results."
+    "selection": "The fixed neighborhood is diagnostic only. No definition, subset, order, or replacement may depend on center or neighbor results.",
+    "staging_plan_path": "tournament/top40-v2/teams/team-10/neighbor_staging_plan.json"
   },
   "schema_version": 1,
   "status": "prospective_unregistered",

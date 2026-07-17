@@ -15,6 +15,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from crypto_trade.tournament.score_adapter_protocol_v5 import score_boundary
+
 _ENSEMBLE_MODES = frozenset({"adaptive", "equal_blend", "reversion_only", "trend_only"})
 
 
@@ -164,15 +166,30 @@ class ResidualTrendReversionEnsemble:
             trend_share = 0.0
         elif self.config.ensemble_mode == "equal_blend":
             trend_share = 0.5
-        scores = trend_share * trend_score + (1.0 - trend_share) * reversion_score
-        if not np.isfinite(scores.to_numpy(dtype=float)).all():
+        transformed_scores = trend_share * trend_score + (1.0 - trend_share) * reversion_score
+        if not np.isfinite(transformed_scores.to_numpy(dtype=float)).all():
             raise ValueError("non-finite ensemble score")
-        if float(scores.max() - scores.min()) < self.config.minimum_score_spread:
+        scores = {
+            str(symbol): float(transformed_scores[symbol])
+            for symbol in sorted(transformed_scores.index)
+        }
+        captured_scores = score_boundary(scores)
+        if captured_scores is not scores:
+            raise TypeError("score_boundary must return its exact input object")
+        _validate_boundary_scores(captured_scores, expected_symbols=frozenset(factor_rows))
+        score_values = tuple(captured_scores.values())
+        if max(score_values) - min(score_values) < self.config.minimum_score_spread:
             return {}
 
         count = self.config.selection_count_per_side
-        long_symbols = sorted(scores.index, key=lambda symbol: (-scores[symbol], symbol))[:count]
-        short_symbols = sorted(scores.index, key=lambda symbol: (scores[symbol], symbol))[:count]
+        long_symbols = sorted(
+            captured_scores,
+            key=lambda symbol: (-captured_scores[symbol], symbol),
+        )[:count]
+        short_symbols = sorted(
+            captured_scores,
+            key=lambda symbol: (captured_scores[symbol], symbol),
+        )[:count]
         if set(long_symbols) & set(short_symbols):
             raise ValueError("long and short sleeves overlap")
         symbol_weight = self.config.gross_exposure / (2.0 * count)
@@ -285,6 +302,24 @@ def _validate_output(
         raise ValueError("target exceeds configured gross exposure")
     if abs(float(values.sum())) > 1e-12:
         raise ValueError("target sleeves must be dollar balanced")
+
+
+def _validate_boundary_scores(
+    scores: dict[str, float],
+    *,
+    expected_symbols: frozenset[str],
+) -> None:
+    if type(scores) is not dict:
+        raise TypeError("score_boundary must return the built-in score dict")
+    if frozenset(scores) != expected_symbols:
+        raise ValueError("score_boundary changed the scored-symbol set")
+    if any(type(symbol) is not str or not symbol for symbol in scores):
+        raise ValueError("score_boundary returned an invalid symbol")
+    if any(type(value) is not float for value in scores.values()):
+        raise TypeError("score_boundary returned a non-built-in-float score")
+    values = np.asarray(tuple(scores.values()), dtype=float)
+    if not np.isfinite(values).all():
+        raise ValueError("score_boundary returned a non-finite score")
 
 
 def build_strategy() -> ResidualTrendReversionEnsemble:

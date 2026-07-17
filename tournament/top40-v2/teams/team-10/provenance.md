@@ -29,15 +29,16 @@ templates until organizer review and preregistration replace them.
 
 The first executable risk state is top-level no-control `risk_policy.json`, byte-identical to
 `risk_policies/no-control.json`. The remaining files are immutable declarations, not runtime
-selectors. They remain dormant unless the no-control core passes every broad positive activation
-minimum; controls cannot rescue failure. Before a later policy candidate is committed, registered,
+selectors. They remain dormant unless the no-control core passes every numeric activation threshold
+and official non-neighbor gate; controls cannot rescue failure. Before a later policy candidate is committed, registered,
 or run, its template must be copied byte-for-byte to root and every affected hash recomputed.
 
 ## Holds
 
 Before any measurement, an organizer must perform the static review, bind the complete executable
 source set, replace every template sentinel, register the family, and register the exact trial through
-the active A5 superset entrypoint, which preserves the A6 pure-crypto preflight. Before any
+the active A7 runtime-preload entrypoint, which preloads the frozen A5 score protocol and preserves
+the A6 pure-crypto preflight. Before any
 qualification claim, the six chronological fold artifacts,
 stitched returns, and all neighbor returns must be centrally produced and hash bound. The private
 ticket remains one-shot and final OOS remains sealed.

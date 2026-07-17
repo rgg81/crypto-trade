@@ -1,5 +1,5 @@
 {
-  "activation_rule": "The no-control reference is the first material run. Signal ablations may be registered only after that result is read; every risk overlay remains blocked unless all broad positive no-control core-alpha activation minima pass.",
+  "activation_rule": "The no-control reference is the first material run. Signal ablations may be registered only after that result is read; every risk overlay remains blocked unless all numeric no-control activation thresholds and official non-neighbor gates in qualification_thresholds.json pass.",
   "accounting": {
     "reference_configurations": 1,
     "signal_ablation_configurations": 7,

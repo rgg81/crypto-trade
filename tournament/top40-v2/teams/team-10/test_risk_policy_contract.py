@@ -59,16 +59,22 @@ def test_risk_plan_counts_paired_costs_as_six_material_policies() -> None:
     ]
     assert plan["core_alpha_activation_gate"] == {
         "applies_to": "t10-rtre-core-v1 with root risk_policy.json in its no-control state",
-        "base_cost_net_return_strictly_positive": True,
-        "base_cost_net_sharpe_strictly_positive": True,
-        "both_sleeves_meet_activity_floors": True,
-        "combined_chop_attribution_strictly_positive": True,
-        "doubled_cost_net_return_strictly_positive": True,
-        "doubled_cost_net_sharpe_strictly_positive": True,
-        "long_bull_attribution_strictly_positive": True,
-        "minimum_positive_folds": 4,
-        "required_positive_return_regimes": ["bull", "bear", "chop"],
-        "short_bear_attribution_strictly_positive": True,
+        "base_cost_net_return": {"operator": ">", "threshold": 0.0},
+        "base_cost_net_sharpe": {"operator": ">=", "threshold": 0.75},
+        "combined_chop_attribution": {"operator": ">", "threshold": 0.0},
+        "doubled_cost_net_return": {"operator": ">", "threshold": 0.0},
+        "doubled_cost_net_sharpe": {"operator": ">=", "threshold": 0.35},
+        "long_bull_attribution": {"operator": ">", "threshold": 0.0},
+        "minimum_positive_folds": {"operator": ">=", "threshold": 4, "total_folds": 6},
+        "official_non_neighbor_gates_must_pass": True,
+        "required_positive_return_regimes": {
+            "operator": ">",
+            "regimes": ["bull", "bear", "chop"],
+            "threshold": 0.0,
+        },
+        "short_bear_attribution": {"operator": ">", "threshold": 0.0},
+        "sleeve_activity_thresholds_path": "qualification_thresholds.json#/sleeves",
+        "thresholds_path": "qualification_thresholds.json",
     }
 
 
@@ -137,3 +143,64 @@ def test_execution_contract_is_next_open_and_organizer_owned() -> None:
 def test_organizer_ledgers_remain_empty() -> None:
     assert (TEAM_DIR / "families.jsonl").read_bytes() == b""
     assert (TEAM_DIR / "experiments.jsonl").read_bytes() == b""
+
+
+def test_complete_numeric_threshold_binding() -> None:
+    thresholds = _load("qualification_thresholds.json")
+    assert thresholds["a5_score_diagnostic"] == {
+        "complete_manifest_scheduled_score_coverage_required": True,
+        "executable_price_column": "open",
+        "holding_horizon_hours": 8,
+        "independent_semantic_coupling_approval_required": True,
+        "minimum_pairs": 240,
+        "minimum_positive_fold_pearson_count": 4,
+        "pooled_development_pearson": {"operator": ">", "threshold": 0.0},
+        "purge_cross_fold_endpoints": True,
+        "required_fold_count": 6,
+        "return_definition": "simple-executable-open-to-open",
+        "schedule_anchor_timestamp_utc": "1970-01-01T00:00:00Z",
+        "schedule_interval_hours": 8,
+        "score_direction": "higher-score-higher-return",
+        "statistic_id": "globally-pooled-pearson-v1",
+    }
+    assert thresholds["development"] == {
+        "maximum_drawdown": {"operator": "<=", "threshold": 0.3},
+        "minimum_annualized_return": {"operator": ">=", "threshold": 0.0},
+        "minimum_calmar": {"operator": ">=", "threshold": 0.4},
+        "minimum_double_cost_sharpe": {"operator": ">=", "threshold": 0.35},
+        "minimum_net_sharpe": {"operator": ">=", "threshold": 0.75},
+        "minimum_positive_folds": {"operator": ">=", "threshold": 4, "total_folds": 6},
+        "minimum_positive_quarter_fraction": {"operator": ">=", "threshold": 0.55},
+        "minimum_trial_adjusted_probability_positive": {
+            "operator": ">=",
+            "threshold": 0.9,
+        },
+    }
+    assert thresholds["stability"] == {
+        "maximum_positive_pnl_concentration": {"operator": "<=", "threshold": 0.4},
+        "minimum_neighbor_median_sharpe": {"operator": ">=", "threshold": 0.5},
+        "minimum_profitable_neighbor_fraction": {"operator": ">=", "threshold": 0.7},
+    }
+
+
+def test_neighbor_staging_is_complete_and_noncircular() -> None:
+    declaration = _load("parameter_neighborhood.json")
+    staging = _load("neighbor_staging_plan.json")
+    declared_ids = [neighbor["neighbor_id"] for neighbor in declaration["neighbors"]]
+    manifest_ids = [
+        neighbor["neighbor_id"]
+        for neighbor in _load("parameter_neighborhood_manifest.template.json")["neighbors"]
+    ]
+    assert len(declared_ids) == 12
+    assert len(set(declared_ids)) == 12
+    assert manifest_ids == declared_ids
+    assert staging["declaration"]["declared_neighbor_count"] == 12
+    assert (
+        staging["declaration"]["all_neighbor_ids_and_one_axis_values_fixed_before_center_result"]
+        is True
+    )
+    rules = staging["noncircular_rules"]
+    assert rules["all_twelve_neighbors_registered_before_first_neighbor_result"] is True
+    assert rules["center_cannot_qualify_until_complete_neighbor_aggregation_passes"] is True
+    assert rules["neighbor_definition_changes_after_center_result"] is False
+    assert rules["neighbor_subset_selection_after_any_neighbor_result"] is False

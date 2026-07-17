@@ -1,9 +1,14 @@
 {
   "candidate_id": "t10-rtre-core-v1",
   "config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-  "falsifier": "This first material trial is the no-control core. Reject it and prohibit every risk-overlay activation if base- or doubled-cost return/Sharpe is nonpositive, fewer than four folds are positive, bull/bear/chop return or long-bull/short-bear/combined-chop attribution is nonpositive, either sleeve is inactive, or any other non-compensatory development gate fails. A failing result requires a separately preregistered mechanism pivot or DNF and cannot be rescued by controls.",
+  "falsifier": "This first material trial is the no-control core. Reject it and prohibit every risk overlay if base net return is not >0, base Sharpe is <0.75, doubled net return is not >0, doubled Sharpe is <0.35, fewer than four of six folds are positive, bull/bear/chop return or long-bull/short-bear/combined-chop attribution is not >0, a sleeve misses its 0.01 exposure, 0.10 active-bar, 0.01 mean-exposure, or 1000 USDT notional floor, any team-declared A5 score gate fails, or any other numeric gate in qualification_thresholds.json fails. Failure requires a separately preregistered mechanism pivot or DNF and cannot be rescued by controls.",
   "family_id": "t10-residual-trend-reversion-ensemble-v1",
   "parameters": {
+    "_top40_v2_score_adapter": {
+      "adapter_id": "top40-v2-declared-score-boundary-v1",
+      "manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "schema_version": 1
+    },
     "efficiency_lower": 0.12,
     "efficiency_upper": 0.32,
     "ensemble_mode": "adaptive",

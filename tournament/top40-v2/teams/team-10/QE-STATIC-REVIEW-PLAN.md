@@ -12,6 +12,9 @@ This is a prospective checklist, not evidence that review has passed.
    ticker denylist or accept a raw Binance listing as eligibility evidence.
 5. Prove that funding, auxiliary frames, transaction opens, marks, fills, positions, equity, and
    evaluator results do not enter the signal.
+   Confirm the exact final built-in finite score dict calls imported `strategy.score_boundary` once
+   after all transforms and before spread filtering, selection, sizing, caps, or central risk; the
+   exact identity return must drive every downstream operation.
 6. Verify deterministic ordering, finite outputs, disjoint sleeves, 0.80 maximum gross, zero requested
    net, and 0.08 maximum weight for the five-per-side reference configuration.
 7. Exercise insufficient breadth, under-history listings, stale histories, missing candles, constant
@@ -28,6 +31,8 @@ This is a prospective checklist, not evidence that review has passed.
    before commit, registration, and run, then recompute all bindings.
 10. Confirm `families.jsonl` and `experiments.jsonl` are still empty and that every generated evidence
     hash, result path, and performance field remains absent before registration/evaluation.
+    Verify the A7/A5/A6 identities in `a7_execution_authority.json`, all numeric thresholds in
+    `qualification_thresholds.json`, and the register-all-before-results neighbor staging rule.
 
 Any material correction after family registration requires a new prospective registration and trial
 count. No result-bearing command may use the superseded historical entrypoint.

@@ -1,18 +1,25 @@
 # team-10 · Top-40 V2
 
-Status: `A5_A6_ACTIVE_PROSPECTIVE_UNREGISTERED`
+Status: `A7_A5_A6_ACTIVE_PROSPECTIVE_UNREGISTERED`
 
 Team 10 is a clean-room prospective draft. No family or material trial has been registered, no
 evaluation has run, and no performance result is claimed. `families.jsonl` and `experiments.jsonl`
 remain organizer-owned empty ledgers.
 
 All future organizer commands must use
-`scripts/top40_v2_tournament_score_diagnostics_v5.py`. This active A5 superset delegates through
-the exact Amendment 0006 pure-crypto authority and is bound by:
+`scripts/top40_v2_tournament_runtime_preload_v7.py`. A7 preloads the frozen A5 score protocol and
+delegates through the exact Amendment 0005 and Amendment 0006 authorities. It is bound by:
+
+- A7 integration-freeze commit `c8b917ca49306d5200a4e08848e73ff6f5a18bf3` and SHA-256
+  `6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51`;
+- active A7 entrypoint SHA-256
+  `8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9`;
+- activation-journal record count `27` and head SHA-256
+  `15e4d3453ee1fdaae0a4f1439f8a5bf57c4cf16c99fa73ff9992c29fa64aa09f`;
 
 - A5 integration-freeze commit `d2b95f610722aab65b4e67466b34efeaa3554101` and SHA-256
   `b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c`;
-- active entrypoint SHA-256
+- superseded direct A5 entrypoint SHA-256
   `0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4`;
 
 - Amendment 0006 freeze SHA-256:
@@ -31,3 +38,7 @@ submission: Team 10 continues within budget, makes a documented pivot, or record
 The first material candidate must use the no-control bytes at root `risk_policy.json`. Controls are
 dormant until that core is broadly positive at ordinary and doubled costs across the declared
 fold/regime/role/activity gates, and cannot rescue a failed core.
+
+The direct A5 script is historical delegated lineage and must not be invoked for a Team 10 result.
+The exact operative A5 hook/label/statistic identities are in `a7_execution_authority.json` and the
+candidate score-adapter manifest template.

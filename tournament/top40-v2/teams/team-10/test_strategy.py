@@ -79,6 +79,48 @@ def test_reference_strategy_is_finite_balanced_and_eligible() -> None:
     assert set(weights) <= set(context.eligible_symbols)
 
 
+def test_public_score_boundary_is_an_exact_identity() -> None:
+    scores = {"BTCUSDT": 1.25, "ETHUSDT": -0.75}
+    assert STRATEGY.score_boundary.__module__ == (
+        "crypto_trade.tournament.score_adapter_protocol_v5"
+    )
+    assert STRATEGY.score_boundary.__name__ == "score_boundary"
+    assert STRATEGY.score_boundary(scores) is scores
+
+
+def test_score_boundary_is_called_once_and_its_exact_object_drives_selection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context = _market_context()
+    captured: list[dict[str, float]] = []
+
+    def capture(scores: dict[str, float]) -> dict[str, float]:
+        assert type(scores) is dict
+        assert all(type(symbol) is str for symbol in scores)
+        assert np.isfinite(np.asarray(tuple(scores.values()), dtype=float)).all()
+        captured.append(scores)
+        return scores
+
+    monkeypatch.setattr(STRATEGY, "score_boundary", capture)
+    weights = STRATEGY.build_strategy().target_weights(context, seed=20260801)
+    assert len(captured) == 1
+    operative_scores = captured[0]
+    expected_longs = set(
+        sorted(operative_scores, key=lambda symbol: (-operative_scores[symbol], symbol))[:5]
+    )
+    expected_shorts = set(
+        sorted(operative_scores, key=lambda symbol: (operative_scores[symbol], symbol))[:5]
+    )
+    assert {symbol for symbol, weight in weights.items() if weight > 0.0} == expected_longs
+    assert {symbol for symbol, weight in weights.items() if weight < 0.0} == expected_shorts
+
+
+def test_score_boundary_copy_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(STRATEGY, "score_boundary", lambda scores: dict(scores))
+    with pytest.raises(TypeError, match="exact input object"):
+        STRATEGY.build_strategy().target_weights(_market_context(), seed=20260801)
+
+
 def test_appended_corrupt_future_is_invariant() -> None:
     context = _market_context()
     expected = STRATEGY.build_strategy().target_weights(context, seed=20260810)
@@ -234,6 +276,71 @@ def test_frozen_config_and_declared_neighbors_are_executable_and_feasible() -> N
         axes.setdefault(neighbor["axis"], []).append(neighbor["value"])
     assert len(manifest["neighbors"]) == 12
     assert all(len(values) == 2 for values in axes.values())
+
+
+def test_a7_and_a5_score_identities_are_exact() -> None:
+    authority = json.loads((TEAM_DIR / "a7_execution_authority.json").read_text(encoding="utf-8"))
+    assert authority["active_entrypoint"] == {
+        "path": "scripts/top40_v2_tournament_runtime_preload_v7.py",
+        "sha256": "8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9",
+    }
+    contract = authority["operative_a5_score_contract"]
+    manifest = json.loads(
+        (
+            TEAM_DIR / "score-adapters/t10-rtre-core-v1.score-adapter-manifest.template.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert manifest["adapter_id"] == contract["adapter_id"]
+    assert manifest["capture_boundary"] == contract["capture_boundary"]
+    assert manifest["hook"] == "strategy.score_boundary"
+    assert manifest["label"] == {
+        "executable_price_column": "open",
+        "holding_horizon_hours": 8,
+        "label_id": "manifest-horizon-simple-executable-open-to-open-return-v1",
+        "minimum_pairs": 240,
+        "purge_cross_fold_endpoints": True,
+        "return_definition": "simple-executable-open-to-open",
+        "score_direction": "higher-score-higher-return",
+        "statistic_id": "globally-pooled-pearson-v1",
+    }
+    assert manifest["schedule_utc"] == {
+        "anchor_timestamp_utc": "1970-01-01T00:00:00Z",
+        "interval_hours": 8,
+    }
+    trial = json.loads((TEAM_DIR / "trial-registration.template.json").read_text(encoding="utf-8"))
+    assert trial["parameters"]["_top40_v2_score_adapter"] == {
+        "adapter_id": "top40-v2-declared-score-boundary-v1",
+        "manifest_sha256": "0" * 64,
+        "schema_version": 1,
+    }
+
+
+def test_score_review_templates_cover_complete_candidate_source_set() -> None:
+    source_manifest = json.loads(
+        (
+            TEAM_DIR / "score-adapters/t10-rtre-core-v1.executable-source-manifest.template.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert [entry["path"] for entry in source_manifest["files"]] == [
+        "frozen_config.json",
+        "risk_policy.json",
+        "strategy.py",
+        "test_risk_policy_contract.py",
+        "test_strategy.py",
+    ]
+    review = json.loads(
+        (TEAM_DIR / "score-adapters/t10-rtre-core-v1.semantic-review.template.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert set(review["findings"]) == {
+        "direct_hook_call_found",
+        "hook_after_declared_score_transform",
+        "hook_before_selection_weight_caps_and_risk",
+        "no_decoy_or_transient_score_path_found",
+        "score_object_is_declared_model_ranking_signal",
+    }
+    assert review["runtime_proof_limit"] == ("static-review-attestation-not-runtime-semantic-proof")
 
 
 @pytest.mark.parametrize(

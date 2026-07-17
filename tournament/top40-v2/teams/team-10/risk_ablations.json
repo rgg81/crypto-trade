@@ -9,16 +9,22 @@
   },
   "core_alpha_activation_gate": {
     "applies_to": "t10-rtre-core-v1 with root risk_policy.json in its no-control state",
-    "base_cost_net_return_strictly_positive": true,
-    "base_cost_net_sharpe_strictly_positive": true,
-    "both_sleeves_meet_activity_floors": true,
-    "combined_chop_attribution_strictly_positive": true,
-    "doubled_cost_net_return_strictly_positive": true,
-    "doubled_cost_net_sharpe_strictly_positive": true,
-    "long_bull_attribution_strictly_positive": true,
-    "minimum_positive_folds": 4,
-    "required_positive_return_regimes": ["bull", "bear", "chop"],
-    "short_bear_attribution_strictly_positive": true
+    "base_cost_net_return": {"operator": ">", "threshold": 0.0},
+    "base_cost_net_sharpe": {"operator": ">=", "threshold": 0.75},
+    "combined_chop_attribution": {"operator": ">", "threshold": 0.0},
+    "doubled_cost_net_return": {"operator": ">", "threshold": 0.0},
+    "doubled_cost_net_sharpe": {"operator": ">=", "threshold": 0.35},
+    "long_bull_attribution": {"operator": ">", "threshold": 0.0},
+    "minimum_positive_folds": {"operator": ">=", "threshold": 4, "total_folds": 6},
+    "official_non_neighbor_gates_must_pass": true,
+    "required_positive_return_regimes": {
+      "operator": ">",
+      "regimes": ["bull", "bear", "chop"],
+      "threshold": 0.0
+    },
+    "short_bear_attribution": {"operator": ">", "threshold": 0.0},
+    "sleeve_activity_thresholds_path": "qualification_thresholds.json#/sleeves",
+    "thresholds_path": "qualification_thresholds.json"
   },
   "execution_contract": {
     "intrabar_fills": false,
@@ -36,7 +42,7 @@
     {"path": "risk_policies/turnover-only.json", "policy_id": "team-10-turnover-only"},
     {"path": "risk_policies/combined.json", "policy_id": "team-10-combined"}
   ],
-  "policy_materialization_rule": "The frozen lifecycle reads only root risk_policy.json. Run the root no-control core first. After it passes every activation minimum, copy any selected immutable risk_policies template byte-for-byte to root before commit, registration, and run, then recompute every risk/source binding. Controls cannot rescue a failed core.",
+  "policy_materialization_rule": "The frozen lifecycle reads only root risk_policy.json. Run the root no-control core first. After it passes every numeric activation threshold and all official non-neighbor gates in qualification_thresholds.json, copy any selected immutable risk_policies template byte-for-byte to root before commit, registration, and run, then recompute every risk/source binding. Controls cannot rescue a failed core.",
   "required_comparisons": [
     "net return and Sharpe",
     "maximum drawdown and tail loss",

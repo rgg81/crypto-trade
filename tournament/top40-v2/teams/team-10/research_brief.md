@@ -83,6 +83,6 @@ The planned first family uses 31 material configurations at most: one no-control
 seven signal/mechanism ablations, twelve two-sided parameter neighbors, five additional risk-policy
 choices (four single controls plus combined), and six confirmatory reservations. A base-cost and
 doubled-cost result are paired outputs of one policy state and do **not** count as two
-configurations. No item is evidence until it is
-registered through the active A5 superset lifecycle, with its delegated A6 preflight, and evaluated
-by the organizer.
+configurations. No item is evidence until it is registered through the active A7 runtime-preload
+lifecycle, with its frozen A5 score protocol and delegated A6 preflight, and evaluated by the
+organizer.
