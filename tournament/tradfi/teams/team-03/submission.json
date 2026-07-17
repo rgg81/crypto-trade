@@ -1,0 +1,47 @@
+{
+  "family_id": "t03-sector-residual-reversal-v1",
+  "frozen_at_utc": "2026-07-17T01:33:04+00:00",
+  "harness": "PASS",
+  "net_is_csv_sha256": "570a8c4f40c8aa290a9cddb0aa0450a7b0acae1f49e3f463397a10d99eff8487",
+  "reported": {
+    "1x": {
+      "ann_turnover": 15.472234085752223,
+      "maxdd": -0.3247121023107685,
+      "mean_gross": 1.0,
+      "mean_net": 0.03186518245369251,
+      "median_names_long": 25.0,
+      "median_names_short": 23.0,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bear": -0.1509075200479035,
+        "bull": 0.49794110663089614,
+        "chop": 1.169697229976878
+      },
+      "sharpe": 0.5679092435090428,
+      "total_return": 2.0250216809147834
+    },
+    "2x": {
+      "ann_turnover": 15.472234085752223,
+      "maxdd": -0.3696226256180789,
+      "mean_gross": 1.0,
+      "mean_net": 0.03186518245369251,
+      "median_names_long": 25.0,
+      "median_names_short": 23.0,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bear": -0.5705302412863283,
+        "bull": 0.3996657420258586,
+        "chop": 1.125729019074045
+      },
+      "sharpe": 0.4390872273186196,
+      "total_return": 1.2696106960885105
+    }
+  },
+  "schema": 1,
+  "sources_sha256": {
+    "scratch_lib.py": "ff0c99d964af2cb6f17206c8247f01b303140985bc7dbd90c6b21f58e2a3f073",
+    "strategy.py": "7fbdd6bf2148eee57c8deca48d0ad32b9403f775b04c9dd0a7ff881f744b2400",
+    "test_strategy.py": "7f18fd30f58418bdaadbf7f0c0f1b137a1c462407ca3409729d8def0bda81305"
+  },
+  "team_id": "team-03"
+}
