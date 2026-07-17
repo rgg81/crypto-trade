@@ -1,0 +1,23 @@
+{
+  "candidate_id": "t10-dac-core-v1",
+  "decision": "approve",
+  "declared_capture_boundary": "candidate-declared-post-transform-pre-selection-weight-cap-risk",
+  "executable_source_manifest_path": "tournament/top40-v2/teams/team-10/score-adapters/t10-dac-core-v1.executable-source-manifest.json",
+  "executable_source_manifest_sha256": "362836527c5f4e59c17bbd2e26cf44cbbc438ca764172d9084d547a8c7636f64",
+  "family_id": "t10-defensive-anchor-convergence-v1",
+  "findings": {
+    "direct_hook_call_found": true,
+    "hook_after_declared_score_transform": true,
+    "hook_before_selection_weight_caps_and_risk": true,
+    "no_decoy_or_transient_score_path_found": true,
+    "score_object_is_declared_model_ranking_signal": true
+  },
+  "hook": "strategy.score_boundary",
+  "review_kind": "top40-v2-score-semantic-coupling-static-review-v1",
+  "reviewed_at_utc": "2026-07-17T01:33:47Z",
+  "reviewer_id": "independent-a5-team10-dac-static-20260717",
+  "runtime_proof_limit": "static-review-attestation-not-runtime-semantic-proof",
+  "schema_version": 1,
+  "strategy_sha256": "d5e09cdb795955bcac87f03b8333092a2d7ba481642d9038c09ff0271b70bf7a",
+  "team_id": "team-10"
+}
