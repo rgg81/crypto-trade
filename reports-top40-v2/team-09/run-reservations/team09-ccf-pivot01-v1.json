@@ -1,0 +1,15 @@
+{
+  "candidate_id": "team09-ccf-pivot01-v1",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "organizer_journal_head_sha256": "d2b8f53af170727ff30c105be334926a104f9a1152fdc6122aee631c881969f0",
+  "private_attempt_number": null,
+  "registration_sha256": "4bb1b4aec9447fe01a02cf4886190147712a2950288bf63d9d00c5e217dc18ea",
+  "reserved_at_utc": "2026-07-17T01:13:12.140026+00:00",
+  "risk_policy_sha256": "f75a2e05cda7ba87a865527f7c95c03a734c1398e8be251f50074ad00163875e",
+  "schema_version": 1,
+  "source_bundle_sha256": "c51b922f7720520087350256abb30318f1834fea071c8c8470f12cdad4b10485",
+  "stage": "development",
+  "strategy_sha256": "5f869a9cb2b4f7d45322f0a723a76f7232b16ccb51bb7a82b3e0c7721f010b18",
+  "team_id": "team-09",
+  "tournament": "quant-portfolio-blind-top40-v2"
+}

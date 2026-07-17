@@ -52,7 +52,7 @@
   "critic_lock": null,
   "final_oos_lock": null,
   "finalist_cohort_lock": null,
-  "legacy_projection_sha256": "3dce86b2315c961be6d9dd1cd465958dc9c129fe13112a2c0efe35aecd3a958a",
+  "legacy_projection_sha256": "82c5cc79177a48d8ce0c1052e19e30c1bbb5d5724ba04a0aa1197be538deccda",
   "legacy_state_sha256": "8c858495fde6ddde203124a055e40ebad5d8d5a684cd20f0e55f6c88f7360b07",
   "objective_lock": null,
   "organizer_audit": {
@@ -73,9 +73,9 @@
   "qualification_lock": null,
   "research_journal": {
     "genesis_sha256": "a11eee0475d514a1f022deda4e62014536f12bfb074556546645c5f8255a48ed",
-    "head_sha256": "d2b8f53af170727ff30c105be334926a104f9a1152fdc6122aee631c881969f0",
+    "head_sha256": "c1fc622efce9e34ea754536df0ef7bb3626cfdd5594947ccb000714df584889d",
     "path": "tournament/top40-v2/organizer_research_journal.jsonl",
-    "record_count": 54
+    "record_count": 55
   },
   "schema_version": 3,
   "selection_lock": null,
