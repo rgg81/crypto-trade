@@ -1,0 +1,23 @@
+{
+  "team_id": "team-09",
+  "primary": {
+    "family_id": "t09-residual-momentum-v1",
+    "family_name": "Residual (beta-stripped) momentum",
+    "mechanism_summary": "Cross-sectional momentum computed on each name's market/sector-residual return component: strip rolling market (and sector-basket) beta exposure from daily returns, form a medium-horizon residual-return momentum score that skips the most recent short window (reversal zone), scale by residual volatility, then go long the top-ranked and short the bottom-ranked names. The book is built from idiosyncratic drift, not index tilts, so it is close to beta-neutral before the organizer's caps even apply.",
+    "economic_rationale": "Investors underreact to firm-specific news more persistently than to market-wide news, so the idiosyncratic component of returns drifts while the systematic component mean-reverts and whipsaws. On this ~65-name Binance stock-perp universe the beta dispersion is extreme (crypto-adjacent lottery names vs mega-cap staples), so raw momentum rankings are dominated by beta tilts that the organizer's net cap (0.25) and per-name cap (0.10) clip away — residualization concentrates the signal in the cross-section that actually survives book construction. Residual momentum is also documented to carry materially less momentum-crash risk (the crash lives in the beta leg) and a higher Sharpe per unit turnover, which matters at 6 bps/side on a daily cadence.",
+    "expected_regime_behavior": "Bull: modest steady gains, lagging raw momentum's beta-loaded upside. Bear/panic: much shallower drawdowns than raw momentum and no post-crash beta-rebound crash, since the systematic component is stripped; may go quiet rather than negative. Chop/high-dispersion sideways markets: best relative environment — idiosyncratic drift dominates while market noise cancels across the long and short legs. Elevated-VIX states degrade it far less than raw momentum; the main failure mode is regime turns so sharp that firm-specific trends themselves reverse en masse.",
+    "falsifier": "Killed if, under the organizer's book construction on IS, the pre-registered formation/skip/vol-scaling grid shows no robust plateau: net IS Sharpe @1x cost <= 0 across the bulk of the grid, or positive cells are isolated spikes whose neighbors are <= 0, or the residualized signal fails to beat its own non-residualized (raw momentum) twin on net Sharpe at both cost tiers, or the breadth floor (median >= 5 names/side) cannot be met without pushing turnover to where the 2x-cost Sharpe flips negative. Any of those outcomes means the residualization premise adds nothing here and the family is abandoned or pivoted."
+  },
+  "backups": [
+    {
+      "family_id": "t09-sector-relative-reversal-v1",
+      "family_name": "Sector-relative mean reversion",
+      "mechanism_summary": "Fade multi-day idiosyncratic gaps versus the name's own sector basket — long names that underperformed their sector-peer basket over a 3-10 day window, short the outperformers, sized on the z-score of the spread."
+    },
+    {
+      "family_id": "t09-short-max-lottery-v1",
+      "family_name": "Skewness / lottery premium (short MAX)",
+      "mechanism_summary": "Short names with recent extreme daily-return spikes (high trailing MAX / lottery appeal) and long the boring low-MAX end, harvesting the overpricing of lottery-like payoffs in a retail-heavy perp universe."
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "team_id": "team-01",
+  "primary": {
+    "family_id": "t01-residual-momentum-v1",
+    "family_name": "Residual (beta-stripped) momentum",
+    "mechanism_summary": "Compute each name's market/sector-residual daily returns (rolling regression against the equal-weight universe and sector basket), then rank names cross-sectionally on the trailing ~12-month-minus-recent-month sum of those residuals, scaled by residual volatility. Long the top-ranked residual winners, short the bottom-ranked residual losers, refreshed at a slow (multi-day to monthly) cadence to keep turnover compatible with 6 bps/side.",
+    "economic_rationale": "Underreaction to firm-specific news persists after stripping the market/sector component: idiosyncratic momentum carries roughly the same premium as raw momentum but with about half the volatility, because raw momentum's tail risk comes from time-varying beta exposure (crash risk when the market whipsaws), not from the stock-specific signal. Residualizing isolates the behavioral underreaction component, which is exactly the part that should survive in a capped, vol-targeted, market-neutral-ish book of ~65 liquid single-stock perps.",
+    "expected_regime_behavior": "Bull: modest positive drift, no beta tailwind by construction. Bear: roughly flat-to-positive — the strategy holds little market beta, so it should not exhibit classic momentum's post-crash rebound crashes (2016-style, 2020-Q4/2021-Q1-style reversals inside the IS window are the stress tests). Chop / high-VIX: weakest regime — residual signals decay faster when idiosyncratic news flow is dominated by index-level volatility; expect lower but not structurally negative Sharpe.",
+    "falsifier": "Killed if, on the IS window via team-run: net Sharpe @1x cost <= 0 across the pre-registered lookback/residualization plateau (not just a single point), OR the edge exists only in raw (non-residualized) momentum form (i.e., residualization destroys rather than cleans the signal, meaning the mechanism premise is wrong), OR the breadth floor (median >= 5 names/side) cannot be met without pushing turnover to where the 1x->2x cost step erases the Sharpe."
+  },
+  "backups": [
+    {
+      "family_id": "t01-52wk-high-anchor-v1",
+      "family_name": "52-week-high proximity / anchoring",
+      "mechanism_summary": "Rank names by closeness of price to the trailing 52-week high; long names near their high, short names far below it — anchoring-driven underreaction, traded at low turnover."
+    },
+    {
+      "family_id": "t01-sector-relative-mr-v1",
+      "family_name": "Sector-relative mean reversion",
+      "mechanism_summary": "Fade multi-day idiosyncratic gaps of a name versus its sector basket (long laggards, short spikers within sector), betting on snap-back toward the sector after non-fundamental dislocations."
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "team_id": "team-06",
+  "vetoed": {
+    "veto_round": "pass-1",
+    "veto_reason": "Orchestrator veto 2026-07-17: primary t06-residual-momentum-v1 collided with team-01 (FCFS, earlier team order); backup 1 (52wk-high anchoring) taken by team-02; backup 2 (sector-relative mean reversion) taken by team-03. Redraw round for teams 04/05/06/08/10.",
+    "primary": {
+      "family_id": "t06-residual-momentum-v1",
+      "family_name": "Residual (beta-stripped) momentum",
+      "mechanism_summary": "Estimate each name's exposure to the common market factor (equal-weight universe return, with an optional sector layer) on a trailing window, strip it out, and rank names cross-sectionally on the volatility-scaled cumulative RESIDUAL return over a ~12-month formation window skipping the most recent month. Long the top decile-to-quintile of residual winners, short the bottom, with slow-moving ranks so daily turnover stays low against 6 bps/side.",
+      "economic_rationale": "Underreaction to firm-specific news persists after the market component is removed, and on a ~65-name universe of highly correlated high-beta US stocks the common factor dominates raw returns — so plain momentum ranks mostly on beta, while residual momentum isolates the idiosyncratic drift that is actually cross-sectionally informative. Residualizing at the signal level makes the book market-neutral by construction (matching the mandate and the 0.25 net cap instead of fighting it) and empirically halves momentum's crash tail while keeping the premium, since crashes are a common-factor phenomenon.",
+      "expected_regime_behavior": "Bull: modest positive drift, no beta tailwind (neutral by construction). Bear/crash and sharp rebounds (2020-03, 2009-type reversals): materially better than plain momentum because the beta-driven crash leg is stripped; small residual drawdowns expected but no deep momentum-crash signature. Chop/sideways: roughly flat to mildly positive — idiosyncratic drift persists even when the index goes nowhere; main risk is factor-estimation noise raising turnover.",
+      "falsifier": "On IS via team-run: net Sharpe @1x cost <= 0 for the pre-registered default configuration, OR no robust plateau (fewer than a contiguous majority of the pre-registered formation/skip/beta-window grid with net Sharpe > 0, i.e. only isolated parameter peaks work), OR the strategy fails the breadth floor (median < 5 names/side), OR net Sharpe @2x cost falls below zero while @1x is positive only because of an unrealistically low-turnover artifact. Any of these kills the family; the documented pivot goes to backup 1."
+    },
+    "backups": [
+      {
+        "family_id": "t06-52wk-high-anchor-v1",
+        "family_name": "52-week-high proximity / anchoring",
+        "mechanism_summary": "Rank names on closeness of the current price to the trailing 52-week high; long names near their high, short names far below it — anchoring-driven underreaction with a very slow, low-turnover signal that is naturally robust to 6 bps/side."
+      },
+      {
+        "family_id": "t06-sector-relative-meanrev-v1",
+        "family_name": "Sector-relative mean reversion",
+        "mechanism_summary": "Fade multi-day idiosyncratic gaps between a name and its sector basket (from aux sector_map): short names that ran ahead of their sector, long names that lagged, expecting convergence back to the basket."
+      }
+    ]
+  },
+  "primary": {
+    "family_id": "t06-lowvol-bab-v1",
+    "family_name": "Low-vol / betting-against-beta (menu #5)",
+    "mechanism_summary": "Rank the universe on trailing realized volatility and beta to the equal-weight universe return over medium lookbacks (order 63-252 trading days); go long the low-vol/low-beta end and short the high-vol/high-beta end, with raw leg weights scaled inversely to each name's estimated beta so the emitted book is approximately ex-ante beta-neutral rather than merely dollar-neutral. Vol and beta ranks are extremely persistent, so daily turnover is tiny and 6 bps/side barely compounds; the organizer's 15% vol-target then levers an intrinsically low-vol spread book — exactly the return shape a net-Sharpe objective rewards.",
+    "economic_rationale": "Leverage-constrained and lottery-seeking investors overpay for high-beta/high-vol names and under-hold boring low-vol compounders, flattening the security-market line; harvesting that flatness (long low-beta scaled up, short high-beta scaled down) is one of the most persistent risk-adjusted premia documented in US equities. This universe is unusually well suited: it spans mega-cap quality at the low-vol end and retail-favorite high-beta names at the other, and single-stock PERPS concentrate exactly the leverage-seeking retail flow that misprices the high-beta end. Beta-scaling the legs converts the classic bull-market bleed of naive dollar-neutral low-vol books into an approximately market-neutral carry on SML flatness, fitting the mandate and the 0.25 net cap instead of fighting them.",
+    "expected_regime_behavior": "Bull, especially junk/lottery rallies (meme-squeeze episodes): weakest regime — the short high-beta leg drags and its upside convexity hurts even after beta-neutral sizing; expect flat-to-modestly-negative stretches, not blowups. Bear/stress: strongest regime — the high-beta end craters while low-vol holds up; low-vol spread books historically rally in drawdowns. Chop: steady positive carry at very low turnover. VIX spikes raise realized correlations and temporarily compress the cross-sectional vol spread — expect signal flattening during spikes, not a sign flip.",
+    "falsifier": "On IS via team-run with the pre-registered default (medium-lookback vol/beta ranking, quintile-type book, beta-scaled legs): net IS Sharpe @1x cost <= 0; OR profitability concentrated in a single sub-period with the remainder <= 0 (regime luck, not structure); OR no robust plateau across the pre-registered lookback grid (~63/126/252d) and quantile widths — only isolated parameter peaks positive; OR the beta-neutral variant materially underperforms the naive dollar-neutral variant, contradicting the SML-flatness mechanism itself; OR breadth floor fails (median < 5 names/side). Any of these kills the family; the single documented pivot goes to backup 1."
+  },
+  "backups": [
+    {
+      "family_id": "t06-sector-pairs-coint-v1",
+      "family_name": "Sector pairs / cointegration stat-arb (menu #8)",
+      "mechanism_summary": "Within each sector (aux sector_map), select cointegrated pairs on a rolling trailing window inside the strategy and trade the pair-spread z-score — long the lagging leg, short the leading leg — expecting spread convergence; dollar-neutral by construction."
+    },
+    {
+      "family_id": "t06-xs-momentum-121-v1",
+      "family_name": "Plain cross-sectional 12-1 momentum (menu #1)",
+      "mechanism_summary": "Rank names on trailing 12-month return skipping the most recent month; long the top quantile, short the bottom — classic relative-strength continuation with slow-moving ranks and low turnover."
+    }
+  ]
+}

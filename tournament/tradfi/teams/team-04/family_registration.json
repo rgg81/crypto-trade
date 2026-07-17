@@ -1,0 +1,46 @@
+{
+  "team_id": "team-04",
+  "vetoed": {
+    "reason": "Orchestrator redraw round 2026-07-17 - pass-1 FCFS collision: residual momentum registered first by team-01; both backups also taken (52wk-high -> team-02, sector-relative MR -> team-03).",
+    "primary": {
+      "family_id": "t04-residual-momentum-v1",
+      "family_name": "Residual (beta-stripped) momentum",
+      "mechanism_summary": "Rank names cross-sectionally on the momentum of their market-residual return component: regress each name's daily returns on the equal-weight universe return over a trailing window, accumulate the residuals over a ~6-12 month formation window skipping the most recent ~1 month, and go long the top residual-momentum names against short the bottom. The signal isolates idiosyncratic underreaction to firm-specific news, stripping out the market/beta component that dominates raw momentum in a ~65-name mega-cap universe.",
+      "economic_rationale": "Investors underreact to gradual firm-specific information (earnings drift, product-cycle news) while beta-driven price moves are quickly arbitraged; residual momentum captures the persistent idiosyncratic component. In equity literature (Blitz-Huij-Martens class of results) residual momentum carries roughly the same premium as raw momentum at about half the volatility and with far smaller crash exposure, because momentum crashes concentrate in the market-beta component. In this universe of heavily traded US mega-caps, raw 12-1 momentum is largely a sector/AI-beta bet; beta-stripping targets the actual anomaly and yields a book that is closer to market-neutral before the organizer's net cap even binds, which suits the neutral-ish mandate, the |net| <= 0.25 cap, and the 15% vol target. Formation at multi-month horizon with a skip month keeps daily turnover low enough to survive 6 bps/side.",
+      "expected_regime_behavior": "Bull: modestly positive, participates in idiosyncratic winners without riding raw market beta. Bear: substantially better than raw cross-sectional momentum because the crash-prone beta component is stripped; drawdowns expected shallower in sharp junk-rally reversals (2020-Q2 style) though not eliminated. Chop/sideways: near-flat to mildly positive, as idiosyncratic drift persists independent of index direction; the main residual risk is violent cross-sectional leadership rotation, which hits any momentum-family book.",
+      "falsifier": "On IS 2010-01-01..2024-06-30 via team-run: if net Sharpe @1x cost is <= 0 across the pre-registered parameter plateau (formation 126-252d, skip ~21d, beta window 60-120d), or only isolated parameter peaks are profitable with no robust plateau, or the book cannot hold the median >=5 names/side breadth floor, or the @2x-cost Sharpe collapses to deeply negative (turnover-fragile), the family is dead and we pivot."
+    },
+    "backups": [
+      {
+        "family_id": "t04-52wk-high-anchor-v1",
+        "family_name": "52-week-high proximity / anchoring",
+        "mechanism_summary": "Long names trading near their trailing 52-week high against short names far below it - anchoring makes investors underreact to news that pushes prices toward the anchor, and the ratio-to-high signal is slow-moving, giving very low turnover at 6 bps/side."
+      },
+      {
+        "family_id": "t04-sector-relative-mr-v1",
+        "family_name": "Sector-relative mean reversion",
+        "mechanism_summary": "Fade multi-day idiosyncratic divergences of a name from its sector basket (using the provided sector_map): short recent outperformers and long recent underperformers within sector, harvesting the snap-back toward the sector factor after non-fundamental gaps."
+      }
+    ]
+  },
+  "primary": {
+    "family_id": "t04-xs-momentum-12-1-v1",
+    "family_name": "Cross-sectional momentum (12-1 class)",
+    "mechanism_summary": "Rank all tradable names on their trailing ~12-month return, skipping the most recent ~1 month (the short-horizon reversal zone), and hold a cross-sectionally demeaned spread book: long the top-ranked fraction against short the bottom-ranked fraction. Relative winners keep winning at multi-month horizons because firm-level information diffuses slowly and performance-chasing flows reinforce the drift; the skip month steps around the liquidity-provision reversal band.",
+    "economic_rationale": "Cross-sectional 12-1 momentum is the most robust and widely replicated anomaly in the free pool (Jegadeesh-Titman lineage): underreaction to gradual firm-specific news plus flow momentum sustain relative drift at 6-12 month horizons across markets, asset classes, and decades. The substrate fit is strong: on ~65 liquid mega-cap perps the formation signal moves slowly, so daily-cadence turnover is low and the premium can survive 6 bps/side; ranking the full cross-section at top/bottom ~30% gives roughly 9-10 names per side, comfortably above the median >=5 breadth floor even in early ragged-start years. The family's known weakness - momentum crashes - is structurally attenuated by the organizer-owned book construction: crashes historically follow high-volatility stress periods, exactly when the 63d 15% vol target deleverages, and the |net| <= 0.25 and per-name 10% caps bound the loser-leg squeeze exposure.",
+    "expected_regime_behavior": "Sustained trends, bull or bear: strongest regime - cross-sectional leadership persists and the spread book harvests it while staying roughly beta-flat. Sharp regime reversals and junk rallies (2009-Q2 / 2020-Q2 style): weakest regime - the short leg squeezes (classic momentum crash), expected to be damped but not eliminated by the vol target and net cap. Choppy leaderless markets: near-flat with a small bleed from rank churn and costs; long formation windows and rank-based (not raw-return) weights are chosen specifically to minimize that churn.",
+    "falsifier": "On IS 2010-01-01..2024-06-30 via team-run output only: the family is dead if there is no robust profitable plateau - i.e. net Sharpe @1x cost <= 0 across the pre-registered grid (formation 126-252 trading days x skip 10-21 days x per-side breadth 20-40%), or profitability is confined to isolated parameter peaks rather than a contiguous plateau, or the @2x-cost Sharpe goes deeply negative (turnover fragility), or the median >=5 names/side breadth floor cannot be held. Any of these triggers the single documented pivot to backup 1."
+  },
+  "backups": [
+    {
+      "family_id": "t04-lowvol-bab-v1",
+      "family_name": "Low-vol / betting-against-beta",
+      "mechanism_summary": "Long the low-volatility/low-beta names against short the high-vol lottery end with beta-balanced legs - leverage-constrained and lottery-seeking investors systematically overpay for volatility, and slow-moving vol/beta estimates make turnover tiny at 6 bps/side."
+    },
+    {
+      "family_id": "t04-ts-trend-plain-v1",
+      "family_name": "Per-name time-series trend (plain)",
+      "mechanism_summary": "Each name is held long or short by the sign of its own trailing k-month return versus its own history - plain own-series continuation with no bear gate and no cross-sectional ranking, mechanically distinct from both the reserved bear-gated TSMOM family and cross-sectional momentum."
+    }
+  ]
+}

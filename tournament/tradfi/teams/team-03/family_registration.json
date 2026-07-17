@@ -1,0 +1,23 @@
+{
+  "team_id": "team-03",
+  "primary": {
+    "family_id": "t03-sector-residual-reversal-v1",
+    "family_name": "Sector-relative short-horizon mean reversion",
+    "mechanism_summary": "Rank names on the short-horizon (roughly 2-7 trading day) return residual versus their sector basket, long the idiosyncratic losers and short the idiosyncratic winners, with the z-scored signal smoothed over a few days to control turnover. The sector leg is stripped before ranking, so the book trades only idiosyncratic snapbacks, not market or sector direction.",
+    "economic_rationale": "Large idiosyncratic single-name moves against the sector are dominated by price pressure from concentrated order flow (fund rebalancing, retail chasing, forced de-risking) and overshoot fundamentals; they revert as liquidity providers replenish inventory. This is a liquidity-provision premium: post-2010 the raw short-horizon reversal decayed in US large caps, but the sector/industry-residual component remained the robust part of the effect because residualizing removes the news-and-beta component that does NOT revert. At 6 bps/side with daily next-open fills the premium is harvestable provided the signal is smoothed so turnover stays proportionate to signal strength.",
+    "expected_regime_behavior": "Earns best in choppy and high-dispersion tapes and in post-stress snapback windows (elevated VIX episodes create forced flows and wider overshoots, so per-trade edge rises even as short-term risk does). Suffers in strong one-way sector-rotation tapes where idiosyncratic losers keep losing for weeks. Crash episodes (e.g. Mar-2020): expect a sharp short drawdown as dislocations widen, followed by outsized reversion gains. Because the sector component is stripped before ranking, bull-vs-bear market direction should matter far less than cross-sectional dispersion.",
+    "falsifier": "Kill the family if, on team-run output across the pre-registered lookback plateau (residual horizons ~2-7d, smoothing ~2-5d, evaluated as a plateau not a single peak), net IS Sharpe @1x cost is < 0.3; OR if the edge is a pre-2015 artifact (the 2015-2024 sub-window net Sharpe <= 0 while full-window is positive); OR if the breadth floor (median >= 5 names per side) cannot be met without pushing net Sharpe below those bars. No parameter mining outside the pre-registered ranges to rescue it."
+  },
+  "backups": [
+    {
+      "family_id": "t03-residual-momentum-v1",
+      "family_name": "Residual (beta-stripped) momentum",
+      "mechanism_summary": "Cross-sectional momentum computed on market/sector-residual returns over a 6-12 month window (skipping the most recent month), which keeps the underreaction premium while shedding the beta-driven crash component of raw momentum; low turnover, naturally decorrelated from the primary reversal family."
+    },
+    {
+      "family_id": "t03-overnight-gap-persistence-v1",
+      "family_name": "Overnight-vs-intraday gap decomposition",
+      "mechanism_summary": "Decompose each name's return into close-to-open (overnight) and open-to-close (intraday) components and trade the persistent overnight component cross-sectionally (long persistent overnight winners, short persistent overnight losers), exploiting the documented clientele split between overnight and intraday flows."
+    }
+  ]
+}

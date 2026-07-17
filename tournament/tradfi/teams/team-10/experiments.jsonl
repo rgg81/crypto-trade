@@ -1,0 +1,2 @@
+{"id": "reg-001", "type": "registration", "family_id": "t10-residual-momentum-v1", "timestamp": "2026-07-17T00:00:00Z"}
+{"id": "reg-002", "type": "registration", "family_id": "t10-low-vol-bab-v1", "note": "redraw round 1: reg-001 primary and both backups vetoed on pass-1 FCFS collisions (teams 01/02/03)", "timestamp": "2026-07-17T00:00:00Z"}

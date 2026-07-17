@@ -1,0 +1,23 @@
+{
+  "team_id": "team-07",
+  "primary": {
+    "family_id": "t07-residual-momentum-v1",
+    "family_name": "Residual (beta-stripped) cross-sectional momentum",
+    "mechanism_summary": "Estimate each name's rolling beta to an equal-weight universe factor (optionally plus its sector basket) derived at runtime from the price panel itself, and compute residual daily returns. Rank names cross-sectionally on cumulative residual return over a ~6-12 month formation window skipping the most recent ~1 month, then go long the top ranks and short the bottom ranks, sector-balanced, with weight banding/smoothing to keep daily turnover low.",
+    "economic_rationale": "Underreaction and gradual information diffusion operate on idiosyncratic news, not on factor moves; stripping the beta component isolates that persistent piece while removing the time-varying factor bet that makes raw momentum crash-prone (raw momentum is implicitly short-beta after bear markets and gets destroyed in sharp rebounds). The residual form is the literature's higher-IR, lower-crash-risk variant, and it is market-neutral by construction - exactly what a 25% net-cap, vol-targeted L/S perp book wants. Formation at monthly scale means signal decay is slow, so 6 bps/side turnover cost stays a small fraction of gross edge.",
+    "expected_regime_behavior": "Bull: modest steady positive carry with near-zero beta (residualization removes the market ride). Bear: roughly flat to mildly positive - no large embedded short-beta position to unwind, so 2020-03/2022-style selloffs should hurt far less than raw momentum. Chop / sharp factor rotations (junk rallies, momentum unwinds like 2020-Q2 or 2021-02): the weak regime - expect the drawdowns to concentrate there, but muted relative to non-residualized momentum. VIX spikes should mainly show up as vol-target de-levering, not signal death.",
+    "falsifier": "On the frozen IS window via team-run: if net Sharpe @1x cost is <= 0 across the pre-registered parameter plateau (formation 6-12m, skip 0-1m, beta window 1-2y, ranking depth variants) rather than at isolated peaks, the idea is dead. Equally fatal: if the residualized book fails to improve on an identically-constructed raw-momentum control (residualization premise falsified), or if costs at plateau settings consume the majority of gross Sharpe and banding/smoothing cannot restore net Sharpe > 0 at both 1x and 2x cost tiers."
+  },
+  "backups": [
+    {
+      "family_id": "t07-sector-relative-reversion-v1",
+      "family_name": "Sector-relative mean reversion",
+      "mechanism_summary": "Fade multi-day (roughly 3-10 day) idiosyncratic divergences of each name against its sector basket (aux sector_map), longing laggards and shorting leaders within sector on a cross-sectional z-score, so the book is sector-neutral by construction and turnover stays below 1-day-reversal levels."
+    },
+    {
+      "family_id": "t07-overnight-tugofwar-v1",
+      "family_name": "Overnight-vs-intraday gap decomposition (tug-of-war)",
+      "mechanism_summary": "Decompose daily returns into close-to-open and open-to-close components from the OHLC panel and trade the cross-sectional persistence of the trailing overnight component (long persistent overnight winners, short overnight losers), formed over a multi-week window to keep turnover manageable."
+    }
+  ]
+}

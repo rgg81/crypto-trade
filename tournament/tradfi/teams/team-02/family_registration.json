@@ -1,0 +1,23 @@
+{
+  "team_id": "team-02",
+  "primary": {
+    "family_id": "t02-residual-momentum-v1",
+    "family_name": "Residual (beta-stripped) momentum",
+    "mechanism_summary": "Compute each name's trailing market-residual daily returns (rolling regression of stock returns on the cross-sectional market factor), form medium-horizon momentum on the residual component (6-12 month formation, ~1 month skip), scale by residual volatility, and rank cross-sectionally. Long the top-ranked residual-momentum names, short the bottom-ranked, emitting raw signed weights from the ranks. The mechanism isolates persistence in firm-specific performance while discarding the beta tilts that drive classical momentum crashes.",
+    "economic_rationale": "Investors underreact to firm-specific news: idiosyncratic information diffuses slowly (limited attention, gradual analyst/flow response), so the residual return component trends at multi-month horizons. Stripping the market component removes the time-varying beta exposure that causes raw momentum's crash risk and makes the anomaly a purer, less crowded cross-sectional bet - a natural fit for a beta-capped market-neutral book on ~65 liquid single-stock perps. Slow-moving ranks keep daily turnover low, so the edge is not consumed by 6 bps/side costs.",
+    "expected_regime_behavior": "Bull: steady positive carry as idiosyncratic winners persist (e.g. AI-cycle leaders vs laggards) without needing a market tilt. Bear/crash: materially milder drawdowns than raw momentum, since momentum crashes (2020-03, 2009-style reversals) are dominated by the beta component this family removes; residual books de-risk gracefully under the engine's vol target. Chop/rotation: worst regime - sharp cross-sectional factor rotations (2021-style growth/value whipsaws) temporarily invert residual ranks; expect flat-to-mildly-negative stretches rather than tail losses.",
+    "falsifier": "If, across the pre-registered formation plateau (126-252 trading-day formation, 10-21 day skip, tercile-to-decile book widths), the strategy cannot achieve net IS Sharpe at 1x cost >= 0.3 on team-run output, or the residual construction fails to beat the equivalent raw-return momentum book on both net Sharpe and max drawdown (i.e. beta-stripping adds nothing), or turnover costs consume more than half of gross Sharpe at every plateau point, the family is dead and I pivot."
+  },
+  "backups": [
+    {
+      "family_id": "t02-sector-relative-reversion-v1",
+      "family_name": "Sector-relative mean reversion",
+      "mechanism_summary": "Fade multi-day idiosyncratic gaps of each name versus its sector_map basket (z-scored spread), long underperformers / short outperformers as liquidity provision, with entry/exit bands to control turnover."
+    },
+    {
+      "family_id": "t02-52wk-high-anchor-v1",
+      "family_name": "52-week-high proximity / anchoring",
+      "mechanism_summary": "Rank names by closeness of price to their trailing 252-day high and go long near-high / short far-from-high, exploiting anchoring-driven underreaction with very low turnover."
+    }
+  ]
+}

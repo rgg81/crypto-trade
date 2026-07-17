@@ -1,0 +1,2 @@
+{"id": "reg-001", "type": "registration", "family_id": "t04-residual-momentum-v1", "timestamp": "2026-07-17"}
+{"id": "reg-002", "type": "registration", "family_id": "t04-xs-momentum-12-1-v1", "supersedes": "reg-001", "reason": "orchestrator-veto-redraw-pass1-collision", "timestamp": "2026-07-17"}

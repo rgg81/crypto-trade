@@ -1,0 +1,47 @@
+{
+  "team_id": "team-08",
+  "primary": {
+    "family_id": "t08-low-vol-bab-v1",
+    "family_name": "Low-volatility / betting-against-beta",
+    "mechanism_summary": "Rank the universe daily on slow-moving trailing beta (versus the equal-weight panel market) blended with realized volatility; go long the low-beta/low-vol end and short the high-beta/high-vol end, with leg sizes scaled so the book's ex-ante beta is approximately zero (beta-balanced rather than dollar-balanced, within the engine's net cap). Because risk estimates drift slowly, turnover is structurally minimal, so the edge survives 6 bps/side at daily cadence nearly untouched and is close to invariant at the published 2x cost tier.",
+    "economic_rationale": "Leverage-constrained investors and lottery-seeking retail overpay for high-beta/high-volatility names to reach return targets without using leverage, flattening the security-market line; a beta-neutral book long the boring end and short the glamour end harvests the resulting risk-adjusted spread. The effect should be amplified in this specific universe: Binance single-stock perps skew toward high-attention, retail-favored glamour names, exactly where lottery demand concentrates and the SML is flattest. The premium reflects a persistent structural constraint (leverage aversion) rather than an informational anomaly, which is why it decays slowly and resists arbitrage.",
+    "expected_regime_behavior": "Stress / high-VIX: strongest environment - high-beta names fall harder than beta alone predicts, so the book profits and acts as crash protection. Chop and rate-rising risk-off tapes: mildly to solidly positive. Speculative melt-ups (2020-21-style high-beta rips): the main drawdown mode - the short leg gets squeezed and the book lags; because legs are beta-balanced, this loss mode is a factor rotation, not a market-direction bet. Residual growth/duration tilt is the second-order exposure the vol-target and per-name caps must carry.",
+    "falsifier": "Killed if IS net Sharpe at 1x cost is <= 0 across the pre-registered plateau of beta/vol estimation windows (~60-252 trading days) and leg widths (tercile to quintile) - i.e., no robust parameter region exists. Also killed if the apparent edge exists only when the book is dollar-neutral but ex-ante beta-short (meaning the 'alpha' is a disguised short-market position that proper beta-balancing removes), or if profits are concentrated in a handful of crash months (fewer than ~10 months driving essentially all PnL) so the IS Sharpe is a tail artifact rather than a persistent SML-flatness premium, or if satisfying the median >= 5 names per side breadth floor requires leg widths at which the effect disappears."
+  },
+  "backups": [
+    {
+      "family_id": "t08-short-horizon-reversal-v1",
+      "family_name": "Plain short-horizon reversal (own-name)",
+      "mechanism_summary": "Long recent multi-day (1-5 day) losers and short recent winners ranked cross-sectionally on each name's OWN raw return with no sector residualization, harvesting the liquidity-provision premium with band/partial rebalancing to keep turnover survivable at 6 bps/side."
+    },
+    {
+      "family_id": "t08-sector-pairs-statarb-v1",
+      "family_name": "Sector pairs / cointegration stat-arb",
+      "mechanism_summary": "Trade z-score dislocations of the price spread between historically co-moving same-sector pairs - long the cheap leg, short the rich leg until spread convergence - a pairwise-spread mechanism distinct from any sector-basket-relative reversion."
+    }
+  ],
+  "vetoed": {
+    "redraw_round": 1,
+    "veto_reason": "Pass-1 FCFS collision: sector-relative reversion registered first by team-03; round-1 backups also taken (residual momentum by team-01, overnight-vs-intraday decomposition by team-07).",
+    "primary": {
+      "family_id": "t08-sector-relative-reversion-v1",
+      "family_name": "Sector-relative mean reversion",
+      "mechanism_summary": "Rank names daily on the z-score of their short-horizon (multi-day) return residual versus their sector basket, and go long the idiosyncratic laggards / short the idiosyncratic leaders, betting the gap snaps back toward the sector. Sector-wide moves are treated as information and never faded; only the sector-relative residual component is traded. Turnover is contained by a multi-day reversion horizon, entry/exit z-bands, and smoothed weight updates so the edge survives 6 bps/side at daily cadence.",
+      "economic_rationale": "Idiosyncratic single-name moves that are not confirmed by the sector are disproportionately liquidity- and flow-driven (index/ETF rebalancing spillover, single-name derivative hedging, retail bursts) rather than fundamental, so supplying liquidity against them earns a premium as prices revert to the sector-implied anchor. Sector-relative isolation is the key filter: it strips out common-factor news that legitimately reprices the whole group, concentrating the book on the residual component with the strongest documented reversion. The mechanism is self-financing long/short within sectors, making it market- and sector-neutral by construction.",
+      "expected_regime_behavior": "Chop/range-bound tape: best environment - frequent unconfirmed dislocations, steady harvest. High-VIX stress: gross alpha per trade rises (bigger dislocations, bigger snap-backs) but so do gap risk and correlated unwinds; vol-targeting and per-name caps carry the tail. Smooth trending bull: thinnest environment - fewer idiosyncratic gaps and reversion is slower, so expect modest positive-to-flat carry. Main structural loss mode: genuine idiosyncratic repricings (earnings-type news) that trend instead of reverting; the design must avoid loading up on the most extreme, most information-laden gaps.",
+      "falsifier": "Killed if, over the IS window with realistic turnover control, the net 1x-cost Sharpe is <= 0 across the whole pre-registered plateau of reversion horizons (~3-10 days) and entry bands - i.e., gross reversion alpha exists only at turnover levels where 6 bps/side erases it. Also killed if the net alpha is concentrated in the early IS years (pre-2015) and is flat-to-negative over 2015-2024, indicating the anomaly decayed away in the modern regime, or if breadth cannot sustain the median >= 5 names per side floor without pushing into the informational (non-reverting) gap tail."
+    },
+    "backups": [
+      {
+        "family_id": "t08-residual-momentum-v1",
+        "family_name": "Residual (beta-stripped) momentum",
+        "mechanism_summary": "Cross-sectional momentum computed on market/sector-residual returns rather than total returns - long persistent idiosyncratic winners, short persistent idiosyncratic losers - giving a lower-turnover, momentum-crash-resistant book."
+      },
+      {
+        "family_id": "t08-overnight-persistence-v1",
+        "family_name": "Overnight-vs-intraday gap decomposition",
+        "mechanism_summary": "Decompose each name's return into close-to-open and open-to-close components and trade the cross-sectionally persistent overnight component as a clientele-demand signal for future total returns."
+      }
+    ]
+  }
+}

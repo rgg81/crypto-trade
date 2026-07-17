@@ -1,0 +1,2 @@
+{"id": "reg-001", "type": "registration", "family_id": "t08-sector-relative-reversion-v1", "ts": "2026-07-17T00:00:00Z"}
+{"id": "reg-002", "type": "registration", "family_id": "t08-low-vol-bab-v1", "note": "redraw round 1: reg-001 primary vetoed (pass-1 collision with team-03); new primary + backups drawn from FREE families", "ts": "2026-07-17T00:30:00Z"}

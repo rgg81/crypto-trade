@@ -1,0 +1,36 @@
+{
+  "team_id": "team-05",
+  "vetoed": {
+    "veto_round": 1,
+    "veto_reason": "pass-1 FCFS collision: residual momentum registered first by team-01; both original backups also taken (sector-relative reversion by team-03, 52wk-high anchoring by team-02)",
+    "primary": {
+      "family_id": "t05-residual-momentum-v1",
+      "family_name": "Residual (beta-stripped) cross-sectional momentum",
+      "mechanism_summary": "Rank names cross-sectionally on momentum computed from market- and sector-residualized daily returns (each name's return stripped of its estimated market and sector-basket component), over a multi-month formation window that skips the most recent bars to avoid the short-horizon reversal zone. Go long the top-ranked residual-momentum names and short the bottom-ranked, with slow signal/weight smoothing so daily turnover stays low. The signal isolates persistence in the idiosyncratic return component rather than market/sector beta timing."
+    },
+    "backups": [
+      {"family_id": "t05-sector-relative-reversion-v1", "family_name": "Sector-relative mean reversion"},
+      {"family_id": "t05-52wk-high-anchor-v1", "family_name": "52-week-high proximity / anchoring"}
+    ]
+  },
+  "primary": {
+    "family_id": "t05-lowvol-bab-v1",
+    "family_name": "Low-volatility / betting-against-beta",
+    "mechanism_summary": "Rank the universe cross-sectionally on trailing realized volatility (with beta-to-universe-proxy as a pre-registered design variant), long the low-vol/low-beta end and short the high-vol/high-beta end in a rank-weighted dollar-neutral book. Vol and beta estimates are slow-moving by construction, so the book turns over very little day to day, and the organizer-side vol-target engine supplies the leverage that makes the low-risk side competitive -- the betting-against-beta construction. The sort key is systematic risk rank ONLY: no momentum, no anchoring, no sector-relative spreads, no extreme-daily-return (MAX) lottery tails, keeping the family mechanically distinct from teams 01/02/03/09.",
+    "economic_rationale": "Leverage-constrained and lottery-seeking investors overpay for high-vol/high-beta names because those names embed leverage they cannot or will not borrow, flattening the risk-return line: low-risk names earn too much per unit of risk, high-risk names too little. A Binance single-stock perp universe is close to a worst-case lottery-demand clientele (retail, levered, drawn to the most volatile tickers), so the overpricing of the volatile end should be at least as strong here as in cash equities, where this premium has a century of evidence. Critically for this tournament's cost model, vol ranks are highly persistent, so natural turnover is a few percent of the book per day and the 6 bps/side drag is nearly negligible -- the edge does not have to clear a large cost hurdle, unlike any short-horizon family, which is the decisive structural fit for a daily-cadence net-Sharpe contest.",
+    "expected_regime_behavior": "Bear markets and high-VIX stress: best regime -- the short lottery leg collapses faster than the long defensive leg holds (2022-style), and realized-vol ranks widen, strengthening the sort. Grinding low-VIX bull: modestly positive to flat; the premium accrues slowly with minimal cost bleed. Speculative melt-ups (2020-2021 style): worst regime -- shorting high-beta runners bleeds while boring longs lag; per-name cap, net cap, and portfolio vol-targeting bound but do not remove the damage. The IS window contains 2020-2021 in full, so the IS Sharpe prices this failure mode honestly rather than hiding it.",
+    "falsifier": "Dead if, via team-run on the IS window: (a) net IS Sharpe at 1x cost <= 0; or (b) the 2015-2024 subperiod net Sharpe <= 0 (premium confined to the early decade); or (c) no robust plateau -- the sign of net Sharpe flips across reasonable vol-estimation lookbacks (roughly 60d to 252d) rather than holding across the range, indicating a lookback-mined artifact; or (d) the melt-up drawdown is deep enough that the 2x-cost Sharpe and maxDD profile are worse than a flat book, i.e. the premium is not deployable under the charter's caps; or (e) the median >= 5 names/side breadth floor cannot be met with slow-turnover rank weights. Any of these triggers the single documented pivot to backup 1."
+  },
+  "backups": [
+    {
+      "family_id": "t05-shorthorizon-reversal-v1",
+      "family_name": "Short-horizon reversal (plain, own-name)",
+      "mechanism_summary": "1-5 day own-name losers bounce and winners fade (liquidity-provision premium against retail overreaction), traded as a tranched/smoothed cross-sectional reversal book with NO sector residualization (mechanically distinct from team-03), where cost survival at 6 bps/side is the pre-declared kill-axis."
+    },
+    {
+      "family_id": "t05-volume-liquidity-anomalies-v1",
+      "family_name": "Volume & liquidity anomalies",
+      "mechanism_summary": "Abnormal-volume attention shocks and Amihud-style illiquidity premia predict the cross-section of subsequent returns in an attention-driven retail perp universe; long positive-anomaly names against short negative-anomaly names using OHLCV-derived volume features only."
+    }
+  ]
+}

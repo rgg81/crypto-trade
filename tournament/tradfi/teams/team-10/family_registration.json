@@ -1,0 +1,47 @@
+{
+  "team_id": "team-10",
+  "primary": {
+    "family_id": "t10-low-vol-bab-v1",
+    "family_name": "Low-vol / betting-against-beta",
+    "mechanism_summary": "Rank names on slow-moving trailing risk (rolling beta vs the equal-weight universe factor, blended with realized volatility; estimation windows ~126-252d): long the low-beta/low-vol tail, short the high-beta/high-vol tail, with the legs beta-balanced so the raw book is ex-ante beta-neutral. Risk estimates drift slowly and ranks get hysteresis/smoothing, so daily turnover is intrinsically tiny - the premium is harvested by holding, not trading, which is exactly what 6 bps/side rewards.",
+    "economic_rationale": "Leverage-constrained investors and lottery-seeking retail overpay for high-beta/high-vol names, flattening or inverting the security-market line, leaving low-risk names underpriced per unit of risk. This universe is Binance's TradFi stock-perp listing set - names selected precisely for speculative retail appeal - so the overpriced lottery/high-beta short leg should be unusually fat here while the boring low-vol long leg supplies ballast. Beta-balanced legs make the book market-neutral by construction, matching the mandate and the |net| <= 0.25 cap.",
+    "expected_regime_behavior": "Calm or grinding markets: steady positive carry as the security-market-line mispricing accrues. Corrections and bears: strongest regime - the high-beta short leg falls faster than the long leg. Violent junk/high-beta melt-ups (meme squeezes, speculative rotations): the known weak regime, with drawdowns as the short leg rips; beta-balancing keeps this a spread loss rather than a directional one. Chop: near-flat gross with minimal cost drag thanks to low turnover.",
+    "falsifier": "Over the pre-registered plateau (beta/vol windows 126-252d, tail fractions ~20-35% per side, beta-balancing on/off as a robustness axis), the family is dead if the plateau-median net IS Sharpe @1x cost is below ~0.3, if positive performance exists only at an isolated parameter peak, or if the edge is concentrated in the early IS years with net Sharpe <= 0 over the 2016-2024 sub-window (stale-anomaly signature). Costs consuming >50% of gross Sharpe anywhere on the plateau also kills it - though at this turnover that would indicate a broken implementation, not a broken mechanism."
+  },
+  "backups": [
+    {
+      "family_id": "t10-ts-trend-v1",
+      "family_name": "Per-name time-series trend (plain)",
+      "mechanism_summary": "Each name goes long/short/flat on the sign and strength of its own k-month return versus its own history (no cross-sectional ranking, no bear gating - plain per-name TSMOM), low-turnover by construction."
+    },
+    {
+      "family_id": "t10-xs-momentum-12-1-v1",
+      "family_name": "Plain cross-sectional 12-1 momentum",
+      "mechanism_summary": "Long trailing 12-month relative winners and short relative losers, skipping the most recent month (reversal zone), on total returns with no residualization."
+    }
+  ],
+  "vetoed": {
+    "round": 1,
+    "reason": "Pass-1 FCFS collision: residual momentum registered first by team-01; both backups also taken (52-week-high anchoring -> team-02, sector-relative mean reversion -> team-03).",
+    "primary": {
+      "family_id": "t10-residual-momentum-v1",
+      "family_name": "Residual (beta-stripped) momentum",
+      "mechanism_summary": "Rank names cross-sectionally on the momentum of their market- and sector-residual return component (formation ~6-12 months, skipping the most recent ~1 month), long the top residual winners and short the residual losers. Residuals come from rolling regressions of each name's daily returns on the equal-weight market factor and its sector basket (via aux sector_map), so the ranked signal reflects idiosyncratic persistence rather than beta or sector tilts. Slow formation windows plus rank smoothing keep daily turnover low enough to survive 6 bps/side.",
+      "economic_rationale": "Underreaction to firm-specific news drives return continuation, but conventional total-return momentum on a ~65-name mega-cap/retail-favorite perp universe is dominated by market-beta and sector noise and carries severe crash risk when the market factor reverses. Stripping the systematic component isolates the behavioral underreaction channel: residual momentum historically delivers a similar premium at roughly half the volatility with far smaller crashes, and is market-neutral by construction - matching both the tournament's net-cap constraint and the sealed-holdout regime uncertainty.",
+      "expected_regime_behavior": "Earns steadily whenever idiosyncratic trends persist, in bull or bear markets alike, because beta exposure is stripped before ranking. In violent factor rotations / junk rallies (classic momentum-crash conditions) it draws down, but materially less than total-return momentum since the crash is mostly a beta effect. In directionless chop it is roughly flat gross and pays a small cost drag thanks to slow signal decay.",
+      "falsifier": "Over the pre-registered parameter plateau (formation 126-252 trading days, skip 10-21 days, residualization window 63-252 days), the family is dead if the plateau-median net IS Sharpe @1x cost is below ~0.3, if positive performance exists only at an isolated parameter peak rather than a plateau, or if transaction costs consume more than half of gross Sharpe across the whole plateau (mechanism true but not harvestable at 6 bps/side)."
+    },
+    "backups": [
+      {
+        "family_id": "t10-52wk-high-anchor-v1",
+        "family_name": "52-week-high proximity / anchoring",
+        "mechanism_summary": "Long names trading near their trailing 252-day high and short names far below it - anchoring-driven underreaction, with intrinsically low turnover that suits the 6 bps/side cost regime."
+      },
+      {
+        "family_id": "t10-sector-relative-mr-v1",
+        "family_name": "Sector-relative mean reversion",
+        "mechanism_summary": "Fade 3-10 day idiosyncratic gaps of a name versus its sector basket (short recent out-runners, long laggards), harvesting the liquidity-provision premium on snap-back toward the sector."
+      }
+    ]
+  }
+}

@@ -1,0 +1,2 @@
+{"id": "reg-001", "type": "registration", "family_id": "t06-residual-momentum-v1", "ts": "2026-07-17T00:00:00Z"}
+{"id": "reg-002", "type": "registration", "family_id": "t06-lowvol-bab-v1", "supersedes": "reg-001", "note": "redraw after pass-1 veto (residual momentum -> team-01; both backups taken)", "ts": "2026-07-17T00:30:00Z"}
