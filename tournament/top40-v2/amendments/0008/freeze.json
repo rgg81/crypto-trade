@@ -1,0 +1,70 @@
+{
+  "activation": {
+    "candidate_id": "team05-crtr-core-v2-infra-r1",
+    "existing_family_id": "team05-causal-residual-trend-reversal-v1",
+    "maximum_development_runs": 1,
+    "new_family_or_pivot_authorized": false,
+    "replacement_material_trial_number": 2,
+    "team_id": "team-05"
+  },
+  "activation_status": "active-one-shot-administrative-authority",
+  "amendment_id": "top40-v2-amendment-0008-team05-infrastructure-replacement",
+  "draft": {
+    "commit": "265551b332e86182a04bee61e9c42778c485e7ab",
+    "files": {
+      "tournament/top40-v2/amendments/0008/AMENDMENT.md": {
+        "sha256": "0da5117ad68e8fa899a055ca78bbc789baad8df9db2d3449afc05ba79de1f0de",
+        "size": 6657
+      },
+      "tournament/top40-v2/amendments/0008/draft.json": {
+        "sha256": "0865755d4c73e0efa6cdcd0facfa3105d1e851e65f5ec6996a83aa06e05714e5",
+        "size": 3254
+      }
+    }
+  },
+  "failure_binding": {
+    "failed_candidate_id": "team05-crtr-core-v2",
+    "metrics_and_artifacts_empty": true,
+    "organizer_registration_record_sha256": "5d4b00663128fe0aec307ef0a6a532c052b7a84a5d53fae2c685b7f974444701",
+    "organizer_result_record_sha256": "15e4d3453ee1fdaae0a4f1439f8a5bf57c4cf16c99fa73ff9992c29fa64aa09f",
+    "registration_event_sha256": "c4727f39271d9cde42935de53d34a0d1ce5f4e7cfeca2db9b282d9a8bc0488c9",
+    "result_event_sha256": "4fe7e3d84b41899b84513d67f17db215d6b59c165cbd379bd598fc2f3f21d5a2"
+  },
+  "freeze_timestamp_utc": "2026-07-17T03:07:16Z",
+  "journal_prefix": {
+    "head_sha256": "fd0bc861a74c6c895f796bccebec44b913dba0814550f97215fdbadeb98ae6fd",
+    "record_count": 61
+  },
+  "parent_authorities": {
+    "amendment_0006_integration_freeze_sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34",
+    "amendment_0007_active_entrypoint_sha256": "8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9",
+    "amendment_0007_integration_freeze_commit": "c8b917ca49306d5200a4e08848e73ff6f5a18bf3",
+    "amendment_0007_integration_freeze_sha256": "6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51",
+    "pure_crypto_policy_sha256": "2c7fb0ff593d06c323517e60df4b28ab9387a2df580b83f82f65ef71c91fc350",
+    "pure_crypto_report_sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
+    "pure_crypto_required_violations": 0
+  },
+  "replacement_constraints": {
+    "a5_first_add_order": [
+      "executable-source-manifest",
+      "independent-semantic-coupling-review",
+      "score-adapter-manifest",
+      "trial-registration"
+    ],
+    "budget_refund_authorized": false,
+    "failed_history_mutation_authorized": false,
+    "identity_whitelist_tests_and_authority_bindings_only": true,
+    "model_risk_score_schedule_label_thesis_and_falsifier_changes_authorized": false,
+    "requires_independent_candidate_semantic_review": true,
+    "terminal_replacement_replay_authorized": false
+  },
+  "review": {
+    "commit": "1dda0b5b539f290253c9994e57b12045eb20b261",
+    "path": "tournament/top40-v2/amendments/0008/REVIEW.json",
+    "reviewer_id": "a8-independent-admin-review",
+    "sha256": "583ca07309adc102265456c3b39cd9d9c304c15cd102616db761c90efc3b2ed8",
+    "size": 1427
+  },
+  "schema_version": 1,
+  "status": "frozen"
+}
