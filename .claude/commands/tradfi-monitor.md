@@ -190,3 +190,30 @@ uv run python analysis/portfolio/tradfi/reconcile_basis_tradfi.py  # perp/fundin
   a bug, does not net to zero). `tradfi_digest.py` now prints the gross long-leg/short-leg/NET split
   each report (best-effort `_funding_split` → `reconcile_basis_tradfi.funding_drag`). See Strategy
   facts → Funding AUDIT.
+
+## SECOND DESK — tradfi-cup-01 tournament winner (team-10, added 2026-07-17)
+
+A SECOND, fully isolated paper desk runs the tournament winner (team-10, per-name 12m sign
+trend on the 65-name tournament universe ex-PAYP → 64 legs). Same HANDS-OFF mandate.
+
+- **Process**: `run_tradfi_tournament_paper.py` (worktree portfolio-tradfi_v2). Relaunch:
+  `nohup env PYTHONUNBUFFERED=1 uv run python run_tradfi_tournament_paper.py > logs/tradfi_tournament_paper.log 2>&1 &`
+- **State**: DB `data/tradfi_tournament_paper.db`, equity `data/tradfi_tournament_equity.csv`,
+  log `logs/tradfi_tournament_paper.log`. Refresh cadence 2100s (staggered vs incumbent 1800s).
+- **Check**: `uv run python scripts/tradfi_tournament_status.py` (exit 1 = alert). Alerts:
+  engine DOWN / TRACEBACK / MISSED rebalance / CANDLE look-ahead / PARITY drift (recompute via
+  `tournament.paper.settled_scaled_book` — the desk's OWN code path, so drift = real bug) /
+  **BUNDLE mutated** (frozen team-10 sources re-hashed vs submission.json — unique to this desk).
+  Observational: eq_parity / eq_live / basis bps / cum funding / held gross+net.
+- **Book expectations** (don't false-alarm): held book is VOL-SCALED (gross ≈ 0.6-1.0 varies
+  with trailing vol, NOT pinned to 1.0); long-tilted (net up to +0.25 cap, typically +0.1-0.2);
+  bear IS Sharpe −1.13 — bleeding in a sharp bear is the known profile, not a defect. Holdout
+  +2.15 came from a trend-friendly window; realistic expectation ≈ IS level (~0.8 Sharpe).
+  Full caveats: `tournament/tradfi/results/FINAL_REPORT.md`.
+- **Engine wiring**: `TournamentPaperEngine` (analysis/portfolio/tradfi/tournament/paper.py)
+  subclasses `TradfiPaperEngine`, overriding `_settled_book` + `_target_weights` — held, PARITY
+  and LIVE tracks all derive from ONE vol-scaled source; base engine got the `_target_weights`
+  hook (pure refactor) on 2026-07-17.
+- **History note**: first-launch tick 2026-07-17 briefly stored the incumbent's held book (hook
+  didn't exist yet); caught by the monitor's parity check on its first run; desk state wiped +
+  relaunched clean the same day. If parity drifts again, suspect the same class of wiring bug.

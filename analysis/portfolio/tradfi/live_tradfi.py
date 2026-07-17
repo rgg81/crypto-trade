@@ -352,6 +352,17 @@ class TradfiPaperEngine:
         return live_ret, funding_ret
 
     # ── one tick: refresh → detect new settled bar → recompute book → book dual P&L → persist ──
+    def _target_weights(self, as_of: pd.Timestamp, deployed_w: pd.DataFrame) -> dict:
+        """Held-book source: vol-scaled target held DURING ``as_of``, plus ``_meta``.
+
+        Default = the incumbent iter-016 bridge (parity-by-independent-recompute via
+        ``lw.deployed_target_weights``; ``deployed_w`` deliberately unused). Subclass desks
+        (e.g. the tournament winner desk) override this to derive the held book from their
+        OWN settled book so all three tracks (held / PARITY / LIVE) share one source.
+        """
+        del deployed_w  # incumbent recomputes independently via the lw bridge
+        return lw.deployed_target_weights(as_of, self.cfg.data_dir)
+
     def run_once(self, *, refresh: bool = True) -> dict | None:
         if refresh:
             self.refresh_data()
@@ -372,7 +383,7 @@ class TradfiPaperEngine:
         launch_ts = pd.Timestamp(int(self.store.get_state("tradfi_launch_candle")), unit="ms")
 
         # 1. held book (parity by construction with deployed_w's frontier) — drop PAYP, no renorm
-        tgt = lw.deployed_target_weights(as_of, self.cfg.data_dir)
+        tgt = self._target_weights(as_of, deployed_w)
         meta = tgt.pop("_meta")
         for ex in sorted(LIVE_EXCLUDED):
             if abs(tgt.get(ex, 0.0)) > 0.0:

@@ -46,8 +46,44 @@ class TournamentPaperConfig(TradfiPaperConfig):
     winner_team: str = WINNER_TEAM
 
 
+def settled_scaled_book(
+    team_dir: Path,
+    *,
+    today_ms: int,
+    data_dir: str | None = None,
+    live_data_dir: str | None = None,
+) -> tuple[pd.Series | None, pd.DataFrame | None]:
+    """(vol-targeted net, VOL-SCALED lagged weight book) for a frozen team bundle on the
+    settled spliced panel — the SINGLE code path shared by the desk engine and the monitor.
+
+    Construction matches Stage 2 (frozen-IS canon; fresh tail return-chained; 2026 tail on the
+    perp), truncated to bars < ``today_ms``. The returned book carries the portfolio vol-target
+    scalar IN THE WEIGHTS (``w_scaled[t] = w[t]·scale[t]``, scale past-only), mirroring the
+    incumbent desk convention where held/LIVE weights are the real vol-scaled magnitudes; the
+    net series is identical to ``engine.net_series`` output bit-for-bit
+    (``net = net_raw·scale``).
+    """
+    tp.check_submission_shas(team_dir)
+    coins = thold.load_holdout_coins(data_dir=data_dir, live_data_dir=live_data_dir)
+    coins = {s: d[d.index < today_ms] for s, d in coins.items() if len(d[d.index < today_ms])}
+    if not coins or all(s == tc.VIX_SYM for s in coins):
+        return None, None
+    pn = te.panels_with_volume(coins)
+    mod = tp.load_strategy(team_dir)
+    raw = te.conform_raw(mod.build_raw_weights(te.team_view(pn), te.make_aux(coins)), pn)
+    tp.purge_team_modules()
+    w = te.normalize_and_cap(raw).shift(1)
+    pnl = (w * pn["ret_fwd"].reindex(columns=w.columns)).sum(axis=1)
+    cost = tc.COST_SIDE * (w - w.shift(1)).abs().sum(axis=1)
+    net_raw = (pnl - cost).dropna()
+    scale = ct.vol_target_scale(net_raw)
+    net = net_raw * scale  # == ct.vol_target(net_raw) == engine.net_series() net
+    w_scaled = w.mul(scale.reindex(w.index).fillna(0.0), axis=0)
+    return net, w_scaled
+
+
 class TournamentPaperEngine(TradfiPaperEngine):
-    """Winner desk: identical plumbing, tournament-winner book source."""
+    """Winner desk: identical plumbing, tournament-winner book source (vol-scaled)."""
 
     def __init__(self, cfg: TournamentPaperConfig) -> None:
         super().__init__(cfg)
@@ -56,24 +92,28 @@ class TournamentPaperEngine(TradfiPaperEngine):
         print(f"[tournament-desk] winner bundle SHA-verified: {cfg.winner_team}", flush=True)
 
     def _settled_book(self) -> tuple[pd.Series | None, pd.DataFrame | None, pd.Timestamp | None]:
-        """(net, deployed_w, as_of) for the WINNER's book on the settled spliced panel.
-
-        Same construction as Stage 2 (frozen-IS canon; fresh tail return-chained; 2026 tail on
-        the perp), truncated to bars whose UTC date < today so no unsettled bar enters. PARITY
-        net = funding-off 1x-cost vol-targeted series (funding/quantization live in the
-        inherited LIVE track, unchanged).
-        """
-        tp.check_submission_shas(self._team_dir)
-        coins = thold.load_holdout_coins(
-            data_dir=self.cfg.data_dir, live_data_dir=self.cfg.live_data_dir
+        """(net, VOL-SCALED deployed_w, as_of) for the WINNER's settled book — held, PARITY
+        and LIVE tracks all derive from this one source (funding/quantization inherited)."""
+        net, w_scaled = settled_scaled_book(
+            self._team_dir,
+            today_ms=self._today_ms(),
+            data_dir=self.cfg.data_dir,
+            live_data_dir=self.cfg.live_data_dir,
         )
-        today_ms = self._today_ms()
-        coins = {s: d[d.index < today_ms] for s, d in coins.items() if len(d[d.index < today_ms])}
-        if not coins or all(s == tc.VIX_SYM for s in coins):
+        if w_scaled is None:
             return None, None, None
-        pn = te.panels_with_volume(coins)
-        mod = tp.load_strategy(self._team_dir)
-        raw = te.conform_raw(mod.build_raw_weights(te.team_view(pn), te.make_aux(coins)), pn)
-        tp.purge_team_modules()
-        net, w = te.net_series(raw, pn["ret_fwd"])
-        return net, w, w.index[-1]
+        return net, w_scaled, w_scaled.index[-1]
+
+    def _target_weights(self, as_of: pd.Timestamp, deployed_w: pd.DataFrame) -> dict:
+        """Held book = the winner's vol-scaled row held DURING ``as_of`` (same source as the
+        LIVE track — no independent recompute needed; parity is checked by the monitor)."""
+        row = deployed_w.loc[as_of]
+        out = {t: float(v) for t, v in row.items() if abs(float(v)) > 1e-12}
+        out["_meta"] = {
+            "as_of": as_of,
+            "gross": float(row.abs().sum()),
+            "net_dollar": float(row.sum()),
+            "n_names": len(out),
+            "scaled": True,
+        }
+        return out
