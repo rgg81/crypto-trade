@@ -1,0 +1,150 @@
+{
+  "advance": 4,
+  "failures": [],
+  "ranked": [
+    {
+      "ann_turnover": 6.399178345580495,
+      "finalist": true,
+      "maxdd": -0.23151810875271983,
+      "median_names_long": 37.0,
+      "median_names_short": 11.0,
+      "rank": 1,
+      "regime_sharpe": {
+        "bear": -1.127786788827586,
+        "bull": 1.186053459421408,
+        "chop": 0.6413715668200886
+      },
+      "sharpe_1x": 0.8200684819929324,
+      "sharpe_2x": 0.7653336894577235,
+      "team_id": "team-10"
+    },
+    {
+      "ann_turnover": 18.132990577515702,
+      "finalist": true,
+      "maxdd": -0.22984939632634094,
+      "median_names_long": 22.0,
+      "median_names_short": 27.0,
+      "rank": 2,
+      "regime_sharpe": {
+        "bear": 0.41346062249609133,
+        "bull": 0.628479292502552,
+        "chop": 1.2765109331336364
+      },
+      "sharpe_1x": 0.7387653570645609,
+      "sharpe_2x": 0.639317751498397,
+      "team_id": "team-06"
+    },
+    {
+      "ann_turnover": 6.032792270757719,
+      "finalist": true,
+      "maxdd": -0.3332896308250598,
+      "median_names_long": 24.0,
+      "median_names_short": 24.0,
+      "rank": 3,
+      "regime_sharpe": {
+        "bear": -1.4014573916676463,
+        "bull": 1.0599512919192373,
+        "chop": 0.5380982070450465
+      },
+      "sharpe_1x": 0.7267215232238381,
+      "sharpe_2x": 0.6889954477130722,
+      "team_id": "team-09"
+    },
+    {
+      "ann_turnover": 15.472234085752223,
+      "finalist": true,
+      "maxdd": -0.3247121023107685,
+      "median_names_long": 25.0,
+      "median_names_short": 23.0,
+      "rank": 4,
+      "regime_sharpe": {
+        "bear": -0.1509075200479035,
+        "bull": 0.49794110663089614,
+        "chop": 1.169697229976878
+      },
+      "sharpe_1x": 0.5679092435090428,
+      "sharpe_2x": 0.4390872273186196,
+      "team_id": "team-03"
+    },
+    {
+      "ann_turnover": 8.477904850966093,
+      "finalist": false,
+      "maxdd": -0.23346680554111043,
+      "median_names_long": 12.0,
+      "median_names_short": 12.0,
+      "rank": 5,
+      "regime_sharpe": {
+        "bear": -1.142627155008257,
+        "bull": 0.7476901440854931,
+        "chop": 0.4686583985040946
+      },
+      "sharpe_1x": 0.5245496867352044,
+      "sharpe_2x": 0.4712512911942724,
+      "team_id": "team-04"
+    },
+    {
+      "ann_turnover": 3.0733272663685276,
+      "finalist": false,
+      "maxdd": -0.3908847178695368,
+      "median_names_long": 22.0,
+      "median_names_short": 26.0,
+      "rank": 6,
+      "regime_sharpe": {
+        "bear": -0.3575081690280273,
+        "bull": 0.6792118929495953,
+        "chop": 0.03651051018582588
+      },
+      "sharpe_1x": 0.49214575890237955,
+      "sharpe_2x": 0.46952887116222997,
+      "team_id": "team-02"
+    },
+    {
+      "ann_turnover": 4.033695615518792,
+      "finalist": false,
+      "maxdd": -0.2833583364448099,
+      "median_names_long": 24.0,
+      "median_names_short": 24.0,
+      "rank": 7,
+      "regime_sharpe": {
+        "bear": -0.24010695691512887,
+        "bull": 0.44429514226422817,
+        "chop": 0.7318548336636881
+      },
+      "sharpe_1x": 0.4546090644543481,
+      "sharpe_2x": 0.41829044356305306,
+      "team_id": "team-01"
+    },
+    {
+      "ann_turnover": 3.8874611181288348,
+      "finalist": false,
+      "maxdd": -0.3497940349655483,
+      "median_names_long": 24.0,
+      "median_names_short": 24.0,
+      "rank": 8,
+      "regime_sharpe": {
+        "bear": -1.3065203782072974,
+        "bull": 0.7373504884673816,
+        "chop": 0.22785649410157352
+      },
+      "sharpe_1x": 0.44780065218805115,
+      "sharpe_2x": 0.417076087873868,
+      "team_id": "team-07"
+    },
+    {
+      "ann_turnover": 0.9151988641888337,
+      "finalist": false,
+      "maxdd": -0.4286333053055349,
+      "median_names_long": 24.0,
+      "median_names_short": 24.0,
+      "rank": 9,
+      "regime_sharpe": {
+        "bear": 0.5927602864025385,
+        "bull": 0.41035386768444765,
+        "chop": -0.17763879015892256
+      },
+      "sharpe_1x": 0.3500406620057439,
+      "sharpe_2x": 0.3423412001392022,
+      "team_id": "team-05"
+    }
+  ]
+}
