@@ -1,0 +1,34 @@
+{
+  "candidate_id": "t10-dac-core-v1",
+  "family_id": "t10-defensive-anchor-convergence-v1",
+  "files": [
+    {
+      "path": "frozen_config.json",
+      "sha256": "782878691621f812b22a6d0f81e7a97122116f3be0b8c8b18f9b567b317c0b1c",
+      "size": 4582
+    },
+    {
+      "path": "risk_policy.json",
+      "sha256": "77a354d3afb387a8c855d92e29a0326d435687094fb73c263cedd1aa2a9cbda3",
+      "size": 580
+    },
+    {
+      "path": "strategy.py",
+      "sha256": "d5e09cdb795955bcac87f03b8333092a2d7ba481642d9038c09ff0271b70bf7a",
+      "size": 20020
+    },
+    {
+      "path": "test_risk_policy_contract.py",
+      "sha256": "3d97bd81302f9163dc6c470b3a7d3b86691c6e82d430d79557bd36d10aab4a54",
+      "size": 9494
+    },
+    {
+      "path": "test_strategy.py",
+      "sha256": "c7849bad3027cd1edde361251654aaaa5abdbf64bae12e73265ba6fd42baa3b7",
+      "size": 12312
+    }
+  ],
+  "manifest_kind": "top40-v2-executable-source-manifest-v1",
+  "schema_version": 1,
+  "team_id": "team-10"
+}
