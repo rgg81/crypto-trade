@@ -1,68 +1,68 @@
 {
-  "candidate_id": "team09-ccf-pivot01-v1",
-  "evidence_class_when_complete": "declared-retrained-out-of-fold",
+  "candidate_id": "team09-drp-pivot02-v1",
+  "evidence_class_when_complete": "declared-clean-instance-out-of-fold",
   "evidence_status": "prospective-no-fold-or-return-artifacts",
   "folds": [
     {
-      "embargo": "2020-06-30",
+      "embargo": "2020-06-28 through 2020-06-30",
       "fold_id": "fold-1",
       "prospective_model_artifact": "artifacts/walk-forward/fold-1/model-declaration.json",
       "test_end_inclusive": "2020-12-31",
       "test_start": "2020-07-01",
-      "training_end_inclusive": "2020-06-29"
+      "training_end_inclusive": "2020-06-27"
     },
     {
-      "embargo": "2020-12-31",
+      "embargo": "2020-12-29 through 2020-12-31",
       "fold_id": "fold-2",
       "prospective_model_artifact": "artifacts/walk-forward/fold-2/model-declaration.json",
       "test_end_inclusive": "2021-06-30",
       "test_start": "2021-01-01",
-      "training_end_inclusive": "2020-12-30"
+      "training_end_inclusive": "2020-12-28"
     },
     {
-      "embargo": "2021-06-30",
+      "embargo": "2021-06-28 through 2021-06-30",
       "fold_id": "fold-3",
       "prospective_model_artifact": "artifacts/walk-forward/fold-3/model-declaration.json",
       "test_end_inclusive": "2021-12-31",
       "test_start": "2021-07-01",
-      "training_end_inclusive": "2021-06-29"
+      "training_end_inclusive": "2021-06-27"
     },
     {
-      "embargo": "2021-12-31",
+      "embargo": "2021-12-29 through 2021-12-31",
       "fold_id": "fold-4",
       "prospective_model_artifact": "artifacts/walk-forward/fold-4/model-declaration.json",
       "test_end_inclusive": "2022-06-30",
       "test_start": "2022-01-01",
-      "training_end_inclusive": "2021-12-30"
+      "training_end_inclusive": "2021-12-28"
     },
     {
-      "embargo": "2022-06-30",
+      "embargo": "2022-06-28 through 2022-06-30",
       "fold_id": "fold-5",
       "prospective_model_artifact": "artifacts/walk-forward/fold-5/model-declaration.json",
       "test_end_inclusive": "2022-12-31",
       "test_start": "2022-07-01",
-      "training_end_inclusive": "2022-06-29"
+      "training_end_inclusive": "2022-06-27"
     },
     {
-      "embargo": "2022-12-31",
+      "embargo": "2022-12-29 through 2022-12-31",
       "fold_id": "fold-6",
       "prospective_model_artifact": "artifacts/walk-forward/fold-6/model-declaration.json",
       "test_end_inclusive": "2023-06-30",
       "test_start": "2023-01-01",
-      "training_end_inclusive": "2022-12-30"
+      "training_end_inclusive": "2022-12-28"
     }
   ],
-  "fold_rule": "Each test interval is evaluated from a clean strategy instance with only authorized earlier replay history. The center is a no-fit deterministic rule; each fold artifact still binds the exact source/config/seed, training cutoff, embargo, and clean-process declaration. No full-period scaler, selector, coefficient, or ensemble is carried into a fold.",
+  "fold_rule": "Each test interval is evaluated from a clean strategy instance with only authorized earlier replay history. Pivot-02 is a no-fit deterministic rule; every fold artifact still binds exact source/config/seed, cutoff, three-day embargo, A5 manifest, and clean-process declaration. No full-period scaler, selector, coefficient, or ensemble is carried into a fold.",
   "future_required_bindings": [
     "six byte-distinct model/declaration artifact SHA-256 values",
     "six fold return artifact SHA-256 values",
     "one stitched daily-return artifact SHA-256",
-    "exact source bundle, strategy, frozen config, risk policy, seed, and journal-head hashes",
+    "exact source bundle, strategy, frozen config, no-control risk policy, seed, A5 manifest, and journal-head hashes",
     "central base-cost and doubled-cost results",
-    "central fold, quarter, regime, role, sleeve, stability, and concentration evidence"
+    "central fold, quarter, regime, role, sleeve, stability, concentration, requested-gross, and insolvency evidence"
   ],
-  "purge_and_embargo": "The strategy is unsupervised and uses no forward label. A one-calendar-day boundary embargo is nevertheless reserved before each test start; any future supervised pivot must additionally purge every overlapping forward label and document its exact horizon.",
+  "purge_and_embargo": "The strategy is unsupervised, but the declared A5 forward label spans 72 hours. Purge every score/label pair whose forward endpoint crosses a fold boundary and reserve the final three calendar days before each test start as embargo.",
   "schema_version": 1,
-  "selection_rule": "No fold is optional and no failed fold is discarded. Stitched chronological evidence can qualify only when all frozen development gates pass. A negative or unqualified series is recorded as evidence and cannot be submitted.",
+  "selection_rule": "No fold is optional and no failed or insolvent fold is discarded. Stitched chronological evidence can qualify only when all frozen gates pass. Negative or unqualified evidence is recorded and pivot-02 terminates as DNF rather than being submitted.",
   "team_id": "team-09"
 }

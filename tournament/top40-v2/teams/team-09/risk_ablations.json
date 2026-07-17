@@ -2,11 +2,12 @@
   "canonical_runtime_policy_path": "tournament/top40-v2/teams/team-09/risk_policy.json",
   "combined_template_path": "risk_policies/05-combined.json",
   "core_alpha_activation_gate": {
-    "applies_to": "team09-ccf-pivot01-v1 with root risk_policy.json in its no-control state",
+    "applies_to": "team09-drp-pivot02-v1 with root risk_policy.json in its no-control state",
     "base_cost_net_return_strictly_positive": true,
     "base_cost_net_sharpe_strictly_positive": true,
     "both_sleeves_meet_activity_floors": true,
     "combined_chop_attribution_strictly_positive": true,
+    "completed_without_insolvency": true,
     "doubled_cost_net_return_strictly_positive": true,
     "doubled_cost_net_sharpe_strictly_positive": true,
     "long_bull_attribution_strictly_positive": true,
@@ -25,7 +26,7 @@
     "center_no_control_included": true,
     "total_policy_states": 6
   },
-  "policy_materialization_rule": "The parent family is terminal and no parent control is authorized. Pivot-01 also runs no-control first. Only after pivot-01 passes every core-alpha and pivot-mechanism activation minimum may a later pivot policy be separately preregistered and copied byte-for-byte to root; controls cannot rescue either failed core.",
+  "policy_materialization_rule": "Both prior families are terminal and no prior control is authorized. Pivot-02 runs no-control first. A pivot-02 policy may be separately preregistered only after the center passes every core, pivot-02, A5, and full-development gate including the complete preregistered neighborhood; copy its immutable template byte-for-byte to root. Controls cannot rescue final-pivot failure.",
   "policies": [
     {
       "hypothesis": "Execution/control baseline with no enabled optional risk control.",
@@ -33,36 +34,36 @@
       "policy_id": "team09-risk-none"
     },
     {
-      "hypothesis": "Scale gross exposure from trailing realized portfolio volatility without exceeding the strategy request.",
+      "hypothesis": "Scale already-low gross exposure from trailing realized portfolio volatility without exceeding the strategy request.",
       "path": "risk_policies/01-volatility-target.json",
       "policy_id": "team09-risk-vol"
     },
     {
-      "hypothesis": "Progressively reduce gross after authoritative portfolio drawdowns of 12%, 20%, and 28%.",
+      "hypothesis": "Progressively reduce already-low gross after authoritative portfolio drawdowns.",
       "path": "risk_policies/02-drawdown-brakes.json",
       "policy_id": "team09-risk-drawdown"
     },
     {
-      "hypothesis": "Close a symbol only after a 12% position loss is confirmed and block same-boundary reentry with a three-bar cooldown.",
+      "hypothesis": "Close a symbol only after its configured position loss and block same-boundary reentry.",
       "path": "risk_policies/03-position-stop.json",
       "policy_id": "team09-risk-stop"
     },
     {
-      "hypothesis": "Cap one-way turnover at 40% per boundary to test whether signal churn is a failure mode after ordinary capacity and costs.",
+      "hypothesis": "Cap one-way turnover to test residual churn after ordinary capacity and costs.",
       "path": "risk_policies/04-turnover-limit.json",
       "policy_id": "team09-risk-turnover"
     },
     {
-      "hypothesis": "Combine volatility targeting, drawdown brakes, position stop, and turnover limit without side scaling or time stop.",
+      "hypothesis": "Combine the four optional controls without side scaling or time stop.",
       "path": "risk_policies/05-combined.json",
       "policy_id": "team09-risk-combined"
     }
   ],
   "policy_count": 6,
-  "registration_rule": "The pivot-01 root no-control core is the first trial of the new family. It must pass every numeric core-alpha and pivot-mechanism gate before any later pivot policy may be registered. Parent controls remain permanently forbidden. The five optional files are dormant templates, not authorization.",
+  "registration_rule": "The pivot-02 root no-control core is the first trial of the final family. It must pass every core, pivot-02, A5, full non-neighborhood, and neighborhood stability gate before any later policy may be registered. Prior controls remain permanently forbidden. The five optional files are dormant templates, not authorization.",
   "schema_version": 1,
   "status": "prospective-no-results",
   "team_id": "team-09",
-  "pivot_threshold_contract_path": "qualification_thresholds.json#/pivot_01_mechanism_gate",
+  "pivot_threshold_contract_path": "qualification_thresholds.json#/pivot_02_mechanism_gate",
   "threshold_contract_path": "qualification_thresholds.json#/core_alpha_activation"
 }

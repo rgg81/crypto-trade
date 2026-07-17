@@ -1,0 +1,39 @@
+{
+  "controls_authorized_for_prior_families": false,
+  "diagnosis": "Two distinct 0.90-gross Team09 mechanisms failed catastrophically. The original carry-unwind book reached 53.33% drawdown with bear Sharpe -2.19; the conditional fragility router then became insolvent on 2022-05-13 before metrics. A third route or sign change would not address the repeated exposure failure. The final pivot must make crash survival structural through much lower gross and caps, broad slow sleeves, exclusion of the most fragile names from both sides, and score-level shrinkage that is never levered back to target.",
+  "new_candidate_id": "team09-drp-pivot02-v1",
+  "new_family_id": "team09-defensive-residual-persistence-v1",
+  "pivot_id": "team09-pivot-02",
+  "pivot_mechanism": "Apply one regime-invariant 72-hour construction: rank three-block pure-crypto residual persistence, exclude the highest crash-fragility quintile from both long and short eligibility, shrink every remaining weight by its captured persistence-and-safety magnitude, select up to eight names per side, request at most 0.10 gross per side, and pair only by scaling downward.",
+  "prior_trials": [
+    {
+      "candidate_id": "team09-fcpc-center-v1",
+      "family_id": "team09-funding-crowding-confirmation-v1",
+      "maximum_drawdown": 0.5332863361540062,
+      "registration_sha256": "e384f401717b5ce291b71129161dddbea46543490d5e11182c04f28f49bf61ae",
+      "status": "completed-terminal-core-failure"
+    },
+    {
+      "candidate_id": "team09-ccf-pivot01-v1",
+      "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+      "failed_at_utc": "2022-05-13T00:00:00Z",
+      "failure_reason": "ValueError: portfolio insolvent at 2022-05-13 00:00:00+00:00",
+      "family_id": "team09-conditional-carry-fragility-v1",
+      "registration_sha256": "4bb1b4aec9447fe01a02cf4886190147712a2950288bf63d9d00c5e217dc18ea",
+      "risk_policy_sha256": "f75a2e05cda7ba87a865527f7c95c03a734c1398e8be251f50074ad00163875e",
+      "source_bundle_sha256": "c51b922f7720520087350256abb30318f1834fea071c8c8470f12cdad4b10485",
+      "status": "failed-insolvent-terminal",
+      "strategy_sha256": "5f869a9cb2b4f7d45322f0a723a76f7232b16ccb51bb7a82b3e0c7721f010b18"
+    }
+  ],
+  "prohibited_shortcuts": [
+    "no market-state router or refinement of pivot-01",
+    "no literal sign flip",
+    "no optional risk overlay or portfolio-drawdown input",
+    "no leverage restoration after crash exclusion or score shrinkage",
+    "no modification or deletion of prior ledgers, registrations, results, reservations, reports, or score artifacts"
+  ],
+  "schema_version": 1,
+  "status": "prospective-unregistered-final-mechanism-pivot",
+  "team_id": "team-09"
+}

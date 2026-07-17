@@ -1,5 +1,5 @@
 {
-  "candidate_id": "team09-ccf-pivot01-v1",
+  "candidate_id": "team09-drp-pivot02-v1",
   "circularity_prohibitions": [
     "No neighbor return, metric, score, daily-return hash, or result manifest may be an input to that neighbor's source bundle, config hash, parameter hash, trial registration, or registration SHA-256.",
     "No neighbor result may be read before the complete ten-neighbor identity set is frozen and every neighbor is preregistered.",
@@ -18,6 +18,7 @@
     "source_bundle_sha256",
     "risk_config_sha256",
     "config_sha256",
+    "score_adapter_manifest_sha256",
     "parameter_artifact_sha256",
     "registration_sha256"
   ],
@@ -28,7 +29,7 @@
       "stage": 0,
       "title": "center and declaration",
       "requirements": [
-        "Run the pivot-01 no-control center first and require every core-alpha, pivot-mechanism, full non-neighborhood development, and team-declared A5 score threshold.",
+        "Run the pivot-02 no-control center first; require completion without insolvency and every core-alpha, pivot-02 mechanism, full non-neighborhood development, and team-declared A5 score threshold.",
         "Keep the already-declared ten one-axis deltas unchanged before any neighbor result."
       ]
     },
@@ -36,16 +37,16 @@
       "stage": 1,
       "title": "non-neighborhood candidate gate",
       "requirements": [
-        "Select either the no-control center or a properly preregistered later policy only after it passes every non-neighborhood development threshold.",
-        "Freeze the selected candidate's strategy, risk, config, seed, and complete executable-source identity before materializing neighbors."
+        "Only the no-control pivot-02 center may seed this neighborhood; optional policies remain dormant until neighborhood stability completes.",
+        "Freeze the center's strategy, no-control risk, config, seed, complete executable-source identity, and exact 72-hour A5 manifest before materializing neighbors."
       ]
     },
     {
       "stage": 2,
       "title": "pre-result neighbor materialization and registration",
       "requirements": [
-        "For each declared delta, create a full parameter artifact and executable strategy/config bytes whose zero-argument builder exposes exactly that neighbor.",
-        "Use the selected candidate's same risk policy and seed for every neighbor.",
+        "For each declared delta, create a full parameter artifact and executable strategy/config bytes whose zero-argument builder exposes exactly that neighbor; bind schedule-changing neighbors to matching A5 schedule/horizon manifests.",
+        "Use the no-control center's same risk policy and seed for every neighbor.",
         "First-add all ten registrations serially under A7 before running or reading any neighbor result."
       ]
     },

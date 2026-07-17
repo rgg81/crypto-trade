@@ -8,35 +8,25 @@
     "integration_freeze_commit": "c8b917ca49306d5200a4e08848e73ff6f5a18bf3",
     "integration_freeze_sha256": "6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51"
   },
-  "candidate_id": "team09-ccf-pivot01-v1",
-  "family_id": "team09-conditional-carry-fragility-v1",
+  "candidate_id": "team09-drp-pivot02-v1",
+  "family_id": "team09-defensive-residual-persistence-v1",
   "parameters": {
-    "bear_downside_resilience_weight": 0.35,
-    "bear_drawdown_resilience_weight": 0.2,
-    "bear_market_return_threshold": -0.04,
-    "bear_negative_breadth_threshold": 0.65,
-    "bear_relative_trend_weight": 0.45,
-    "bear_score_threshold": 0.35,
-    "bear_trend_bars": 21,
+    "downside_semideviation_weight": 0.4,
+    "drawdown_weight": 0.25,
     "expected_seed": 20260801,
-    "fragility_bars": 63,
-    "funding_half_life_hours": 72.0,
-    "funding_lookback_hours": 168,
-    "funding_persistence_weight": 0.5,
-    "funding_rate_floor": 1e-07,
+    "fragility_bars": 90,
+    "fragility_exclusion_quantile": 0.8,
+    "fragility_shrink_strength": 0.6,
     "interval_hours": 8,
-    "maximum_funding_age_hours": 16,
-    "maximum_symbol_weight": 0.09,
-    "maximum_symbols_per_side": 6,
-    "minimum_cross_section": 12,
-    "minimum_down_market_bars": 6,
-    "minimum_funding_events": 12,
-    "minimum_symbols_per_side": 4,
-    "normal_confirmation_bars": 9,
-    "normal_confirmation_threshold": 0.1,
-    "normal_crowding_threshold": 0.3,
-    "rebalance_hour_utc": 0,
-    "target_side_gross": 0.45
+    "jump_risk_weight": 0.35,
+    "maximum_symbol_weight": 0.015,
+    "maximum_symbols_per_side": 8,
+    "minimum_cross_section": 20,
+    "minimum_symbols_per_side": 6,
+    "persistence_block_bars": 90,
+    "persistence_block_count": 3,
+    "rebalance_every_bars": 9,
+    "target_side_gross": 0.1
   },
   "operative_score_protocol": {
     "delegated_by_a7": true,
@@ -48,10 +38,11 @@
     "integration_freeze_sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c"
   },
   "pivot": {
-    "ordinal": 1,
-    "parent_candidate_id": "team09-fcpc-center-v1",
-    "parent_family_id": "team09-funding-crowding-confirmation-v1",
-    "reason": "Parent no-control core failed maximum drawdown and bear-regime gates; optional controls were forbidden."
+    "ordinal": 2,
+    "immediate_parent_candidate_id": "team09-ccf-pivot01-v1",
+    "immediate_parent_family_id": "team09-conditional-carry-fragility-v1",
+    "prior_candidate_ids": ["team09-fcpc-center-v1", "team09-ccf-pivot01-v1"],
+    "reason": "Both prior no-control candidates became terminal; pivot-01 was insolvent at 2022-05-13 with 0.90 requested gross, so the final mechanism pivot embeds substantially lower exposure, broad diversification, and crash-fragility exclusion/shrinkage."
   },
   "pure_crypto_authority": {
     "amendment_id": "top40-v2-amendment-0006-pure-crypto-universe",
@@ -62,13 +53,13 @@
     "scope": "native crypto assets only; a Binance perpetual listing alone is insufficient; stablecoins and direct TradFi, metal, commodity, equity, ETF, index, FX, premarket, and leveraged-token exposures are ineligible"
   },
   "risk_policy_contract": {
-    "first_material_trial": "new-family no-control core; optional controls and neighbors remain dormant until every core, pivot-mechanism, full non-neighborhood development, and team-declared A5 score gate passes",
+    "first_material_trial": "final-family no-control core; controls remain dormant until core, full development including neighborhood stability, pivot-02 mechanism, and A5 gates all pass",
     "no_control_template": "risk_policies/00-none.json",
     "root_path": "risk_policy.json",
     "root_required_policy_id": "team09-risk-none"
   },
   "schema_version": 1,
   "seed": 20260801,
-  "status": "pivot-01-prospective-unregistered",
+  "status": "pivot-02-prospective-unregistered",
   "team_id": "team-09"
 }

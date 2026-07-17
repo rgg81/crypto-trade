@@ -1,13 +1,13 @@
 {
   "a5_score_diagnostics": {
     "complete_manifest_scheduled_score_coverage_required": true,
-    "holding_horizon_hours": 24,
+    "holding_horizon_hours": 72,
     "independent_semantic_coupling_approval_required": true,
     "minimum_pairs_per_fold": 240,
     "minimum_positive_fold_pearson_count": 4,
     "pooled_development_pearson": {"comparison": ">", "threshold": 0.0},
     "required_fold_count": 6,
-    "schedule_interval_hours": 24,
+    "schedule_interval_hours": 72,
     "team_noncompensatory_gate": true
   },
   "core_alpha_activation": {
@@ -79,6 +79,7 @@
     }
   },
   "disposition": {
+    "additional_mechanism_pivot_after_pivot_02": false,
     "failed_core_may_activate_controls": false,
     "failed_development_candidate_may_submit": false,
     "terminal_alternative": "dnf"
@@ -97,6 +98,19 @@
     "bull_net_return": {"comparison": ">", "threshold": 0.0},
     "chop_net_return": {"comparison": ">", "threshold": 0.0},
     "maximum_drawdown": {"comparison": "<=", "threshold": 0.3},
+    "non_compensatory": true
+  },
+  "pivot_02_mechanism_gate": {
+    "bear_net_return": {"comparison": ">", "threshold": 0.0},
+    "bear_net_sharpe": {"comparison": ">", "threshold": 0.0},
+    "bull_net_return": {"comparison": ">", "threshold": 0.0},
+    "bull_net_sharpe": {"comparison": ">", "threshold": 0.0},
+    "chop_net_return": {"comparison": ">", "threshold": 0.0},
+    "chop_net_sharpe": {"comparison": ">", "threshold": 0.0},
+    "completed_without_insolvency": true,
+    "maximum_drawdown": {"comparison": "<=", "threshold": 0.25},
+    "maximum_requested_gross": {"comparison": "<=", "threshold": 0.2},
+    "maximum_requested_symbol_weight": {"comparison": "<=", "threshold": 0.015},
     "non_compensatory": true
   },
   "schema_version": 1,

@@ -23,58 +23,35 @@ sys.modules[SPEC.name] = STRATEGY
 SPEC.loader.exec_module(STRATEGY)
 
 
-def _context(*, confirmed: bool = True) -> SimpleNamespace:
-    decision = pd.Timestamp(year=2023, month=1, day=2, tz="UTC")
-    symbols = tuple(f"T{index:02d}USDT" for index in range(16))
-    funding_levels = np.linspace(-0.0008, 0.0008, len(symbols))
-    bar_times = pd.date_range(end=decision - pd.Timedelta(hours=8), periods=90, freq="8h")
-    funding_times = pd.date_range(end=decision - pd.Timedelta(hours=8), periods=21, freq="8h")
+def _context(*, symbol_count: int = 24, periods: int = 310) -> SimpleNamespace:
+    decision = pd.Timestamp("2023-01-02T00:00:00Z")
+    symbols = tuple(f"C{index:02d}USDT" for index in range(symbol_count))
+    times = pd.date_range(end=decision - pd.Timedelta(hours=8), periods=periods, freq="8h")
+    step = np.arange(periods, dtype=float)
+    midpoint = (symbol_count - 1) / 2.0
+    common = 0.00055 * np.sin(step / 9.0) + 0.00020 * np.cos(step / 23.0)
     bars: dict[str, pd.DataFrame] = {}
-    funding_rows: list[dict[str, object]] = []
-    for symbol, level in zip(symbols, funding_levels, strict=True):
-        desired = -1.0 if level > 0 else 1.0
-        price_direction = desired if confirmed else -desired
-        closes = 100.0 * np.exp(price_direction * 0.002 * np.arange(len(bar_times)))
+    for index, symbol in enumerate(symbols):
+        relative_drift = 0.00042 * (index - midpoint) / midpoint
+        idiosyncratic = 0.00002 * np.sin(step / 17.0 + index * 0.31)
+        increments = common + relative_drift + idiosyncratic
+        log_close = math.log(100.0 + index) + np.cumsum(increments)
+        closes = np.exp(log_close)
         bars[symbol] = pd.DataFrame(
             {
-                "open_time": bar_times,
+                "open_time": times,
                 "symbol": symbol,
-                "open": closes / math.exp(price_direction * 0.001),
+                "open": closes / np.exp(0.5 * increments),
                 "close": closes,
-                "quote_volume": 1_000_000.0,
+                "quote_volume": 1_000_000.0 + index,
             }
-        )
-        funding_rows.extend(
-            {
-                "funding_time": timestamp,
-                "symbol": symbol,
-                "funding_rate": float(level),
-                "mark_price": 100.0,
-                "settlement_time": timestamp,
-            }
-            for timestamp in funding_times
         )
     return SimpleNamespace(
         decision_time=decision,
         eligible_symbols=symbols,
         bars=bars,
-        funding=pd.DataFrame(funding_rows),
         auxiliary={},
     )
-
-
-def _bear_context() -> SimpleNamespace:
-    context = _context()
-    periods = len(next(iter(context.bars.values())))
-    for index, symbol in enumerate(context.eligible_symbols):
-        # Every asset declines, but downside capture increases monotonically across symbols.
-        slope = -0.001 - 0.0003 * index
-        closes = 100.0 * np.exp(slope * np.arange(periods))
-        context.bars[symbol] = context.bars[symbol].assign(
-            open=closes / math.exp(slope * 0.5),
-            close=closes,
-        )
-    return context
 
 
 def _weights(context: SimpleNamespace) -> dict[str, float]:
@@ -83,111 +60,95 @@ def _weights(context: SimpleNamespace) -> dict[str, float]:
     return result
 
 
-def test_center_creates_balanced_material_long_and_short_sleeves() -> None:
+def test_center_is_broad_balanced_and_structurally_low_gross() -> None:
     context = _context()
     weights = _weights(context)
-    longs = {symbol: weight for symbol, weight in weights.items() if weight > 0}
-    shorts = {symbol: weight for symbol, weight in weights.items() if weight < 0}
+    longs = {symbol: weight for symbol, weight in weights.items() if weight > 0.0}
+    shorts = {symbol: weight for symbol, weight in weights.items() if weight < 0.0}
 
-    assert len(longs) >= 4
-    assert len(shorts) >= 4
+    assert 6 <= len(longs) <= 8
+    assert 6 <= len(shorts) <= 8
     assert sum(longs.values()) == pytest.approx(-sum(shorts.values()))
-    assert sum(abs(weight) for weight in weights.values()) <= 1.0
-    assert abs(sum(weights.values())) <= 0.25
-    assert max(abs(weight) for weight in weights.values()) <= 0.10
+    assert sum(abs(weight) for weight in weights.values()) < 0.20
+    assert abs(sum(weights.values())) <= 1e-12
+    assert max(abs(weight) for weight in weights.values()) <= 0.015
+    assert max(abs(weight) for weight in weights.values()) <= 0.0125 + 1e-12
     assert set(weights).issubset(context.eligible_symbols)
 
 
-def test_synthetic_positions_have_correct_relative_funding_carry_direction() -> None:
+def test_persistent_relative_leaders_are_long_and_laggards_short() -> None:
     context = _context()
-    weights = _weights(context)
-    mean_rates = context.funding.groupby("symbol")["funding_rate"].mean()
-    # The central evaluator uses cashflow = -position * mark * funding_rate.
-    relative_carry = sum(-weight * float(mean_rates[symbol]) for symbol, weight in weights.items())
-    assert relative_carry > 0
-
-
-def test_bear_route_longs_resilience_and_shorts_fragility() -> None:
-    context = _bear_context()
     weights = _weights(context)
     indices = {symbol: index for index, symbol in enumerate(context.eligible_symbols)}
-    long_indices = [indices[symbol] for symbol, weight in weights.items() if weight > 0]
-    short_indices = [indices[symbol] for symbol, weight in weights.items() if weight < 0]
-    assert len(long_indices) >= 4
-    assert len(short_indices) >= 4
-    assert max(long_indices) < min(short_indices)
-    assert sum(abs(weight) for weight in weights.values()) == pytest.approx(0.9)
+    long_indices = [indices[symbol] for symbol, weight in weights.items() if weight > 0.0]
+    short_indices = [indices[symbol] for symbol, weight in weights.items() if weight < 0.0]
+    assert min(long_indices) > max(short_indices)
 
 
-def test_bear_fragility_route_is_not_a_funding_sign_flip() -> None:
-    context = _bear_context()
-    expected = _weights(context)
-    context.funding.loc[:, "funding_rate"] *= -1.0
-    assert _weights(context) == expected
-
-
-def test_price_confirmation_is_required() -> None:
-    assert _weights(_context(confirmed=False)) == {}
-
-
-def test_equal_funding_pressure_requests_flat() -> None:
+def test_extreme_crash_fragility_is_zeroed_before_a5_and_never_selected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     context = _context()
-    context.funding.loc[:, "funding_rate"] = 0.0001
-    assert _weights(context) == {}
+    symbol = context.eligible_symbols[len(context.eligible_symbols) // 2]
+    frame = context.bars[symbol].copy()
+    start_log = math.log(float(frame["close"].iloc[-92]))
+    shocks = np.resize(np.array([0.20, -0.19], dtype=float), 91)
+    frame.loc[frame.index[-91:], "close"] = np.exp(start_log + np.cumsum(shocks))
+    context.bars[symbol] = frame
+    captured: dict[str, float] = {}
 
+    def capture(scores: dict[str, float]) -> dict[str, float]:
+        captured.update(scores)
+        return scores
 
-@pytest.mark.parametrize("stale", [False, True])
-def test_missing_gap_or_stale_latest_bar_is_not_time_compressed(stale: bool) -> None:
-    context = _context()
-    affected = context.eligible_symbols[0]
-    if stale:
-        context.bars[affected] = context.bars[affected].iloc[:-1].copy()
-    else:
-        context.bars[affected] = context.bars[affected].drop(context.bars[affected].index[-10])
+    monkeypatch.setattr(STRATEGY, "score_boundary", capture)
     weights = _weights(context)
-    assert affected not in weights
-    assert any(weight > 0 for weight in weights.values())
-    assert any(weight < 0 for weight in weights.values())
+    assert captured[symbol] == 0.0
+    assert symbol not in weights
+    assert any(weight > 0.0 for weight in weights.values())
+    assert any(weight < 0.0 for weight in weights.values())
 
 
-def test_under_history_new_member_with_funding_does_not_abort_cross_section() -> None:
+def test_score_magnitude_shrinks_weights_without_gross_restoration() -> None:
+    config = STRATEGY.StrategyConfig()
+    weights = _weights(_context())
+    structural_base = config.target_side_gross / config.maximum_symbols_per_side
+    assert max(abs(weight) for weight in weights.values()) <= structural_base
+    assert sum(abs(weight) for weight in weights.values()) < 2.0 * config.target_side_gross
+
+
+def test_no_funding_or_portfolio_state_is_required() -> None:
+    context = _context()
+    assert not hasattr(context, "funding")
+    assert not hasattr(context, "positions")
+    assert _weights(context)
+
+
+def test_missing_gap_or_stale_symbol_is_excluded_without_time_compression() -> None:
+    for stale in (False, True):
+        context = _context()
+        affected = context.eligible_symbols[0]
+        if stale:
+            context.bars[affected] = context.bars[affected].iloc[:-1].copy()
+        else:
+            context.bars[affected] = context.bars[affected].drop(context.bars[affected].index[-10])
+        weights = _weights(context)
+        assert affected not in weights
+        assert any(weight > 0.0 for weight in weights.values())
+        assert any(weight < 0.0 for weight in weights.values())
+
+
+def test_under_history_new_member_does_not_abort_cross_section() -> None:
     context = _context()
     symbol = "NEWUSDT"
     context.eligible_symbols = (*context.eligible_symbols, symbol)
-    context.bars[symbol] = next(iter(context.bars.values())).iloc[-10:].assign(symbol=symbol)
-    extra = context.funding[context.funding["symbol"] == context.eligible_symbols[0]].copy()
-    extra.loc[:, "symbol"] = symbol
-    context.funding = pd.concat([context.funding, extra], ignore_index=True)
-
+    context.bars[symbol] = next(iter(context.bars.values())).iloc[-50:].assign(symbol=symbol)
     weights = _weights(context)
     assert symbol not in weights
     assert weights
 
 
-@pytest.mark.parametrize("funding_history", ["none", "insufficient", "stale"])
-def test_member_without_usable_funding_is_excluded_without_aborting(
-    funding_history: str,
-) -> None:
-    context = _context()
-    symbol = "NEWUSDT"
-    context.eligible_symbols = (*context.eligible_symbols, symbol)
-    context.bars[symbol] = next(iter(context.bars.values())).assign(symbol=symbol)
-    if funding_history != "none":
-        extra = context.funding[context.funding["symbol"] == context.eligible_symbols[0]].copy()
-        extra.loc[:, "symbol"] = symbol
-        if funding_history == "insufficient":
-            extra = extra.tail(STRATEGY.StrategyConfig().minimum_funding_events - 1)
-        else:
-            extra.loc[:, "funding_time"] -= pd.Timedelta(hours=24)
-        context.funding = pd.concat([context.funding, extra], ignore_index=True)
-
-    weights = _weights(context)
-    assert symbol not in weights
-    assert any(weight > 0 for weight in weights.values())
-    assert any(weight < 0 for weight in weights.values())
-
-
-def test_input_order_does_not_change_targets() -> None:
+def test_input_order_and_clean_instances_are_deterministic() -> None:
     context = _context()
     expected = _weights(context)
     context.eligible_symbols = tuple(reversed(context.eligible_symbols))
@@ -195,18 +156,11 @@ def test_input_order_does_not_change_targets() -> None:
         symbol: context.bars[symbol].iloc[::-1].reset_index(drop=True)
         for symbol in context.eligible_symbols
     }
-    context.funding = context.funding.iloc[::-1].reset_index(drop=True)
     assert _weights(context) == expected
+    assert _weights(_context()) == expected
 
 
-def test_clean_instances_are_deterministic() -> None:
-    context = _context()
-    first = _weights(context)
-    second = _weights(_context())
-    assert first == second
-
-
-def test_declared_score_boundary_is_called_once_and_returned_dict_drives_selection(
+def test_declared_score_boundary_is_called_once_and_returned_dict_drives_book(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[dict[str, float]] = []
@@ -226,60 +180,99 @@ def test_declared_score_boundary_is_called_once_and_returned_dict_drives_selecti
     assert len(calls) == 1
 
 
-def test_declared_score_boundary_rejects_changed_object_identity(
+def test_scheduled_insufficient_breadth_captures_one_empty_score_dict(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, float]] = []
+
+    def capture(scores: dict[str, float]) -> dict[str, float]:
+        calls.append(scores)
+        return scores
+
+    monkeypatch.setattr(STRATEGY, "score_boundary", capture)
+    assert _weights(_context(symbol_count=12)) == {}
+    assert calls == [{}]
+
+
+def test_declared_score_boundary_rejects_identity_keys_and_values(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(STRATEGY, "score_boundary", lambda scores: dict(scores))
     with pytest.raises(ValueError, match="object identity"):
         _weights(_context())
 
+    def remove_key(scores: dict[str, float]) -> dict[str, float]:
+        scores.pop(next(iter(scores)))
+        return scores
 
-def test_future_bar_and_funding_rows_fail_closed() -> None:
-    bar_context = _context()
-    symbol = bar_context.eligible_symbols[0]
-    future = bar_context.bars[symbol].iloc[[-1]].copy()
-    future.loc[:, "open_time"] = bar_context.decision_time
-    bar_context.bars[symbol] = pd.concat([bar_context.bars[symbol], future], ignore_index=True)
-    with pytest.raises(ValueError, match="unavailable"):
-        _weights(bar_context)
+    monkeypatch.setattr(STRATEGY, "score_boundary", remove_key)
+    with pytest.raises(ValueError, match="exact score keys"):
+        _weights(_context())
 
-    funding_context = _context()
-    future_funding = funding_context.funding.iloc[[0]].copy()
-    future_funding.loc[:, "funding_time"] = funding_context.decision_time
-    funding_context.funding = pd.concat(
-        [funding_context.funding, future_funding], ignore_index=True
+    def inject_nonfinite(scores: dict[str, float]) -> dict[str, float]:
+        scores[next(iter(scores))] = math.inf
+        return scores
+
+    monkeypatch.setattr(STRATEGY, "score_boundary", inject_nonfinite)
+    with pytest.raises(TypeError, match="invalid score values"):
+        _weights(_context())
+
+
+def test_future_duplicate_and_invalid_bars_fail_closed() -> None:
+    future_context = _context()
+    symbol = future_context.eligible_symbols[0]
+    future = future_context.bars[symbol].iloc[[-1]].copy()
+    future.loc[:, "open_time"] = future_context.decision_time
+    future_context.bars[symbol] = pd.concat(
+        [future_context.bars[symbol], future], ignore_index=True
     )
-    with pytest.raises(ValueError, match="non-past"):
-        _weights(funding_context)
+    with pytest.raises(ValueError, match="unavailable"):
+        _weights(future_context)
+
+    duplicate_context = _context()
+    symbol = duplicate_context.eligible_symbols[0]
+    duplicate_context.bars[symbol] = pd.concat(
+        [duplicate_context.bars[symbol], duplicate_context.bars[symbol].iloc[[-1]]],
+        ignore_index=True,
+    )
+    with pytest.raises(ValueError, match="duplicate"):
+        _weights(duplicate_context)
+
+    invalid_context = _context()
+    symbol = invalid_context.eligible_symbols[0]
+    invalid_context.bars[symbol].loc[invalid_context.bars[symbol].index[-1], "close"] = np.inf
+    with pytest.raises(ValueError, match="invalid close"):
+        _weights(invalid_context)
 
 
-@pytest.mark.parametrize(
-    ("fault", "message"),
-    [
-        ("duplicate", "duplicate"),
-        ("timestamp", "invalid"),
-        ("rate", "invalid"),
-        ("ineligible", "ineligible"),
-    ],
-)
-def test_malformed_funding_fails_closed(fault: str, message: str) -> None:
+def test_context_membership_must_match_a6_eligible_set_exactly() -> None:
     context = _context()
-    if fault == "duplicate":
-        context.funding = pd.concat([context.funding, context.funding.iloc[[0]]], ignore_index=True)
-    elif fault == "timestamp":
-        context.funding.loc[0, "funding_time"] = pd.NaT
-    elif fault == "rate":
-        context.funding.loc[0, "funding_rate"] = np.inf
-    else:
-        context.funding.loc[0, "symbol"] = "OUTSIDEUSDT"
-    with pytest.raises(ValueError, match=message):
+    context.bars["OUTSIDEUSDT"] = next(iter(context.bars.values())).copy()
+    with pytest.raises(ValueError, match="match the eligible-symbol set"):
         _weights(context)
 
+    duplicate = _context()
+    duplicate.eligible_symbols = (*duplicate.eligible_symbols, duplicate.eligible_symbols[0])
+    with pytest.raises(ValueError, match="duplicates"):
+        _weights(duplicate)
 
-def test_non_rebalance_boundary_holds_and_wrong_seed_fails() -> None:
+    mismatch = _context()
+    symbol = mismatch.eligible_symbols[0]
+    mismatch.bars[symbol].loc[:, "symbol"] = "OTHERUSDT"
+    with pytest.raises(ValueError, match="mismatched symbol"):
+        _weights(mismatch)
+
+
+def test_schedule_grid_and_seed_are_exact() -> None:
     context = _context()
     context.decision_time += pd.Timedelta(hours=8)
     assert STRATEGY.build_strategy().target_weights(context, seed=20260801) is None
+
+    off_grid = _context()
+    off_grid.decision_time += pd.Timedelta(hours=1)
+    with pytest.raises(ValueError, match="eight-hour grid"):
+        STRATEGY.build_strategy().target_weights(off_grid, seed=20260801)
+
     with pytest.raises(ValueError, match="seed"):
         STRATEGY.build_strategy().target_weights(_context(), seed=7)
     with pytest.raises(ValueError, match="seed"):
@@ -291,12 +284,12 @@ def test_frozen_config_and_trial_template_cover_every_strategy_parameter() -> No
     trial = json.loads((TEAM_DIR / "trial_registration_template.json").read_text(encoding="utf-8"))
     expected = dataclasses.asdict(STRATEGY.StrategyConfig())
     assert frozen["parameters"] == expected
-    assert {
-        key: value for key, value in trial["parameters"].items() if key != "_top40_v2_score_adapter"
-    } == expected
-    assert trial["parameters"]["_top40_v2_score_adapter"] == {
-        "adapter_id": "top40-v2-declared-score-boundary-v1",
-        "manifest_sha256": "0" * 64,
+    trial_parameters = dict(trial["parameters"])
+    score_opt_in = trial_parameters.pop("_top40_v2_score_adapter")
+    assert trial_parameters == expected
+    assert score_opt_in == {
+        "adapter_id": STRATEGY.SCORE_ADAPTER_ID,
+        "manifest_sha256": "<organizer-fill-canonical-score-adapter-manifest-64-hex-sha256>",
         "schema_version": 1,
     }
     assert frozen["seed"] == expected["expected_seed"]
@@ -340,19 +333,23 @@ def test_complete_family_cartesian_domain_is_declared_and_feasible() -> None:
 def test_score_manifest_binds_exact_a5_boundary_schedule_and_label() -> None:
     manifest = json.loads(
         (
-            TEAM_DIR / "score-adapters/team09-ccf-pivot01-v1.score-adapter-manifest.template.json"
+            TEAM_DIR / "score-adapters/team09-drp-pivot02-v1.score-adapter-manifest.template.json"
         ).read_text(encoding="utf-8")
     )
     assert manifest["adapter_id"] == STRATEGY.SCORE_ADAPTER_ID
     assert manifest["capture_boundary"] == STRATEGY.SCORE_CAPTURE_BOUNDARY
     assert manifest["hook"] == "strategy.score_boundary"
+    expected_horizon = (
+        STRATEGY.StrategyConfig().interval_hours * STRATEGY.StrategyConfig().rebalance_every_bars
+    )
+    assert expected_horizon == 72
     assert manifest["schedule_utc"] == {
         "anchor_timestamp_utc": "1970-01-01T00:00:00Z",
-        "interval_hours": 24,
+        "interval_hours": 72,
     }
     assert manifest["label"] == {
         "executable_price_column": "open",
-        "holding_horizon_hours": 24,
+        "holding_horizon_hours": 72,
         "label_id": "manifest-horizon-simple-executable-open-to-open-return-v1",
         "minimum_pairs": 240,
         "purge_cross_fold_endpoints": True,
@@ -360,15 +357,19 @@ def test_score_manifest_binds_exact_a5_boundary_schedule_and_label() -> None:
         "score_direction": "higher-score-higher-return",
         "statistic_id": "globally-pooled-pearson-v1",
     }
+    assert manifest["schedule_utc"]["interval_hours"] == expected_horizon
+    assert manifest["label"]["holding_horizon_hours"] == expected_horizon
 
 
-def test_a7_a5_identity_chain_and_numeric_thresholds_are_candidate_exact() -> None:
+def test_a7_a5_pure_crypto_identity_and_pivot02_gates_are_exact() -> None:
     authority = json.loads((TEAM_DIR / "a7_execution_authority.json").read_text(encoding="utf-8"))
     frozen = json.loads((TEAM_DIR / "frozen_config.json").read_text(encoding="utf-8"))
     lineage = json.loads((TEAM_DIR / "a5_score_lineage.json").read_text(encoding="utf-8"))
     thresholds = json.loads(
         (TEAM_DIR / "qualification_thresholds.json").read_text(encoding="utf-8")
     )
+    assert authority["candidate_id"] == "team09-drp-pivot02-v1"
+    assert authority["family_id"] == "team09-defensive-residual-persistence-v1"
     assert authority["active_entrypoint"] == {
         "path": "scripts/top40_v2_tournament_runtime_preload_v7.py",
         "sha256": "8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9",
@@ -379,80 +380,46 @@ def test_a7_a5_identity_chain_and_numeric_thresholds_are_candidate_exact() -> No
         "report_sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
         "violations": 0,
     }
-    assert frozen["pure_crypto_authority"] == {
-        "amendment_id": "top40-v2-amendment-0006-pure-crypto-universe",
-        "canonical_report_sha256": pure_crypto["report_sha256"],
-        "integration_freeze_sha256": (
-            "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34"
-        ),
-        "policy_sha256": pure_crypto["policy_sha256"],
-        "required_violations": pure_crypto["violations"],
-        "scope": (
-            "native crypto assets only; a Binance perpetual listing alone is insufficient; "
-            "stablecoins and direct TradFi, metal, commodity, equity, ETF, index, FX, "
-            "premarket, and leveraged-token exposures are ineligible"
-        ),
-    }
-    assert lineage["candidate_identity"] == {
-        "candidate_id": "team09-ccf-pivot01-v1",
-        "config_path": "tournament/top40-v2/teams/team-09/frozen_config.json",
-        "family_id": "team09-conditional-carry-fragility-v1",
-        "risk_policy_id": "team09-risk-none",
-        "risk_policy_path": "tournament/top40-v2/teams/team-09/risk_policy.json",
-        "seed": 20260801,
-        "strategy_factory": "build_strategy",
-        "strategy_path": "tournament/top40-v2/teams/team-09/strategy.py",
-        "team_id": "team-09",
-    }
-    development = thresholds["development_qualification"]
-    assert thresholds["a5_score_diagnostics"] == {
-        "complete_manifest_scheduled_score_coverage_required": True,
-        "holding_horizon_hours": 24,
-        "independent_semantic_coupling_approval_required": True,
-        "minimum_pairs_per_fold": 240,
-        "minimum_positive_fold_pearson_count": 4,
-        "pooled_development_pearson": {"comparison": ">", "threshold": 0.0},
-        "required_fold_count": 6,
-        "schedule_interval_hours": 24,
-        "team_noncompensatory_gate": True,
-    }
-    assert development["aggregate"] == {
-        "maximum_drawdown": 0.3,
-        "minimum_annualized_return": 0.0,
-        "minimum_calmar": 0.4,
-        "minimum_double_cost_sharpe": 0.35,
-        "minimum_net_sharpe": 0.75,
-        "minimum_positive_quarter_fraction": 0.55,
-        "minimum_trial_adjusted_probability_positive": 0.9,
-    }
-    assert development["regimes"] == {
-        "minimum_positive_sharpe_regimes": 3,
-        "minimum_worst_regime_sharpe": -0.25,
-        "required_positive_return_regimes": ["bull", "bear", "chop"],
-    }
-    assert development["stability"] == {
-        "maximum_positive_pnl_concentration": 0.4,
-        "minimum_neighbor_median_sharpe": 0.5,
-        "minimum_profitable_neighbor_fraction": 0.7,
-    }
-    assert thresholds["pivot_01_mechanism_gate"] == {
+    assert (
+        frozen["pure_crypto_authority"]["canonical_report_sha256"] == (pure_crypto["report_sha256"])
+    )
+    assert frozen["pure_crypto_authority"]["required_violations"] == 0
+    assert lineage["candidate_identity"]["candidate_id"] == "team09-drp-pivot02-v1"
+    assert lineage["candidate_identity"]["family_id"] == (
+        "team09-defensive-residual-persistence-v1"
+    )
+    assert lineage["pivot_lineage"]["ordinal"] == 2
+    assert len(lineage["pivot_lineage"]["prior_trials"]) == 2
+    assert thresholds["a5_score_diagnostics"]["holding_horizon_hours"] == 72
+    assert thresholds["a5_score_diagnostics"]["schedule_interval_hours"] == 72
+    assert thresholds["pivot_02_mechanism_gate"] == {
         "bear_net_return": {"comparison": ">", "threshold": 0.0},
         "bear_net_sharpe": {"comparison": ">", "threshold": 0.0},
         "bull_net_return": {"comparison": ">", "threshold": 0.0},
+        "bull_net_sharpe": {"comparison": ">", "threshold": 0.0},
         "chop_net_return": {"comparison": ">", "threshold": 0.0},
-        "maximum_drawdown": {"comparison": "<=", "threshold": 0.3},
+        "chop_net_sharpe": {"comparison": ">", "threshold": 0.0},
+        "completed_without_insolvency": True,
+        "maximum_drawdown": {"comparison": "<=", "threshold": 0.25},
+        "maximum_requested_gross": {"comparison": "<=", "threshold": 0.2},
+        "maximum_requested_symbol_weight": {
+            "comparison": "<=",
+            "threshold": 0.015,
+        },
         "non_compensatory": True,
     }
 
 
-def test_neighbor_staging_has_a_preresult_freeze_and_read_barrier() -> None:
+def test_neighbor_staging_has_center_gate_and_preresult_read_barrier() -> None:
     plan = json.loads((TEAM_DIR / "neighbor_staging_plan.json").read_text(encoding="utf-8"))
     neighborhood = json.loads(
         (TEAM_DIR / "parameter_neighborhood.json").read_text(encoding="utf-8")
     )
+    assert plan["candidate_id"] == "team09-drp-pivot02-v1"
     assert plan["declared_neighbor_count"] == len(neighborhood["neighbors"]) == 10
     assert plan["execution_mode"] == "strictly-serial"
     assert "all ten registrations are first-added" in plan["result_read_barrier"]
+    assert "no-control pivot-02 center" in plan["stages"][1]["requirements"][0]
     assert any("may be an input" in rule for rule in plan["circularity_prohibitions"])
 
 
@@ -460,35 +427,17 @@ def test_neighbor_staging_has_a_preresult_freeze_and_read_barrier() -> None:
     ("changes", "message"),
     [
         ({"interval_hours": 8.0}, "integers"),
-        ({"normal_confirmation_bars": 9.5}, "integers"),
         ({"expected_seed": 20260801.0}, "integers"),
-        ({"funding_half_life_hours": math.inf}, "finite"),
-        ({"funding_lookback_hours": 170}, "complete funding intervals"),
-        (
-            {"funding_lookback_hours": 80, "minimum_funding_events": 12},
-            "infeasible",
-        ),
-        (
-            {
-                "funding_lookback_hours": 16,
-                "minimum_funding_events": 2,
-                "maximum_funding_age_hours": 24,
-            },
-            "outside the funding window",
-        ),
-        ({"bear_market_return_threshold": 0.0}, "must be in"),
-        (
-            {"bear_relative_trend_weight": 0.5},
-            "sum to one",
-        ),
-        (
-            {
-                "maximum_symbols_per_side": 5,
-                "maximum_symbol_weight": 0.08,
-                "target_side_gross": 0.5,
-            },
-            "cannot fund",
-        ),
+        ({"rebalance_every_bars": 1}, "slower"),
+        ({"persistence_block_count": 1}, "at least two"),
+        ({"fragility_bars": 271}, "fit inside"),
+        ({"minimum_cross_section": 10}, "support both"),
+        ({"fragility_exclusion_quantile": 0.5}, "must be in"),
+        ({"fragility_exclusion_quantile": 0.55}, "leave both"),
+        ({"downside_semideviation_weight": 0.5}, "sum to one"),
+        ({"fragility_shrink_strength": math.inf}, "finite"),
+        ({"target_side_gross": 0.16}, "must be in"),
+        ({"maximum_symbol_weight": 0.01}, "base allocation"),
     ],
 )
 def test_invalid_configuration_domain_fails_closed(

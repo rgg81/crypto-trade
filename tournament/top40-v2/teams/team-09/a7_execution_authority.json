@@ -10,7 +10,7 @@
   },
   "amendment_id": "top40-v2-amendment-0007-frozen-worker-a5-protocol-preload",
   "binding_kind": "top40-v2-a7-execution-authority-v1",
-  "candidate_id": "team09-ccf-pivot01-v1",
+  "candidate_id": "team09-drp-pivot02-v1",
   "delegated_amendment_0005_integration": {
     "commit": "d2b95f610722aab65b4e67466b34efeaa3554101",
     "operative_score_entrypoint": {
@@ -22,7 +22,7 @@
     "role": "exact score protocol delegated by the active A7 preload surface",
     "sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c"
   },
-  "family_id": "team09-conditional-carry-fragility-v1",
+  "family_id": "team09-defensive-residual-persistence-v1",
   "integration_freeze": {
     "commit": "c8b917ca49306d5200a4e08848e73ff6f5a18bf3",
     "path": "tournament/top40-v2/amendments/0007/integration-freeze.json",
@@ -34,9 +34,9 @@
     "violations": 0
   },
   "score_identity_contract": {
-    "candidate_id": "team09-ccf-pivot01-v1",
+    "candidate_id": "team09-drp-pivot02-v1",
     "config_path": "tournament/top40-v2/teams/team-09/frozen_config.json",
-    "family_id": "team09-conditional-carry-fragility-v1",
+    "family_id": "team09-defensive-residual-persistence-v1",
     "required_exact_result_identity_fields": [
       "team_id",
       "family_id",

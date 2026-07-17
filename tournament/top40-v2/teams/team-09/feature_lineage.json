@@ -1,62 +1,60 @@
 {
-  "candidate_id": "team09-ccf-pivot01-v1",
+  "candidate_id": "team09-drp-pivot02-v1",
   "derived_features": [
     {
-      "availability": "Strictly past funding_time rows only.",
-      "definition": "Seven-day exponentially decayed funding pressure with sign-persistence scaling.",
-      "feature": "relative_funding_pressure",
-      "missing_rule": "Exclude stale or under-history symbol without imputation.",
-      "purpose": "Normal-route relative carry/crowding."
+      "availability": "270 contiguous completed eight-hour returns ending at the decision boundary.",
+      "definition": "Subtract the per-bar pure-crypto cross-sectional median return from every symbol return.",
+      "feature": "market_residual_return",
+      "missing_rule": "Exclude a symbol with any missing, stale, duplicate, nonfinite, nonpositive-price, or nonadjacent observation; flat below 20 complete symbols.",
+      "purpose": "Remove common crypto direction without a fitted beta or regime label."
     },
     {
-      "availability": "Contiguous eight-hour closes ending exactly at the decision boundary.",
-      "definition": "Median cross-sectional log return over 21 bars and fraction of symbols with negative 21-bar return.",
-      "feature": "causal_broad_decline_router",
-      "missing_rule": "Require at least 12 symbols with complete price and funding history.",
-      "purpose": "Route only broad declines to the fragility mechanism."
+      "availability": "Same complete past-only 270-return panel.",
+      "definition": "Cross-sectional centered ranks of cumulative residual return in three successive nonoverlapping 90-bar blocks, averaged and multiplied by a fixed sign-agreement factor.",
+      "feature": "three_block_residual_persistence",
+      "missing_rule": "No imputation or time compression.",
+      "purpose": "Identify durable relative leaders and laggards rather than a one-block move."
     },
     {
-      "availability": "Same 63-bar contiguous past-close window.",
-      "definition": "Symbol return minus cross-sectional market return over 21 bars.",
-      "feature": "bear_relative_trend",
-      "missing_rule": "Exclude incomplete symbol.",
-      "purpose": "Separate resilient leaders from laggards during broad declines."
+      "availability": "Last 90 completed returns for each otherwise valid symbol.",
+      "definition": "Cross-sectional percentile rank of a 40% downside-semideviation, 35% maximum-absolute-return, and 25% maximum-drawdown composite.",
+      "feature": "crash_fragility_percentile",
+      "missing_rule": "The same exact complete history requirement applies; no fallback estimator.",
+      "purpose": "Capture both long-side crash damage and short-side discontinuous squeeze risk."
     },
     {
-      "availability": "Same 63-bar window; market-down bars are known at decision time.",
-      "definition": "Slope of symbol log returns on cross-sectional median returns using only negative market-return bars.",
-      "feature": "downside_beta",
-      "missing_rule": "Use neutral zero only when fewer than six down-market bars or zero denominator; cross-sectional rank remains causal.",
-      "purpose": "Measure downside fragility rather than ordinary beta."
-    },
-    {
-      "availability": "Same 63-bar contiguous close window.",
-      "definition": "Maximum peak-to-subsequent-close loss inside the window.",
-      "feature": "drawdown_depth",
-      "missing_rule": "Exclude incomplete symbol.",
-      "purpose": "Distinguish persistent damage from relative price noise."
-    },
-    {
-      "availability": "Computed entirely at the decision boundary.",
-      "definition": "Normal route uses the confirmed opposite-funding-crowd margin. Bear route reranks 45% relative trend, 35% inverse downside beta, and 20% inverse drawdown. The active route adds a 2.0 pass offset and applies direction as sign before one A5 capture.",
-      "feature": "pivot01_signed_long_desirability",
-      "missing_rule": "Explicit flat if either captured-score sleeve lacks four symbols.",
-      "purpose": "Exact returned score dict drives filtering, ordering, side selection, and capped proportional weights."
+      "availability": "Computed entirely at the scheduled decision from the two preceding features.",
+      "definition": "Encode fragility percentile above 0.80 as exact zero. For remaining symbols, rerank persistence and set signed magnitude to 0.35 + 0.65 times absolute persistence rank times (1 - 0.60 times fragility percentile).",
+      "feature": "pivot02_signed_safety_adjusted_persistence",
+      "missing_rule": "Explicit flat if the captured dictionary cannot supply at least six positive and six negative symbols.",
+      "purpose": "One A5 score object supplies exclusion, side, ordering, and non-restored position shrinkage."
     }
   ],
   "forbidden_inputs": [
-    "future bars or funding",
+    "future or incomplete bars",
+    "funding or a reuse of either prior Team09 mechanism",
     "organizer regime labels",
-    "portfolio equity, drawdown, positions, or risk state",
-    "parent performance as a timestamp-to-target rule",
+    "portfolio equity, drawdown, positions, fills, or risk state",
     "private or final-OOS data",
-    "ineligible non-crypto instruments"
+    "stablecoins or ineligible non-crypto instruments"
   ],
+  "portfolio_mapping": {
+    "base_weight": "target_side_gross / maximum_symbols_per_side = 0.0125 at center",
+    "gross_ceiling": "0.10 per side and 0.20 total at center",
+    "pairing": "scale only the larger captured-score sleeve downward; never scale either sleeve upward",
+    "selection": "up to eight largest positive and eight largest-magnitude negative captured scores, with at least six per side",
+    "symbol_ceiling": "0.015 absolute",
+    "weight_shrink": "base weight multiplied directly by absolute captured score in [0.35, 1.0]"
+  },
   "raw_fields": [
-    {"availability_time": "open_time + 8h", "field": "close", "source": "A6-certified eligible Binance USD-M transaction bars"},
-    {"availability_time": "funding_time < decision_time", "field": "funding_rate", "source": "A6-certified eligible Binance USD-M funding rows"},
-    {"availability_time": "organizer decision boundary", "field": "eligible_symbols", "source": "A6 point-in-time pure-crypto membership and executable-open intersection"}
+    {"availability_time": "open_time + 8h", "field": "close", "source": "A6-certified eligible Binance USD-M completed bars"},
+    {"availability_time": "organizer decision boundary", "field": "eligible_symbols", "source": "A6 point-in-time native-crypto membership and executable-open intersection"}
   ],
+  "schedule": {
+    "anchor_timestamp_utc": "1970-01-01T00:00:00Z",
+    "holding_horizon_hours": 72,
+    "rebalance_interval_hours": 72
+  },
   "schema_version": 1,
   "team_id": "team-09"
 }

@@ -1,45 +1,45 @@
 {
-  "activation_rule": "Pivot-01 no-control runs first. Mechanism ablations remain dormant until that result is read; optional risk policies remain blocked unless every new-family core activation gate passes.",
+  "activation_rule": "Pivot-02 no-control runs first. Mechanism ablations remain dormant until that center completes without insolvency and its full result is read. Optional risk policies and neighbors remain governed by their stricter gates.",
   "mechanism_ablations": [
     {
-      "ablation_id": "team09-p01-ablation-no-bear-route",
-      "change": "Disable the broad-decline fragility route and always use confirmed carry unwind.",
-      "falsifying_interpretation": "If this matches pivot-01 in bear and drawdown behavior, conditional fragility routing did not address the diagnosed failure.",
+      "ablation_id": "team09-p02-ablation-no-fragility-screen",
+      "change": "Retain residual persistence but admit the entire valid cross-section and set fragility shrink to zero.",
+      "falsifying_interpretation": "Directly tests whether embedded crash exclusion/shrinkage is necessary for survival and drawdown improvement.",
       "material_configuration": true
     },
     {
-      "ablation_id": "team09-p01-ablation-relative-trend-only",
-      "change": "Within the bear route, rank only relative trend.",
-      "falsifying_interpretation": "Tests whether downside capture and drawdown depth add mechanism evidence beyond ordinary cross-sectional momentum.",
+      "ablation_id": "team09-p02-ablation-no-residualization",
+      "change": "Rank raw three-block returns rather than subtracting the contemporaneous pure-crypto median return.",
+      "falsifying_interpretation": "Tests whether market-direction removal contributes beyond ordinary momentum.",
       "material_configuration": true
     },
     {
-      "ablation_id": "team09-p01-ablation-downside-beta-only",
-      "change": "Within the bear route, rank only inverse downside beta.",
-      "falsifying_interpretation": "Tests whether conditional market capture is the sole useful fragility component.",
+      "ablation_id": "team09-p02-ablation-recent-block-only",
+      "change": "Use only the most recent 90-bar residual-return block and remove multi-block agreement.",
+      "falsifying_interpretation": "Tests whether slow persistence is supported rather than a one-block trend chase.",
       "material_configuration": true
     },
     {
-      "ablation_id": "team09-p01-ablation-drawdown-only",
-      "change": "Within the bear route, rank only inverse trailing drawdown depth.",
-      "falsifying_interpretation": "Tests whether the pivot is merely a trailing drawdown sort.",
+      "ablation_id": "team09-p02-ablation-equal-weight-safe",
+      "change": "Keep crash exclusion and side ordering but give every selected safe symbol the same base weight.",
+      "falsifying_interpretation": "Tests whether captured score-level safety shrinkage adds protection beyond binary exclusion.",
       "material_configuration": true
     },
     {
-      "ablation_id": "team09-p01-ablation-always-fragility",
-      "change": "Use fragility ranking at every decision instead of causal market-state routing.",
-      "falsifying_interpretation": "If always-fragility dominates without losing bull/chop, the router and retained carry mechanism are unsupported.",
+      "ablation_id": "team09-p02-ablation-fragility-only",
+      "change": "Remove residual persistence and rank the crash-screened set only by inverse fragility on both sides around its cross-sectional center.",
+      "falsifying_interpretation": "If this dominates, persistence is unsupported and the proposal is merely a defensive-quality sort.",
       "material_configuration": true
     },
     {
-      "ablation_id": "team09-p01-ablation-flat-control",
-      "change": "Return an explicit flat book at every rebalance boundary.",
+      "ablation_id": "team09-p02-ablation-flat-control",
+      "change": "Return an explicit flat book at every scheduled boundary.",
       "falsifying_interpretation": "Execution/control baseline; must not manufacture alpha.",
       "material_configuration": true
     }
   ],
-  "registration_rule": "Every source-level ablation requires a separately preregistered complete executable bundle. This file is a declaration only and six ablations consume six material configurations.",
+  "registration_rule": "Every source-level ablation requires a separately preregistered complete executable bundle and matching A5 manifest. This declaration is not authorization, and six ablations consume six material configurations.",
   "schema_version": 1,
-  "status": "pivot-01-prospective-no-results",
+  "status": "pivot-02-prospective-no-results",
   "team_id": "team-09"
 }
