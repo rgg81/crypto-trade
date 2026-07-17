@@ -1,51 +1,51 @@
 {
-  "activation_rule": "The no-control reference is the first material run. Signal ablations may be registered only after that result is read; every risk overlay remains blocked unless all numeric no-control activation thresholds and official non-neighbor gates in qualification_thresholds.json pass.",
+  "activation_rule": "Pivot-01 no-control center runs first. All ablation definitions are prospective, but no ablation or risk policy can rescue insolvency or a failed core gate.",
   "accounting": {
     "reference_configurations": 1,
     "signal_ablation_configurations": 7,
-    "status": "prospective_unregistered",
+    "status": "pivot_01_prospective_unregistered",
     "total_material_configurations": 8
   },
-  "executable_materialization_rule": "The zero-argument builder exposes only the reference defaults. Every non-core ablation requires separately hash-bound executable strategy/config bytes that expose its declared override before registration; this JSON alone is not an executable variant.",
+  "executable_materialization_rule": "Each override requires separate hash-bound executable strategy/config bytes and an A5 manifest/review before registration; this file is not a runtime selector.",
   "ablations": [
     {
-      "ablation_id": "trend-only",
-      "expected_diagnostic": "Should retain continuation behavior but lose chop robustness if the reversal sleeve is causal.",
-      "overrides": {"ensemble_mode": "trend_only"}
+      "ablation_id": "equal-weighted-anchor",
+      "expected_diagnostic": "Tests whether quote-volume weighting contributes beyond an ordinary geometric price anchor.",
+      "overrides": {"volume_weighted_anchor": false}
     },
     {
-      "ablation_id": "reversion-only",
-      "expected_diagnostic": "Should retain chop reversal behavior but lose directional bull/bear sleeve robustness if continuation is causal.",
-      "overrides": {"ensemble_mode": "reversion_only"}
+      "ablation_id": "no-residual-confirmation",
+      "expected_diagnostic": "Tests whether short-horizon stabilization/rollover confirmation avoids premature convergence entries.",
+      "overrides": {"confirmation_weight": 0.0}
     },
     {
-      "ablation_id": "fixed-equal-blend",
-      "expected_diagnostic": "Tests whether the causal path-efficiency switch improves regime robustness beyond a fixed mixture.",
-      "overrides": {"ensemble_mode": "equal_blend"}
+      "ablation_id": "no-tail-quarantine",
+      "expected_diagnostic": "Directly tests whether excluding gap, tail, drawdown, range, and volatility extremes is essential to solvency and drawdown resilience.",
+      "overrides": {"tail_quarantine_enabled": false}
     },
     {
-      "ablation_id": "no-market-residualization",
-      "expected_diagnostic": "Tests the core relative-value claim by replacing residual returns with raw coin returns.",
-      "overrides": {"residualize": false}
+      "ablation_id": "no-rank-retention",
+      "expected_diagnostic": "Tests whether the two-rank incumbent buffer materially reduces turnover without erasing the convergence signal.",
+      "overrides": {"retention_rank_buffer": 0}
     },
     {
-      "ablation_id": "medium-trend-only",
-      "expected_diagnostic": "Tests whether the 63-bar continuation component adds stability beyond the 18-bar horizon.",
-      "overrides": {"trend_medium_weight": 1.0}
+      "ablation_id": "shorter-anchor",
+      "expected_diagnostic": "Tests whether the 63-bar anchor adds stability beyond a more reactive 48-bar anchor.",
+      "overrides": {"anchor_horizon_bars": 48}
     },
     {
-      "ablation_id": "slow-trend-only",
-      "expected_diagnostic": "Tests whether the 18-bar continuation component adds responsiveness beyond the 63-bar horizon.",
-      "overrides": {"trend_medium_weight": 0.0}
+      "ablation_id": "loose-dislocation-quarantine",
+      "expected_diagnostic": "Tests whether excluding very large anchor deviations avoids value traps and rebound hazards.",
+      "overrides": {"maximum_abs_anchor_dislocation": 0.25}
     },
     {
-      "ablation_id": "narrow-four-per-side",
-      "expected_diagnostic": "Tests whether the apparent edge depends on the fifth-ranked coin or excessive rank breadth.",
-      "overrides": {"selection_count_per_side": 4}
+      "ablation_id": "loose-one-bar-gap-filter",
+      "expected_diagnostic": "Tests the specific contribution of the 20% one-bar quarantine while retaining the other tail filters.",
+      "overrides": {"maximum_abs_one_bar_return": 0.99}
     }
   ],
-  "family_id": "t10-residual-trend-reversion-ensemble-v1",
-  "reference_candidate_id": "t10-rtre-core-v1",
+  "family_id": "t10-defensive-anchor-convergence-v1",
+  "reference_candidate_id": "t10-dac-core-v1",
   "schema_version": 1,
   "team_id": "team-10"
 }

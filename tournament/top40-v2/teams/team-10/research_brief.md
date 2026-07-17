@@ -1,88 +1,45 @@
-# Team 10 research brief — residual trend/reversion regime ensemble
+# Team 10 pivot-01 research brief — defensive anchor convergence
 
 Status: **prospective, unregistered, unevaluated**
 
-## Mechanism
+The registered initial no-control candidate is terminal after portfolio insolvency at
+`2022-05-13 00:00:00+00:00`; it produced no metrics. Its artifacts remain unchanged. Controls are
+forbidden, so pivot-01 introduces a new parent-linked family rather than modifying that result.
 
-Crypto assets repeatedly separate into leaders and laggards even after removing the contemporaneous
-cross-sectional market move. Continuation should be more plausible when the common market path is
-directional; short-horizon overshoots should be more plausible when that path is inefficient and
-choppy. The preregistered family therefore combines two economically different residual sleeves:
+## Mechanism and causal construction
 
-1. a medium/slow residual-continuation score over 18 and 63 closed 8-hour bars; and
-2. a six-bar residual-reversal score.
+At the 00:00 UTC decision only, pivot-01 forms 63 exact past-closed 8h candles for each A6-eligible
+coin. It excludes recent gaps, cumulative extremes, deep drawdowns, broad price ranges, excessive
+volatility, and insufficient volume. Within the remaining cohort it measures residual distance from
+a quote-volume-weighted log-price anchor and combines its negative with nine-bar market-residual
+confirmation. The exact finite expected-return score is captured by A5 before spread filtering,
+buffered selection, sizing, or central risk.
 
-At every decision, the market return is the median return across sufficiently covered eligible
-coins. Each coin's market residual is scored at all three horizons. A past-only 63-bar path-
-efficiency statistic sets the common trend/reversion mixture. Robust cross-sectional standardization
-and deterministic ranks select five leaders and five laggards. Each side receives 0.40 gross, so
-the requested portfolio is 0.80 gross and zero net with 0.08 per selected coin.
+Four moderate discounts are held long and four premiums short at 0.025 each. The book is 0.20 gross,
+zero net, updates at most daily, retains incumbents inside two extra ranks, and returns hold when
+sleeves do not change. This is a convergence/cohort mechanism, not a scaled or sign-flipped version
+of the failed adaptive trend/reversal family.
 
-Amendment 0006 is the sole asset-eligibility authority. The strategy neither recognizes nor admits
-symbols by name, and funding is deliberately excluded from this mechanism.
+## Regime roles
 
-## Causal rules
+- Bull: confirmed moderate discounts should recover through the long sleeve.
+- Bear: confirmed moderate premiums should decay through the short sleeve; crashed names are not
+  chased short.
+- Chop: two-sided convergence toward the volume anchor is the primary expected edge.
+- Stress: quarantine and low gross are intrinsic construction rules; no risk overlay is active.
 
-- A candle is usable only after its 8-hour close is at or before the decision boundary.
-- Every signal window must be exactly adjacent at 8-hour spacing; missing candles are not compressed.
-- The most recent usable candle for a scored symbol must close exactly at the decision boundary.
-- A cross-sectional market observation requires at least 12 eligible coins.
-- At least 16 fully scored coins are required; otherwise the requested book is flat.
-- No full-period coefficients, learned scalers, timestamp lookup tables, auxiliary data, funding, or
-  future rows enter the strategy.
-- The seed does not alter ranks; deterministic symbol order resolves exact ties.
+Long-bull, short-bear, combined-chop, both sleeves, ordinary/doubled costs, six folds, quarters, A5
+score correlation, and every numeric threshold remain non-compensatory.
 
-## Expected regime and sleeve roles
+## Falsifiers and staging
 
-- **Bull:** directional path efficiency shifts weight toward continuation. The long sleeve owns
-  residual leaders; the short sleeve hedges residual laggards. The required long-bull attribution
-  must be positive.
-- **Bear:** the same balanced ranking should place the most persistent residual losers in the short
-  sleeve. The required short-bear attribution must be positive.
-- **Chop:** low market efficiency shifts weight toward fading six-bar residual overshoots. Combined
-  chop return must be positive.
-- **Stress:** the raw signal remains balanced. The separately preregistered central volatility target,
-  drawdown brakes, position stop, and turnover cap are intended to constrain gap and liquidity risk;
-  they receive no optimistic execution.
+Insolvency, missing metrics, nonpositive base/doubled return, Sharpe below 0.75/0.35, or any gate in
+`qualification_thresholds.json` terminates the core. The volume-anchor, confirmation, quarantine,
+and retention ablations test the mechanism. All 12 parameter neighbors are fixed now; if the center
+passes non-neighbor gates, all must be materialized, reviewed, and registered before the first
+neighbor result, then run without early stopping. Controls cannot rescue failure.
 
-Both sleeves must independently satisfy the frozen activity and notional gates. A strong combined
-return cannot excuse an inactive side.
-
-## Primary falsifiers
-
-Reject or pivot this family if any of the following occurs in visible chronological evidence:
-
-- any non-compensatory development gate fails, including net Sharpe below 0.75, non-positive
-  annualized return, Calmar below 0.40, drawdown above 0.30, or doubled-cost Sharpe below 0.35;
-- bull, bear, or chop net return is not positive, fewer than three regimes have positive Sharpe, or
-  worst-regime Sharpe is below -0.25;
-- long-bull, short-bear, or combined-chop attribution is non-positive;
-- fewer than four of six true out-of-fold folds are profitable or fewer than 55% of quarters are
-  profitable;
-- fewer than 70% of declared neighbors are profitable, their median Sharpe is below 0.50, or the
-  result is an isolated parameter peak;
-- doubled costs, a single sleeve, or one fold/quarter explains away the apparent edge;
-- adaptive mixing does not improve robustness relative to both preregistered pure-mode controls;
-- the no-residualization ablation is indistinguishable, contradicting the proposed relative-value
-  mechanism.
-
-The team will not submit a negative or merely least-bad in-sample model. It will simplify, use at
-most two documented mechanism pivots inside the cumulative budget, or record DNF.
-
-The first material trial is the unchanged reference with top-level no-control `risk_policy.json`.
-Before any volatility, drawdown, position-stop, turnover, or combined policy may be registered, the
-core must have strictly positive return and Sharpe at ordinary and doubled costs, at least four
-positive folds, positive bull/bear/chop returns, positive long-bull, short-bear, and combined-chop
-attribution, and active long and short sleeves. Controls cannot rescue a negative or otherwise
-failed core. Failure permits only a separately preregistered mechanism revision/pivot or DNF, whose
-own no-control core must restart the sequence.
-
-## Prospective accounting
-
-The planned first family uses 31 material configurations at most: one no-control reference,
-seven signal/mechanism ablations, twelve two-sided parameter neighbors, five additional risk-policy
-choices (four single controls plus combined), and six confirmatory reservations. A base-cost and
-doubled-cost result are paired outputs of one policy state and do **not** count as two
-configurations. No item is evidence until it is registered through the active A7 runtime-preload
-lifecycle, with its frozen A5 score protocol and delegated A6 preflight, and evaluated by the
-organizer.
+The cumulative material budget counts the terminal initial core as one. Pivot-01 reserves at most 31
+more choices: one center, seven mechanism ablations, twelve neighbors, five additional policies only
+after a passing core, and six confirmations. Base/doubled costs are paired outputs, not separate
+choices; the resulting cumulative ceiling is 32 of 80.

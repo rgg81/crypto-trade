@@ -58,7 +58,8 @@ def test_risk_plan_counts_paired_costs_as_six_material_policies() -> None:
         "risk_policies/combined.json",
     ]
     assert plan["core_alpha_activation_gate"] == {
-        "applies_to": "t10-rtre-core-v1 with root risk_policy.json in its no-control state",
+        "applies_to": "t10-dac-core-v1 pivot-01 with root risk_policy.json in its no-control state",
+        "all_team_a5_score_gates_must_pass": True,
         "base_cost_net_return": {"operator": ">", "threshold": 0.0},
         "base_cost_net_sharpe": {"operator": ">=", "threshold": 0.75},
         "combined_chop_attribution": {"operator": ">", "threshold": 0.0},
@@ -140,9 +141,29 @@ def test_execution_contract_is_next_open_and_organizer_owned() -> None:
     }
 
 
-def test_organizer_ledgers_remain_empty() -> None:
-    assert (TEAM_DIR / "families.jsonl").read_bytes() == b""
-    assert (TEAM_DIR / "experiments.jsonl").read_bytes() == b""
+def test_initial_terminal_ledger_history_is_preserved() -> None:
+    families = [
+        json.loads(line)
+        for line in (TEAM_DIR / "families.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    experiments = [
+        json.loads(line)
+        for line in (TEAM_DIR / "experiments.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert families[0]["family_id"] == "t10-residual-trend-reversion-ensemble-v1"
+    assert [event["event_type"] for event in experiments[:2]] == [
+        "trial_registration",
+        "trial_result",
+    ]
+    assert experiments[1]["status"] == "failed"
+    assert experiments[1]["failure_reason"] == (
+        "ValueError: portfolio insolvent at 2022-05-13 00:00:00+00:00"
+    )
+    assert experiments[1]["metrics_summary"] == {}
+    assert experiments[1]["registration_sha256"] == (
+        "2f6625ee5b4ca7e641b9e9b1a6f8ec7068bcc6bc6e9a75a8cc910c2fd8345fa2"
+    )
+    assert all(event["candidate_id"] == "t10-rtre-core-v1" for event in experiments[:2])
 
 
 def test_complete_numeric_threshold_binding() -> None:
@@ -150,7 +171,7 @@ def test_complete_numeric_threshold_binding() -> None:
     assert thresholds["a5_score_diagnostic"] == {
         "complete_manifest_scheduled_score_coverage_required": True,
         "executable_price_column": "open",
-        "holding_horizon_hours": 8,
+        "holding_horizon_hours": 24,
         "independent_semantic_coupling_approval_required": True,
         "minimum_pairs": 240,
         "minimum_positive_fold_pearson_count": 4,
@@ -159,7 +180,7 @@ def test_complete_numeric_threshold_binding() -> None:
         "required_fold_count": 6,
         "return_definition": "simple-executable-open-to-open",
         "schedule_anchor_timestamp_utc": "1970-01-01T00:00:00Z",
-        "schedule_interval_hours": 8,
+        "schedule_interval_hours": 24,
         "score_direction": "higher-score-higher-return",
         "statistic_id": "globally-pooled-pearson-v1",
     }

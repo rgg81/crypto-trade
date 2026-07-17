@@ -8,7 +8,8 @@
     "prohibited_interpretation": "Do not count base and doubled costs as two policy configurations."
   },
   "core_alpha_activation_gate": {
-    "applies_to": "t10-rtre-core-v1 with root risk_policy.json in its no-control state",
+    "applies_to": "t10-dac-core-v1 pivot-01 with root risk_policy.json in its no-control state",
+    "all_team_a5_score_gates_must_pass": true,
     "base_cost_net_return": {"operator": ">", "threshold": 0.0},
     "base_cost_net_sharpe": {"operator": ">=", "threshold": 0.75},
     "combined_chop_attribution": {"operator": ">", "threshold": 0.0},
@@ -42,7 +43,7 @@
     {"path": "risk_policies/turnover-only.json", "policy_id": "team-10-turnover-only"},
     {"path": "risk_policies/combined.json", "policy_id": "team-10-combined"}
   ],
-  "policy_materialization_rule": "The frozen lifecycle reads only root risk_policy.json. Run the root no-control core first. After it passes every numeric activation threshold and all official non-neighbor gates in qualification_thresholds.json, copy any selected immutable risk_policies template byte-for-byte to root before commit, registration, and run, then recompute every risk/source binding. Controls cannot rescue a failed core.",
+  "policy_materialization_rule": "The frozen lifecycle reads only root risk_policy.json. The initial family is terminal and receives no controls. Run pivot-01 no-control first; only after every numeric activation, A5, and official non-neighbor gate passes may any separately registered policy be considered. Controls cannot rescue failure.",
   "required_comparisons": [
     "net return and Sharpe",
     "maximum drawdown and tail loss",
@@ -55,6 +56,6 @@
     "same-boundary reentry prevention"
   ],
   "schema_version": 1,
-  "status": "prospective_unregistered",
+  "status": "pivot_01_prospective_unregistered",
   "team_id": "team-10"
 }
