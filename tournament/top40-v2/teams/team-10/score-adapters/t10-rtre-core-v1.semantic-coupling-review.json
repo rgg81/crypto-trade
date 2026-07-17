@@ -1,0 +1,23 @@
+{
+  "candidate_id": "t10-rtre-core-v1",
+  "decision": "approve",
+  "declared_capture_boundary": "candidate-declared-post-transform-pre-selection-weight-cap-risk",
+  "executable_source_manifest_path": "tournament/top40-v2/teams/team-10/score-adapters/t10-rtre-core-v1.executable-source-manifest.json",
+  "executable_source_manifest_sha256": "6d4d9d0a6f62baac0a078ecc732bc03966c07f4df19cea9e5aecc6ecc67eec24",
+  "family_id": "t10-residual-trend-reversion-ensemble-v1",
+  "findings": {
+    "direct_hook_call_found": true,
+    "hook_after_declared_score_transform": true,
+    "hook_before_selection_weight_caps_and_risk": true,
+    "no_decoy_or_transient_score_path_found": true,
+    "score_object_is_declared_model_ranking_signal": true
+  },
+  "hook": "strategy.score_boundary",
+  "review_kind": "top40-v2-score-semantic-coupling-static-review-v1",
+  "reviewed_at_utc": "2026-07-17T00:39:02Z",
+  "reviewer_id": "independent-a5-team10-rtre-static-20260717",
+  "runtime_proof_limit": "static-review-attestation-not-runtime-semantic-proof",
+  "schema_version": 1,
+  "strategy_sha256": "87827171d2f8493948bd74e81cea0972c2e0fbab0480a79cd9b03c1c93af876f",
+  "team_id": "team-10"
+}
