@@ -52,7 +52,7 @@
   "critic_lock": null,
   "final_oos_lock": null,
   "finalist_cohort_lock": null,
-  "legacy_projection_sha256": "3e6f93da76ec57c26876163627e190b85a90b8046a8ab4842d803822487b5edd",
+  "legacy_projection_sha256": "b9103e2bb3ba2234527e4146e7f3bb5c0f361c39e171d8876308b4443fd22f6e",
   "legacy_state_sha256": "8c858495fde6ddde203124a055e40ebad5d8d5a684cd20f0e55f6c88f7360b07",
   "objective_lock": null,
   "organizer_audit": {
@@ -219,13 +219,13 @@
       "trial_count": 3
     },
     "team-09": {
-      "active_family_id": "team09-funding-crowding-confirmation-v1",
+      "active_family_id": "team09-conditional-carry-fragility-v1",
       "canonical_result": null,
       "development_assessment": null,
       "dnf": null,
-      "family_count": 1,
+      "family_count": 2,
       "finalist_freeze": null,
-      "pivot_count": 0,
+      "pivot_count": 1,
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
