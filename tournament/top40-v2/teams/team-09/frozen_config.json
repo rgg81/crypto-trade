@@ -1,9 +1,12 @@
 {
   "active_command_authority": {
-    "entrypoint": "scripts/top40_v2_tournament_score_diagnostics_v5.py",
-    "entrypoint_sha256": "0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4",
-    "integration_freeze_commit": "d2b95f610722aab65b4e67466b34efeaa3554101",
-    "integration_freeze_sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c"
+    "activation_journal_head_sha256": "15e4d3453ee1fdaae0a4f1439f8a5bf57c4cf16c99fa73ff9992c29fa64aa09f",
+    "activation_journal_record_count": 27,
+    "amendment_id": "top40-v2-amendment-0007-frozen-worker-a5-protocol-preload",
+    "entrypoint": "scripts/top40_v2_tournament_runtime_preload_v7.py",
+    "entrypoint_sha256": "8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9",
+    "integration_freeze_commit": "c8b917ca49306d5200a4e08848e73ff6f5a18bf3",
+    "integration_freeze_sha256": "6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51"
   },
   "candidate_id": "team09-fcpc-center-v1",
   "family_id": "team09-funding-crowding-confirmation-v1",
@@ -26,6 +29,15 @@
     "rebalance_hour_utc": 0,
     "target_side_gross": 0.45,
     "volatility_bars": 63
+  },
+  "operative_score_protocol": {
+    "delegated_by_a7": true,
+    "direct_entrypoint_invocation_allowed": false,
+    "entrypoint": "scripts/top40_v2_tournament_score_diagnostics_v5.py",
+    "entrypoint_sha256": "0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4",
+    "integration_freeze_commit": "d2b95f610722aab65b4e67466b34efeaa3554101",
+    "integration_freeze_path": "tournament/top40-v2/amendments/0005/integration-freeze.json",
+    "integration_freeze_sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c"
   },
   "pure_crypto_authority": {
     "amendment_id": "top40-v2-amendment-0006-pure-crypto-universe",

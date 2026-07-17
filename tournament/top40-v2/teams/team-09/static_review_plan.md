@@ -9,9 +9,10 @@ not substitute performance judgment for contract review.
 ## Required review
 
 1. Confirm the package is confined to `tournament/top40-v2/teams/team-09`, ledgers are empty, and
-   the bootstrap says `A5_A6_ACTIVE_PROSPECTIVE_UNREGISTERED`.
-2. Confirm every future command is pinned to the active Amendment 0005 superset entrypoint, that it
-   delegates through Amendment 0006, and no ineligible asset classification can enter team code.
+   the bootstrap says `A7_A6_ACTIVE_PROSPECTIVE_UNREGISTERED`.
+2. Confirm every future command is pinned to the active A7 entrypoint, that its exact delegated A5
+   score surface and A6 pure-crypto bindings match `a7_execution_authority.json` and
+   `a5_score_lineage.json`, and no ineligible asset classification can enter team code.
 3. Match every `StrategyConfig` field and value to `frozen_config.json` and the complete trial
    template. Check every declared family range and neighbor is feasible under `validate()`.
 4. Trace each feature to past-only context data. Check exact eight-hour price adjacency, latest
@@ -29,6 +30,10 @@ not substitute performance judgment for contract review.
 9. Enumerate the entire executable Team09 tree at the candidate source commit. Require an acyclic
    manifest that equals the complete executable dependency set; hash every file and reject
    unlisted executable helpers.
+   Verify the exact score manifest, direct one-positional `strategy.score_boundary` call, capture
+   boundary, same-object return, and use of the captured dict for filtering, ordering, side
+   selection, and weights before caps/risk. Complete the semantic-review template only from exact
+   reviewed bytes.
 10. Validate all six risk-policy JSON files against the frozen organizer parser/schema. Confirm
     next-open execution, ordinary costs, capacity sharing, and same-boundary reentry are organizer
     responsibilities. Confirm each policy run produces paired base/doubled-cost panels and counts
@@ -44,6 +49,8 @@ not substitute performance judgment for contract review.
     config/template completeness, and risk-policy validity.
 12. Confirm the walk-forward and neighborhood files are prospective plans only. They are not
     qualification evidence until exact model/parameter/return hashes and central evidence exist.
+    Enforce `neighbor_staging_plan.json` so all identities are frozen before any result read and no
+    result hash can enter its own registration lineage.
 13. Confirm the hard disposition: no qualifier freeze or submission unless every development gate
     passes; otherwise continue, pivot within budget, or DNF.
 14. Replace family/trial timestamp placeholders only with actual lifecycle event times and replace

@@ -16,9 +16,11 @@ contiguous past-close relative performance to confirm an unwind:
 
 The center rebalances once daily at 00:00 UTC. It uses seven days of strictly past funding events,
 a three-day price-confirmation horizon, and a 21-day volatility scale. Cross-sectional average-tie
-ranks avoid a fitted distribution. The selected long and short sleeves receive equal gross
-exposure; no learned beta or hedge ratio is used. Each symbol remains below the evaluator's 10%
-cap, total gross stays below one, and net target exposure is zero.
+ranks avoid a fitted distribution. The exact signed joint-margin score passes through the public
+A5 identity boundary before filtering or construction; its returned magnitude orders and
+proportionally allocates each capped sleeve. The selected long and short sleeves receive equal
+gross exposure; no learned beta or hedge ratio is used. Each symbol remains below the evaluator's
+10% cap, total gross stays below one, and net target exposure is zero.
 
 ## Why it could span market conditions
 

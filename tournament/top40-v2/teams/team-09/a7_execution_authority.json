@@ -13,7 +13,13 @@
   "candidate_id": "team09-fcpc-center-v1",
   "delegated_amendment_0005_integration": {
     "commit": "d2b95f610722aab65b4e67466b34efeaa3554101",
+    "operative_score_entrypoint": {
+      "direct_invocation_allowed": false,
+      "path": "scripts/top40_v2_tournament_score_diagnostics_v5.py",
+      "sha256": "0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4"
+    },
     "path": "tournament/top40-v2/amendments/0005/integration-freeze.json",
+    "role": "exact score protocol delegated by the active A7 preload surface",
     "sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c"
   },
   "family_id": "team09-funding-crowding-confirmation-v1",
@@ -26,6 +32,28 @@
     "policy_sha256": "2c7fb0ff593d06c323517e60df4b28ab9387a2df580b83f82f65ef71c91fc350",
     "report_sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
     "violations": 0
+  },
+  "score_identity_contract": {
+    "candidate_id": "team09-fcpc-center-v1",
+    "config_path": "tournament/top40-v2/teams/team-09/frozen_config.json",
+    "family_id": "team09-funding-crowding-confirmation-v1",
+    "required_exact_result_identity_fields": [
+      "team_id",
+      "family_id",
+      "candidate_id",
+      "seed",
+      "strategy_sha256",
+      "source_bundle_sha256",
+      "risk_config_sha256",
+      "config_sha256",
+      "registration_sha256"
+    ],
+    "risk_policy_id_for_first_trial": "team09-risk-none",
+    "risk_policy_path": "tournament/top40-v2/teams/team-09/risk_policy.json",
+    "seed": 20260801,
+    "strategy_factory": "build_strategy",
+    "strategy_path": "tournament/top40-v2/teams/team-09/strategy.py",
+    "team_id": "team-09"
   },
   "schema_version": 1,
   "team_id": "team-09"

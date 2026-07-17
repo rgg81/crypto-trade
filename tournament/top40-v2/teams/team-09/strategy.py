@@ -20,6 +20,12 @@ from collections.abc import Mapping
 import numpy as np
 import pandas as pd
 
+from crypto_trade.tournament.score_adapter_protocol_v5 import score_boundary
+
+SCORE_ADAPTER_ID = "top40-v2-declared-score-boundary-v1"
+SCORE_CAPTURE_BOUNDARY = "candidate-declared-post-transform-pre-selection-weight-cap-risk"
+_PASSING_SCORE_MAGNITUDE = 2.0
+
 
 @dataclasses.dataclass(frozen=True)
 class StrategyConfig:
@@ -147,6 +153,45 @@ def _centered_ranks(values: Mapping[str, float]) -> dict[str, float]:
     ranks = ordered.rank(method="average")
     centered = 2.0 * (ranks - 1.0) / (len(ordered) - 1.0) - 1.0
     return {str(symbol): float(value) for symbol, value in centered.items()}
+
+
+def _allocate_capped_side(
+    candidates: list[tuple[float, str]],
+    *,
+    gross: float,
+    maximum_symbol_weight: float,
+    direction: float,
+) -> dict[str, float]:
+    """Allocate gross proportionally to captured score magnitudes with a hard symbol cap."""
+
+    remaining = float(gross)
+    active = [(symbol, float(magnitude)) for magnitude, symbol in candidates]
+    allocations: dict[str, float] = {}
+    while active and remaining > np.finfo(float).eps:
+        total_strength = sum(strength for _symbol, strength in active)
+        if total_strength <= 0 or not math.isfinite(total_strength):
+            raise ValueError("captured side scores cannot support finite positive allocation")
+        capped: list[tuple[str, float]] = []
+        uncapped: list[tuple[str, float]] = []
+        for symbol, strength in active:
+            proposed = remaining * strength / total_strength
+            if proposed >= maximum_symbol_weight:
+                capped.append((symbol, maximum_symbol_weight))
+            else:
+                uncapped.append((symbol, proposed))
+        if not capped:
+            for symbol, proposed in uncapped:
+                allocations[symbol] = direction * float(proposed)
+            remaining = 0.0
+            break
+        for symbol, amount in capped:
+            allocations[symbol] = direction * float(amount)
+            remaining -= amount
+        capped_symbols = {symbol for symbol, _amount in capped}
+        active = [item for item in active if item[0] not in capped_symbols]
+    if remaining > 1e-12:
+        raise ValueError("captured side scores could not satisfy the frozen gross allocation")
+    return allocations
 
 
 class FundingCrowdingStrategy:
@@ -320,27 +365,57 @@ class FundingCrowdingStrategy:
         funding_ranks = _centered_ranks({symbol: funding_raw[symbol] for symbol in valid_symbols})
         price_ranks = _centered_ranks({symbol: price_raw[symbol] for symbol in valid_symbols})
 
+        # This is the single declared A5 score object.  Positive values mean long desirability;
+        # negative values mean short desirability.  The offset keeps direction stable over the
+        # complete rank domain, while magnitude 2.0 is exactly the joint crowding/confirmation
+        # pass boundary.  No threshold filtering, side selection, weight cap, or risk action has
+        # occurred at this capture boundary.
+        scores: dict[str, float] = {}
+        for symbol in valid_symbols:
+            crowding = float(funding_ranks[symbol])
+            desired_direction = -1.0 if crowding > 0 else 1.0 if crowding < 0 else 0.0
+            confirmation = desired_direction * float(price_ranks[symbol])
+            if desired_direction == 0.0:
+                score = 0.0
+            else:
+                joint_margin = min(
+                    abs(crowding) - self.config.crowding_threshold,
+                    confirmation - self.config.confirmation_threshold,
+                )
+                score = desired_direction * (_PASSING_SCORE_MAGNITUDE + joint_margin)
+            scores[str(symbol)] = float(score)
+
+        if type(scores) is not dict or any(
+            type(symbol) is not str or type(value) is not float or not math.isfinite(value)
+            for symbol, value in scores.items()
+        ):
+            raise TypeError("declared score boundary requires a finite built-in dict[str, float]")
+        expected_score_keys = frozenset(valid_symbols)
+        captured_scores = score_boundary(scores)
+        if captured_scores is not scores:
+            raise ValueError("declared score boundary changed score object identity")
+        if type(captured_scores) is not dict or frozenset(captured_scores) != expected_score_keys:
+            raise ValueError("declared score boundary changed exact score keys")
+        if any(
+            type(symbol) is not str or type(value) is not float or not math.isfinite(value)
+            for symbol, value in captured_scores.items()
+        ):
+            raise TypeError("declared score boundary returned invalid score values")
+
         long_candidates: list[tuple[float, str]] = []
         short_candidates: list[tuple[float, str]] = []
-        for symbol in valid_symbols:
-            crowding = funding_ranks[symbol]
-            desired_direction = -1.0 if crowding > 0 else 1.0 if crowding < 0 else 0.0
-            confirmation = desired_direction * price_ranks[symbol]
-            if (
-                desired_direction == 0.0
-                or abs(crowding) < self.config.crowding_threshold
-                or confirmation < self.config.confirmation_threshold
-            ):
+        for symbol in sorted(captured_scores):
+            captured_score = captured_scores[symbol]
+            if abs(captured_score) < _PASSING_SCORE_MAGNITUDE:
                 continue
-            strength = abs(crowding) * (1.0 + confirmation)
-            candidate = (-strength, symbol)
-            if desired_direction > 0:
+            candidate = (abs(captured_score), symbol)
+            if captured_score > 0:
                 long_candidates.append(candidate)
-            else:
+            elif captured_score < 0:
                 short_candidates.append(candidate)
 
-        long_candidates.sort()
-        short_candidates.sort()
+        long_candidates.sort(key=lambda item: (-item[0], item[1]))
+        short_candidates.sort(key=lambda item: (-item[0], item[1]))
         if (
             len(long_candidates) < self.config.minimum_symbols_per_side
             or len(short_candidates) < self.config.minimum_symbols_per_side
@@ -359,10 +434,20 @@ class FundingCrowdingStrategy:
         )
         # Equal gross on both sides is a mechanism constraint, not an estimated hedge ratio.
         paired_gross = min(long_gross, short_gross)
-        long_weight = paired_gross / len(selected_longs)
-        short_weight = -paired_gross / len(selected_shorts)
-        result = {symbol: long_weight for _strength, symbol in selected_longs}
-        result.update({symbol: short_weight for _strength, symbol in selected_shorts})
+        result = _allocate_capped_side(
+            selected_longs,
+            gross=paired_gross,
+            maximum_symbol_weight=self.config.maximum_symbol_weight,
+            direction=1.0,
+        )
+        result.update(
+            _allocate_capped_side(
+                selected_shorts,
+                gross=paired_gross,
+                maximum_symbol_weight=self.config.maximum_symbol_weight,
+                direction=-1.0,
+            )
+        )
         return result
 
 

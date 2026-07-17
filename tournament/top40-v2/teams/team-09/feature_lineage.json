@@ -26,11 +26,11 @@
     },
     {
       "availability": "Computed at the decision boundary after symbol-level eligibility checks.",
-      "definition": "Average-tie cross-sectional ranks map funding pressure and price confirmation independently to [-1, 1]. A candidate must exceed the crowding threshold and have price rank aligned with the opposite-of-crowding direction.",
+      "definition": "Average-tie cross-sectional ranks map funding pressure and price confirmation independently to [-1, 1]. For the opposite-of-crowding direction, take the smaller of the crowding-threshold margin and aligned-confirmation-threshold margin, add the fixed 2.0 pass-boundary offset, and apply the desired direction as sign. The resulting finite signed dictionary crosses the A5 identity boundary once. Absolute returned score at least 2.0 passes both thresholds; its magnitude ranks and proportionally sizes the selected side subject to the frozen cap.",
       "feature": "confirmed_crowding_unwind",
       "missing_rule": "Request an explicit flat book if the valid cross-section or either sleeve lacks frozen minimum breadth.",
       "parents": ["decayed_relative_funding_pressure", "funding_sign_persistence", "volatility_scaled_price_confirmation"],
-      "purpose": "Produce the causal long/short selection signal."
+      "purpose": "Produce the exact causal long-desirability score used after capture for filtering, side selection, ordering, and capped proportional allocation."
     }
   ],
   "forbidden_inputs": [

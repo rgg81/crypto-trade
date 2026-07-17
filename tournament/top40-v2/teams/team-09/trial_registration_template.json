@@ -1,7 +1,7 @@
 {
   "candidate_id": "team09-fcpc-center-v1",
   "config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-  "falsifier": "This first material trial is the no-control core. Reject it and prohibit every risk-overlay activation if base- or doubled-cost return/Sharpe is nonpositive, fewer than four folds are positive, bull/bear/chop return or long-bull/short-bear/combined-chop attribution is nonpositive, either sleeve is inactive, or any other centrally derived development gate fails. Otherwise make a separately preregistered mechanism pivot or record DNF; controls cannot rescue it.",
+  "falsifier": "This first material trial is the no-control core. Reject it and prohibit every risk-overlay activation if any numeric comparison in qualification_thresholds.json#/core_alpha_activation fails. A later candidate must also pass every full development and team-declared A5 score threshold in that file. Otherwise make a separately preregistered mechanism pivot or record DNF; controls cannot rescue it.",
   "family_id": "team09-funding-crowding-confirmation-v1",
   "parameters": {
     "confirmation_bars": 9,

@@ -173,6 +173,34 @@ def test_clean_instances_are_deterministic() -> None:
     assert first == second
 
 
+def test_declared_score_boundary_is_called_once_and_returned_dict_drives_selection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, float]] = []
+
+    def capture_and_zero(scores: dict[str, float]) -> dict[str, float]:
+        assert type(scores) is dict
+        assert scores
+        assert all(type(symbol) is str for symbol in scores)
+        assert all(type(value) is float and math.isfinite(value) for value in scores.values())
+        calls.append(scores)
+        for symbol in scores:
+            scores[symbol] = 0.0
+        return scores
+
+    monkeypatch.setattr(STRATEGY, "score_boundary", capture_and_zero)
+    assert _weights(_context()) == {}
+    assert len(calls) == 1
+
+
+def test_declared_score_boundary_rejects_changed_object_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(STRATEGY, "score_boundary", lambda scores: dict(scores))
+    with pytest.raises(ValueError, match="object identity"):
+        _weights(_context())
+
+
 def test_future_bar_and_funding_rows_fail_closed() -> None:
     bar_context = _context()
     symbol = bar_context.eligible_symbols[0]
@@ -267,6 +295,96 @@ def test_complete_family_cartesian_domain_is_declared_and_feasible() -> None:
         dataclasses.replace(center, **dict(zip(fields, values, strict=True))).validate()
         combinations += 1
     assert combinations == 3**5
+
+
+def test_score_manifest_binds_exact_a5_boundary_schedule_and_label() -> None:
+    manifest = json.loads(
+        (
+            TEAM_DIR / "score-adapters/team09-fcpc-center-v1.score-adapter-manifest.template.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert manifest["adapter_id"] == STRATEGY.SCORE_ADAPTER_ID
+    assert manifest["capture_boundary"] == STRATEGY.SCORE_CAPTURE_BOUNDARY
+    assert manifest["hook"] == "strategy.score_boundary"
+    assert manifest["schedule_utc"] == {
+        "anchor_timestamp_utc": "1970-01-01T00:00:00Z",
+        "interval_hours": 24,
+    }
+    assert manifest["label"] == {
+        "executable_price_column": "open",
+        "holding_horizon_hours": 24,
+        "label_id": "manifest-horizon-simple-executable-open-to-open-return-v1",
+        "minimum_pairs": 240,
+        "purge_cross_fold_endpoints": True,
+        "return_definition": "simple-executable-open-to-open",
+        "score_direction": "higher-score-higher-return",
+        "statistic_id": "globally-pooled-pearson-v1",
+    }
+
+
+def test_a7_a5_identity_chain_and_numeric_thresholds_are_candidate_exact() -> None:
+    authority = json.loads((TEAM_DIR / "a7_execution_authority.json").read_text(encoding="utf-8"))
+    lineage = json.loads((TEAM_DIR / "a5_score_lineage.json").read_text(encoding="utf-8"))
+    thresholds = json.loads(
+        (TEAM_DIR / "qualification_thresholds.json").read_text(encoding="utf-8")
+    )
+    assert authority["active_entrypoint"] == {
+        "path": "scripts/top40_v2_tournament_runtime_preload_v7.py",
+        "sha256": "8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9",
+    }
+    assert lineage["candidate_identity"] == {
+        "candidate_id": "team09-fcpc-center-v1",
+        "config_path": "tournament/top40-v2/teams/team-09/frozen_config.json",
+        "family_id": "team09-funding-crowding-confirmation-v1",
+        "risk_policy_id": "team09-risk-none",
+        "risk_policy_path": "tournament/top40-v2/teams/team-09/risk_policy.json",
+        "seed": 20260801,
+        "strategy_factory": "build_strategy",
+        "strategy_path": "tournament/top40-v2/teams/team-09/strategy.py",
+        "team_id": "team-09",
+    }
+    development = thresholds["development_qualification"]
+    assert thresholds["a5_score_diagnostics"] == {
+        "complete_manifest_scheduled_score_coverage_required": True,
+        "holding_horizon_hours": 24,
+        "independent_semantic_coupling_approval_required": True,
+        "minimum_pairs_per_fold": 240,
+        "minimum_positive_fold_pearson_count": 4,
+        "pooled_development_pearson": {"comparison": ">", "threshold": 0.0},
+        "required_fold_count": 6,
+        "schedule_interval_hours": 24,
+        "team_noncompensatory_gate": True,
+    }
+    assert development["aggregate"] == {
+        "maximum_drawdown": 0.3,
+        "minimum_annualized_return": 0.0,
+        "minimum_calmar": 0.4,
+        "minimum_double_cost_sharpe": 0.35,
+        "minimum_net_sharpe": 0.75,
+        "minimum_positive_quarter_fraction": 0.55,
+        "minimum_trial_adjusted_probability_positive": 0.9,
+    }
+    assert development["regimes"] == {
+        "minimum_positive_sharpe_regimes": 3,
+        "minimum_worst_regime_sharpe": -0.25,
+        "required_positive_return_regimes": ["bull", "bear", "chop"],
+    }
+    assert development["stability"] == {
+        "maximum_positive_pnl_concentration": 0.4,
+        "minimum_neighbor_median_sharpe": 0.5,
+        "minimum_profitable_neighbor_fraction": 0.7,
+    }
+
+
+def test_neighbor_staging_has_a_preresult_freeze_and_read_barrier() -> None:
+    plan = json.loads((TEAM_DIR / "neighbor_staging_plan.json").read_text(encoding="utf-8"))
+    neighborhood = json.loads(
+        (TEAM_DIR / "parameter_neighborhood.json").read_text(encoding="utf-8")
+    )
+    assert plan["declared_neighbor_count"] == len(neighborhood["neighbors"]) == 10
+    assert plan["execution_mode"] == "strictly-serial"
+    assert "all ten registrations are first-added" in plan["result_read_barrier"]
+    assert any("may be an input" in rule for rule in plan["circularity_prohibitions"])
 
 
 @pytest.mark.parametrize(

@@ -1,5 +1,5 @@
 {
-  "activation_rule": "Neighbors remain dormant until the no-control core passes every broad positive activation minimum and the selected controlled/base candidate passes all non-neighborhood development gates.",
+  "activation_rule": "Neighbors remain dormant until the no-control core passes every numeric core-alpha activation minimum and the selected controlled/base candidate passes all non-neighborhood development gates. Neighborhood stability itself is evaluated only after the fixed neighbor set runs and is never an activation prerequisite.",
   "candidate_id": "team09-fcpc-center-v1",
   "center_parameters_path": "tournament/top40-v2/teams/team-09/frozen_config.json",
   "declaration_status": "prospective-no-return-artifacts",
@@ -16,7 +16,7 @@
     {"changes": {"confirmation_threshold": 0.0}, "neighbor_id": "team09-n09-confirmation-threshold-000"},
     {"changes": {"confirmation_threshold": 0.2}, "neighbor_id": "team09-n10-confirmation-threshold-020"}
   ],
-  "registration_rule": "Each neighbor is a separate material preregistration with a full parameter artifact and distinct daily-return artifact. No placeholder hash in this draft is qualification evidence.",
+  "registration_rule": "Follow neighbor_staging_plan.json. Freeze and preregister all ten exact neighbor identities before reading any neighbor result. Each neighbor has a pre-result full parameter artifact; its distinct daily-return artifact is produced later and cannot feed back into source/config/registration identity. No placeholder hash in this draft is qualification evidence.",
   "schema_version": 1,
   "stability_gate": {
     "maximum_positive_pnl_concentration": 0.4,

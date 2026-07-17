@@ -1,0 +1,72 @@
+{
+  "candidate_id": "team09-fcpc-center-v1",
+  "circularity_prohibitions": [
+    "No neighbor return, metric, score, daily-return hash, or result manifest may be an input to that neighbor's source bundle, config hash, parameter hash, trial registration, or registration SHA-256.",
+    "No neighbor result may be read before the complete ten-neighbor identity set is frozen and every neighbor is preregistered.",
+    "The post-run parameter-neighborhood evidence manifest is an organizer-derived consumer of preregistered parameter and return artifacts; it is not an executable or registration input.",
+    "A candidate cannot be declared development-qualified before the completed neighborhood evidence passes all stability thresholds."
+  ],
+  "declared_neighbor_count": 10,
+  "execution_mode": "strictly-serial",
+  "identity_fields_per_neighbor": [
+    "team_id",
+    "family_id",
+    "candidate_id",
+    "neighbor_id",
+    "seed",
+    "strategy_sha256",
+    "source_bundle_sha256",
+    "risk_config_sha256",
+    "config_sha256",
+    "parameter_artifact_sha256",
+    "registration_sha256"
+  ],
+  "result_read_barrier": "Do not read any of the ten neighbor results until all ten registrations are first-added and their exact identities are frozen.",
+  "schema_version": 1,
+  "stages": [
+    {
+      "stage": 0,
+      "title": "center and declaration",
+      "requirements": [
+        "Run the no-control center first and require every core-alpha activation threshold.",
+        "Keep the already-declared ten one-axis deltas unchanged before any neighbor result."
+      ]
+    },
+    {
+      "stage": 1,
+      "title": "non-neighborhood candidate gate",
+      "requirements": [
+        "Select either the no-control center or a properly preregistered later policy only after it passes every non-neighborhood development threshold.",
+        "Freeze the selected candidate's strategy, risk, config, seed, and complete executable-source identity before materializing neighbors."
+      ]
+    },
+    {
+      "stage": 2,
+      "title": "pre-result neighbor materialization and registration",
+      "requirements": [
+        "For each declared delta, create a full parameter artifact and executable strategy/config bytes whose zero-argument builder exposes exactly that neighbor.",
+        "Use the selected candidate's same risk policy and seed for every neighbor.",
+        "First-add all ten registrations serially under A7 before running or reading any neighbor result."
+      ]
+    },
+    {
+      "stage": 3,
+      "title": "serial execution behind a read barrier",
+      "requirements": [
+        "Run neighbors one at a time under A7.",
+        "Stage each result without exposing it to Team09 selection until all ten runs are terminal.",
+        "Reject any result whose A5 score identity differs from its preregistration."
+      ]
+    },
+    {
+      "stage": 4,
+      "title": "post-run organizer evidence",
+      "requirements": [
+        "After the barrier opens, bind each pre-existing parameter artifact and daily-return artifact into the organizer-owned neighborhood manifest.",
+        "Apply profitable-fraction >= 0.70, median Sharpe >= 0.50, and positive-PnL concentration <= 0.40.",
+        "Record failure as evidence; do not redefine or replace a failed neighbor after reading results."
+      ]
+    }
+  ],
+  "team_id": "team-09"
+}

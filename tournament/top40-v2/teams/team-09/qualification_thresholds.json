@@ -1,0 +1,97 @@
+{
+  "a5_score_diagnostics": {
+    "complete_manifest_scheduled_score_coverage_required": true,
+    "holding_horizon_hours": 24,
+    "independent_semantic_coupling_approval_required": true,
+    "minimum_pairs_per_fold": 240,
+    "minimum_positive_fold_pearson_count": 4,
+    "pooled_development_pearson": {"comparison": ">", "threshold": 0.0},
+    "required_fold_count": 6,
+    "schedule_interval_hours": 24,
+    "team_noncompensatory_gate": true
+  },
+  "core_alpha_activation": {
+    "applies_before_any_optional_risk_control": true,
+    "base_cost_net_return": {"comparison": ">", "threshold": 0.0},
+    "base_cost_net_sharpe": {"comparison": ">", "threshold": 0.0},
+    "combined_chop_net_return": {"comparison": ">", "threshold": 0.0},
+    "doubled_cost_net_return": {"comparison": ">", "threshold": 0.0},
+    "doubled_cost_net_sharpe": {"comparison": ">", "threshold": 0.0},
+    "long_bull_net_return": {"comparison": ">", "threshold": 0.0},
+    "minimum_positive_folds": {"comparison": ">=", "threshold": 4, "total_folds": 6},
+    "regime_net_returns": {
+      "bear": {"comparison": ">", "threshold": 0.0},
+      "bull": {"comparison": ">", "threshold": 0.0},
+      "chop": {"comparison": ">", "threshold": 0.0}
+    },
+    "short_bear_net_return": {"comparison": ">", "threshold": 0.0},
+    "sleeves": {
+      "long": {
+        "minimum_active_bar_fraction": 0.1,
+        "minimum_executed_notional_usdt": 1000.0,
+        "minimum_mean_gross_exposure": 0.01,
+        "minimum_side_exposure": 0.01
+      },
+      "short": {
+        "minimum_active_bar_fraction": 0.1,
+        "minimum_executed_notional_usdt": 1000.0,
+        "minimum_mean_gross_exposure": 0.01,
+        "minimum_side_exposure": 0.01
+      }
+    }
+  },
+  "development_qualification": {
+    "aggregate": {
+      "maximum_drawdown": 0.3,
+      "minimum_annualized_return": 0.0,
+      "minimum_calmar": 0.4,
+      "minimum_double_cost_sharpe": 0.35,
+      "minimum_net_sharpe": 0.75,
+      "minimum_positive_quarter_fraction": 0.55,
+      "minimum_trial_adjusted_probability_positive": 0.9
+    },
+    "folds": {
+      "minimum_positive_folds": 4,
+      "required_fold_count": 6
+    },
+    "non_compensatory": true,
+    "regimes": {
+      "minimum_positive_sharpe_regimes": 3,
+      "minimum_worst_regime_sharpe": -0.25,
+      "required_positive_return_regimes": ["bull", "bear", "chop"]
+    },
+    "roles": {
+      "combined_chop_net_return": {"comparison": ">", "threshold": 0.0},
+      "long_bull_net_return": {"comparison": ">", "threshold": 0.0},
+      "short_bear_net_return": {"comparison": ">", "threshold": 0.0}
+    },
+    "sleeves": {
+      "minimum_active_bar_fraction": 0.1,
+      "minimum_executed_notional_usdt": 1000.0,
+      "minimum_mean_gross_exposure": 0.01,
+      "minimum_side_exposure": 0.01,
+      "required_sides": ["long", "short"]
+    },
+    "stability": {
+      "maximum_positive_pnl_concentration": 0.4,
+      "minimum_neighbor_median_sharpe": 0.5,
+      "minimum_profitable_neighbor_fraction": 0.7
+    }
+  },
+  "disposition": {
+    "failed_core_may_activate_controls": false,
+    "failed_development_candidate_may_submit": false,
+    "terminal_alternative": "dnf"
+  },
+  "private_qualification_after_complete_development_pass": {
+    "maximum_attempts": 1,
+    "maximum_drawdown": 0.3,
+    "minimum_annualized_return": 0.0,
+    "minimum_double_cost_sharpe": 0.0,
+    "minimum_net_sharpe": 0.5,
+    "minimum_positive_quarter_fraction": 0.5
+  },
+  "schema_version": 1,
+  "score_authority": "Exact central A5 protocol delegated by the active A7 entrypoint; this local copy is a preregistered decision contract and cannot replace central derivation.",
+  "team_id": "team-09"
+}

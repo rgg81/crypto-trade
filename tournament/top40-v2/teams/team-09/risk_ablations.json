@@ -62,5 +62,6 @@
   "registration_rule": "The root no-control core is the first material preregistration. It must pass positive ordinary/doubled return and Sharpe, fold, bull/bear/chop, long-bull/short-bear/combined-chop, and sleeve-activity minima before any later policy may be registered. The five later policy paths are immutable templates copied byte-for-byte to root before their own commit, registration, and run. Controls cannot rescue failure.",
   "schema_version": 1,
   "status": "prospective-no-results",
-  "team_id": "team-09"
+  "team_id": "team-09",
+  "threshold_contract_path": "qualification_thresholds.json#/core_alpha_activation"
 }

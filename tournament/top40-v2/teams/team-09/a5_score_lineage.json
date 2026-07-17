@@ -1,0 +1,80 @@
+{
+  "active_execution_surface": {
+    "amendment_id": "top40-v2-amendment-0007-frozen-worker-a5-protocol-preload",
+    "entrypoint_path": "scripts/top40_v2_tournament_runtime_preload_v7.py",
+    "entrypoint_sha256": "8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9",
+    "integration_freeze_commit": "c8b917ca49306d5200a4e08848e73ff6f5a18bf3",
+    "integration_freeze_sha256": "6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51"
+  },
+  "candidate_identity": {
+    "candidate_id": "team09-fcpc-center-v1",
+    "config_path": "tournament/top40-v2/teams/team-09/frozen_config.json",
+    "family_id": "team09-funding-crowding-confirmation-v1",
+    "risk_policy_id": "team09-risk-none",
+    "risk_policy_path": "tournament/top40-v2/teams/team-09/risk_policy.json",
+    "seed": 20260801,
+    "strategy_factory": "build_strategy",
+    "strategy_path": "tournament/top40-v2/teams/team-09/strategy.py",
+    "team_id": "team-09"
+  },
+  "delegated_a5_score_surface": {
+    "direct_invocation_allowed": false,
+    "entrypoint_path": "scripts/top40_v2_tournament_score_diagnostics_v5.py",
+    "entrypoint_sha256": "0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4",
+    "integration_freeze_commit": "d2b95f610722aab65b4e67466b34efeaa3554101",
+    "integration_freeze_path": "tournament/top40-v2/amendments/0005/integration-freeze.json",
+    "integration_freeze_sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c",
+    "invocation_rule": "Invoke A7 only; A7 preloads and delegates these exact A5 score bytes and identities."
+  },
+  "exact_match_fields": [
+    "team_id",
+    "family_id",
+    "candidate_id",
+    "seed",
+    "strategy_sha256",
+    "source_bundle_sha256",
+    "risk_config_sha256",
+    "config_sha256",
+    "registration_sha256"
+  ],
+  "hash_resolution": {
+    "first_added_only": true,
+    "post_registration_mutation_allowed": false,
+    "result_must_reference_registration_sha256": true,
+    "zero_sha256_sentinel": "0000000000000000000000000000000000000000000000000000000000000000",
+    "zero_sentinel_accepted_by_registration_or_score": false
+  },
+  "lineage": [
+    {
+      "stage": 1,
+      "requirement": "First-add the family record with the exact team_id and family_id before any material result."
+    },
+    {
+      "stage": 2,
+      "requirement": "Materialize the no-control root policy and exact center strategy/config, then compute registration hashes from those final bytes."
+    },
+    {
+      "stage": 3,
+      "requirement": "First-add the trial registration under A7 and bind all exact_match_fields plus the complete executable-source identity."
+    },
+    {
+      "stage": 4,
+      "requirement": "Run the registered candidate under A7. Accept no staged result whose identity tuple or any hash differs from its registration."
+    },
+    {
+      "stage": 5,
+      "requirement": "Let the exact delegated A5 score protocol derive diagnostics only from the registered staged artifacts; no team-authored metric may substitute."
+    },
+    {
+      "stage": 6,
+      "requirement": "Apply qualification_thresholds.json as the prospective decision rule while treating the central A5 evidence record as authoritative."
+    }
+  ],
+  "pure_crypto_dependency": {
+    "policy_sha256": "2c7fb0ff593d06c323517e60df4b28ab9387a2df580b83f82f65ef71c91fc350",
+    "report_sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
+    "required_violations": 0
+  },
+  "schema_version": 1,
+  "team_id": "team-09"
+}
