@@ -1,0 +1,30 @@
+{
+  "activation_authorized": false,
+  "amendment_id": "top40-v2-amendment-0008-team05-infrastructure-replacement",
+  "decision": "approved",
+  "draft": {
+    "commit": "265551b332e86182a04bee61e9c42778c485e7ab",
+    "files": {
+      "tournament/top40-v2/amendments/0008/AMENDMENT.md": "0da5117ad68e8fa899a055ca78bbc789baad8df9db2d3449afc05ba79de1f0de",
+      "tournament/top40-v2/amendments/0008/draft.json": "0865755d4c73e0efa6cdcd0facfa3105d1e851e65f5ec6996a83aa06e05714e5"
+    }
+  },
+  "review_scope": {
+    "a7_and_a6_parent_authorities_match": true,
+    "a7_documentary_one_shot_authority_requires_no_dispatcher_change": true,
+    "exactly_one_development_run_is_authorized": true,
+    "existing_family_is_unchanged_and_no_pivot_is_authorized": true,
+    "failed_history_remains_immutable_and_charged": true,
+    "fresh_candidate_bound_a5_ancestry_is_required_in_strict_order": true,
+    "freeze_not_review_is_the_activation_boundary": true,
+    "incident_is_infrastructure_only_before_strategy_construction": true,
+    "metrics_and_artifacts_are_empty": true,
+    "replacement_identity_is_exact_safe_and_unique": true,
+    "replacement_is_material_trial_2": true,
+    "scientific_risk_score_universe_budget_and_gate_changes_are_forbidden": true,
+    "terminal_replacement_replay_is_forbidden": true
+  },
+  "reviewed_at_utc": "2026-07-17T03:06:39Z",
+  "reviewer_id": "a8-independent-admin-review",
+  "schema_version": 1
+}
