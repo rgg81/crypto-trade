@@ -1,0 +1,34 @@
+{
+  "candidate_id": "team09-drp-pivot02-v1",
+  "family_id": "team09-defensive-residual-persistence-v1",
+  "files": [
+    {
+      "path": "frozen_config.json",
+      "sha256": "dcc37167524f5b0ccecb4b9172cbe46266f223cd6d984633349c01b1ca02c563",
+      "size": 3457
+    },
+    {
+      "path": "risk_policy.json",
+      "sha256": "f75a2e05cda7ba87a865527f7c95c03a734c1398e8be251f50074ad00163875e",
+      "size": 577
+    },
+    {
+      "path": "strategy.py",
+      "sha256": "c99529728368c9eda6a0ae92a676885e894d0f607053e3efa21a6d5a41445b15",
+      "size": 20092
+    },
+    {
+      "path": "tests/test_risk_policies.py",
+      "sha256": "131fb5784c8676fc6f23b855458df403a99357a6a6c322c7ebd0ec2b56f5379f",
+      "size": 3942
+    },
+    {
+      "path": "tests/test_strategy.py",
+      "sha256": "a2b4b805ddcaae052513eec969e3759dd539bd426ec3da74252671703a45b1a6",
+      "size": 18682
+    }
+  ],
+  "manifest_kind": "top40-v2-executable-source-manifest-v1",
+  "schema_version": 1,
+  "team_id": "team-09"
+}
