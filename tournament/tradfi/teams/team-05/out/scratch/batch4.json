@@ -1,0 +1,6 @@
+{"batch_id": "b4_abnvol_anchor", "experiments": [
+  {"id": "exp-011", "config": {"kind": "abn_vol", "W": 60, "F": 5, "H": 10, "direction": 1}},
+  {"id": "exp-012", "config": {"kind": "abn_vol", "W": 60, "F": 5, "H": 5, "direction": 1}},
+  {"id": "exp-013", "config": {"kind": "abn_vol", "W": 60, "F": 5, "H": 20, "direction": 1}},
+  {"id": "exp-014", "config": {"kind": "abn_vol", "W": 60, "F": 1, "H": 10, "direction": 1}}
+]}

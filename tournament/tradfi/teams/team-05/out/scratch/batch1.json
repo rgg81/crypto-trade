@@ -1,0 +1,6 @@
+{"batch_id": "b1_lookback_plateau", "experiments": [
+  {"id": "exp-001", "config": {"sort": "vol", "L": 120, "weighting": "rank"}},
+  {"id": "exp-002", "config": {"sort": "vol", "L": 60, "weighting": "rank"}},
+  {"id": "exp-003", "config": {"sort": "vol", "L": 180, "weighting": "rank"}},
+  {"id": "exp-004", "config": {"sort": "vol", "L": 252, "weighting": "rank"}}
+]}

@@ -1,0 +1,46 @@
+{
+  "family_id": "t05-volume-liquidity-anomalies-v1",
+  "frozen_at_utc": "2026-07-17T01:53:13+00:00",
+  "harness": "PASS",
+  "net_is_csv_sha256": "785892c19c2c3c05d5e6e07c404856a820b576b1398fe7ad6a5e81e54cbc6fde",
+  "reported": {
+    "1x": {
+      "ann_turnover": 0.9151988641888337,
+      "maxdd": -0.4286333053055349,
+      "mean_gross": 1.0,
+      "mean_net": -2.3082815220975843e-19,
+      "median_names_long": 24.0,
+      "median_names_short": 24.0,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bear": 0.5927602864025385,
+        "bull": 0.41035386768444765,
+        "chop": -0.17763879015892256
+      },
+      "sharpe": 0.3500406620057439,
+      "total_return": 0.9829535189323726
+    },
+    "2x": {
+      "ann_turnover": 0.9151988641888337,
+      "maxdd": -0.4293129185757939,
+      "mean_gross": 1.0,
+      "mean_net": -2.3082815220975843e-19,
+      "median_names_long": 24.0,
+      "median_names_short": 24.0,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bear": 0.5837022424355813,
+        "bull": 0.40260047369906654,
+        "chop": -0.18397541724866556
+      },
+      "sharpe": 0.3423412001392022,
+      "total_return": 0.945300504918448
+    }
+  },
+  "schema": 1,
+  "sources_sha256": {
+    "strategy.py": "230b9668bb2a5260e48fae5064d9fb3ba7c14da7d9c17114d3aedd1729bb7be0",
+    "test_strategy.py": "c325d27759a3d345c313ecab4c3c534d699e8c7a79144c164cd866ada0809dba"
+  },
+  "team_id": "team-05"
+}

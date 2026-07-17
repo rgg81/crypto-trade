@@ -1,0 +1,5 @@
+{"batch_id": "b6_amihud_refine", "experiments": [
+  {"id": "exp-019", "config": {"kind": "amihud", "K": 504, "H": 0, "direction": 1}},
+  {"id": "exp-020", "config": {"kind": "dollar_vol", "K": 252, "H": 0, "direction": -1}},
+  {"id": "exp-021", "config": {"kind": "amihud", "K": 252, "weighting": "quantile", "q": 15, "H": 0, "direction": 1}}
+]}

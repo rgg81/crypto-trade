@@ -1,0 +1,142 @@
+{
+  "exp-019": {
+    "config": {
+      "H": 0,
+      "K": 504,
+      "direction": 1,
+      "kind": "amihud"
+    },
+    "diag": {
+      "beta_of_net_vs_ew_mkt": 0.18058957135659454,
+      "meltup_core_2020_2021_msharpe": 1.4533630201130212,
+      "sub_2010_2015_msharpe": 0.19133253233953676,
+      "sub_2015_2024H1_msharpe": 0.2718071163417243
+    },
+    "m_1x": {
+      "ann_turnover": 0.5617947626412849,
+      "maxdd": -0.4516099682077973,
+      "mean_gross": 1.0,
+      "mean_net": 8.693428913834551e-19,
+      "median_names_long": 24.0,
+      "median_names_short": 24.0,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bear": 0.02344794716497214,
+        "bull": 0.318241067974364,
+        "chop": -0.03711254591348736
+      },
+      "sharpe": 0.2455515401834808,
+      "total_return": 0.5309480890941705
+    },
+    "m_2x": {
+      "ann_turnover": 0.5617947626412849,
+      "maxdd": -0.45298230345892654,
+      "mean_gross": 1.0,
+      "mean_net": 8.693428913834551e-19,
+      "median_names_long": 24.0,
+      "median_names_short": 24.0,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bear": 0.018172731016461257,
+        "bull": 0.3127359000223385,
+        "chop": -0.04215370432799282
+      },
+      "sharpe": 0.24010049203403988,
+      "total_return": 0.5098032758200088
+    }
+  },
+  "exp-020": {
+    "config": {
+      "H": 0,
+      "K": 252,
+      "direction": -1,
+      "kind": "dollar_vol"
+    },
+    "diag": {
+      "beta_of_net_vs_ew_mkt": 0.08324905921663744,
+      "meltup_core_2020_2021_msharpe": 1.4494791245203211,
+      "sub_2010_2015_msharpe": -0.1173755719018355,
+      "sub_2015_2024H1_msharpe": 0.22443728224737947
+    },
+    "m_1x": {
+      "ann_turnover": 0.746539291505575,
+      "maxdd": -0.585357896165024,
+      "mean_gross": 1.0,
+      "mean_net": -8.570125354328601e-19,
+      "median_names_long": 24.0,
+      "median_names_short": 24.0,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bear": 1.2606418480125818,
+        "bull": 0.01340075651427717,
+        "chop": -0.2493742528298518
+      },
+      "sharpe": 0.11547989895637278,
+      "total_return": 0.10454724948854954
+    },
+    "m_2x": {
+      "ann_turnover": 0.746539291505575,
+      "maxdd": -0.589105145618773,
+      "mean_gross": 1.0,
+      "mean_net": -8.570125354328601e-19,
+      "median_names_long": 24.0,
+      "median_names_short": 24.0,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bear": 1.2543322287345078,
+        "bull": 0.0071783190511104785,
+        "chop": -0.2550405436349245
+      },
+      "sharpe": 0.10940847968201638,
+      "total_return": 0.0883132624753089
+    }
+  },
+  "exp-021": {
+    "config": {
+      "H": 0,
+      "K": 252,
+      "direction": 1,
+      "kind": "amihud",
+      "q": 15,
+      "weighting": "quantile"
+    },
+    "diag": {
+      "beta_of_net_vs_ew_mkt": 0.14798353941649423,
+      "meltup_core_2020_2021_msharpe": 1.3434342623521844,
+      "sub_2010_2015_msharpe": 0.20159882023967618,
+      "sub_2015_2024H1_msharpe": 0.3187608722455794
+    },
+    "m_1x": {
+      "ann_turnover": 0.9952825013713659,
+      "maxdd": -0.4064560407406872,
+      "mean_gross": 1.0,
+      "mean_net": -1.231412117928407e-17,
+      "median_names_long": 15.0,
+      "median_names_short": 15.0,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bear": 1.3975717528665201,
+        "bull": 0.22888022294375027,
+        "chop": -0.2386046093310374
+      },
+      "sharpe": 0.28085408915268917,
+      "total_return": 0.6538360697555285
+    },
+    "m_2x": {
+      "ann_turnover": 0.9952825013713659,
+      "maxdd": -0.4089516827830396,
+      "mean_gross": 1.0,
+      "mean_net": -1.231412117928407e-17,
+      "median_names_long": 15.0,
+      "median_names_short": 15.0,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bear": 1.38628958350306,
+        "bull": 0.22091770796083085,
+        "chop": -0.24900543436714817
+      },
+      "sharpe": 0.27233843078529535,
+      "total_return": 0.6201353227687056
+    }
+  }
+}

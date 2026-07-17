@@ -1,0 +1,5 @@
+{"batch_id": "b2_bab_balance", "experiments": [
+  {"id": "exp-005", "config": {"sort": "vol", "L": 120, "weighting": "rank", "bab_balance": true}},
+  {"id": "exp-006", "config": {"sort": "vol", "L": 252, "weighting": "rank", "bab_balance": true}},
+  {"id": "exp-007", "config": {"sort": "beta", "L": 252, "weighting": "rank", "bab_balance": true}}
+]}

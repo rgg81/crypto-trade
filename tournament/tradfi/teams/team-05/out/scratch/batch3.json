@@ -1,0 +1,5 @@
+{"batch_id": "b3_infamily_closure", "experiments": [
+  {"id": "exp-008", "config": {"sort": "vol", "L": 120, "weighting": "sector_rank", "min_sector_names": 4}},
+  {"id": "exp-009", "config": {"sort": "vol", "L": 120, "weighting": "sector_rank", "min_sector_names": 4, "bab_balance": true}},
+  {"id": "exp-010", "config": {"sort": "idio_vol", "L": 120, "weighting": "rank", "bab_balance": true}}
+]}

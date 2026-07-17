@@ -1,0 +1,6 @@
+{"batch_id": "b5_amihud_divergence", "experiments": [
+  {"id": "exp-015", "config": {"kind": "amihud", "K": 126, "H": 0, "direction": 1}},
+  {"id": "exp-016", "config": {"kind": "amihud", "K": 252, "H": 0, "direction": 1}},
+  {"id": "exp-017", "config": {"kind": "divergence", "D": 20, "W": 60, "H": 10, "direction": 1}},
+  {"id": "exp-018", "config": {"kind": "divergence", "D": 60, "W": 60, "H": 10, "direction": 1}}
+]}

@@ -1,5 +1,10 @@
 {
   "team_id": "team-05",
+  "pivot_chain": [
+    "t05-lowvol-bab-v1: APPROVED then FALSIFIED on IS per pre-registered kill (a) — see research_brief.md and is_report.md",
+    "t05-shorthorizon-reversal-v1: pivot request VETOED (already another team's approved family); pivot not spent",
+    "t05-volume-liquidity-anomalies-v1: ACTIVE — pre-approved pivot (orchestrator ruling 2026-07-17), reg-004; pre-brief in research_brief.md PART III"
+  ],
   "vetoed": {
     "veto_round": 1,
     "veto_reason": "pass-1 FCFS collision: residual momentum registered first by team-01; both original backups also taken (sector-relative reversion by team-03, 52wk-high anchoring by team-02)",

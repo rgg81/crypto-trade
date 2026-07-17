@@ -1,0 +1,141 @@
+{
+  "exp-008": {
+    "config": {
+      "L": 120,
+      "min_sector_names": 4,
+      "sort": "vol",
+      "weighting": "sector_rank"
+    },
+    "diag": {
+      "beta_of_net_vs_ew_mkt": -0.25117463813856195,
+      "meltup_core_2020_2021_msharpe": -1.7586293979904377,
+      "sub_2010_2015_msharpe": 0.02124838531514087,
+      "sub_2015_2024H1_msharpe": -0.7275132175024884
+    },
+    "m_1x": {
+      "ann_turnover": 7.967144440478189,
+      "maxdd": -0.8407634279616277,
+      "mean_gross": 1.0,
+      "mean_net": 1.3326160258968275e-18,
+      "median_names_long": 21.0,
+      "median_names_short": 21.0,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bear": 0.9531317362987418,
+        "bull": -0.5826073206781492,
+        "chop": -0.6583977520736831
+      },
+      "sharpe": -0.47151951070766096,
+      "total_return": -0.719918786370876
+    },
+    "m_2x": {
+      "ann_turnover": 7.967144440478189,
+      "maxdd": -0.8562730142210654,
+      "mean_gross": 1.0,
+      "mean_net": 1.3326160258968275e-18,
+      "median_names_long": 21.0,
+      "median_names_short": 21.0,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bear": 0.8862402713151076,
+        "bull": -0.6380685424597743,
+        "chop": -0.6899904703713988
+      },
+      "sharpe": -0.5242456955011556,
+      "total_return": -0.7518940984078458
+    }
+  },
+  "exp-009": {
+    "config": {
+      "L": 120,
+      "bab_balance": true,
+      "min_sector_names": 4,
+      "sort": "vol",
+      "weighting": "sector_rank"
+    },
+    "diag": {
+      "beta_of_net_vs_ew_mkt": -0.1506288633839977,
+      "meltup_core_2020_2021_msharpe": -1.5845212669587156,
+      "sub_2010_2015_msharpe": 0.5005475405770072,
+      "sub_2015_2024H1_msharpe": -0.43092093218304744
+    },
+    "m_1x": {
+      "ann_turnover": 8.501842570643227,
+      "maxdd": -0.710146169400406,
+      "mean_gross": 1.0,
+      "mean_net": 0.14096627426750055,
+      "median_names_long": 21.0,
+      "median_names_short": 21.0,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bear": -0.2704492494527627,
+        "bull": -0.08728883731515456,
+        "chop": -0.20322914548289245
+      },
+      "sharpe": -0.13197436360366074,
+      "total_return": -0.3998011062869081
+    },
+    "m_2x": {
+      "ann_turnover": 8.501842570643227,
+      "maxdd": -0.7454752754243134,
+      "mean_gross": 1.0,
+      "mean_net": 0.14096627426750055,
+      "median_names_long": 21.0,
+      "median_names_short": 21.0,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bear": -0.3425080314389376,
+        "bull": -0.15242936294614093,
+        "chop": -0.24412673113391128
+      },
+      "sharpe": -0.19433933624850372,
+      "total_return": -0.4856856465410886
+    }
+  },
+  "exp-010": {
+    "config": {
+      "L": 120,
+      "bab_balance": true,
+      "sort": "idio_vol",
+      "weighting": "rank"
+    },
+    "diag": {
+      "beta_of_net_vs_ew_mkt": -0.15592682943647093,
+      "meltup_core_2020_2021_msharpe": -1.9936019694885578,
+      "sub_2010_2015_msharpe": -0.1759230756726275,
+      "sub_2015_2024H1_msharpe": -0.5596953481047567
+    },
+    "m_1x": {
+      "ann_turnover": 8.176407353704336,
+      "maxdd": -0.7966012329382861,
+      "mean_gross": 0.9999999985947772,
+      "mean_net": 0.155140135143697,
+      "median_names_long": 24.0,
+      "median_names_short": 24.0,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bear": -0.64904631259702,
+        "bull": -0.5395942145528514,
+        "chop": 0.11197822143434086
+      },
+      "sharpe": -0.4397218958076638,
+      "total_return": -0.7353092497093141
+    },
+    "m_2x": {
+      "ann_turnover": 8.176407353704336,
+      "maxdd": -0.8214525161343543,
+      "mean_gross": 0.9999999985947772,
+      "mean_net": 0.155140135143697,
+      "median_names_long": 24.0,
+      "median_names_short": 24.0,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bear": -0.7241684739806523,
+        "bull": -0.5983104915465659,
+        "chop": 0.05724553271174032
+      },
+      "sharpe": -0.49985091232504,
+      "total_return": -0.7736580267956754
+    }
+  }
+}
