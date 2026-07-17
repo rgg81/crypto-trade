@@ -1,0 +1,74 @@
+[
+  {
+    "label": "{\"L\": 252, \"M\": 126, \"kind\": \"rank\"}",
+    "sharpe_1x": -0.7616,
+    "sharpe_2x": -1.0523,
+    "maxdd_1x": -0.8889,
+    "ann_turnover": 40.25,
+    "median_long": 24.0,
+    "median_short": 24.0,
+    "mean_gross": 1.0,
+    "mean_net": 0.0,
+    "total_return_1x": -0.873,
+    "n_months": 174,
+    "regime_sharpe_1x": {
+      "bull": -0.879,
+      "bear": 0.079,
+      "chop": -0.616
+    }
+  },
+  {
+    "label": "{\"L\": 252, \"M\": 126, \"kind\": \"zscore\"}",
+    "sharpe_1x": -0.6725,
+    "sharpe_2x": -0.8019,
+    "maxdd_1x": -0.9062,
+    "ann_turnover": 25.8,
+    "median_long": 30.0,
+    "median_short": 18.0,
+    "mean_gross": 1.0,
+    "mean_net": 0.0004,
+    "total_return_1x": -0.893,
+    "n_months": 174,
+    "regime_sharpe_1x": {
+      "bull": -0.773,
+      "bear": -0.312,
+      "chop": -0.337
+    }
+  },
+  {
+    "label": "{\"L\": 252, \"M\": 126, \"kind\": \"quantile\", \"q\": 0.3333333333333333}",
+    "sharpe_1x": -0.5623,
+    "sharpe_2x": -0.826,
+    "maxdd_1x": -0.8243,
+    "ann_turnover": 33.53,
+    "median_long": 17.0,
+    "median_short": 16.0,
+    "mean_gross": 1.0,
+    "mean_net": 0.0181,
+    "total_return_1x": -0.769,
+    "n_months": 174,
+    "regime_sharpe_1x": {
+      "bull": -0.62,
+      "bear": -0.041,
+      "chop": -0.533
+    }
+  },
+  {
+    "label": "{\"L\": 252, \"M\": 126, \"kind\": \"quantile\", \"q\": 0.2}",
+    "sharpe_1x": -0.7212,
+    "sharpe_2x": -1.0379,
+    "maxdd_1x": -0.8849,
+    "ann_turnover": 55.2,
+    "median_long": 10.0,
+    "median_short": 9.0,
+    "mean_gross": 1.0,
+    "mean_net": 0.0513,
+    "total_return_1x": -0.86,
+    "n_months": 174,
+    "regime_sharpe_1x": {
+      "bull": -0.791,
+      "bear": -0.297,
+      "chop": -0.579
+    }
+  }
+]

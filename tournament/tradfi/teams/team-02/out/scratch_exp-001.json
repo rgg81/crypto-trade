@@ -1,0 +1,20 @@
+[
+  {
+    "label": "{\"L\": 252, \"M\": 126, \"kind\": \"rank\"}",
+    "sharpe_1x": -0.7616,
+    "sharpe_2x": -1.0523,
+    "maxdd_1x": -0.8889,
+    "ann_turnover": 40.25,
+    "median_long": 24.0,
+    "median_short": 24.0,
+    "mean_gross": 1.0,
+    "mean_net": 0.0,
+    "total_return_1x": -0.873,
+    "n_months": 174,
+    "regime_sharpe_1x": {
+      "bull": -0.879,
+      "bear": 0.079,
+      "chop": -0.616
+    }
+  }
+]

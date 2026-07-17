@@ -1,0 +1,38 @@
+[
+  {
+    "label": "{\"L\": 252, \"M\": 126, \"halflife\": 10, \"inv_vol\": false, \"kind\": \"rank\"}",
+    "sharpe_1x": -0.4941,
+    "sharpe_2x": -0.5417,
+    "maxdd_1x": -0.8077,
+    "ann_turnover": 6.55,
+    "median_long": 26.0,
+    "median_short": 22.0,
+    "mean_gross": 1.0,
+    "mean_net": -0.0015,
+    "total_return_1x": -0.757,
+    "n_months": 174,
+    "regime_sharpe_1x": {
+      "bull": -0.65,
+      "bear": 0.542,
+      "chop": -0.256
+    }
+  },
+  {
+    "label": "{\"L\": 252, \"M\": 126, \"halflife\": 10, \"inv_vol\": true, \"kind\": \"rank\"}",
+    "sharpe_1x": 0.232,
+    "sharpe_2x": 0.1513,
+    "maxdd_1x": -0.3333,
+    "ann_turnover": 8.08,
+    "median_long": 26.0,
+    "median_short": 22.0,
+    "mean_gross": 1.0,
+    "mean_net": 0.2098,
+    "total_return_1x": 0.407,
+    "n_months": 174,
+    "regime_sharpe_1x": {
+      "bull": 0.415,
+      "bear": -1.371,
+      "chop": 0.339
+    }
+  }
+]

@@ -1,0 +1,42 @@
+{
+  "metrics": {
+    "1x": {
+      "ann_turnover": 3.0733272663685276,
+      "maxdd": -0.3908847178695368,
+      "mean_gross": 1.0,
+      "mean_net": 0.00687487750384986,
+      "median_names_long": 22.0,
+      "median_names_short": 26.0,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bear": -0.3575081690280273,
+        "bull": 0.6792118929495953,
+        "chop": 0.03651051018582588
+      },
+      "sharpe": 0.49214575890237955,
+      "total_return": 1.9266494001026078
+    },
+    "2x": {
+      "ann_turnover": 3.0733272663685276,
+      "maxdd": -0.39376718120354237,
+      "mean_gross": 1.0,
+      "mean_net": 0.00687487750384986,
+      "median_names_long": 22.0,
+      "median_names_short": 26.0,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bear": -0.37982557770813713,
+        "bull": 0.6538984673574489,
+        "chop": 0.02441872961082255
+      },
+      "sharpe": 0.46952887116222997,
+      "total_return": 1.7642130041501125
+    }
+  },
+  "schema": 1,
+  "team_id": "team-02",
+  "window": {
+    "hi_exclusive": "2024-07-01",
+    "lo": "2010-01-01"
+  }
+}
