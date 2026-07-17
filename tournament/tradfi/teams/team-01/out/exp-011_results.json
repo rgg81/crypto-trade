@@ -1,0 +1,139 @@
+[
+ {
+  "label": "rank continuous",
+  "cfg": {
+   "resid": "market+sector",
+   "beta_win": 63,
+   "form": 252,
+   "skip": 21,
+   "scaling": "blend",
+   "scheme": "rank",
+   "halflife": 10,
+   "mp_frac": 0.9
+  },
+  "cost_1x": {
+   "sharpe": 0.4546090644543481,
+   "maxdd": -0.2833583364448099,
+   "ann_turnover": 4.033695615518792,
+   "total_return": 1.2049913717125196,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.44429514226422817,
+    "bear": -0.24010695691512887,
+    "chop": 0.7318548336636881
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 5.2754678731192714e-17
+  },
+  "cost_2x": {
+   "sharpe": 0.41829044356305306,
+   "maxdd": -0.28785331155016514,
+   "ann_turnover": 4.033695615518792,
+   "total_return": 1.0409855284584766,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.40911665521963514,
+    "bear": -0.2908548444953225,
+    "chop": 0.6981594206444165
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 5.2754678731192714e-17
+  }
+ },
+ {
+  "label": "quantile q=0.3",
+  "cfg": {
+   "resid": "market+sector",
+   "beta_win": 63,
+   "form": 252,
+   "skip": 21,
+   "scaling": "blend",
+   "scheme": "quantile",
+   "halflife": 10,
+   "mp_frac": 0.9,
+   "q": 0.3
+  },
+  "cost_1x": {
+   "sharpe": 0.39917386039945524,
+   "maxdd": -0.28057608532873557,
+   "ann_turnover": 5.004118124430761,
+   "total_return": 0.9098768241043051,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.41497235977654595,
+    "bear": -0.2572296101152629,
+    "chop": 0.5962690492656878
+   },
+   "median_names_long": 22.0,
+   "median_names_short": 26.0,
+   "mean_gross": 1.0,
+   "mean_net": -1.110135341309925e-16
+  },
+  "cost_2x": {
+   "sharpe": 0.35178178459419135,
+   "maxdd": -0.28612922831626353,
+   "ann_turnover": 5.004118124430761,
+   "total_return": 0.7326036955211912,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.3689454142402117,
+    "bear": -0.3125403844481948,
+    "chop": 0.5504228590507468
+   },
+   "median_names_long": 22.0,
+   "median_names_short": 26.0,
+   "mean_gross": 1.0,
+   "mean_net": -1.110135341309925e-16
+  }
+ },
+ {
+  "label": "quantile q=0.2",
+  "cfg": {
+   "resid": "market+sector",
+   "beta_win": 63,
+   "form": 252,
+   "skip": 21,
+   "scaling": "blend",
+   "scheme": "quantile",
+   "halflife": 10,
+   "mp_frac": 0.9,
+   "q": 0.2
+  },
+  "cost_1x": {
+   "sharpe": 0.4843674768497628,
+   "maxdd": -0.29230674341437224,
+   "ann_turnover": 6.144091336616568,
+   "total_return": 1.3751568567697414,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.43300087338791604,
+    "bear": -0.4120979594332761,
+    "chop": 1.0409189739670304
+   },
+   "median_names_long": 17.0,
+   "median_names_short": 30.0,
+   "mean_gross": 1.0,
+   "mean_net": -8.763870583985989e-17
+  },
+  "cost_2x": {
+   "sharpe": 0.4394690974096955,
+   "maxdd": -0.295908088969808,
+   "ann_turnover": 6.144091336616568,
+   "total_return": 1.1567913497864764,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.3906305636975429,
+    "bear": -0.47632842840213413,
+    "chop": 0.994817391563793
+   },
+   "median_names_long": 17.0,
+   "median_names_short": 30.0,
+   "mean_gross": 1.0,
+   "mean_net": -8.763870583985989e-17
+  }
+ }
+]

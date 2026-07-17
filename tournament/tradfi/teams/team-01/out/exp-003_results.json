@@ -1,0 +1,92 @@
+[
+ {
+  "label": "raw-mom form252 skip21 sum",
+  "cfg": {
+   "resid": "none",
+   "beta_win": 252,
+   "form": 252,
+   "skip": 21,
+   "scaling": "sum",
+   "scheme": "rank",
+   "halflife": 10,
+   "mp_frac": 0.9
+  },
+  "cost_1x": {
+   "sharpe": 0.4849558429048911,
+   "maxdd": -0.25914214443344785,
+   "ann_turnover": 4.041581659160416,
+   "total_return": 1.3662923865262884,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.6521901951580856,
+    "bear": -1.2676808939570992,
+    "chop": 0.6945122198947362
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 5.339759970843547e-17
+  },
+  "cost_2x": {
+   "sharpe": 0.4542832951403148,
+   "maxdd": -0.2627201622474229,
+   "ann_turnover": 4.041581659160416,
+   "total_return": 1.2160203786747688,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.6215754541678017,
+    "bear": -1.3033176926407428,
+    "chop": 0.6662228009110412
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 5.339759970843547e-17
+  }
+ },
+ {
+  "label": "raw-mom form252 skip21 ir",
+  "cfg": {
+   "resid": "none",
+   "beta_win": 252,
+   "form": 252,
+   "skip": 21,
+   "scaling": "ir",
+   "scheme": "rank",
+   "halflife": 10,
+   "mp_frac": 0.9
+  },
+  "cost_1x": {
+   "sharpe": 0.3322893192875541,
+   "maxdd": -0.2702678164156813,
+   "ann_turnover": 4.182622561241248,
+   "total_return": 0.7428356196995918,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.3413674104988987,
+    "bear": -0.4771248536500403,
+    "chop": 0.5830333950828599
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 5.854453689375657e-17
+  },
+  "cost_2x": {
+   "sharpe": 0.2980629373872508,
+   "maxdd": -0.27679666067270015,
+   "ann_turnover": 4.182622561241248,
+   "total_return": 0.6164451471693289,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.30707012083345187,
+    "bear": -0.5226888378802997,
+    "chop": 0.5537635776716341
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 5.854453689375657e-17
+  }
+ }
+]

@@ -1,0 +1,47 @@
+[
+ {
+  "label": "resid-mom core 252/21 b252 ir",
+  "cfg": {
+   "resid": "market",
+   "beta_win": 252,
+   "form": 252,
+   "skip": 21,
+   "scaling": "ir",
+   "scheme": "rank",
+   "halflife": 10,
+   "mp_frac": 0.9
+  },
+  "cost_1x": {
+   "sharpe": 0.3239886596978103,
+   "maxdd": -0.2808782496253338,
+   "ann_turnover": 3.9063790575399,
+   "total_return": 0.7150601122722358,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.2990354071960436,
+    "bear": -0.3791742853250088,
+    "chop": 0.6496677896184417
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 5.421491302726704e-17
+  },
+  "cost_2x": {
+   "sharpe": 0.2892828072705119,
+   "maxdd": -0.2859625655552265,
+   "ann_turnover": 3.9063790575399,
+   "total_return": 0.5905870014596446,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.2661567349900887,
+    "bear": -0.4193223959089559,
+    "chop": 0.6126576582408668
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 5.421491302726704e-17
+  }
+ }
+]

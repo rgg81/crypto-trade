@@ -1,0 +1,92 @@
+[
+ {
+  "label": "scaling ir",
+  "cfg": {
+   "resid": "market+sector",
+   "beta_win": 63,
+   "form": 252,
+   "skip": 21,
+   "scaling": "ir",
+   "scheme": "rank",
+   "halflife": 10,
+   "mp_frac": 0.9
+  },
+  "cost_1x": {
+   "sharpe": 0.4093658202071376,
+   "maxdd": -0.28562696311575353,
+   "ann_turnover": 4.046001872464248,
+   "total_return": 0.9987903388016937,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.37968435683903545,
+    "bear": -0.06149744325681016,
+    "chop": 0.6732286127149659
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 4.5853525019187e-17
+  },
+  "cost_2x": {
+   "sharpe": 0.3717641483057051,
+   "maxdd": -0.29028353629233805,
+   "ann_turnover": 4.046001872464248,
+   "total_return": 0.8453707590616655,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.34295495721134023,
+    "bear": -0.11001078624445378,
+    "chop": 0.6387239969369228
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 4.5853525019187e-17
+  }
+ },
+ {
+  "label": "scaling sum",
+  "cfg": {
+   "resid": "market+sector",
+   "beta_win": 63,
+   "form": 252,
+   "skip": 21,
+   "scaling": "sum",
+   "scheme": "rank",
+   "halflife": 10,
+   "mp_frac": 0.9
+  },
+  "cost_1x": {
+   "sharpe": 0.4800335697482179,
+   "maxdd": -0.2793025358187984,
+   "ann_turnover": 3.9495962237631894,
+   "total_return": 1.3286541756514243,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.49567159087423807,
+    "bear": -0.4665851155270707,
+    "chop": 0.7600731383301567
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 4.3838055326591206e-17
+  },
+  "cost_2x": {
+   "sharpe": 0.4453759156374221,
+   "maxdd": -0.2835459182902341,
+   "ann_turnover": 3.9495962237631894,
+   "total_return": 1.163276519746531,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.4622903489862744,
+    "bear": -0.51680444050463,
+    "chop": 0.7275768348619062
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 4.3838055326591206e-17
+  }
+ }
+]

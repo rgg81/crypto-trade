@@ -1,0 +1,182 @@
+[
+ {
+  "label": "halflife 0",
+  "cfg": {
+   "resid": "market+sector",
+   "beta_win": 63,
+   "form": 252,
+   "skip": 21,
+   "scaling": "blend",
+   "scheme": "rank",
+   "halflife": 0,
+   "mp_frac": 0.9
+  },
+  "cost_1x": {
+   "sharpe": 0.36776550536494734,
+   "maxdd": -0.26474036772459164,
+   "ann_turnover": 22.466804131039318,
+   "total_return": 0.787670414815524,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.41786672386488083,
+    "bear": -0.7047334975428592,
+    "chop": 0.5793654173553269
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 4.6459356116850596e-17
+  },
+  "cost_2x": {
+   "sharpe": 0.1596653835849805,
+   "maxdd": -0.2902569099277704,
+   "ann_turnover": 22.466804131039318,
+   "total_return": 0.16662214179815615,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.21945025976532306,
+    "bear": -0.9978199169739307,
+    "chop": 0.3711336074168999
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 4.6459356116850596e-17
+  }
+ },
+ {
+  "label": "halflife 5",
+  "cfg": {
+   "resid": "market+sector",
+   "beta_win": 63,
+   "form": 252,
+   "skip": 21,
+   "scaling": "blend",
+   "scheme": "rank",
+   "halflife": 5,
+   "mp_frac": 0.9
+  },
+  "cost_1x": {
+   "sharpe": 0.4732142222068962,
+   "maxdd": -0.2670928789795628,
+   "ann_turnover": 5.604492873378243,
+   "total_return": 1.262361703502295,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.49202833483537844,
+    "bear": -0.4144797480265806,
+    "chop": 0.7266665491692081
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 4.830734461629543e-17
+  },
+  "cost_2x": {
+   "sharpe": 0.42221284246476337,
+   "maxdd": -0.2734700938874768,
+   "ann_turnover": 5.604492873378243,
+   "total_return": 1.0324809079719786,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.44298196592914174,
+    "bear": -0.48504301975665093,
+    "chop": 0.6775782507092137
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 4.830734461629543e-17
+  }
+ },
+ {
+  "label": "halflife 10",
+  "cfg": {
+   "resid": "market+sector",
+   "beta_win": 63,
+   "form": 252,
+   "skip": 21,
+   "scaling": "blend",
+   "scheme": "rank",
+   "halflife": 10,
+   "mp_frac": 0.9
+  },
+  "cost_1x": {
+   "sharpe": 0.4546090644543481,
+   "maxdd": -0.2833583364448099,
+   "ann_turnover": 4.033695615518792,
+   "total_return": 1.2049913717125196,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.44429514226422817,
+    "bear": -0.24010695691512887,
+    "chop": 0.7318548336636881
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 5.2754678731192714e-17
+  },
+  "cost_2x": {
+   "sharpe": 0.41829044356305306,
+   "maxdd": -0.28785331155016514,
+   "ann_turnover": 4.033695615518792,
+   "total_return": 1.0409855284584766,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.40911665521963514,
+    "bear": -0.2908548444953225,
+    "chop": 0.6981594206444165
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 5.2754678731192714e-17
+  }
+ },
+ {
+  "label": "halflife 21",
+  "cfg": {
+   "resid": "market+sector",
+   "beta_win": 63,
+   "form": 252,
+   "skip": 21,
+   "scaling": "blend",
+   "scheme": "rank",
+   "halflife": 21,
+   "mp_frac": 0.9
+  },
+  "cost_1x": {
+   "sharpe": 0.4061345252959861,
+   "maxdd": -0.2969520840380785,
+   "ann_turnover": 2.947227069409018,
+   "total_return": 1.0115600595798524,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.3396582838497451,
+    "bear": 0.012635010046099097,
+    "chop": 0.758428962345948
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 2.4558957117335933e-17
+  },
+  "cost_2x": {
+   "sharpe": 0.3798476506528633,
+   "maxdd": -0.3001140155669074,
+   "ann_turnover": 2.947227069409018,
+   "total_return": 0.9009707030089025,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.3137603610069004,
+    "bear": -0.022804444832698983,
+    "chop": 0.7356135658335873
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 2.4558957117335933e-17
+  }
+ }
+]

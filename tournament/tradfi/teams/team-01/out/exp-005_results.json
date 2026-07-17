@@ -1,0 +1,272 @@
+[
+ {
+  "label": "form126 skip10",
+  "cfg": {
+   "resid": "market",
+   "beta_win": 252,
+   "form": 126,
+   "skip": 10,
+   "scaling": "ir",
+   "scheme": "rank",
+   "halflife": 10,
+   "mp_frac": 0.9
+  },
+  "cost_1x": {
+   "sharpe": 0.303167402322628,
+   "maxdd": -0.30345067747688237,
+   "ann_turnover": 5.772634403433244,
+   "total_return": 0.6595918344745286,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.6282679897244992,
+    "bear": -0.33519585264481205,
+    "chop": -0.6662707569699095
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 5.742168362620632e-17
+  },
+  "cost_2x": {
+   "sharpe": 0.25320772446138684,
+   "maxdd": -0.3076873882099711,
+   "ann_turnover": 5.772634403433244,
+   "total_return": 0.48462784345995,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.5812927767637941,
+    "bear": -0.3963764382736459,
+    "chop": -0.7217630919330154
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 5.742168362620632e-17
+  }
+ },
+ {
+  "label": "form126 skip21",
+  "cfg": {
+   "resid": "market",
+   "beta_win": 252,
+   "form": 126,
+   "skip": 21,
+   "scaling": "ir",
+   "scheme": "rank",
+   "halflife": 10,
+   "mp_frac": 0.9
+  },
+  "cost_1x": {
+   "sharpe": 0.28359877022246655,
+   "maxdd": -0.28888599049292873,
+   "ann_turnover": 6.100192581998734,
+   "total_return": 0.6045154509664856,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.5920259633820923,
+    "bear": -0.33712281302046615,
+    "chop": -0.6661384111304329
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 5.5543979893076e-17
+  },
+  "cost_2x": {
+   "sharpe": 0.23089688488713375,
+   "maxdd": -0.2933879869546181,
+   "ann_turnover": 6.100192581998734,
+   "total_return": 0.4239871578208889,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.5426587406100307,
+    "bear": -0.40311149025653303,
+    "chop": -0.7262097184819979
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 5.5543979893076e-17
+  }
+ },
+ {
+  "label": "form189 skip10",
+  "cfg": {
+   "resid": "market",
+   "beta_win": 252,
+   "form": 189,
+   "skip": 10,
+   "scaling": "ir",
+   "scheme": "rank",
+   "halflife": 10,
+   "mp_frac": 0.9
+  },
+  "cost_1x": {
+   "sharpe": 0.2897617337489861,
+   "maxdd": -0.3312881659227329,
+   "ann_turnover": 4.501006003359474,
+   "total_return": 0.5797927111142078,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.46367623363572685,
+    "bear": -0.6989705041931517,
+    "chop": 0.06504026744288498
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 5.841622772563188e-17
+  },
+  "cost_2x": {
+   "sharpe": 0.2512527781497904,
+   "maxdd": -0.33430163905958,
+   "ann_turnover": 4.501006003359474,
+   "total_return": 0.4531993442169957,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.42782623717034884,
+    "bear": -0.7724451210906143,
+    "chop": 0.02997948794886483
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 5.841622772563188e-17
+  }
+ },
+ {
+  "label": "form189 skip21",
+  "cfg": {
+   "resid": "market",
+   "beta_win": 252,
+   "form": 189,
+   "skip": 21,
+   "scaling": "ir",
+   "scheme": "rank",
+   "halflife": 10,
+   "mp_frac": 0.9
+  },
+  "cost_1x": {
+   "sharpe": 0.2942255703701776,
+   "maxdd": -0.3136483162372067,
+   "ann_turnover": 4.676848096032839,
+   "total_return": 0.6113453610104624,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.4118415482629664,
+    "bear": -0.25539948545598234,
+    "chop": 0.10355264519108817
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 5.68468448992931e-17
+  },
+  "cost_2x": {
+   "sharpe": 0.25431668195487245,
+   "maxdd": -0.3167964172241544,
+   "ann_turnover": 4.676848096032839,
+   "total_return": 0.4754695951629506,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.37475139975796734,
+    "bear": -0.3269174149710156,
+    "chop": 0.067058889013612
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 5.68468448992931e-17
+  }
+ },
+ {
+  "label": "form252 skip10",
+  "cfg": {
+   "resid": "market",
+   "beta_win": 252,
+   "form": 252,
+   "skip": 10,
+   "scaling": "ir",
+   "scheme": "rank",
+   "halflife": 10,
+   "mp_frac": 0.9
+  },
+  "cost_1x": {
+   "sharpe": 0.34267256408849156,
+   "maxdd": -0.30120709709313753,
+   "ann_turnover": 3.8071295966047476,
+   "total_return": 0.7720552963215679,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.36321350109566436,
+    "bear": -0.6474802001418403,
+    "chop": 0.6265814982918175
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 5.563311541436923e-17
+  },
+  "cost_2x": {
+   "sharpe": 0.3085552912060974,
+   "maxdd": -0.30589756061607665,
+   "ann_turnover": 3.8071295966047476,
+   "total_return": 0.6467899213033779,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.3308722753299099,
+    "bear": -0.6869280750041038,
+    "chop": 0.5897646157649563
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 5.563311541436923e-17
+  }
+ },
+ {
+  "label": "form252 skip21",
+  "cfg": {
+   "resid": "market",
+   "beta_win": 252,
+   "form": 252,
+   "skip": 21,
+   "scaling": "ir",
+   "scheme": "rank",
+   "halflife": 10,
+   "mp_frac": 0.9
+  },
+  "cost_1x": {
+   "sharpe": 0.3239886596978103,
+   "maxdd": -0.2808782496253338,
+   "ann_turnover": 3.9063790575399,
+   "total_return": 0.7150601122722358,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.2990354071960436,
+    "bear": -0.3791742853250088,
+    "chop": 0.6496677896184417
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 5.421491302726704e-17
+  },
+  "cost_2x": {
+   "sharpe": 0.2892828072705119,
+   "maxdd": -0.2859625655552265,
+   "ann_turnover": 3.9063790575399,
+   "total_return": 0.5905870014596446,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.2661567349900887,
+    "bear": -0.4193223959089559,
+    "chop": 0.6126576582408668
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 5.421491302726704e-17
+  }
+ }
+]

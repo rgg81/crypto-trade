@@ -1,0 +1,47 @@
+[
+ {
+  "label": "scaling blend",
+  "cfg": {
+   "resid": "market+sector",
+   "beta_win": 63,
+   "form": 252,
+   "skip": 21,
+   "scaling": "blend",
+   "scheme": "rank",
+   "halflife": 10,
+   "mp_frac": 0.9
+  },
+  "cost_1x": {
+   "sharpe": 0.4546090644543481,
+   "maxdd": -0.2833583364448099,
+   "ann_turnover": 4.033695615518792,
+   "total_return": 1.2049913717125196,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.44429514226422817,
+    "bear": -0.24010695691512887,
+    "chop": 0.7318548336636881
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 5.2754678731192714e-17
+  },
+  "cost_2x": {
+   "sharpe": 0.41829044356305306,
+   "maxdd": -0.28785331155016514,
+   "ann_turnover": 4.033695615518792,
+   "total_return": 1.0409855284584766,
+   "n_months": 174,
+   "regime_sharpe": {
+    "bull": 0.40911665521963514,
+    "bear": -0.2908548444953225,
+    "chop": 0.6981594206444165
+   },
+   "median_names_long": 24.0,
+   "median_names_short": 24.0,
+   "mean_gross": 1.0,
+   "mean_net": 5.2754678731192714e-17
+  }
+ }
+]
