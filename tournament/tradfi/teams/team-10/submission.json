@@ -1,0 +1,46 @@
+{
+  "family_id": "t10-ts-trend-v1",
+  "frozen_at_utc": "2026-07-17T02:16:13+00:00",
+  "harness": "PASS",
+  "net_is_csv_sha256": "363b27994d8299e8273061641ef2553a841479da7b000958a3e95dadd1e57e47",
+  "reported": {
+    "1x": {
+      "ann_turnover": 6.399178345580495,
+      "maxdd": -0.23151810875271983,
+      "mean_gross": 0.9696654865284068,
+      "mean_net": 0.19542646392438598,
+      "median_names_long": 37.0,
+      "median_names_short": 11.0,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bear": -1.127786788827586,
+        "bull": 1.186053459421408,
+        "chop": 0.6413715668200886
+      },
+      "sharpe": 0.8200684819929324,
+      "total_return": 4.241282047495205
+    },
+    "2x": {
+      "ann_turnover": 6.399178345580495,
+      "maxdd": -0.23574941553263595,
+      "mean_gross": 0.9696654865284068,
+      "mean_net": 0.19542646392438598,
+      "median_names_long": 37.0,
+      "median_names_short": 11.0,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bear": -1.1728407663886193,
+        "bull": 1.133201534796596,
+        "chop": 0.5769534567924733
+      },
+      "sharpe": 0.7653336894577235,
+      "total_return": 3.631032122409745
+    }
+  },
+  "schema": 1,
+  "sources_sha256": {
+    "strategy.py": "a74c15dbca5c1559ae4cf934910615c56c1a9d75e3f4068d7aa9a96621b9815d",
+    "test_strategy.py": "0c77914a3fb8b872aaa426ca924f52e9822394d2b0c6b3089a55dbaf73a49ca0"
+  },
+  "team_id": "team-10"
+}
