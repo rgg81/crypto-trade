@@ -1,5 +1,5 @@
 {
-  "candidate_id": "t10-dac-core-v1",
+  "candidate_id": "t10-fpu-core-v1",
   "evidence_class": "declared-retrained-out-of-fold",
   "folds": [
     {

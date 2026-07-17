@@ -1,5 +1,5 @@
 {
-  "candidate_id": "t10-dac-core-v1",
+  "candidate_id": "t10-fpu-core-v1",
   "evidence_status": "prospective_plan_only",
   "folds": [
     {
@@ -51,15 +51,15 @@
       "training_start": "2020-02-03"
     }
   ],
-  "fold_model_rule": "Instantiate a clean pivot-01 strategy in every fold. It has no learned coefficients; each byte-distinct fold artifact binds exact source/config/seed, 24h schedule, fold dates, empty learned-state declaration, and fresh-state proof.",
-  "label_rule": "No forward label enters strategy fitting. Organizer performance labels begin strictly after each decision and are used only for fold scoring.",
+  "fold_model_rule": "Instantiate a clean final pivot-02 strategy in every fold. It has no learned coefficients; every byte-distinct fold artifact binds exact source/config/seed, 168h schedule, fold dates, empty learned-state declaration, and fresh-state proof.",
+  "label_rule": "No forward label enters strategy fitting. Organizer performance labels begin strictly after each scheduled decision and are used only for fold scoring.",
   "minimum_requirements": {
     "positive_folds": 4,
     "positive_quarter_fraction": 0.55,
     "trial_adjusted_probability_positive": 0.9
   },
-  "purge_rule": "The seven-day gap between each expanding training end and test start exceeds the 24h score/holding horizon; no test observation is used for a parameter or preprocessing choice.",
+  "purge_rule": "The seven-day gap equals the 168h score/holding horizon and A5 purges cross-fold endpoints; no test observation is used for a parameter or preprocessing choice.",
   "schema_version": 1,
-  "selection_rule": "Register the exact family and candidate before producing any fold result. Stitched out-of-fold evidence is evaluated only by the organizer and may not be replaced with slices from one fitted backtest.",
+  "selection_rule": "Register the exact family and sole final candidate before producing any fold result. Stitched out-of-fold evidence is evaluated only by the organizer and may not be replaced with slices from one fitted backtest.",
   "team_id": "team-10"
 }

@@ -1,51 +1,15 @@
 {
-  "activation_rule": "Pivot-01 no-control center runs first. All ablation definitions are prospective, but no ablation or risk policy can rescue insolvency or a failed core gate.",
   "accounting": {
     "reference_configurations": 1,
-    "signal_ablation_configurations": 7,
-    "status": "pivot_01_prospective_unregistered",
-    "total_material_configurations": 8
+    "signal_ablation_configurations": 0,
+    "status": "final_pivot_prospective_unregistered",
+    "total_material_configurations": 1
   },
-  "executable_materialization_rule": "Each override requires separate hash-bound executable strategy/config bytes and an A5 manifest/review before registration; this file is not a runtime selector.",
-  "ablations": [
-    {
-      "ablation_id": "equal-weighted-anchor",
-      "expected_diagnostic": "Tests whether quote-volume weighting contributes beyond an ordinary geometric price anchor.",
-      "overrides": {"volume_weighted_anchor": false}
-    },
-    {
-      "ablation_id": "no-residual-confirmation",
-      "expected_diagnostic": "Tests whether short-horizon stabilization/rollover confirmation avoids premature convergence entries.",
-      "overrides": {"confirmation_weight": 0.0}
-    },
-    {
-      "ablation_id": "no-tail-quarantine",
-      "expected_diagnostic": "Directly tests whether excluding gap, tail, drawdown, range, and volatility extremes is essential to solvency and drawdown resilience.",
-      "overrides": {"tail_quarantine_enabled": false}
-    },
-    {
-      "ablation_id": "no-rank-retention",
-      "expected_diagnostic": "Tests whether the two-rank incumbent buffer materially reduces turnover without erasing the convergence signal.",
-      "overrides": {"retention_rank_buffer": 0}
-    },
-    {
-      "ablation_id": "shorter-anchor",
-      "expected_diagnostic": "Tests whether the 63-bar anchor adds stability beyond a more reactive 48-bar anchor.",
-      "overrides": {"anchor_horizon_bars": 48}
-    },
-    {
-      "ablation_id": "loose-dislocation-quarantine",
-      "expected_diagnostic": "Tests whether excluding very large anchor deviations avoids value traps and rebound hazards.",
-      "overrides": {"maximum_abs_anchor_dislocation": 0.25}
-    },
-    {
-      "ablation_id": "loose-one-bar-gap-filter",
-      "expected_diagnostic": "Tests the specific contribution of the 20% one-bar quarantine while retaining the other tail filters.",
-      "overrides": {"maximum_abs_one_bar_return": 0.99}
-    }
-  ],
-  "family_id": "t10-defensive-anchor-convergence-v1",
-  "reference_candidate_id": "t10-dac-core-v1",
+  "ablations": [],
+  "candidate_id": "t10-fpu-core-v1",
+  "family_id": "t10-funding-pressure-unwind-v1",
+  "reason": "Final pivot-02 has one fully frozen mechanism. Controls, parameter exploration, sign flips, mechanism ablations, and post-result rescue variants are forbidden. A failed center is DNF.",
   "schema_version": 1,
+  "status": "final_pivot_ablations_forbidden",
   "team_id": "team-10"
 }

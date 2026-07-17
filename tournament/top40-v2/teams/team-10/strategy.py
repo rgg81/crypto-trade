@@ -1,9 +1,14 @@
-"""Team 10 pivot-01: defensive volume-anchor convergence.
+"""Team 10 final pivot-02: funding-pressure transfer and unwind.
 
-The strategy is a slow, market-neutral relative-value mechanism.  It trades moderate deviations
-from a causal volume-weighted price anchor only inside a crash-quarantined cohort, changes sleeves
-at most once per 24 hours, and retains incumbents inside a rank buffer.  Amendment 0006 supplies
-the eligible pure-crypto universe; ticker text is never an eligibility feature.
+The strategy ranks the organizer-authorized native-crypto universe by strictly past funding
+pressure.  Persistent positive funding is a costly crowded-long condition and therefore receives a
+lower expected price-return score; persistent negative funding receives a higher score.  Four
+low-pressure contracts are held long and four high-pressure contracts short on a weekly schedule.
+
+Universe classification is deliberately outside this module.  Amendment 0006 supplies membership
+containing native crypto assets only and excludes stablecoin bases plus tokenized or synthetic
+TradFi securities, commodities, metals, and indexes.  The strategy never guesses asset class from
+ticker text.
 """
 
 from __future__ import annotations
@@ -23,30 +28,31 @@ _SCHEDULE_ANCHOR = pd.Timestamp("1970-01-01T00:00:00Z")
 
 @dataclasses.dataclass(frozen=True)
 class StrategyConfig:
-    """Complete material configuration for defensive anchor convergence."""
+    """Complete material configuration for the final funding-pressure mechanism."""
 
     interval_hours: int = 8
-    decision_interval_hours: int = 24
-    anchor_horizon_bars: int = 63
+    decision_interval_hours: int = 168
+    price_history_bars: int = 64
     volatility_horizon_bars: int = 42
     tail_horizon_bars: int = 21
-    confirmation_horizon_bars: int = 9
-    minimum_cross_section: int = 14
-    minimum_scored_symbols: int = 12
+    funding_lookback_days: int = 14
+    minimum_funding_events: int = 12
+    recent_funding_events: int = 3
+    maximum_funding_staleness_hours: int = 24
+    minimum_cross_section: int = 12
+    minimum_scored_symbols: int = 10
     selection_count_per_side: int = 4
     retention_rank_buffer: int = 2
-    gross_exposure: float = 0.20
-    maximum_symbol_weight: float = 0.03
+    gross_exposure: float = 0.12
+    maximum_symbol_weight: float = 0.02
     maximum_abs_one_bar_return: float = 0.20
     maximum_abs_tail_return: float = 0.35
     maximum_window_drawdown: float = 0.45
     maximum_log_price_range: float = 0.70
     maximum_annualized_volatility: float = 1.50
-    maximum_abs_anchor_dislocation: float = 0.15
+    maximum_abs_funding_rate: float = 0.01
     minimum_positive_volume_fraction: float = 0.80
-    confirmation_weight: float = 0.25
-    volume_weighted_anchor: bool = True
-    tail_quarantine_enabled: bool = True
+    funding_persistence_weight: float = 0.30
     robust_z_clip: float = 4.0
     minimum_score_spread: float = 0.75
     minimum_selected_abs_score: float = 0.25
@@ -55,10 +61,13 @@ class StrategyConfig:
         integer_fields = (
             self.interval_hours,
             self.decision_interval_hours,
-            self.anchor_horizon_bars,
+            self.price_history_bars,
             self.volatility_horizon_bars,
             self.tail_horizon_bars,
-            self.confirmation_horizon_bars,
+            self.funding_lookback_days,
+            self.minimum_funding_events,
+            self.recent_funding_events,
+            self.maximum_funding_staleness_hours,
             self.minimum_cross_section,
             self.minimum_scored_symbols,
             self.selection_count_per_side,
@@ -67,13 +76,14 @@ class StrategyConfig:
             raise ValueError("integer configuration fields must be positive")
         if self.decision_interval_hours % self.interval_hours:
             raise ValueError("decision interval must be a multiple of the bar interval")
-        if not (
-            self.confirmation_horizon_bars
-            < self.tail_horizon_bars
-            < self.volatility_horizon_bars
-            < self.anchor_horizon_bars
-        ):
-            raise ValueError("feature horizons must be strictly increasing")
+        if not (self.tail_horizon_bars < self.volatility_horizon_bars < self.price_history_bars):
+            raise ValueError("price quarantine horizons must be strictly increasing")
+        if self.recent_funding_events > self.minimum_funding_events:
+            raise ValueError("recent funding events cannot exceed the minimum event count")
+        if self.maximum_funding_staleness_hours > 24 * self.funding_lookback_days:
+            raise ValueError("funding staleness cannot exceed the funding lookback")
+        if self.minimum_cross_section < self.minimum_scored_symbols:
+            raise ValueError("minimum cross section cannot be below minimum scored symbols")
         if self.minimum_scored_symbols < 2 * self.selection_count_per_side:
             raise ValueError("minimum scored symbols cannot permit overlapping sleeves")
         if type(self.retention_rank_buffer) is not int or self.retention_rank_buffer < 0:
@@ -89,33 +99,29 @@ class StrategyConfig:
             self.maximum_abs_one_bar_return,
             self.maximum_abs_tail_return,
             self.maximum_window_drawdown,
-            self.maximum_abs_anchor_dislocation,
             self.minimum_positive_volume_fraction,
         )
         if any(not 0.0 < value < 1.0 for value in unit_interval_fields):
-            raise ValueError(
-                "return, drawdown, dislocation, and volume thresholds must be in (0, 1)"
-            )
+            raise ValueError("return, drawdown, and volume thresholds must be in (0, 1)")
         positive_fields = (
             self.maximum_log_price_range,
             self.maximum_annualized_volatility,
+            self.maximum_abs_funding_rate,
             self.robust_z_clip,
             self.minimum_score_spread,
             self.minimum_selected_abs_score,
         )
         if any(not math.isfinite(value) or value <= 0.0 for value in positive_fields):
             raise ValueError("scale and score thresholds must be positive and finite")
-        if not math.isfinite(self.confirmation_weight) or self.confirmation_weight < 0.0:
-            raise ValueError("confirmation weight must be finite and nonnegative")
         if (
-            type(self.volume_weighted_anchor) is not bool
-            or type(self.tail_quarantine_enabled) is not bool
+            not math.isfinite(self.funding_persistence_weight)
+            or self.funding_persistence_weight < 0.0
         ):
-            raise ValueError("anchor and quarantine switches must be Boolean")
+            raise ValueError("funding persistence weight must be finite and nonnegative")
 
 
-class DefensiveAnchorConvergence:
-    """Stateful daily sleeve selector with causal tail quarantine and rank retention."""
+class FundingPressureUnwind:
+    """Stateful weekly selector for a balanced funding-pressure transfer book."""
 
     def __init__(self, config: StrategyConfig | None = None) -> None:
         self.config = config or StrategyConfig()
@@ -136,8 +142,12 @@ class DefensiveAnchorConvergence:
             raise ValueError("eligible symbols must be unique")
 
         interval = pd.Timedelta(hours=self.config.interval_hours)
-        histories: dict[str, pd.DataFrame] = {}
-        returns_by_symbol: dict[str, pd.Series] = {}
+        expected_close_times = pd.date_range(
+            end=decision_time,
+            periods=self.config.price_history_bars,
+            freq=interval,
+        )
+        price_admissible: set[str] = set()
         for symbol in sorted(eligible):
             raw_frame = context.bars.get(symbol)
             if raw_frame is None:
@@ -145,89 +155,64 @@ class DefensiveAnchorConvergence:
             history = _closed_history(raw_frame, decision_time, interval)
             if history.empty or history.index[-1] != decision_time:
                 continue
-            histories[symbol] = history
-            returns_by_symbol[symbol] = _adjacent_log_returns(history["close"], interval)
-        if len(returns_by_symbol) < self.config.minimum_cross_section:
-            return self._capture_empty_and_flat()
-
-        return_matrix = pd.concat(returns_by_symbol, axis=1).sort_index()
-        return_matrix.columns = list(returns_by_symbol)
-        breadth = return_matrix.notna().sum(axis=1)
-        market_return = return_matrix.median(axis=1, skipna=True).where(
-            breadth >= self.config.minimum_cross_section
-        )
-
-        expected_close_times = pd.date_range(
-            end=decision_time,
-            periods=self.config.anchor_horizon_bars + 1,
-            freq=interval,
-        )
-        expected_return_times = expected_close_times[1:]
-        raw_features: dict[str, tuple[float, float]] = {}
-        for symbol in sorted(histories):
-            window = histories[symbol].reindex(expected_close_times)
+            window = history.reindex(expected_close_times)
             if window.isna().any().any():
-                continue
-            log_returns = returns_by_symbol[symbol].reindex(expected_return_times)
-            common = market_return.reindex(expected_return_times)
-            if log_returns.isna().any() or common.isna().any():
                 continue
             prices = window["close"].to_numpy(dtype=float)
             quote_volume = window["quote_volume"].to_numpy(dtype=float)
-            raw_return_values = log_returns.to_numpy(dtype=float)
-            if self.config.tail_quarantine_enabled and not self._passes_tail_quarantine(
-                prices, quote_volume, raw_return_values
+            if _passes_price_admissibility(prices, quote_volume, self.config):
+                price_admissible.add(symbol)
+        if len(price_admissible) < self.config.minimum_cross_section:
+            return self._capture_empty_and_flat()
+
+        funding = _closed_funding(
+            getattr(context, "funding", None),
+            decision_time=decision_time,
+            lookback=pd.Timedelta(days=self.config.funding_lookback_days),
+        )
+        pressure_by_symbol: dict[str, float] = {}
+        for symbol in sorted(price_admissible):
+            rows = funding.loc[funding["symbol"] == symbol]
+            if len(rows) < self.config.minimum_funding_events:
+                continue
+            if decision_time - rows["funding_time"].iloc[-1] > pd.Timedelta(
+                hours=self.config.maximum_funding_staleness_hours
             ):
                 continue
-            residual_returns = raw_return_values - common.to_numpy(dtype=float)
-            anchor_prices = prices[1:]
-            anchor_volume = (
-                quote_volume[1:]
-                if self.config.volume_weighted_anchor
-                else np.ones_like(quote_volume[1:])
-            )
-            volume_sum = float(anchor_volume.sum())
-            if volume_sum <= np.finfo(float).eps:
+            rates = rows["funding_rate"].to_numpy(dtype=float)
+            if float(np.abs(rates).max()) > self.config.maximum_abs_funding_rate:
                 continue
-            log_anchor = float(np.dot(np.log(anchor_prices), anchor_volume) / volume_sum)
-            anchor_distance = float(np.log(anchor_prices[-1]) - log_anchor)
-            confirmation = _studentized_sum(
-                residual_returns[-self.config.confirmation_horizon_bars :]
+            sign_balance = float(np.sign(rates).mean())
+            recent_sign_balance = float(np.sign(rates[-self.config.recent_funding_events :]).mean())
+            absolute_transfer = float(np.abs(rates).sum())
+            cumulative_transfer = float(rates.sum())
+            persistent_transfer = (
+                0.5 * sign_balance + 0.5 * recent_sign_balance
+            ) * absolute_transfer
+            pressure = cumulative_transfer + (
+                self.config.funding_persistence_weight * persistent_transfer
             )
-            raw_features[symbol] = (anchor_distance, confirmation)
-        if len(raw_features) < self.config.minimum_scored_symbols:
+            if math.isfinite(pressure):
+                pressure_by_symbol[symbol] = pressure
+        if len(pressure_by_symbol) < self.config.minimum_scored_symbols:
             return self._capture_empty_and_flat()
 
-        features = pd.DataFrame.from_dict(
-            raw_features,
-            orient="index",
-            columns=("anchor_distance", "confirmation"),
-        ).sort_index()
-        residual_distance = features["anchor_distance"] - float(
-            features["anchor_distance"].median()
-        )
-        moderate = residual_distance.abs() <= self.config.maximum_abs_anchor_dislocation
-        features = features.loc[moderate]
-        residual_distance = residual_distance.loc[moderate]
-        if len(features) < self.config.minimum_scored_symbols:
-            return self._capture_empty_and_flat()
-
-        distance_z = _robust_cross_sectional_z(
-            residual_distance,
+        funding_pressure = pd.Series(pressure_by_symbol, dtype=float).sort_index()
+        pressure_z = _robust_cross_sectional_z(
+            funding_pressure,
             self.config.robust_z_clip,
         )
-        confirmation_z = _robust_cross_sectional_z(
-            features["confirmation"],
-            self.config.robust_z_clip,
-        )
-        transformed_scores = -distance_z + self.config.confirmation_weight * confirmation_z
+        transformed_scores = -pressure_z
         if not np.isfinite(transformed_scores.to_numpy(dtype=float)).all():
-            raise ValueError("non-finite anchor-convergence score")
+            raise ValueError("non-finite funding-pressure score")
         scores = {
             str(symbol): float(transformed_scores[symbol])
             for symbol in sorted(transformed_scores.index)
         }
-        captured_scores = _capture_scores(scores, expected_symbols=frozenset(features.index))
+        captured_scores = _capture_scores(
+            scores,
+            expected_symbols=frozenset(pressure_by_symbol),
+        )
         if max(captured_scores.values()) - min(captured_scores.values()) < (
             self.config.minimum_score_spread
         ):
@@ -265,40 +250,6 @@ class DefensiveAnchorConvergence:
         weights.update({symbol: -symbol_weight for symbol in short_symbols})
         _validate_output(weights, eligible, self.config)
         return weights
-
-    def _passes_tail_quarantine(
-        self,
-        prices: np.ndarray,
-        quote_volume: np.ndarray,
-        log_returns: np.ndarray,
-    ) -> bool:
-        if not (
-            np.isfinite(prices).all()
-            and np.isfinite(quote_volume).all()
-            and np.isfinite(log_returns).all()
-        ):
-            return False
-        if (prices <= 0.0).any() or (quote_volume < 0.0).any():
-            return False
-        positive_volume_fraction = float(np.mean(quote_volume > 0.0))
-        if positive_volume_fraction < self.config.minimum_positive_volume_fraction:
-            return False
-        simple_returns = np.expm1(log_returns)
-        if float(np.abs(simple_returns).max()) > self.config.maximum_abs_one_bar_return:
-            return False
-        tail_return = abs(float(np.expm1(log_returns[-self.config.tail_horizon_bars :].sum())))
-        if tail_return > self.config.maximum_abs_tail_return:
-            return False
-        running_peak = np.maximum.accumulate(prices)
-        maximum_drawdown = float(np.max(1.0 - prices / running_peak))
-        if maximum_drawdown > self.config.maximum_window_drawdown:
-            return False
-        log_range = float(np.log(prices.max()) - np.log(prices.min()))
-        if log_range > self.config.maximum_log_price_range:
-            return False
-        volatility_window = log_returns[-self.config.volatility_horizon_bars :]
-        annualized_volatility = float(volatility_window.std(ddof=0) * math.sqrt(3 * 365))
-        return annualized_volatility <= self.config.maximum_annualized_volatility
 
     def _flat(self) -> dict[str, float]:
         self._long_symbols = ()
@@ -356,20 +307,72 @@ def _closed_history(
     return closed
 
 
-def _adjacent_log_returns(prices: pd.Series, interval: pd.Timedelta) -> pd.Series:
-    returns = np.log(prices).diff()
-    adjacency = prices.index.to_series().diff().eq(interval).to_numpy()
-    returns.iloc[~adjacency] = np.nan
-    return returns
+def _closed_funding(
+    frame: Any,
+    *,
+    decision_time: pd.Timestamp,
+    lookback: pd.Timedelta,
+) -> pd.DataFrame:
+    columns = ("funding_time", "symbol", "funding_rate")
+    if frame is None:
+        return pd.DataFrame(columns=columns)
+    if not isinstance(frame, pd.DataFrame):
+        raise TypeError("funding input must be a pandas DataFrame")
+    missing = set(columns) - set(frame.columns)
+    if missing:
+        raise ValueError(f"funding frame missing columns: {sorted(missing)}")
+    funding_times = pd.to_datetime(frame["funding_time"], utc=True, errors="raise")
+    usable_mask = (funding_times < decision_time) & (funding_times >= decision_time - lookback)
+    if not bool(usable_mask.any()):
+        return pd.DataFrame(columns=columns)
+    closed = pd.DataFrame(
+        {
+            "funding_time": funding_times.loc[usable_mask],
+            "symbol": frame.loc[usable_mask, "symbol"],
+            "funding_rate": pd.to_numeric(
+                frame.loc[usable_mask, "funding_rate"],
+                errors="raise",
+            ),
+        }
+    )
+    if any(type(symbol) is not str or not symbol for symbol in closed["symbol"]):
+        raise ValueError("past funding symbols must be nonempty strings")
+    if closed.duplicated(subset=["symbol", "funding_time"]).any():
+        raise ValueError("duplicate funding event for symbol and timestamp")
+    rates = closed["funding_rate"].to_numpy(dtype=float)
+    if not np.isfinite(rates).all():
+        raise ValueError("past funding rates must be finite")
+    return closed.sort_values(["symbol", "funding_time"]).reset_index(drop=True)
 
 
-def _studentized_sum(values: np.ndarray) -> float:
-    if values.ndim != 1 or len(values) < 2 or not np.isfinite(values).all():
-        raise ValueError("confirmation window must be finite and one dimensional")
-    energy = float(np.sqrt(np.square(values).sum()))
-    if energy <= np.finfo(float).eps:
-        return 0.0
-    return float(values.sum() / energy)
+def _passes_price_admissibility(
+    prices: np.ndarray,
+    quote_volume: np.ndarray,
+    config: StrategyConfig,
+) -> bool:
+    if not np.isfinite(prices).all() or not np.isfinite(quote_volume).all():
+        return False
+    if (prices <= 0.0).any() or (quote_volume < 0.0).any():
+        return False
+    if float(np.mean(quote_volume > 0.0)) < config.minimum_positive_volume_fraction:
+        return False
+    log_returns = np.diff(np.log(prices))
+    simple_returns = np.expm1(log_returns)
+    if float(np.abs(simple_returns).max()) > config.maximum_abs_one_bar_return:
+        return False
+    tail_return = abs(float(np.expm1(log_returns[-config.tail_horizon_bars :].sum())))
+    if tail_return > config.maximum_abs_tail_return:
+        return False
+    running_peak = np.maximum.accumulate(prices)
+    maximum_drawdown = float(np.max(1.0 - prices / running_peak))
+    if maximum_drawdown > config.maximum_window_drawdown:
+        return False
+    log_range = float(np.log(prices.max()) - np.log(prices.min()))
+    if log_range > config.maximum_log_price_range:
+        return False
+    volatility_window = log_returns[-config.volatility_horizon_bars :]
+    annualized_volatility = float(volatility_window.std(ddof=0) * math.sqrt(3 * 365))
+    return annualized_volatility <= config.maximum_annualized_volatility
 
 
 def _robust_cross_sectional_z(values: pd.Series, clip: float) -> pd.Series:
@@ -455,6 +458,6 @@ def _validate_output(
         raise ValueError("target sleeves must be dollar balanced")
 
 
-def build_strategy() -> DefensiveAnchorConvergence:
-    """Canonical tournament entrypoint for pivot-01."""
-    return DefensiveAnchorConvergence()
+def build_strategy() -> FundingPressureUnwind:
+    """Canonical tournament entrypoint for final pivot-02."""
+    return FundingPressureUnwind()

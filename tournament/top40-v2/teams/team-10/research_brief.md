@@ -1,45 +1,49 @@
-# Team 10 pivot-01 research brief — defensive anchor convergence
+# Team 10 final pivot-02 research brief — funding-pressure transfer and unwind
 
 Status: **prospective, unregistered, unevaluated**
 
-The registered initial no-control candidate is terminal after portfolio insolvency at
-`2022-05-13 00:00:00+00:00`; it produced no metrics. Its artifacts remain unchanged. Controls are
-forbidden, so pivot-01 introduces a new parent-linked family rather than modifying that result.
+Both earlier families are terminal. The initial no-control residual trend/reversion candidate became
+insolvent before metrics. Pivot-01 restored solvency but falsified its convergence thesis: annualized
+return was `-0.09328445205038527`, Sharpe `-1.86846407399797`, doubled-cost Sharpe
+`-2.436836526128816`, Calmar `-0.30631265956122306`, maximum drawdown
+`0.3045399827222629`, and positive-quarter fraction `0.14285714285714285`. Every reported regime
+Sharpe was negative: bull `-1.5124282333375314`, bear `-2.200607191286561`, chop
+`-3.0617769845946468`, and stress `-1.5413188398402713`. Its `9581` trades and worse doubled-cost
+result also show that daily rank churn magnified a pervasive alpha failure. This is not an isolated
+regime, scale, or control problem, so neither a sign flip nor a risk overlay is defensible.
 
-## Mechanism and causal construction
+## Final mechanism
 
-At the 00:00 UTC decision only, pivot-01 forms 63 exact past-closed 8h candles for each A6-eligible
-coin. It excludes recent gaps, cumulative extremes, deep drawdowns, broad price ranges, excessive
-volatility, and insufficient volume. Within the remaining cohort it measures residual distance from
-a quote-volume-weighted log-price anchor and combines its negative with nine-bar market-residual
-confirmation. The exact finite expected-return score is captured by A5 before spread filtering,
-buffered selection, sizing, or central risk.
+Pivot-02 uses a new economic input: paid funding imbalance. At the weekly Unix-epoch-anchored
+decision, it admits only exact, non-extreme price histories and strictly past, nonstale funding events
+from the prior 14 days. Funding pressure is cumulative transfer plus a frozen persistence term.
+Persistent positive funding represents costly crowded longs, so it receives a low expected price
+return score; low or negative pressure receives a high score. The exact negative robust z-score is
+captured once by A5 before score filtering, selection, retention, sizing, caps, or organizer risk.
 
-Four moderate discounts are held long and four premiums short at 0.025 each. The book is 0.20 gross,
-zero net, updates at most daily, retains incumbents inside two extra ranks, and returns hold when
-sleeves do not change. This is a convergence/cohort mechanism, not a scaled or sign-flipped version
-of the failed adaptive trend/reversal family.
+Four lowest-pressure contracts are held long and four highest-pressure contracts short at `0.015`
+each. The book is `0.12` gross, zero net, changes at most weekly, retains incumbents within two extra
+ranks, and returns hold when sleeves are unchanged. The lower gross and weekly cadence are intrinsic
+to the transfer mechanism, not a control applied to either failed signal.
 
-## Regime roles
+## Universe and regime roles
 
-- Bull: confirmed moderate discounts should recover through the long sleeve.
-- Bear: confirmed moderate premiums should decay through the short sleeve; crashed names are not
-  chased short.
-- Chop: two-sided convergence toward the volume anchor is the primary expected edge.
-- Stress: quarantine and low gross are intrinsic construction rules; no risk overlay is active.
+Only organizer-qualified native crypto base assets may enter. Stablecoin bases and tokenized or
+synthetic TradFi securities, commodities, metals, and indexes remain excluded even if Binance lists
+them as perpetual contracts. A stable quote/collateral currency does not turn a native crypto base
+asset into a stablecoin. Amendment 0006 metadata is the only classifier; ticker-name heuristics are
+forbidden.
 
-Long-bull, short-bear, combined-chop, both sleeves, ordinary/doubled costs, six folds, quarters, A5
-score correlation, and every numeric threshold remain non-compensatory.
+- Bull: the long sleeve owns low-cost, low-crowding or negatively funded contracts and targets
+  under-owned participation or short covering.
+- Bear: the short sleeve holds highly positive-funded crowded longs, receives funding, and targets
+  unwind.
+- Chop: the balanced book targets recurring funding transfer and cross-sectional crowding
+  normalization.
+- Stress: exact data admissibility, weekly cadence, `0.12` gross, and zero net are frozen portfolio
+  construction; no central risk control is active.
 
-## Falsifiers and staging
-
-Insolvency, missing metrics, nonpositive base/doubled return, Sharpe below 0.75/0.35, or any gate in
-`qualification_thresholds.json` terminates the core. The volume-anchor, confirmation, quarantine,
-and retention ablations test the mechanism. All 12 parameter neighbors are fixed now; if the center
-passes non-neighbor gates, all must be materialized, reviewed, and registered before the first
-neighbor result, then run without early stopping. Controls cannot rescue failure.
-
-The cumulative material budget counts the terminal initial core as one. Pivot-01 reserves at most 31
-more choices: one center, seven mechanism ablations, twelve neighbors, five additional policies only
-after a passing core, and six confirmations. Base/doubled costs are paired outputs, not separate
-choices; the resulting cumulative ceiling is 32 of 80.
+Every return, cost, A5, fold, quarter, drawdown, Calmar, regime, role, and sleeve threshold is
+non-compensatory. This is the second and final pivot. Controls, ablations, and neighbors are
+forbidden; core failure is DNF. Official stability thresholds are preserved and not waived, so Team
+10 also cannot self-claim qualification without organizer-authorized stability evidence.

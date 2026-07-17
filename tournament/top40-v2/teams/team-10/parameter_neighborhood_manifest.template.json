@@ -1,91 +1,9 @@
 {
-  "candidate_id": "t10-dac-core-v1",
-  "neighbors": [
-    {
-      "daily_returns_path": "PENDING/p01-n01-anchor-54.daily-returns.json",
-      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "neighbor_id": "p01-n01-anchor-54",
-      "parameter_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/p01-n01-anchor-54.parameters.json",
-      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-    },
-    {
-      "daily_returns_path": "PENDING/p01-n02-anchor-72.daily-returns.json",
-      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "neighbor_id": "p01-n02-anchor-72",
-      "parameter_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/p01-n02-anchor-72.parameters.json",
-      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-    },
-    {
-      "daily_returns_path": "PENDING/p01-n03-confirm-6.daily-returns.json",
-      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "neighbor_id": "p01-n03-confirm-6",
-      "parameter_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/p01-n03-confirm-6.parameters.json",
-      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-    },
-    {
-      "daily_returns_path": "PENDING/p01-n04-confirm-12.daily-returns.json",
-      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "neighbor_id": "p01-n04-confirm-12",
-      "parameter_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/p01-n04-confirm-12.parameters.json",
-      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-    },
-    {
-      "daily_returns_path": "PENDING/p01-n05-gap-015.daily-returns.json",
-      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "neighbor_id": "p01-n05-gap-015",
-      "parameter_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/p01-n05-gap-015.parameters.json",
-      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-    },
-    {
-      "daily_returns_path": "PENDING/p01-n06-gap-025.daily-returns.json",
-      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "neighbor_id": "p01-n06-gap-025",
-      "parameter_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/p01-n06-gap-025.parameters.json",
-      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-    },
-    {
-      "daily_returns_path": "PENDING/p01-n07-tail-030.daily-returns.json",
-      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "neighbor_id": "p01-n07-tail-030",
-      "parameter_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/p01-n07-tail-030.parameters.json",
-      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-    },
-    {
-      "daily_returns_path": "PENDING/p01-n08-tail-040.daily-returns.json",
-      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "neighbor_id": "p01-n08-tail-040",
-      "parameter_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/p01-n08-tail-040.parameters.json",
-      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-    },
-    {
-      "daily_returns_path": "PENDING/p01-n09-vol-125.daily-returns.json",
-      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "neighbor_id": "p01-n09-vol-125",
-      "parameter_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/p01-n09-vol-125.parameters.json",
-      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-    },
-    {
-      "daily_returns_path": "PENDING/p01-n10-vol-175.daily-returns.json",
-      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "neighbor_id": "p01-n10-vol-175",
-      "parameter_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/p01-n10-vol-175.parameters.json",
-      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-    },
-    {
-      "daily_returns_path": "PENDING/p01-n11-buffer-1.daily-returns.json",
-      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "neighbor_id": "p01-n11-buffer-1",
-      "parameter_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/p01-n11-buffer-1.parameters.json",
-      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-    },
-    {
-      "daily_returns_path": "PENDING/p01-n12-buffer-3.daily-returns.json",
-      "daily_returns_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "neighbor_id": "p01-n12-buffer-3",
-      "parameter_artifact_path": "tournament/top40-v2/teams/team-10/PENDING/p01-n12-buffer-3.parameters.json",
-      "parameter_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
-    }
-  ],
+  "candidate_id": "t10-fpu-core-v1",
+  "evidence_status": "not-authorized",
+  "family_id": "t10-funding-pressure-unwind-v1",
+  "neighbors": [],
+  "reason": "Final pivot-02 neighbors are explicitly forbidden. This declaration prevents historical pivot-01 neighbor templates from being mistaken for active evidence.",
   "schema_version": 1,
   "team_id": "team-10"
 }

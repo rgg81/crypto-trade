@@ -1,0 +1,38 @@
+{
+  "diagnosis_scope": "Mechanism-level: pivot-01 was solvent but negative in every reported regime; chop was worst, doubled costs further reduced Sharpe, drawdown breached 0.30, and 9581 trades exposed high churn. This supports replacing both signal and cadence, not flipping or controlling the old score.",
+  "evidence": {
+    "candidate_id": "t10-dac-core-v1",
+    "metrics": {
+      "annualized_return": -0.09328445205038527,
+      "calmar": -0.30631265956122306,
+      "double_cost_sharpe": -2.436836526128816,
+      "max_drawdown": 0.3045399827222629,
+      "net_sharpe": -1.86846407399797,
+      "net_sortino": -2.396098794518946,
+      "positive_quarter_fraction": 0.14285714285714285,
+      "regime_sharpe": {
+        "bear": -2.200607191286561,
+        "bull": -1.5124282333375314,
+        "chop": -3.0617769845946468,
+        "stress": -1.5413188398402713
+      },
+      "trade_count": 9581
+    },
+    "registration_sha256": "1261660821ba905a2c52d4fc6086bba3918a18480966973f0fb85c5b5b554ea6",
+    "result_timestamp_utc": "2026-07-17T01:52:20.727751Z",
+    "risk_policy_sha256": "77a354d3afb387a8c855d92e29a0326d435687094fb73c263cedd1aa2a9cbda3",
+    "source_bundle_sha256": "ee3cac3c14ea028b11198cc1532b7fc50bfb98fcdc924882e9bc1d3e62888183",
+    "status": "completed",
+    "strategy_sha256": "d5e09cdb795955bcac87f03b8333092a2d7ba481642d9038c09ff0271b70bf7a"
+  },
+  "final_failure_action": "dnf",
+  "new_candidate_id": "t10-fpu-core-v1",
+  "new_family_id": "t10-funding-pressure-unwind-v1",
+  "parent_family_id": "t10-defensive-anchor-convergence-v1",
+  "pivot_number": 2,
+  "pivot_reason": "Replace pervasively negative daily price-anchor convergence with a weekly, balanced funding-transfer and positioning-crowding mechanism using a new causal input and exact 168h A5 score/label contract. Controls, ablations, sign flips, and neighbors are not used.",
+  "registered_at_utc": "REPLACE_WITH_ACTUAL_PIVOT_FAMILY_REGISTRATION_TIMESTAMP_Z",
+  "schema_version": 1,
+  "status": "prospective_unregistered_final",
+  "team_id": "team-10"
+}

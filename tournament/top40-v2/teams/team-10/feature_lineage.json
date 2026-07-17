@@ -1,14 +1,14 @@
 {
-  "candidate_id": "t10-dac-core-v1",
+  "candidate_id": "t10-fpu-core-v1",
   "features": [
     {
       "availability_rule": "Usable only when open_time + 8h <= decision_time.",
       "event_timestamp": "open_time + 8h",
       "field": "close",
       "lag": "no additional lag after close",
-      "missing_rule": "Require exact 8h adjacency; never bridge or impute.",
-      "source": "DecisionContext.bars for A6-authorized eligible symbols",
-      "transform": "log close and adjacent log return"
+      "missing_rule": "Require 64 exact 8h close boundaries; never bridge or impute.",
+      "source": "DecisionContext.bars for A6-authorized native-crypto symbols",
+      "transform": "price admissibility only: one-bar/tail return, drawdown, log range, and annualized volatility"
     },
     {
       "availability_rule": "Available with the same closed candle.",
@@ -17,62 +17,38 @@
       "lag": "no additional lag after close",
       "missing_rule": "Require finite nonnegative values and at least 80% positive observations.",
       "source": "DecisionContext.bars",
-      "transform": "63-bar weights for the log-price anchor"
+      "transform": "price-history admissibility only; never an alpha rank"
     },
     {
-      "availability_rule": "At least 14 eligible adjacent returns at each timestamp.",
-      "event_timestamp": "closed 8h timestamp",
-      "field": "cross_sectional_market_return",
-      "lag": "past-closed constituents only",
-      "missing_rule": "Missing below breadth 14; dependent candidates fail closed.",
-      "source": "eligible close returns",
-      "transform": "cross-sectional median"
+      "availability_rule": "Use only funding_time strictly before decision_time and no earlier than 14 days before it.",
+      "event_timestamp": "funding_time",
+      "field": "funding_rate",
+      "lag": "strictly past event",
+      "missing_rule": "Require at least 12 unique finite events, a latest event no older than 24h, and no absolute event rate above 0.01; exclude rather than impute.",
+      "source": "DecisionContext.funding for an A6-authorized eligible symbol",
+      "transform": "cumulative funding transfer plus 0.30 times sign-persistence-weighted absolute transfer over the trailing 14 days"
     },
     {
-      "availability_rule": "All windows end at the scheduled 00:00 UTC decision.",
-      "event_timestamp": "decision_time",
-      "field": "tail_quarantine",
-      "lag": "21/42/63 past returns or closes",
-      "missing_rule": "Exclude rather than impute.",
-      "source": "close returns, closes, and quote volume",
-      "transform": "exclude >20% one-bar absolute return, >35% 21-bar absolute return, >45% drawdown, >0.70 log range, >1.50 annualized volatility, or insufficient positive volume"
-    },
-    {
-      "availability_rule": "All 63 anchor candles are exactly adjacent and closed.",
-      "event_timestamp": "decision_time",
-      "field": "residual_volume_anchor_distance",
-      "lag": "63 past-closed bars",
-      "missing_rule": "Exclude; also quarantine absolute residual distance above 0.15.",
-      "source": "close and quote volume",
-      "transform": "latest log close minus quote-volume-weighted mean log close, then subtract cross-sectional median distance"
-    },
-    {
-      "availability_rule": "Nine exact adjacent residual returns end at decision_time.",
-      "event_timestamp": "decision_time",
-      "field": "residual_confirmation",
-      "lag": "nine past-closed bars",
-      "missing_rule": "Exclude.",
-      "source": "coin return minus cross-sectional market return",
-      "transform": "sum divided by root sum of squares"
-    },
-    {
-      "availability_rule": "Computed only at the 24h schedule after quarantine and robust cross-sectional transforms.",
+      "availability_rule": "Computed only at the 168h Unix-epoch-anchored schedule after price and funding admissibility.",
       "event_timestamp": "decision_time",
       "field": "operative_expected_return_score",
-      "lag": "inherits anchor and confirmation",
-      "missing_rule": "Flat below 12 scored coins, spread 0.75, or four scores on either side of +/-0.25.",
-      "source": "residual anchor distance and confirmation",
-      "transform": "-robust_z(distance) + 0.25 * robust_z(confirmation), exposed once through strategy.score_boundary before selection"
+      "lag": "inherits strictly past closed candles and funding events",
+      "missing_rule": "Capture one empty dict and flatten below 10 scored coins; flatten after capture for spread below 0.75 or insufficient four-per-side scores beyond +/-0.25.",
+      "source": "cross-sectional funding pressure",
+      "transform": "negative robust z-score of funding pressure, exposed once through strategy.score_boundary before spread filtering, selection, retention, sizing, caps, or organizer risk"
     }
   ],
   "forbidden_inputs": [
     "ticker-based asset classification",
-    "future or open candles",
-    "funding and auxiliary datasets",
+    "stablecoin base assets",
+    "tokenized or synthetic TradFi securities, commodities, metals, or indexes",
+    "future, still-open, or duplicate candles",
+    "funding events at or after decision_time",
     "transaction opens before A5 label construction",
     "positions, equity, fills, PnL, results, private qualifier, or OOS data"
   ],
-  "family_id": "t10-defensive-anchor-convergence-v1",
+  "family_id": "t10-funding-pressure-unwind-v1",
   "schema_version": 1,
-  "team_id": "team-10"
+  "team_id": "team-10",
+  "universe_authority": "Amendment 0006 metadata-qualified eligible_symbols only; quote/collateral denomination does not classify the base asset."
 }

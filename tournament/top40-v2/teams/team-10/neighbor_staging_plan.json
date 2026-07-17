@@ -1,33 +1,20 @@
 {
-  "candidate_id": "t10-dac-core-v1",
+  "candidate_id": "t10-fpu-core-v1",
   "center_risk_state": "team-10-no-control",
-  "declaration": {
-    "all_neighbor_ids_and_one_axis_values_fixed_before_center_result": true,
-    "declared_neighbor_count": 12,
-    "parameter_declaration_path": "tournament/top40-v2/teams/team-10/parameter_neighborhood.json",
-    "result_fields_permitted_in_declaration": false
-  },
-  "family_id": "t10-defensive-anchor-convergence-v1",
+  "family_id": "t10-funding-pressure-unwind-v1",
   "noncircular_rules": {
-    "all_twelve_neighbors_registered_before_first_neighbor_result": true,
-    "center_cannot_qualify_until_complete_neighbor_aggregation_passes": true,
-    "failed_center_action": "do-not-run-neighbors; use remaining preregistered pivot allowance or dnf",
+    "center_failure_action": "dnf",
+    "historical_pivot_01_neighbor_declarations_are_not_reusable": true,
     "neighbor_definition_changes_after_center_result": false,
-    "neighbor_subset_selection_after_any_neighbor_result": false,
-    "neighbor_trials_use_same_no_control_risk_bytes_as_center": true,
-    "policy_mismatched_neighbor_evidence_reusable": false
+    "neighbor_runs_authorized": false,
+    "qualification_without_official_stability_evidence": false,
+    "stability_thresholds_waived": false
   },
   "schema_version": 1,
-  "stages": [
-    {"stage_id": "stage-0-freeze", "terminal_condition": "Freeze all 12 definitions, shared 24h A5 identity, folds, no-control bytes, and materialization recipe before the center result."},
-    {"stage_id": "stage-1-center", "terminal_condition": "Run pivot-01 no-control center; insolvency, missing metrics, or any numeric non-neighbor gate failure stops the family."},
-    {"stage_id": "stage-2-register-all", "terminal_condition": "Materialize, independently review, and register all 12 predeclared variants before the first neighbor result."},
-    {"stage_id": "stage-3-run-all", "terminal_condition": "Run all 12 with identical folds, score identity, seed, no-control risk, and paired costs without early stopping."},
-    {"stage_id": "stage-4-aggregate", "terminal_condition": "Bind all artifacts and compute the three stability statistics once; qualification remains withheld until they pass."}
-  ],
-  "status": "pivot_01_prospective_unregistered_no_results",
+  "stages": [],
+  "status": "final_pivot_neighbors_forbidden_no_evidence",
   "team_id": "team-10",
-  "thresholds": {
+  "thresholds_preserved_but_not_claimed": {
     "maximum_positive_pnl_concentration": 0.4,
     "minimum_neighbor_median_sharpe": 0.5,
     "minimum_profitable_neighbor_fraction": 0.7
