@@ -52,7 +52,7 @@
   "critic_lock": null,
   "final_oos_lock": null,
   "finalist_cohort_lock": null,
-  "legacy_projection_sha256": "82c5cc79177a48d8ce0c1052e19e30c1bbb5d5724ba04a0aa1197be538deccda",
+  "legacy_projection_sha256": "55e0a7c74cbb9e69a756b98b83cfda6695534d097b1f00c0c757c965af961fb4",
   "legacy_state_sha256": "8c858495fde6ddde203124a055e40ebad5d8d5a684cd20f0e55f6c88f7360b07",
   "objective_lock": null,
   "organizer_audit": {
@@ -233,13 +233,13 @@
       "trial_count": 2
     },
     "team-10": {
-      "active_family_id": "t10-residual-trend-reversion-ensemble-v1",
+      "active_family_id": "t10-defensive-anchor-convergence-v1",
       "canonical_result": null,
       "development_assessment": null,
       "dnf": null,
-      "family_count": 1,
+      "family_count": 2,
       "finalist_freeze": null,
-      "pivot_count": 0,
+      "pivot_count": 1,
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
