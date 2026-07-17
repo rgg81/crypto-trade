@@ -52,7 +52,7 @@
   "critic_lock": null,
   "final_oos_lock": null,
   "finalist_cohort_lock": null,
-  "legacy_projection_sha256": "54d0c2aa97385fc53bd8bd9bbe4552e9fb5611a7cdf7a1f3d792b62ef6b02988",
+  "legacy_projection_sha256": "e5b4e88657e0aab07324d313b1ae2ff4a573cb3ef85f2f16a9040e341aab12ac",
   "legacy_state_sha256": "8c858495fde6ddde203124a055e40ebad5d8d5a684cd20f0e55f6c88f7360b07",
   "objective_lock": null,
   "organizer_audit": {
@@ -175,28 +175,38 @@
       "active_family_id": "t06-relative-rank-persistence-v1",
       "canonical_result": null,
       "development_assessment": null,
-      "dnf": null,
+      "dnf": {
+        "previous_status": "researching",
+        "reason": "Final pivot-02 completed with positive but subthreshold no-control IS: net Sharpe 0.563381 < 0.75, doubled-cost Sharpe 0.105250 < 0.35, and positive-quarter fraction 0.500000 < 0.55; both permitted mechanism pivots are consumed, and controls, neighbors, diagnostics, or private data cannot rescue the failed complete development gate.",
+        "reason_code": "withdrawn",
+        "recorded_at_utc": "2026-07-17T02:49:02.193551+00:00"
+      },
       "family_count": 3,
       "finalist_freeze": null,
       "pivot_count": 2,
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
-      "status": "researching",
+      "status": "dnf",
       "trial_count": 3
     },
     "team-07": {
       "active_family_id": "t07-two-tape-rank-durability-v1",
       "canonical_result": null,
       "development_assessment": null,
-      "dnf": null,
+      "dnf": {
+        "previous_status": "researching",
+        "reason": "Final pivot-02 passed aggregate IS but failed the noncompensatory trial-adjusted-confidence and short-bear-role gates: probability positive 0.843725 < 0.90 and short-bear net return -0.004866 <= 0; both permitted mechanism pivots are consumed, and controls, neighbors, or private data cannot rescue the core.",
+        "reason_code": "withdrawn",
+        "recorded_at_utc": "2026-07-17T02:49:43.347593+00:00"
+      },
       "family_count": 3,
       "finalist_freeze": null,
       "pivot_count": 2,
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
-      "status": "researching",
+      "status": "dnf",
       "trial_count": 3
     },
     "team-08": {
