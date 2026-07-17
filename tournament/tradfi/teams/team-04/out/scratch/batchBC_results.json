@@ -1,0 +1,90 @@
+[
+  {
+    "id": "exp-010",
+    "skip": 0,
+    "m1": {
+      "sharpe": 0.515663356062091,
+      "maxdd": -0.22707049136014368,
+      "ann_turnover": 25.91429461925896,
+      "total_return": 1.7592311991066394,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bull": 0.7333138454409754,
+        "bear": -1.2209874034580526,
+        "chop": 0.5426027943683869
+      },
+      "median_names_long": 9.0,
+      "median_names_short": 9.0,
+      "mean_gross": 1.0,
+      "mean_net": 7.975740119433596e-19
+    },
+    "sharpe_2x": 0.3827458704770995,
+    "maxdd_2x": -0.25617278676858324
+  },
+  {
+    "id": "exp-011",
+    "skip": 10,
+    "m1": {
+      "sharpe": 0.37786691811735884,
+      "maxdd": -0.2787857012976377,
+      "ann_turnover": 25.868216725676955,
+      "total_return": 0.9144400584318126,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bull": 0.5986672121884987,
+        "bear": -1.9297206453202476,
+        "chop": 0.6245351393534594
+      },
+      "median_names_long": 9.0,
+      "median_names_short": 9.0,
+      "mean_gross": 1.0,
+      "mean_net": 7.999316058302746e-19
+    },
+    "sharpe_2x": 0.23822458700831223,
+    "maxdd_2x": -0.3077627035136966
+  },
+  {
+    "id": "exp-012",
+    "scheme": "rank-linear",
+    "m1": {
+      "sharpe": 0.28958329807601285,
+      "maxdd": -0.2918926303925633,
+      "ann_turnover": 20.304667548376965,
+      "total_return": 0.5908664641383716,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bull": 0.45350086580713345,
+        "bear": -1.632954832806095,
+        "chop": 0.4439474810062493
+      },
+      "median_names_long": 24.0,
+      "median_names_short": 24.0,
+      "mean_gross": 1.0,
+      "mean_net": 4.691778796236205e-19
+    },
+    "sharpe_2x": 0.14323345253200226,
+    "maxdd_2x": -0.33828058545916484
+  },
+  {
+    "id": "exp-013",
+    "scheme": "vol-scaled mom",
+    "m1": {
+      "sharpe": 0.3394541033127519,
+      "maxdd": -0.2928309542012152,
+      "ann_turnover": 28.099294369919715,
+      "total_return": 0.7667625183649516,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bull": 0.44216692416348996,
+        "bear": -1.651006799320816,
+        "chop": 0.7265000441807528
+      },
+      "median_names_long": 9.0,
+      "median_names_short": 9.0,
+      "mean_gross": 1.0,
+      "mean_net": 5.144494294118645e-19
+    },
+    "sharpe_2x": 0.17272742028454155,
+    "maxdd_2x": -0.4384206879585305
+  }
+]

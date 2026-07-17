@@ -1,0 +1,46 @@
+{
+  "family_id": "t04-xs-momentum-12-1-v1",
+  "frozen_at_utc": "2026-07-17T01:46:01+00:00",
+  "harness": "PASS",
+  "net_is_csv_sha256": "5a2eab032b96bdc5d1383901fb36a4a7c62882ea1b0362af12e9e3b3e7520590",
+  "reported": {
+    "1x": {
+      "ann_turnover": 8.477904850966093,
+      "maxdd": -0.23346680554111043,
+      "mean_gross": 1.0,
+      "mean_net": 7.096363644726815e-19,
+      "median_names_long": 12.0,
+      "median_names_short": 12.0,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bear": -1.142627155008257,
+        "bull": 0.7476901440854931,
+        "chop": 0.4686583985040946
+      },
+      "sharpe": 0.5245496867352044,
+      "total_return": 1.7486897134317245
+    },
+    "2x": {
+      "ann_turnover": 8.477904850966093,
+      "maxdd": -0.23938022007854343,
+      "mean_gross": 1.0,
+      "mean_net": 7.096363644726815e-19,
+      "median_names_long": 12.0,
+      "median_names_short": 12.0,
+      "n_months": 174,
+      "regime_sharpe": {
+        "bear": -1.2016114485440386,
+        "bull": 0.6951013590870486,
+        "chop": 0.416911329689468
+      },
+      "sharpe": 0.4712512911942724,
+      "total_return": 1.4423224940890274
+    }
+  },
+  "schema": 1,
+  "sources_sha256": {
+    "strategy.py": "01328a8c122f5cfb54cee650b9625974f7d18a35cb50d4f39c7172e06320f3ae",
+    "test_strategy.py": "3df22db47f78d6ccc938ab3acee8efcccf3c5b335c502bda88fb65b289046823"
+  },
+  "team_id": "team-04"
+}
