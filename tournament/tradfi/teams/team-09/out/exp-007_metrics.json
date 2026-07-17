@@ -1,0 +1,40 @@
+{
+  "config": {
+    "id": "exp-007",
+    "k": 5,
+    "L": 63,
+    "sector_demean": true
+  },
+  "cost_1x": {
+    "sharpe": -0.9239352378482537,
+    "maxdd": -0.91717704343358,
+    "ann_turnover": 13.918657845279398,
+    "total_return": -0.9011079526100445,
+    "n_months": 174,
+    "regime_sharpe": {
+      "bull": -1.2875724829217419,
+      "bear": 1.4431298845965708,
+      "chop": -0.6660473368725168
+    },
+    "median_names_long": 24.0,
+    "median_names_short": 24.0,
+    "mean_gross": 1.0,
+    "mean_net": 5.326903445279046e-19
+  },
+  "cost_2x": {
+    "sharpe": -1.0247985735511396,
+    "maxdd": -0.9315912325770345,
+    "ann_turnover": 13.918657845279398,
+    "total_return": -0.9217447404851629,
+    "n_months": 174,
+    "regime_sharpe": {
+      "bull": -1.3909569784143285,
+      "bear": 1.3232844578910026,
+      "chop": -0.7465261869022114
+    },
+    "median_names_long": 24.0,
+    "median_names_short": 24.0,
+    "mean_gross": 1.0,
+    "mean_net": 5.326903445279046e-19
+  }
+}
