@@ -7,9 +7,9 @@
     "integration_freeze_sha256": "6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51"
   },
   "candidate_identity": {
-    "candidate_id": "team09-fcpc-center-v1",
+    "candidate_id": "team09-ccf-pivot01-v1",
     "config_path": "tournament/top40-v2/teams/team-09/frozen_config.json",
-    "family_id": "team09-funding-crowding-confirmation-v1",
+    "family_id": "team09-conditional-carry-fragility-v1",
     "risk_policy_id": "team09-risk-none",
     "risk_policy_path": "tournament/top40-v2/teams/team-09/risk_policy.json",
     "seed": 20260801,
@@ -44,6 +44,13 @@
     "zero_sha256_sentinel": "0000000000000000000000000000000000000000000000000000000000000000",
     "zero_sentinel_accepted_by_registration_or_score": false
   },
+  "pivot_lineage": {
+    "ordinal": 1,
+    "parent_candidate_id": "team09-fcpc-center-v1",
+    "parent_family_id": "team09-funding-crowding-confirmation-v1",
+    "parent_registration_sha256": "e384f401717b5ce291b71129161dddbea46543490d5e11182c04f28f49bf61ae",
+    "parent_terminal_for_controls": true
+  },
   "lineage": [
     {
       "stage": 1,
@@ -51,7 +58,7 @@
     },
     {
       "stage": 2,
-      "requirement": "Materialize the no-control root policy and exact center strategy/config, then compute registration hashes from those final bytes."
+      "requirement": "Materialize the no-control root policy and exact pivot-01 root strategy/config, then compute registration hashes from those final bytes."
     },
     {
       "stage": 3,

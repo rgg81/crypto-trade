@@ -63,6 +63,20 @@ def _context(*, confirmed: bool = True) -> SimpleNamespace:
     )
 
 
+def _bear_context() -> SimpleNamespace:
+    context = _context()
+    periods = len(next(iter(context.bars.values())))
+    for index, symbol in enumerate(context.eligible_symbols):
+        # Every asset declines, but downside capture increases monotonically across symbols.
+        slope = -0.001 - 0.0003 * index
+        closes = 100.0 * np.exp(slope * np.arange(periods))
+        context.bars[symbol] = context.bars[symbol].assign(
+            open=closes / math.exp(slope * 0.5),
+            close=closes,
+        )
+    return context
+
+
 def _weights(context: SimpleNamespace) -> dict[str, float]:
     result = STRATEGY.build_strategy().target_weights(context, seed=20260801)
     assert isinstance(result, dict)
@@ -91,6 +105,25 @@ def test_synthetic_positions_have_correct_relative_funding_carry_direction() -> 
     # The central evaluator uses cashflow = -position * mark * funding_rate.
     relative_carry = sum(-weight * float(mean_rates[symbol]) for symbol, weight in weights.items())
     assert relative_carry > 0
+
+
+def test_bear_route_longs_resilience_and_shorts_fragility() -> None:
+    context = _bear_context()
+    weights = _weights(context)
+    indices = {symbol: index for index, symbol in enumerate(context.eligible_symbols)}
+    long_indices = [indices[symbol] for symbol, weight in weights.items() if weight > 0]
+    short_indices = [indices[symbol] for symbol, weight in weights.items() if weight < 0]
+    assert len(long_indices) >= 4
+    assert len(short_indices) >= 4
+    assert max(long_indices) < min(short_indices)
+    assert sum(abs(weight) for weight in weights.values()) == pytest.approx(0.9)
+
+
+def test_bear_fragility_route_is_not_a_funding_sign_flip() -> None:
+    context = _bear_context()
+    expected = _weights(context)
+    context.funding.loc[:, "funding_rate"] *= -1.0
+    assert _weights(context) == expected
 
 
 def test_price_confirmation_is_required() -> None:
@@ -258,7 +291,14 @@ def test_frozen_config_and_trial_template_cover_every_strategy_parameter() -> No
     trial = json.loads((TEAM_DIR / "trial_registration_template.json").read_text(encoding="utf-8"))
     expected = dataclasses.asdict(STRATEGY.StrategyConfig())
     assert frozen["parameters"] == expected
-    assert trial["parameters"] == expected
+    assert {
+        key: value for key, value in trial["parameters"].items() if key != "_top40_v2_score_adapter"
+    } == expected
+    assert trial["parameters"]["_top40_v2_score_adapter"] == {
+        "adapter_id": "top40-v2-declared-score-boundary-v1",
+        "manifest_sha256": "0" * 64,
+        "schema_version": 1,
+    }
     assert frozen["seed"] == expected["expected_seed"]
 
 
@@ -300,7 +340,7 @@ def test_complete_family_cartesian_domain_is_declared_and_feasible() -> None:
 def test_score_manifest_binds_exact_a5_boundary_schedule_and_label() -> None:
     manifest = json.loads(
         (
-            TEAM_DIR / "score-adapters/team09-fcpc-center-v1.score-adapter-manifest.template.json"
+            TEAM_DIR / "score-adapters/team09-ccf-pivot01-v1.score-adapter-manifest.template.json"
         ).read_text(encoding="utf-8")
     )
     assert manifest["adapter_id"] == STRATEGY.SCORE_ADAPTER_ID
@@ -324,6 +364,7 @@ def test_score_manifest_binds_exact_a5_boundary_schedule_and_label() -> None:
 
 def test_a7_a5_identity_chain_and_numeric_thresholds_are_candidate_exact() -> None:
     authority = json.loads((TEAM_DIR / "a7_execution_authority.json").read_text(encoding="utf-8"))
+    frozen = json.loads((TEAM_DIR / "frozen_config.json").read_text(encoding="utf-8"))
     lineage = json.loads((TEAM_DIR / "a5_score_lineage.json").read_text(encoding="utf-8"))
     thresholds = json.loads(
         (TEAM_DIR / "qualification_thresholds.json").read_text(encoding="utf-8")
@@ -332,10 +373,30 @@ def test_a7_a5_identity_chain_and_numeric_thresholds_are_candidate_exact() -> No
         "path": "scripts/top40_v2_tournament_runtime_preload_v7.py",
         "sha256": "8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9",
     }
+    pure_crypto = authority["pure_crypto_report"]
+    assert pure_crypto == {
+        "policy_sha256": "2c7fb0ff593d06c323517e60df4b28ab9387a2df580b83f82f65ef71c91fc350",
+        "report_sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
+        "violations": 0,
+    }
+    assert frozen["pure_crypto_authority"] == {
+        "amendment_id": "top40-v2-amendment-0006-pure-crypto-universe",
+        "canonical_report_sha256": pure_crypto["report_sha256"],
+        "integration_freeze_sha256": (
+            "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34"
+        ),
+        "policy_sha256": pure_crypto["policy_sha256"],
+        "required_violations": pure_crypto["violations"],
+        "scope": (
+            "native crypto assets only; a Binance perpetual listing alone is insufficient; "
+            "stablecoins and direct TradFi, metal, commodity, equity, ETF, index, FX, "
+            "premarket, and leveraged-token exposures are ineligible"
+        ),
+    }
     assert lineage["candidate_identity"] == {
-        "candidate_id": "team09-fcpc-center-v1",
+        "candidate_id": "team09-ccf-pivot01-v1",
         "config_path": "tournament/top40-v2/teams/team-09/frozen_config.json",
-        "family_id": "team09-funding-crowding-confirmation-v1",
+        "family_id": "team09-conditional-carry-fragility-v1",
         "risk_policy_id": "team09-risk-none",
         "risk_policy_path": "tournament/top40-v2/teams/team-09/risk_policy.json",
         "seed": 20260801,
@@ -374,6 +435,14 @@ def test_a7_a5_identity_chain_and_numeric_thresholds_are_candidate_exact() -> No
         "minimum_neighbor_median_sharpe": 0.5,
         "minimum_profitable_neighbor_fraction": 0.7,
     }
+    assert thresholds["pivot_01_mechanism_gate"] == {
+        "bear_net_return": {"comparison": ">", "threshold": 0.0},
+        "bear_net_sharpe": {"comparison": ">", "threshold": 0.0},
+        "bull_net_return": {"comparison": ">", "threshold": 0.0},
+        "chop_net_return": {"comparison": ">", "threshold": 0.0},
+        "maximum_drawdown": {"comparison": "<=", "threshold": 0.3},
+        "non_compensatory": True,
+    }
 
 
 def test_neighbor_staging_has_a_preresult_freeze_and_read_barrier() -> None:
@@ -391,13 +460,13 @@ def test_neighbor_staging_has_a_preresult_freeze_and_read_barrier() -> None:
     ("changes", "message"),
     [
         ({"interval_hours": 8.0}, "integers"),
-        ({"confirmation_bars": 9.5}, "integers"),
+        ({"normal_confirmation_bars": 9.5}, "integers"),
         ({"expected_seed": 20260801.0}, "integers"),
         ({"funding_half_life_hours": math.inf}, "finite"),
         ({"funding_lookback_hours": 170}, "complete funding intervals"),
         (
             {"funding_lookback_hours": 80, "minimum_funding_events": 12},
-            "available slots",
+            "infeasible",
         ),
         (
             {
@@ -405,7 +474,12 @@ def test_neighbor_staging_has_a_preresult_freeze_and_read_barrier() -> None:
                 "minimum_funding_events": 2,
                 "maximum_funding_age_hours": 24,
             },
-            "cannot exceed",
+            "outside the funding window",
+        ),
+        ({"bear_market_return_threshold": 0.0}, "must be in"),
+        (
+            {"bear_relative_trend_weight": 0.5},
+            "sum to one",
         ),
         (
             {

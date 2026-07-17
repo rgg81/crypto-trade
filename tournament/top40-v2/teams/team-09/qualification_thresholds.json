@@ -91,6 +91,14 @@
     "minimum_net_sharpe": 0.5,
     "minimum_positive_quarter_fraction": 0.5
   },
+  "pivot_01_mechanism_gate": {
+    "bear_net_return": {"comparison": ">", "threshold": 0.0},
+    "bear_net_sharpe": {"comparison": ">", "threshold": 0.0},
+    "bull_net_return": {"comparison": ">", "threshold": 0.0},
+    "chop_net_return": {"comparison": ">", "threshold": 0.0},
+    "maximum_drawdown": {"comparison": "<=", "threshold": 0.3},
+    "non_compensatory": true
+  },
   "schema_version": 1,
   "score_authority": "Exact central A5 protocol delegated by the active A7 entrypoint; this local copy is a preregistered decision contract and cannot replace central derivation.",
   "team_id": "team-09"

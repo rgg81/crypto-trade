@@ -1,45 +1,45 @@
 {
-  "activation_rule": "The no-control center is the first material run. Mechanism ablations may be registered only after that result is read; every risk overlay remains blocked unless all broad positive no-control core-alpha activation minima pass.",
+  "activation_rule": "Pivot-01 no-control runs first. Mechanism ablations remain dormant until that result is read; optional risk policies remain blocked unless every new-family core activation gate passes.",
   "mechanism_ablations": [
     {
-      "ablation_id": "team09-ablation-funding-only",
-      "change": "Remove the relative-price confirmation gate while retaining funding ranking and balanced sleeves.",
-      "falsifying_interpretation": "If it matches the joint rule across folds, price confirmation adds no evidence and the proposed unwind timing mechanism is unsupported.",
+      "ablation_id": "team09-p01-ablation-no-bear-route",
+      "change": "Disable the broad-decline fragility route and always use confirmed carry unwind.",
+      "falsifying_interpretation": "If this matches pivot-01 in bear and drawdown behavior, conditional fragility routing did not address the diagnosed failure.",
       "material_configuration": true
     },
     {
-      "ablation_id": "team09-ablation-price-only",
-      "change": "Remove funding pressure and select symmetric relative-price leaders/laggards with the same breadth and exposure construction.",
-      "falsifying_interpretation": "If it matches the joint rule, funding crowding and relative carry are not responsible for performance.",
+      "ablation_id": "team09-p01-ablation-relative-trend-only",
+      "change": "Within the bear route, rank only relative trend.",
+      "falsifying_interpretation": "Tests whether downside capture and drawdown depth add mechanism evidence beyond ordinary cross-sectional momentum.",
       "material_configuration": true
     },
     {
-      "ablation_id": "team09-ablation-no-persistence",
-      "change": "Set funding_persistence_weight to zero.",
-      "falsifying_interpretation": "If persistence consistently harms results, remove it rather than tune its sign after viewing outcomes.",
+      "ablation_id": "team09-p01-ablation-downside-beta-only",
+      "change": "Within the bear route, rank only inverse downside beta.",
+      "falsifying_interpretation": "Tests whether conditional market capture is the sole useful fragility component.",
       "material_configuration": true
     },
     {
-      "ablation_id": "team09-ablation-no-vol-scale",
-      "change": "Use raw confirmation-horizon log return before the cross-sectional rank instead of volatility-scaled return.",
-      "falsifying_interpretation": "If raw return is uniformly more stable, volatility scaling is unnecessary complexity.",
+      "ablation_id": "team09-p01-ablation-drawdown-only",
+      "change": "Within the bear route, rank only inverse trailing drawdown depth.",
+      "falsifying_interpretation": "Tests whether the pivot is merely a trailing drawdown sort.",
       "material_configuration": true
     },
     {
-      "ablation_id": "team09-ablation-funding-sign-flip",
-      "change": "Trade with, rather than against, the funding-crowding rank while retaining confirmation and exposure rules.",
-      "falsifying_interpretation": "If the sign-flipped rule dominates, the crowd-unwind thesis has the wrong causal direction.",
+      "ablation_id": "team09-p01-ablation-always-fragility",
+      "change": "Use fragility ranking at every decision instead of causal market-state routing.",
+      "falsifying_interpretation": "If always-fragility dominates without losing bull/chop, the router and retained carry mechanism are unsupported.",
       "material_configuration": true
     },
     {
-      "ablation_id": "team09-ablation-unconfirmed-flat-control",
+      "ablation_id": "team09-p01-ablation-flat-control",
       "change": "Return an explicit flat book at every rebalance boundary.",
-      "falsifying_interpretation": "This execution/control baseline must show no fabricated alpha and verifies result plumbing.",
+      "falsifying_interpretation": "Execution/control baseline; must not manufacture alpha.",
       "material_configuration": true
     }
   ],
-  "registration_rule": "Register every ablation before any result is read. The zero-argument builder exposes only center defaults; each source-level ablation requires its own complete hash-bound executable strategy/config bundle that exposes the declared change. This JSON alone does not alter runtime behavior. Six mechanism ablations consume six material configurations.",
+  "registration_rule": "Every source-level ablation requires a separately preregistered complete executable bundle. This file is a declaration only and six ablations consume six material configurations.",
   "schema_version": 1,
-  "status": "prospective-no-results",
+  "status": "pivot-01-prospective-no-results",
   "team_id": "team-09"
 }

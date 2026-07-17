@@ -1,25 +1,21 @@
 # team-09 · Top-40 V2
 
-Status: `A7_A6_ACTIVE_PROSPECTIVE_UNREGISTERED`
+Status: `PIVOT_01_A7_A6_PROSPECTIVE_UNREGISTERED`
 
-Team09 is a clean-room prospective draft under the active A7 runtime-preload command surface, its
-exact delegated A5 score protocol, and A6 pure-crypto authority. The package contains no
-registration, evaluator result, performance claim, private-qualifier access, or OOS access.
-`families.jsonl` and `experiments.jsonl` remain empty.
+The initial family `team09-funding-crowding-confirmation-v1` and candidate
+`team09-fcpc-center-v1` completed one no-control development run. It is terminal for controls:
+maximum drawdown was `0.5332863362` and bear Sharpe was `-2.1891077697`, so the preregistered
+core-activation rule forbids every optional risk overlay. Its ledger rows and reviewed score
+artifacts remain immutable history.
 
-The proposed mechanism is a funding-crowding dislocation unwind with relative-price
-confirmation. Any future organizer command must use
-`scripts/top40_v2_tournament_runtime_preload_v7.py`, SHA-256
-`8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9`. A7 delegates the exact
-A5 score surface and preserves the exact Amendment 0006 pure-crypto preflight. Negative
-development evidence is research evidence, never a submission: Team09 must pass every
-non-compensatory IS gate or finish DNF.
+Root files now propose genuine mechanism pivot-01: family
+`team09-conditional-carry-fragility-v1`, candidate `team09-ccf-pivot01-v1`. Broad causal declines
+route to relative-resilience longs and downside-fragility shorts; other conditions retain the
+confirmed carry-unwind mechanism. Root `risk_policy.json` remains byte-exact no-control.
 
-The first material candidate must use the no-control bytes at root `risk_policy.json`. Controls are
-dormant until that core is broadly positive at ordinary and doubled costs across the declared
-fold/regime/role/activity gates, and cannot rescue a failed core.
-
-`a5_score_lineage.json`, `a7_execution_authority.json`, and
-`qualification_thresholds.json` are mandatory local handoff contracts. Zero-hash or timestamp
-sentinels are not valid identities and must be replaced only at the corresponding first-added
-lifecycle event.
+The pivot is unregistered and unevaluated. Any future command must use the exact A7 authority and
+delegated A5/A6 lineage in the root identity drafts. A6 is the sole universe authority: only its
+certified native-crypto assets are eligible; stablecoins and direct TradFi, metal, commodity,
+equity, ETF, index, FX, premarket, or leveraged-token exposures remain excluded even when Binance
+lists a perpetual. Negative or unqualified pivot evidence leads to another properly preregistered
+pivot within budget or DNF, never a bad submission.

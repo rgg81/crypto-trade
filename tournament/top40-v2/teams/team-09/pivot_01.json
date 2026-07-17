@@ -1,0 +1,37 @@
+{
+  "controls_authorized_for_parent": false,
+  "diagnosis": "The parent opposite-funding-crowd rule is structurally inverted during broad declines: low funding can identify distressed falling knives for the long sleeve, while high relative funding can identify comparatively resilient contracts selected short. Equal gross did not prevent a 53.33% drawdown or bear Sharpe -2.19.",
+  "evidence": {
+    "annualized_return": 0.3078295642325928,
+    "calmar": 0.5772312983914435,
+    "double_cost_sharpe": 0.47440383531980773,
+    "maximum_drawdown": 0.5332863361540062,
+    "net_sharpe": 1.1060511251036294,
+    "positive_quarter_fraction": 0.5714285714285714,
+    "regime_sharpe": {
+      "bear": -2.1891077697363226,
+      "bull": 1.8043195252454862,
+      "chop": 2.2209678968015787,
+      "stress": 1.5868345336578027
+    },
+    "registration_sha256": "e384f401717b5ce291b71129161dddbea46543490d5e11182c04f28f49bf61ae",
+    "risk_policy_sha256": "f75a2e05cda7ba87a865527f7c95c03a734c1398e8be251f50074ad00163875e",
+    "source_bundle_sha256": "532e98c12b61232ee04ac444ce99a1573a11d6f60b10a759751e38017b0188c5",
+    "strategy_sha256": "6d69e10c4536a5277175cb825f6acb72fd15e1d78dd7fd0fb5924a42e82c9cc5"
+  },
+  "new_candidate_id": "team09-ccf-pivot01-v1",
+  "new_family_id": "team09-conditional-carry-fragility-v1",
+  "parent_candidate_id": "team09-fcpc-center-v1",
+  "parent_family_id": "team09-funding-crowding-confirmation-v1",
+  "pivot_id": "team09-pivot-01",
+  "pivot_mechanism": "Causally route broad declines to cross-sectional downside fragility: long relative leaders with shallow drawdown and low downside capture; short relative laggards with deep drawdown and high downside capture. Retain the parent carry-unwind mechanism only outside the broad-decline state.",
+  "prohibited_shortcuts": [
+    "no literal global sign flip",
+    "no optional risk control or drawdown overlay",
+    "no cosmetic threshold-only repair",
+    "no modification or deletion of parent ledgers, results, reports, or score artifacts"
+  ],
+  "schema_version": 1,
+  "status": "prospective-unregistered",
+  "team_id": "team-09"
+}

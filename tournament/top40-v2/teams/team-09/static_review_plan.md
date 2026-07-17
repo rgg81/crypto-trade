@@ -8,13 +8,18 @@ not substitute performance judgment for contract review.
 
 ## Required review
 
-1. Confirm the package is confined to `tournament/top40-v2/teams/team-09`, ledgers are empty, and
-   the bootstrap says `A7_A6_ACTIVE_PROSPECTIVE_UNREGISTERED`.
+1. Confirm the package is confined to `tournament/top40-v2/teams/team-09`, the existing parent
+   ledger rows and score artifacts are unchanged, no pivot row exists yet, and the bootstrap says
+   `PIVOT_01_A7_A6_PROSPECTIVE_UNREGISTERED`.
 2. Confirm every future command is pinned to the active A7 entrypoint, that its exact delegated A5
    score surface and A6 pure-crypto bindings match `a7_execution_authority.json` and
-   `a5_score_lineage.json`, and no ineligible asset classification can enter team code.
+   `a5_score_lineage.json`. Require the A6 canonical report to have zero violations and treat its
+   point-in-time eligible-symbol context as the sole universe authority; do not add ticker
+   heuristics or admit a contract merely because Binance lists a perpetual.
 3. Match every `StrategyConfig` field and value to `frozen_config.json` and the complete trial
    template. Check every declared family range and neighbor is feasible under `validate()`.
+   Confirm family/candidate identity is `team09-conditional-carry-fragility-v1` /
+   `team09-ccf-pivot01-v1` and parent artifacts remain untouched.
 4. Trace each feature to past-only context data. Check exact eight-hour price adjacency, latest
    close freshness, strictly past funding timestamps, bounded funding lookback, funding freshness,
    under-history exclusion, and absence of imputation or future compression.
@@ -25,6 +30,8 @@ not substitute performance judgment for contract review.
 7. Inspect funding sign economics: a positive funding row charges a carried long and benefits a
    carried short in the central evaluator. Confirm the strategy interprets high relative funding
    as a short crowd and low relative funding as a long crowd without claiming its own cashflows.
+   Separately confirm the bear route ignores funding direction, uses causal market breadth/trend,
+   and ranks relative trend, inverse downside beta, and inverse drawdown with weights 0.45/0.35/0.20.
 8. Check no date-to-target table, private/OOS reference, fitted opaque state, evaluator state,
    filesystem/network/subprocess path, or hidden dependency exists.
 9. Enumerate the entire executable Team09 tree at the candidate source commit. Require an acyclic
@@ -38,8 +45,8 @@ not substitute performance judgment for contract review.
     next-open execution, ordinary costs, capacity sharing, and same-boundary reentry are organizer
     responsibilities. Confirm each policy run produces paired base/doubled-cost panels and counts
     as one material configuration.
-    Before the first registration, require root `risk_policy.json` to be byte-identical to
-    `risk_policies/00-none.json`. Run that core first and require positive ordinary/doubled return
+    Confirm parent controls are forbidden. Before pivot registration, require root
+    `risk_policy.json` to be byte-identical to `risk_policies/00-none.json`. Run that core first and require positive ordinary/doubled return
     and Sharpe, at least four positive folds, positive bull/bear/chop returns, positive
     long-bull/short-bear/combined-chop attribution, and active sleeves before any control. Controls
     cannot rescue failure. For a later policy, copy its immutable template byte-for-byte to root
@@ -52,7 +59,9 @@ not substitute performance judgment for contract review.
     Enforce `neighbor_staging_plan.json` so all identities are frozen before any result read and no
     result hash can enter its own registration lineage.
 13. Confirm the hard disposition: no qualifier freeze or submission unless every development gate
-    passes; otherwise continue, pivot within budget, or DNF.
+   passes; otherwise continue, pivot within budget, or DNF.
+    Pivot-01 additionally requires positive bear return and Sharpe, maximum drawdown <= 0.30, and
+    positive bull/chop returns.
 14. Replace family/trial timestamp placeholders only with actual lifecycle event times and replace
     every zero-hash sentinel before schema validation and registration.
 

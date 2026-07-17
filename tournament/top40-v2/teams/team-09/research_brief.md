@@ -1,106 +1,44 @@
-# Team09 research brief — confirmed funding-crowding unwind
+# Team09 pivot-01 research brief
 
-Status: **prospective, unregistered, unevaluated**
+Status: **prospective, unregistered, unevaluated pivot**
 
-## Question and mechanism
+## Diagnosis
 
-Does a persistent cross-sectional funding extreme become tradable after price begins moving against
-the crowded side? Funding is the observable transfer price between long and short perpetual
-inventory. High relative funding suggests crowded longs; low relative funding suggests crowded
-shorts. Crowding can persist, so Team09 does not trade the funding rank alone. It waits for causal,
-contiguous past-close relative performance to confirm an unwind:
+The parent no-control rule achieved net Sharpe `1.1061`, annual return `30.78%`, and doubled-cost
+Sharpe `0.4744`, with strong bull/chop/stress Sharpes. It nevertheless had `53.33%` drawdown and
+bear Sharpe `-2.1891`. In a broad crypto decline, low funding can describe distressed contracts
+rather than future rebound; the parent consequently risked buying falling knives and shorting
+comparatively resilient contracts. This is a selection-mechanism failure, not permission to add a
+drawdown brake. Parent controls are forbidden.
 
-- long: low relative funding plus positive relative-price confirmation;
-- short: high relative funding plus negative relative-price confirmation; and
-- flat: too little cross-sectional history or fewer than four qualifying symbols on either side.
+## Pivot mechanism
 
-The center rebalances once daily at 00:00 UTC. It uses seven days of strictly past funding events,
-a three-day price-confirmation horizon, and a 21-day volatility scale. Cross-sectional average-tie
-ranks avoid a fitted distribution. The exact signed joint-margin score passes through the public
-A5 identity boundary before filtering or construction; its returned magnitude orders and
-proportionally allocates each capped sleeve. The selected long and short sleeves receive equal
-gross exposure; no learned beta or hedge ratio is used. Each symbol remains below the evaluator's
-10% cap, total gross stays below one, and net target exposure is zero.
+At 00:00 UTC, use only contiguous closed 8h bars and strictly past funding. Compute a causal
+seven-day cross-sectional median return and negative breadth:
 
-## Why it could span market conditions
+- normal route: retain confirmed opposite-funding-crowd selection;
+- broad-decline route (median return at most `-4%`, negative breadth at least `65%`): rank `45%`
+  relative trend, `35%` inverse downside beta, and `20%` inverse trailing drawdown, then rerank;
+- require at least four longs and four shorts; keep `0.45` gross per side and `0.09` symbol cap.
 
-In bull conditions, underfunded relative leaders should support the long sleeve while crowded
-laggards remain eligible shorts. In bear conditions, high-relative-funding laggards should support
-the short sleeve while the balanced long sleeve limits directional beta. In chop, relative funding
-transfer and crowd unwinds—not market direction—are the proposed return source. During stress,
-breadth can disappear and the signal must request flat rather than manufacture a weak sleeve.
-Organizer-owned volatility targeting, drawdown brakes, a close-confirmed position stop, and a
-turnover limit are separate prospective risk-policy hypotheses.
+The input universe is exclusively Amendment-0006-certified native crypto. Stablecoins and direct
+TradFi, metal, commodity, equity, ETF, index, FX, premarket, or leveraged-token exposures are
+ineligible even when Binance lists them as perpetual contracts.
 
-These are hypotheses, not performance claims. Positive net return in bull, bear, and chop; long
-bull attribution; short bear attribution; combined chop attribution; both sleeves' materiality;
-and every common stability/cost gate are required evidence.
+The bear route changes which assets are long and short. It does not inspect portfolio drawdown,
+reduce gross, call a risk policy, flip every funding sign, or use organizer regime labels. The
+same 24h A5 schedule and open-to-open label remain economically aligned with daily decisions.
 
-## Causal discipline
+## Falsifier
 
-At decision time `t`, the newest price candle opens at `t-8h` and closes at `t`. A symbol is
-excluded unless its entire required tail is exactly contiguous at eight-hour spacing. Funding
-uses only events with `funding_time < t`, a bounded trailing window, a minimum event count, and a
-maximum age. No future row is ignored silently: a future bar or non-past funding event fails
-closed. Under-history or stale individual symbols are excluded without aborting the remaining
-eligible cross-section.
+The pivot fails if its no-control core has nonpositive bear return or Sharpe, drawdown above
+`0.30`, nonpositive bull or chop return, inactive sleeves, failed costs/folds/quarters/stability,
+or failed A5 diagnostics. Aggregate Sharpe cannot compensate. Optional controls remain dormant
+unless the core passes every activation gate and cannot rescue failure.
 
-The strategy has no supervised labels, fitted coefficients, date-to-target table, filesystem
-access, network access, external model, or stochastic state. Cross-sectional ranks and portfolio
-weights are recomputed from the supplied past-only context in sorted symbol order.
+## Prospective accounting
 
-## Falsifiers and decisions
-
-The mechanism is falsified if any of the following remains true after the preregistered trials:
-
-- stitched chronological evidence fails any frozen development gate;
-- any of bull, bear, or chop has nonpositive net return;
-- the long sleeve is not positive in bull or the short sleeve is not positive in bear;
-- the joint rule does not improve meaningfully over funding-only and price-only ablations;
-- fewer than 70% of preregistered neighbors are profitable, neighbor median Sharpe is below 0.50,
-  or positive PnL concentration exceeds 0.40;
-- doubled-cost Sharpe is below 0.35 or risk controls only cosmetically suppress volatility; or
-- the apparent result is concentrated in one fold, quarter, regime, side, or symbol.
-
-A failed center leads to a documented ablation decision or a genuine mechanism pivot within the
-common cumulative budget. A negative or otherwise unqualified IS result is never frozen as a
-submission. If no family passes every gate by the budget/deadline, Team09 records DNF.
-
-The first material trial is the unchanged center with top-level no-control `risk_policy.json`.
-Before any volatility, drawdown, position-stop, turnover, or combined policy may be registered, the
-core must have strictly positive return and Sharpe at ordinary and doubled costs, at least four
-positive folds, positive bull/bear/chop returns, positive long-bull, short-bear, and combined-chop
-attribution, and active long and short sleeves. Controls cannot rescue a negative or otherwise
-failed core. Failure permits only a separately preregistered mechanism revision/pivot or DNF, whose
-own no-control core must restart the sequence.
-
-## Prospective trial allocation
-
-The planned material allocation is 31 configurations, leaving 49 of the common 80 for documented
-follow-up or at most two mechanism pivots:
-
-- 1 no-control center mechanism;
-- 6 mechanism/control ablations in `ablations.json`;
-- 10 two-sided parameter neighbors in `parameter_neighborhood.json`;
-- 5 additional declarative risk policies (four single controls plus combined), each producing paired
-  base/doubled-cost panels in one run; and
-- 9 confirmatory reruns or preregistered simplifications selected only after a written review.
-
-The 31 count does not grant permission to batch or inspect results before registration. Every
-material configuration must be registered through the active Amendment 0005 superset entrypoint,
-which preserves the A6 preflight, before its result is read. The no-control center plus five later
-policies count as six policy states, not twelve: base and doubled costs are paired outputs of the
-same organizer run.
-
-## Selection rule
-
-Selection is non-compensatory. First require every centrally derived development, regime, sleeve,
-stability, concentration, and doubled-cost gate. Among passers only, compare the lower of base and
-doubled-cost Sharpe, then the worst fold/regime Sharpe, then simplicity and turnover. A high
-aggregate Sharpe cannot compensate for a failed gate, and a relative rank cannot advance a
-non-passer.
-
-No private ticket may be consumed until source, complete executable dependency manifest,
-parameters, seed, risk policy, trial journal head, OOF declarations, neighborhood, provenance,
-and centrally derived positive development evidence are frozen under the then-active lifecycle
-authority. Private failure is terminal DNF. Final OOS is not a research view.
+Pivot-01 consumes the first permitted mechanism pivot. Its center, six mechanism ablations, ten
+predeclared neighbors, and any later policy are separate material configurations. The neighbor
+set is fixed before results and follows a strict serial read barrier. No private or OOS view is a
+research round.

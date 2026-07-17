@@ -1,13 +1,23 @@
 {
-  "candidate_id": "team09-fcpc-center-v1",
+  "candidate_id": "team09-ccf-pivot01-v1",
   "config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-  "falsifier": "This first material trial is the no-control core. Reject it and prohibit every risk-overlay activation if any numeric comparison in qualification_thresholds.json#/core_alpha_activation fails. A later candidate must also pass every full development and team-declared A5 score threshold in that file. Otherwise make a separately preregistered mechanism pivot or record DNF; controls cannot rescue it.",
-  "family_id": "team09-funding-crowding-confirmation-v1",
+  "falsifier": "Reject the pivot-01 no-control core if any qualification_thresholds.json core_alpha_activation, pivot_01_mechanism_gate, full non-neighborhood development, or team-declared A5 score requirement fails, especially bear return/Sharpe > 0 and maximum drawdown <= 0.30; require retained positive bull/chop behavior. Controls and neighbors cannot rescue failure.",
+  "family_id": "team09-conditional-carry-fragility-v1",
   "parameters": {
-    "confirmation_bars": 9,
-    "confirmation_threshold": 0.1,
-    "crowding_threshold": 0.3,
+    "_top40_v2_score_adapter": {
+      "adapter_id": "top40-v2-declared-score-boundary-v1",
+      "manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "schema_version": 1
+    },
+    "bear_downside_resilience_weight": 0.35,
+    "bear_drawdown_resilience_weight": 0.2,
+    "bear_market_return_threshold": -0.04,
+    "bear_negative_breadth_threshold": 0.65,
+    "bear_relative_trend_weight": 0.45,
+    "bear_score_threshold": 0.35,
+    "bear_trend_bars": 21,
     "expected_seed": 20260801,
+    "fragility_bars": 63,
     "funding_half_life_hours": 72.0,
     "funding_lookback_hours": 168,
     "funding_persistence_weight": 0.5,
@@ -17,17 +27,20 @@
     "maximum_symbol_weight": 0.09,
     "maximum_symbols_per_side": 6,
     "minimum_cross_section": 12,
+    "minimum_down_market_bars": 6,
     "minimum_funding_events": 12,
     "minimum_symbols_per_side": 4,
+    "normal_confirmation_bars": 9,
+    "normal_confirmation_threshold": 0.1,
+    "normal_crowding_threshold": 0.3,
     "rebalance_hour_utc": 0,
-    "target_side_gross": 0.45,
-    "volatility_bars": 63
+    "target_side_gross": 0.45
   },
   "risk_config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
   "seed": 20260801,
   "source_bundle_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
   "strategy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
   "team_id": "team-09",
-  "thesis": "Without risk-overlay assistance, a funding extreme is actionable only when relative price confirms that the crowded side is unwinding; active balanced sleeves should monetize relative carry and dislocation across bull, bear, and chop after ordinary and doubled costs.",
+  "thesis": "A causal broad-decline router should avoid the parent family's falling-knife long and resilient-short inversion by replacing it with relative-resilience longs and downside-fragility shorts, while preserving the successful carry-unwind route outside bear conditions.",
   "timestamp_utc": "REPLACE_WITH_ACTUAL_REGISTRATION_TIMESTAMP_Z"
 }

@@ -49,6 +49,12 @@ def test_risk_plan_counts_cost_panels_as_paired_outputs() -> None:
     plan = _load(TEAM_DIR / "risk_ablations.json")
     assert plan["policy_count"] == 6
     assert len(plan["policies"]) == 6
+    assert plan["threshold_contract_path"] == (
+        "qualification_thresholds.json#/core_alpha_activation"
+    )
+    assert plan["pivot_threshold_contract_path"] == (
+        "qualification_thresholds.json#/pivot_01_mechanism_gate"
+    )
     assert plan["material_policy_accounting"] == {
         "additional_policy_configurations_after_core": 5,
         "center_no_control_included": True,
@@ -73,7 +79,7 @@ def test_risk_plan_counts_cost_panels_as_paired_outputs() -> None:
         "risk_policies/05-combined.json",
     ]
     assert plan["core_alpha_activation_gate"] == {
-        "applies_to": "team09-fcpc-center-v1 with root risk_policy.json in its no-control state",
+        "applies_to": "team09-ccf-pivot01-v1 with root risk_policy.json in its no-control state",
         "base_cost_net_return_strictly_positive": True,
         "base_cost_net_sharpe_strictly_positive": True,
         "both_sleeves_meet_activity_floors": True,

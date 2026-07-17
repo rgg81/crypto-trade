@@ -8,13 +8,18 @@
     "integration_freeze_commit": "c8b917ca49306d5200a4e08848e73ff6f5a18bf3",
     "integration_freeze_sha256": "6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51"
   },
-  "candidate_id": "team09-fcpc-center-v1",
-  "family_id": "team09-funding-crowding-confirmation-v1",
+  "candidate_id": "team09-ccf-pivot01-v1",
+  "family_id": "team09-conditional-carry-fragility-v1",
   "parameters": {
-    "confirmation_bars": 9,
-    "confirmation_threshold": 0.1,
-    "crowding_threshold": 0.3,
+    "bear_downside_resilience_weight": 0.35,
+    "bear_drawdown_resilience_weight": 0.2,
+    "bear_market_return_threshold": -0.04,
+    "bear_negative_breadth_threshold": 0.65,
+    "bear_relative_trend_weight": 0.45,
+    "bear_score_threshold": 0.35,
+    "bear_trend_bars": 21,
     "expected_seed": 20260801,
+    "fragility_bars": 63,
     "funding_half_life_hours": 72.0,
     "funding_lookback_hours": 168,
     "funding_persistence_weight": 0.5,
@@ -24,11 +29,14 @@
     "maximum_symbol_weight": 0.09,
     "maximum_symbols_per_side": 6,
     "minimum_cross_section": 12,
+    "minimum_down_market_bars": 6,
     "minimum_funding_events": 12,
     "minimum_symbols_per_side": 4,
+    "normal_confirmation_bars": 9,
+    "normal_confirmation_threshold": 0.1,
+    "normal_crowding_threshold": 0.3,
     "rebalance_hour_utc": 0,
-    "target_side_gross": 0.45,
-    "volatility_bars": 63
+    "target_side_gross": 0.45
   },
   "operative_score_protocol": {
     "delegated_by_a7": true,
@@ -39,20 +47,28 @@
     "integration_freeze_path": "tournament/top40-v2/amendments/0005/integration-freeze.json",
     "integration_freeze_sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c"
   },
+  "pivot": {
+    "ordinal": 1,
+    "parent_candidate_id": "team09-fcpc-center-v1",
+    "parent_family_id": "team09-funding-crowding-confirmation-v1",
+    "reason": "Parent no-control core failed maximum drawdown and bear-regime gates; optional controls were forbidden."
+  },
   "pure_crypto_authority": {
     "amendment_id": "top40-v2-amendment-0006-pure-crypto-universe",
     "canonical_report_sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
-    "integration_freeze_sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34"
+    "integration_freeze_sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34",
+    "policy_sha256": "2c7fb0ff593d06c323517e60df4b28ab9387a2df580b83f82f65ef71c91fc350",
+    "required_violations": 0,
+    "scope": "native crypto assets only; a Binance perpetual listing alone is insufficient; stablecoins and direct TradFi, metal, commodity, equity, ETF, index, FX, premarket, and leveraged-token exposures are ineligible"
   },
   "risk_policy_contract": {
-    "combined_template": "risk_policies/05-combined.json",
-    "first_material_trial": "no-control core; controls remain dormant until every broad positive core-alpha activation minimum passes",
+    "first_material_trial": "new-family no-control core; optional controls and neighbors remain dormant until every core, pivot-mechanism, full non-neighborhood development, and team-declared A5 score gate passes",
     "no_control_template": "risk_policies/00-none.json",
     "root_path": "risk_policy.json",
-    "root_materialization_rule": "The lifecycle reads only root risk_policy.json. Copy any later immutable risk_policies template byte-for-byte to root before commit, registration, and run; controls cannot rescue a failed core."
+    "root_required_policy_id": "team09-risk-none"
   },
   "schema_version": 1,
   "seed": 20260801,
-  "status": "prospective-unregistered",
+  "status": "pivot-01-prospective-unregistered",
   "team_id": "team-09"
 }

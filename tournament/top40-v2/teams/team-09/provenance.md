@@ -1,13 +1,14 @@
 # Team09 provenance and clean-room declaration
 
-Status: **prospective, unregistered, no evidence generated**
+Status: **pivot-01 prospective and unregistered; parent evidence preserved**
 
 ## Permitted sources inspected
 
 This draft was produced from the public Top-40 V2 charter, `config.toml`, methodology, Phase-0
 policy, team playbook, public JSON schemas, neutral strategy protocol/runner interfaces, the
-organizer-supplied A7/A5 identity contract, active Amendment 0006, and Team09's own
-bootstrap/empty ledgers. No other V2 team, V1 strategy/result, private record, final-OOS data,
+organizer-supplied A7/A5 identity contract, active Amendment 0006, and Team09's own bootstrap,
+parent ledgers, parent score artifacts, and parent terminal result. No other V2 team, V1
+strategy/result, private record, final-OOS data,
 ballot, leaderboard, report, or evaluator output was inspected.
 
 The eventual market authority is the shared immutable Binance USD-M snapshot bound by
@@ -16,12 +17,10 @@ The eventual market authority is the shared immutable Binance USD-M snapshot bou
 The strategy uses only the neutral worker's past-closed `bars`, strictly past `funding`, and
 point-in-time `eligible_symbols` views. It does not read snapshot files directly.
 
-The first executable risk state is top-level no-control `risk_policy.json`, byte-identical to
-`risk_policies/00-none.json`. The remaining files are immutable declarations, not runtime
-selectors. They stay dormant unless the no-control core passes every broad positive activation
-minimum; controls cannot rescue failure. Before any later policy candidate is committed,
-registered, or run, its template must be copied byte-for-byte to root `risk_policy.json` and every
-affected hash recomputed.
+The parent family ran only top-level no-control `risk_policy.json` and failed its activation rule;
+all parent controls are permanently forbidden. Pivot-01 again begins with top-level no-control
+bytes, byte-identical to `risk_policies/00-none.json`. Optional pivot policies are dormant unless
+the new core passes every activation gate and cannot rescue failure.
 
 ## A7 execution, delegated A5 score, and pure-crypto authority
 
@@ -38,12 +37,14 @@ Only native-crypto assets certified by that authority are in scope. A Binance pe
 alone is not sufficient; stablecoins, tokenized/direct metals or commodities, equities, ETFs,
 indexes, FX, premarket/TradFi contracts, and leveraged tokens are forbidden.
 
-## Independent origin
+## Pivot origin
 
-Team09's hypothesis is a funding-crowding dislocation with relative-price confirmation and
-balanced sleeves. Funding pressure is treated as a transfer-price/crowding measure, not a future
-return label. The price leg waits for evidence that the crowded side is unwinding. The design is
-self-contained in `strategy.py`; it was not copied from a historical or competing strategy.
+The parent result showed that confirmed funding-crowd unwind was profitable overall but structurally
+failed in bear conditions. Pivot-01 replaces the parent selection mechanism only during a causal
+broad decline: it longs relative resilience and shorts downside fragility using relative trend,
+downside beta, and drawdown depth. It does not consume organizer regime labels or portfolio risk
+state and is not a sign flip or optional risk overlay. The design is self-contained in
+`strategy.py` and was not copied from another team.
 
 ## Dependency and execution declaration
 
@@ -62,7 +63,7 @@ first-added freeze process.
 
 ## Current evidence state
 
-`families.jsonl` and `experiments.jsonl` are empty. No script, test, evaluator, lifecycle command,
-registration, development run, private run, or OOS run has been executed for this draft. The
-package makes no IS or OOS performance claim. The walk-forward, neighborhood, and risk artifacts
-are prospective plans whose eventual hashes and central return artifacts do not yet exist.
+The ledgers preserve one registered parent family and one completed parent no-control trial. Its
+exact result and score artifacts remain history. Pivot-01 itself has no family registration, trial
+registration, evaluator result, private run, or OOS run. Its walk-forward, neighborhood, A5, and
+risk files remain prospective templates until organizer/reviewer hashes exist.
