@@ -1,0 +1,46 @@
+{
+  "metrics": {
+    "1x": {
+      "ann_turnover": 188.35889268945584,
+      "maxdd": -0.24155424907440404,
+      "mean_gross": 0.9935415682232204,
+      "mean_net": 0.01883067284122135,
+      "median_names_long": 20.0,
+      "median_names_short": 20.0,
+      "n_months": 54,
+      "regime_sharpe": {
+        "bear": 1.9996820092457808,
+        "bull": 3.2122179486256695,
+        "chop": 0.8280121596361972
+      },
+      "sharpe": 2.406749605639445,
+      "total_cost": 0.5314325289229673,
+      "total_funding_pnl": 0.7134679330892657,
+      "total_return": 37.66604203992516
+    },
+    "2x": {
+      "ann_turnover": 188.35889268945584,
+      "maxdd": -0.2583878445628296,
+      "mean_gross": 0.9935415682232204,
+      "mean_net": 0.01883067284122135,
+      "median_names_long": 20.0,
+      "median_names_short": 20.0,
+      "n_months": 54,
+      "regime_sharpe": {
+        "bear": 1.4147458982730416,
+        "bull": 2.6725310988473394,
+        "chop": 0.09292286920513451
+      },
+      "sharpe": 1.7022614276817054,
+      "total_cost": 1.0628650578459347,
+      "total_funding_pnl": 0.7134679330892657,
+      "total_return": 11.37743078828972
+    }
+  },
+  "schema": 1,
+  "team_id": "team-01",
+  "window": {
+    "hi_exclusive": "2024-07-01",
+    "lo": "2020-01-01"
+  }
+}

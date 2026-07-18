@@ -1,0 +1,11 @@
+{
+  "corruption_ok": true,
+  "determinism_ok": true,
+  "n_truncations": 12,
+  "ok": true,
+  "samebar_ok": true,
+  "scan_ok": true,
+  "truncation_ok": true,
+  "violations": [],
+  "widening_ok": true
+}
