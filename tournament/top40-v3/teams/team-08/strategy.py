@@ -70,12 +70,27 @@ def _complete_history(
     if not required.issubset(frame.columns):
         return pd.DataFrame(columns=sorted(required))
     interval = pd.Timedelta(hours=parameters.interval_hours)
-    times = pd.to_datetime(frame["open_time"], utc=True, errors="coerce")
-    complete = times.notna() & ((times + interval) <= decision_time)
-    result = frame.loc[complete, ["open_time", "close", "quote_volume"]].copy()
+    required_bars = parameters.slow_horizon_bars + 1
+    end = decision_time - interval
+    start = end - (required_bars - 1) * interval
+
+    # The worker supplies a strictly increasing append-only UTC stream. Restrict conversion to
+    # the exact fixed estimator window so historical replay remains bounded as the tape grows.
+    raw_times = frame["open_time"]
+    if isinstance(raw_times.dtype, pd.DatetimeTZDtype):
+        left = int(raw_times.searchsorted(start, side="left"))
+        right = int(raw_times.searchsorted(end, side="right"))
+        candidate = frame.iloc[left:right]
+        times = pd.to_datetime(candidate["open_time"], utc=True, errors="coerce")
+    else:
+        all_times = pd.to_datetime(raw_times, utc=True, errors="coerce")
+        in_window = all_times.notna() & all_times.between(start, end, inclusive="both")
+        candidate = frame.loc[in_window]
+        times = all_times.loc[in_window]
+    result = candidate.loc[:, ["open_time", "close", "quote_volume"]].copy()
     if result.empty:
         return pd.DataFrame(columns=sorted(required))
-    result["open_time"] = times.loc[complete]
+    result["open_time"] = times
     result["close"] = pd.to_numeric(result["close"], errors="coerce")
     result["quote_volume"] = pd.to_numeric(result["quote_volume"], errors="coerce")
     finite = (
@@ -96,7 +111,6 @@ def _complete_history(
         .sort_values("open_time", kind="mergesort")
         .drop_duplicates("open_time", keep="last")
     )
-    required_bars = parameters.slow_horizon_bars + 1
     if len(result) < required_bars:
         return pd.DataFrame(columns=sorted(required))
     recent = result.tail(required_bars).reset_index(drop=True)
@@ -179,7 +193,10 @@ def _momentum_features(
             parameters.slow_horizon_bars,
             parameters.volatility_floor,
         )
-        signs = tuple(1.0 if value > 0.0 else -1.0 if value < 0.0 else 0.0 for value in (fast, medium, slow))
+        signs = tuple(
+            1.0 if value > 0.0 else -1.0 if value < 0.0 else 0.0
+            for value in (fast, medium, slow)
+        )
         feature = MomentumFeature(
             fast_scaled_momentum=fast,
             medium_scaled_momentum=medium,
