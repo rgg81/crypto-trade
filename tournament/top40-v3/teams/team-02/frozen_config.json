@@ -1,7 +1,7 @@
 {
   "artifact": "frozen_reference_config",
-  "candidate_id": "t02-residual-low-max-7d-v1",
-  "candidate_status": "transparent_baseline_not_yet_evaluated",
+  "candidate_id": "t02-high-max-vintage-router-7d-v2",
+  "candidate_status": "preregistered_sign_and_turnover_pivot_not_yet_evaluated",
   "data_contract": {
     "allowed_bar_fields": [
       "open_time",
@@ -24,26 +24,29 @@
     "rebalance_boundary_utc": "daily-00:00",
     "target_execution": "organizer_owned_next_executable_open"
   },
-  "family_id": "t02-low-max-anti-lottery-v1",
+  "family_id": "t02-high-max-attention-persistence-v2",
   "implementation": {
     "build_factory": "build_strategy",
     "entrypoint": "strategy.py",
-    "stateful": false
+    "stateful": true
   },
   "parameters": {
     "decision_hour_utc": 0,
-    "high_max_short_symbol_cap": 0.02,
+    "directional_large_side_gross": 0.2,
+    "directional_small_side_gross": 0.16,
     "interval_hours": 8,
     "liquidity_history_bars": 90,
-    "long_side_gross": 0.2,
     "max_lookback_days": 7,
-    "maximum_abs_net": 0.05,
+    "maximum_abs_net": 0.04,
     "maximum_symbol_weight": 0.03,
     "minimum_positions_per_side": 8,
     "minimum_positive_volume_fraction": 0.9,
     "minimum_valid_symbols": 20,
+    "neutral_side_gross": 0.18,
     "selected_fraction_per_side": 0.25,
-    "short_side_gross": 0.16
+    "tape_long_days": 28,
+    "tape_short_days": 7,
+    "vintage_count": 7
   },
   "risk_policy": {
     "path": "risk_policy.json",
@@ -51,5 +54,8 @@
   },
   "schema_version": 1,
   "seed": 20260718,
-  "team_id": "team-02"
+  "team_id": "team-02",
+  "v3_parent": {
+    "candidate_id": "t02-residual-low-max-7d-v1"
+  }
 }

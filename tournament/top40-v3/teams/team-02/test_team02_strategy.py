@@ -13,7 +13,6 @@ import pandas as pd
 
 from crypto_trade.tournament.protocol import DecisionContext
 
-
 TEAM_DIR = Path(__file__).resolve().parent
 DECISION_TIME = pd.Timestamp("2023-06-26T00:00:00Z")
 SEED = 20260718
@@ -110,6 +109,12 @@ def test_deterministic_order_independent_targets() -> None:
     )
     assert first == second == _weights(reordered)
 
+    stateful = strategy_module.build_strategy()
+    duplicate_first = stateful.target_weights(context, seed=SEED)
+    duplicate_second = stateful.target_weights(context, seed=SEED)
+    assert duplicate_first == duplicate_second
+    assert len(stateful._vintages) == 1
+
 
 def test_weights_are_broad_bounded_and_short_capped() -> None:
     weights = _weights(_context())
@@ -120,9 +125,76 @@ def test_weights_are_broad_bounded_and_short_capped() -> None:
     assert len(shorts) >= 8
     assert max(longs) <= 0.03 + 1e-12
     assert max(abs(value) for value in shorts) <= 0.02 + 1e-12
-    assert math.fsum(abs(value) for value in weights.values()) <= 0.5 + 1e-12
-    assert abs(math.fsum(weights.values())) <= 0.05 + 1e-12
-    assert math.fsum(abs(value) for value in shorts) <= 0.16 + 1e-12
+    assert math.fsum(abs(value) for value in weights.values()) <= 0.36 / 7.0 + 1e-12
+    assert abs(math.fsum(weights.values())) <= 0.04 / 7.0 + 1e-12
+
+
+def test_trial_two_admits_high_max_continuation_sign() -> None:
+    context = _context()
+    parameters = strategy_module.StrategyParameters()
+    scores, tape_state = strategy_module._max_scores_and_tape_state(
+        context,
+        parameters=parameters,
+    )
+    cohort = strategy_module._portfolio(
+        scores,
+        tape_state=tape_state,
+        parameters=parameters,
+    )
+
+    highest = max(scores, key=lambda symbol: (scores[symbol], symbol))
+    lowest = min(scores, key=lambda symbol: (scores[symbol], symbol))
+    assert scores[highest] > scores[lowest]
+    assert cohort[highest] > 0.0
+    assert cohort[lowest] < 0.0
+
+
+def test_tape_router_assigns_bull_bear_and_chop_roles() -> None:
+    parameters = strategy_module.StrategyParameters()
+    assert strategy_module._routed_side_gross("bull", parameters=parameters) == (0.20, 0.16)
+    assert strategy_module._routed_side_gross("bear", parameters=parameters) == (0.16, 0.20)
+    assert strategy_module._routed_side_gross("neutral", parameters=parameters) == (0.18, 0.18)
+
+
+def test_vintages_ramp_expire_and_drop_membership_without_renormalizing() -> None:
+    first_time = DECISION_TIME - pd.Timedelta(days=6)
+    full_cohort = (("AUSDT", 0.20), ("BUSDT", -0.16))
+    one = (
+        strategy_module.Vintage(
+            decision_time=first_time,
+            weights=full_cohort,
+        ),
+    )
+    seven = tuple(
+        strategy_module.Vintage(
+            decision_time=first_time + pd.Timedelta(days=offset),
+            weights=full_cohort,
+        )
+        for offset in range(7)
+    )
+
+    ramp = strategy_module._aggregate_vintages(
+        one,
+        eligible_symbols=frozenset({"AUSDT", "BUSDT"}),
+        divisor=7,
+    )
+    mature = strategy_module._aggregate_vintages(
+        seven,
+        eligible_symbols=frozenset({"AUSDT", "BUSDT"}),
+        divisor=7,
+    )
+    membership_exit = strategy_module._aggregate_vintages(
+        seven,
+        eligible_symbols=frozenset({"AUSDT"}),
+        divisor=7,
+    )
+
+    assert math.isclose(sum(abs(value) for value in ramp.values()), 0.36 / 7.0)
+    assert set(mature) == {"AUSDT", "BUSDT"}
+    assert math.isclose(mature["AUSDT"], 0.20)
+    assert math.isclose(mature["BUSDT"], -0.16)
+    assert set(membership_exit) == {"AUSDT"}
+    assert math.isclose(membership_exit["AUSDT"], 0.20)
 
 
 def test_future_rows_cannot_change_targets() -> None:

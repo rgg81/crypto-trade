@@ -15,7 +15,7 @@
   ],
   "policy_id": "team-02-v3-controlled",
   "position_stop": {
-    "cooldown_bars": 6,
+    "cooldown_bars": 21,
     "enabled": true,
     "loss_fraction": 0.08
   },

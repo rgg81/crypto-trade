@@ -52,6 +52,27 @@ concentration, unstable nearby windows, a weak short sleeve, and regime weakness
 and lower robustness but are not standalone vetoes. A squeeze filter that alone creates all
 profitability falsifies the claimed MAX mechanism.
 
+## Opening-probe coaching record
+
+Trial 1 (`t02-residual-low-max-7d-v1`) falsified the opening anti-lottery sign. Its train
+Sharpe was -0.635, annualized return was -11.60%, doubled-cost Sharpe was -1.002, and only 20%
+of quarters were positive. Bear Sharpe was -1.666 and the run generated 18,346 trades.
+
+The mandatory artifact-level sign audit reconciled the evaluator return to within
+`2.58e-16`. Before costs, the exact inversion improved Sharpe from -0.376 to +0.380 and had
+60% positive quarters. The same realized costs reduced inverted Sharpe to +0.120; doubling
+those costs reduced it to -0.140. This is evidence for a weak high-MAX continuation effect and
+strong evidence that daily whole-book replacement is uneconomic. Merely negating Trial 1 is
+therefore prohibited as the next candidate.
+
+The preregistered Trial 2 pivot will admit the failed original thesis: it will test high-MAX
+attention persistence using seven overlapping, equally weighted daily vintages. Each vintage
+expires after seven days, so stable-universe one-way replacement is structurally limited to
+one seventh of the book. A parameter-free 7/28-day common-crypto tape sign router will assign
+the larger sleeve to longs in bull conditions, shorts in bear conditions, and equal sleeves
+when the two horizons disagree. Rankings remain exclusively the single largest seven-day
+median-residual return. This is one fixed revision, not a horizon or threshold search.
+
 ## Collision guard
 
 Do not use the full distribution of positive squared residuals or realized skew as the main

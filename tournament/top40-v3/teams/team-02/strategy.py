@@ -1,9 +1,10 @@
-"""Team 02: causal seven-day residual low-MAX anti-lottery baseline."""
+"""Team 02: causal high-MAX attention persistence with seven daily vintages."""
 
 from __future__ import annotations
 
 import dataclasses
 import math
+from collections import deque
 
 import numpy as np
 import pandas as pd
@@ -21,11 +22,20 @@ class StrategyParameters:
     minimum_valid_symbols: int = 20
     minimum_positions_per_side: int = 8
     selected_fraction_per_side: float = 0.25
-    long_side_gross: float = 0.20
-    short_side_gross: float = 0.16
+    vintage_count: int = 7
+    tape_short_days: int = 7
+    tape_long_days: int = 28
+    directional_large_side_gross: float = 0.20
+    directional_small_side_gross: float = 0.16
+    neutral_side_gross: float = 0.18
     maximum_symbol_weight: float = 0.03
-    high_max_short_symbol_cap: float = 0.02
-    maximum_abs_net: float = 0.05
+    maximum_abs_net: float = 0.04
+
+
+@dataclasses.dataclass(frozen=True)
+class Vintage:
+    decision_time: pd.Timestamp
+    weights: tuple[tuple[str, float], ...]
 
 
 _REFERENCE = StrategyParameters()
@@ -152,11 +162,11 @@ def _daily_returns(bars: pd.DataFrame) -> pd.Series:
     return pd.Series(returns, dtype=float).sort_index()
 
 
-def _max_scores(
+def _max_scores_and_tape_state(
     context: DecisionContext,
     *,
     parameters: StrategyParameters,
-) -> dict[str, float]:
+) -> tuple[dict[str, float], str]:
     decision_time = _utc(context.decision_time)
     eligible = tuple(sorted({str(symbol) for symbol in context.eligible_symbols}))
     histories: dict[str, pd.Series] = {}
@@ -173,10 +183,33 @@ def _max_scores(
         if not daily.empty:
             histories[symbol] = daily
     if len(histories) < parameters.minimum_valid_symbols:
-        return {}
+        return {}, "neutral"
 
     returns = pd.DataFrame(histories, dtype=float).sort_index()
-    residuals = returns.sub(returns.median(axis=1, skipna=True), axis=0)
+    market_return = returns.median(axis=1, skipna=True)
+    market_days = pd.date_range(
+        end=decision_time.floor("D") - pd.Timedelta(days=1),
+        periods=parameters.tape_long_days,
+        freq="D",
+    )
+    market_window = market_return.reindex(market_days)
+    market_breadth = returns.notna().sum(axis=1).reindex(market_days)
+    if (
+        not np.isfinite(market_window.to_numpy(dtype=float)).all()
+        or (market_breadth < parameters.minimum_valid_symbols).any()
+    ):
+        return {}, "neutral"
+
+    short_tape = float(market_window.tail(parameters.tape_short_days).sum())
+    long_tape = float(market_window.sum())
+    if short_tape > 0.0 and long_tape > 0.0:
+        tape_state = "bull"
+    elif short_tape < 0.0 and long_tape < 0.0:
+        tape_state = "bear"
+    else:
+        tape_state = "neutral"
+
+    residuals = returns.sub(market_return, axis=0)
     target_days = pd.date_range(
         end=decision_time.floor("D") - pd.Timedelta(days=1),
         periods=parameters.max_lookback_days,
@@ -191,12 +224,25 @@ def _max_scores(
         value = float(np.max(values))
         if math.isfinite(value):
             scores[symbol] = value
-    return scores
+    return scores, tape_state
+
+
+def _routed_side_gross(
+    tape_state: str,
+    *,
+    parameters: StrategyParameters,
+) -> tuple[float, float]:
+    if tape_state == "bull":
+        return parameters.directional_large_side_gross, parameters.directional_small_side_gross
+    if tape_state == "bear":
+        return parameters.directional_small_side_gross, parameters.directional_large_side_gross
+    return parameters.neutral_side_gross, parameters.neutral_side_gross
 
 
 def _portfolio(
     scores: dict[str, float],
     *,
+    tape_state: str,
     parameters: StrategyParameters,
 ) -> dict[str, float]:
     if len(scores) < parameters.minimum_valid_symbols:
@@ -210,20 +256,21 @@ def _portfolio(
     if side_count < parameters.minimum_positions_per_side:
         return {}
 
-    # Low-MAX names are long. The high-MAX short sleeve is deliberately smaller and has a
-    # stricter per-name cap because lottery winners can continue squeezing.
-    longs = ordered[:side_count]
-    shorts = ordered[-side_count:]
-    long_weight = parameters.long_side_gross / side_count
-    short_weight = parameters.short_side_gross / side_count
+    # Trial 1 falsified the anti-lottery sign. Trial 2 admits the pivot: high-MAX names are the
+    # attention-persistence long sleeve and low-MAX names are the short sleeve.
+    shorts = ordered[:side_count]
+    longs = ordered[-side_count:]
+    long_gross, short_gross = _routed_side_gross(tape_state, parameters=parameters)
+    long_weight = long_gross / side_count
+    short_weight = short_gross / side_count
     if long_weight > parameters.maximum_symbol_weight + 1e-12:
         return {}
-    if short_weight > parameters.high_max_short_symbol_cap + 1e-12:
+    if short_weight > parameters.maximum_symbol_weight + 1e-12:
         return {}
 
     result = {symbol: long_weight for symbol in longs}
     result.update({symbol: -short_weight for symbol in shorts})
-    gross_limit = parameters.long_side_gross + parameters.short_side_gross
+    gross_limit = long_gross + short_gross
     gross = math.fsum(abs(value) for value in result.values())
     net = math.fsum(result.values())
     if gross > gross_limit + 1e-12 or gross > 0.5 + 1e-12:
@@ -233,9 +280,30 @@ def _portfolio(
     return {symbol: result[symbol] for symbol in sorted(result)}
 
 
-class ResidualLowMax:
+def _aggregate_vintages(
+    vintages: tuple[Vintage, ...],
+    *,
+    eligible_symbols: frozenset[str],
+    divisor: int,
+) -> dict[str, float]:
+    totals: dict[str, float] = {}
+    for vintage in vintages:
+        for symbol, weight in vintage.weights:
+            if symbol in eligible_symbols:
+                totals[symbol] = totals.get(symbol, 0.0) + weight / divisor
+    return {
+        symbol: value
+        for symbol, value in sorted(totals.items())
+        if abs(value) > 1e-15
+    }
+
+
+class HighMaxVintageRouter:
     def __init__(self, parameters: StrategyParameters = _REFERENCE):
         self.parameters = parameters
+        self._vintages: deque[Vintage] = deque()
+        self._last_decision_time: pd.Timestamp | None = None
+        self._last_target: dict[str, float] = {}
 
     def target_weights(
         self,
@@ -247,9 +315,33 @@ class ResidualLowMax:
         decision_time = _utc(context.decision_time)
         if not _is_scheduled(decision_time, self.parameters):
             return None
-        scores = _max_scores(context, parameters=self.parameters)
-        return _portfolio(scores, parameters=self.parameters)
+        if self._last_decision_time is not None:
+            if decision_time == self._last_decision_time:
+                return dict(self._last_target)
+            if decision_time < self._last_decision_time:
+                return {}
+
+        scores, tape_state = _max_scores_and_tape_state(context, parameters=self.parameters)
+        cohort = _portfolio(scores, tape_state=tape_state, parameters=self.parameters)
+        self._vintages.append(
+            Vintage(
+                decision_time=decision_time,
+                weights=tuple(sorted(cohort.items())),
+            )
+        )
+        expiry = decision_time - pd.Timedelta(days=self.parameters.vintage_count)
+        while self._vintages and self._vintages[0].decision_time <= expiry:
+            self._vintages.popleft()
+
+        target = _aggregate_vintages(
+            tuple(self._vintages),
+            eligible_symbols=frozenset(str(value) for value in context.eligible_symbols),
+            divisor=self.parameters.vintage_count,
+        )
+        self._last_decision_time = decision_time
+        self._last_target = target
+        return dict(target)
 
 
 def build_strategy() -> TargetStrategy:
-    return ResidualLowMax()
+    return HighMaxVintageRouter()
