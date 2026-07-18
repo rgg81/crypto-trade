@@ -1,0 +1,15 @@
+{
+  "candidate_id": "team05-crtr-ab-turnover",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "organizer_journal_head_sha256": "578e73f1704efb8a76405f36d7cf77b93b608eec906d37de278a36efc543835e",
+  "private_attempt_number": null,
+  "registration_sha256": "eee891537127774648331bad62e82cb1412f6eef8a2be6e6a432d1abbbb32b2b",
+  "reserved_at_utc": "2026-07-18T09:44:08.372940+00:00",
+  "risk_policy_sha256": "b0f58fd66420bc38c4ce0838fbbd785cbec1476faad97bfdb151f55d2c3ce0ca",
+  "schema_version": 1,
+  "source_bundle_sha256": "b927314eeb27313d45fd5a0a9a2fcdc719e234d8e8db037cf6e8da32b2cbcd41",
+  "stage": "development",
+  "strategy_sha256": "4188181fbf28f805c9df0c11e5eb0244235aedc7938f5beb27d3614b86dc58c0",
+  "team_id": "team-05",
+  "tournament": "quant-portfolio-blind-top40-v2"
+}
