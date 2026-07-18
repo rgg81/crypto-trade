@@ -1,0 +1,50 @@
+{
+  "family_id": "t06-ls-ratio-contrarian-v1",
+  "frozen_at_utc": "2026-07-18T19:28:19+00:00",
+  "harness": "PASS",
+  "net_is_csv_sha256": "ba87b39801526061879f6dd412ef559459c3fe3d8118ed502227abf765c7bec6",
+  "reported": {
+    "1x": {
+      "ann_turnover": 93.8004870617056,
+      "maxdd": -0.32631583302004685,
+      "mean_gross": 1.0,
+      "mean_net": 1.489762524037719e-19,
+      "median_names_long": 20.0,
+      "median_names_short": 20.0,
+      "n_months": 54,
+      "regime_sharpe": {
+        "bear": 1.0239578125354234,
+        "bull": 1.3854108928175701,
+        "chop": 0.9519218091381404
+      },
+      "sharpe": 1.1756997396808886,
+      "total_cost": 0.2576178613798183,
+      "total_funding_pnl": 0.0701095731185052,
+      "total_return": 1.8195142543992566
+    },
+    "2x": {
+      "ann_turnover": 93.8004870617056,
+      "maxdd": -0.4007229185419402,
+      "mean_gross": 1.0,
+      "mean_net": 1.489762524037719e-19,
+      "median_names_long": 20.0,
+      "median_names_short": 20.0,
+      "n_months": 54,
+      "regime_sharpe": {
+        "bear": 0.9613699304591052,
+        "bull": 1.2701841013984485,
+        "chop": 0.11309782487814114
+      },
+      "sharpe": 0.7437039200090628,
+      "total_cost": 0.5152357227596366,
+      "total_funding_pnl": 0.0701095731185052,
+      "total_return": 0.7893696710947098
+    }
+  },
+  "schema": 1,
+  "sources_sha256": {
+    "strategy.py": "8c18799131dd64e6a045bf3ba2e93801b9c92c728e87366de4a5afcdfc501385",
+    "test_strategy.py": "a51434e5c7d040c2bfdcaccafb9c34cd4118b00a744652e6ac16ef953d728f63"
+  },
+  "team_id": "team-06"
+}
