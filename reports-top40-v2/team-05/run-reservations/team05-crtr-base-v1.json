@@ -1,0 +1,15 @@
+{
+  "candidate_id": "team05-crtr-base-v1",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "organizer_journal_head_sha256": "1811f7b84308c0a71e3848d96a98128511530c60cc1de006e1f11e85d5936c1f",
+  "private_attempt_number": null,
+  "registration_sha256": "ef72eb0b10e8996488543a122a8e56aa6c59dc428bf43e535f678b029f09fea6",
+  "reserved_at_utc": "2026-07-18T10:07:45.192584+00:00",
+  "risk_policy_sha256": "9af084c44d5082fb4cd5ab320ba76241d330b601567cdd6a3667f1fcdf523355",
+  "schema_version": 1,
+  "source_bundle_sha256": "b3ca7469c822a55105ccfc807e557199274b25ec6f8c7bde4c2a98247c0805ef",
+  "stage": "development",
+  "strategy_sha256": "4188181fbf28f805c9df0c11e5eb0244235aedc7938f5beb27d3614b86dc58c0",
+  "team_id": "team-05",
+  "tournament": "quant-portfolio-blind-top40-v2"
+}
