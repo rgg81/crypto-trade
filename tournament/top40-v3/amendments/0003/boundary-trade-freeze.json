@@ -1,0 +1,72 @@
+{
+  "addendum_id": "top40-v3-amendment-0003-end-boundary-trade-count",
+  "addendum_tests": {
+    "collected": 6,
+    "command": [
+      "env",
+      "PYTHONPATH=src",
+      "PYTHONDONTWRITEBYTECODE=1",
+      "uv",
+      "run",
+      "--frozen",
+      "pytest",
+      "-q",
+      "tests/tournament/test_top40_amendment_0003_boundary_trades.py"
+    ],
+    "output_base64": "Li4uLi4uICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIFsxMDAlXQo2IHBhc3NlZCBpbiAwLjM0cwo=",
+    "output_sha256": "7ee80106f1abbaaa581ce1211400cf3331164e30080b64a31ac2be739c01369a",
+    "output_size": 98,
+    "passed": 6
+  },
+  "implementation": {
+    "commit": "41b10caee66d46d225a2f3b4de23da47c95d9bcb",
+    "files": [
+      {
+        "path": "src/crypto_trade/tournament/top40_amendment_0003_boundary_trades.py",
+        "sha256": "0658339272febc1c475b2d187737f4626739b928e108e648dd4fb63fc17aacc0",
+        "size": 17885
+      },
+      {
+        "path": "scripts/top40_v3_amendment_0003_boundary_trades.py",
+        "sha256": "dbbd5f8909243b6da930acae46e57977069eb3de486f24e069612eed065b32bc",
+        "size": 2418
+      },
+      {
+        "path": "tests/tournament/test_top40_amendment_0003_boundary_trades.py",
+        "sha256": "0f52d6e23b8204e71c6fb017c7f1993abb1745c78257e29fb76c9131f091d416",
+        "size": 1808
+      },
+      {
+        "path": "tournament/top40-v3/amendments/0003/BOUNDARY-TRADE-ADDENDUM.md",
+        "sha256": "d0a9c9750e12da82e3dec04f1e06af4732d4a2057d00fc1819ac5b9b5540d0d3",
+        "size": 1063
+      }
+    ],
+    "manifest_sha256": "d97dd6a0074798f784f0aed3de892b74df0b53f11bae97f64085813898d1f171"
+  },
+  "parent_activation": {
+    "freeze_commit": "4d63d3fce4d217fd3f908773afc51863750d47a7",
+    "freeze_file_sha256": "f280f57f25ddb9528447b72543db0f0b4358de8f8ae3750aadc23c361aa8cf88",
+    "implementation_commit": "b0b01c0e81095b5b8792fd893f124b6577bb00dc",
+    "parent_freeze_sha256": "bbeb52060628a09505af374c4fc68d1d604c68d46e0e1f268e183642d89ded2c",
+    "record_sha256": "8a139030bff6b1f10a370d6b49838ec85a23d5a14c35876b216f2386f6ebe801",
+    "validation_journal_head_sha256": "92cabb4425537019346f596141f76a4dbe943a9c6d7bc0181bb05615114c30c0"
+  },
+  "record_sha256": "82654fb7b2e80ac8e27e67f57107b601c6f26137dd84f06453f54b5d9614c396",
+  "released_validation": {
+    "cohort_freeze_sha256": "a32e0fe862e9a4579f51e7a13b21eb7a854e761f76e0524a591c424faf3e6365",
+    "journal_file_sha256": "b549828bd7fd77e57d05113b83b5dd86130cc49ef2dc75658fdac1b481eb53e7",
+    "journal_head_sha256": "92cabb4425537019346f596141f76a4dbe943a9c6d7bc0181bb05615114c30c0",
+    "journal_path": "tournament/top40-v3/validation-probe-journal.jsonl",
+    "packet_sha256_by_team": {
+      "team-04": "7e1da335bbe9342396a0e20229ff33280f54e4828fb3b23c8c0980aef9d388cd",
+      "team-05": "6f26e64365fccbfec2faf889fc1596042ebcc0313de176424fb6d338558f60ba",
+      "team-06": "3b02b2174671d709556cc9b6c18ebb4c07f9a74b25bd3bec0702ef45c6a927ee",
+      "team-09": "32e6422dca32033a2121bdb1a20d4352ca2d389aeb4dbca8bdad39022d6a22da"
+    },
+    "parent_activation_freeze_sha256": "dabb6ea5d1370ef48d28a413ac8e99e460a7d42d388a7e60887e220750471033",
+    "parent_durability_freeze_sha256": "3d50a3e4f8f5923696c27ac315c5b01f0610018f33eb28a341c884e968dc4177",
+    "release_record_sha256": "92cabb4425537019346f596141f76a4dbe943a9c6d7bc0181bb05615114c30c0"
+  },
+  "schema_version": 1
+}
