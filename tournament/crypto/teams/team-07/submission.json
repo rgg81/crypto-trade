@@ -1,0 +1,50 @@
+{
+  "family_id": "t07-vol-structure-v1",
+  "frozen_at_utc": "2026-07-18T19:35:38+00:00",
+  "harness": "PASS",
+  "net_is_csv_sha256": "7919adcd9f40ec9518f0f897976915372169afb0fafa6065ad663c5cf9c51e68",
+  "reported": {
+    "1x": {
+      "ann_turnover": 70.46534003001695,
+      "maxdd": -0.31133210352397733,
+      "mean_gross": 0.9924385661051084,
+      "mean_net": 4.838316711988698e-16,
+      "median_names_long": 20.0,
+      "median_names_short": 20.0,
+      "n_months": 54,
+      "regime_sharpe": {
+        "bear": 1.2029350550080404,
+        "bull": 1.4398631831954924,
+        "chop": 0.28243384978796826
+      },
+      "sharpe": 1.024682326266311,
+      "total_cost": 0.198805029228124,
+      "total_funding_pnl": 0.11692278910171192,
+      "total_return": 3.121211047683996
+    },
+    "2x": {
+      "ann_turnover": 70.46534003001695,
+      "maxdd": -0.3279570021483229,
+      "mean_gross": 0.9924385661051084,
+      "mean_net": 4.838316711988698e-16,
+      "median_names_long": 20.0,
+      "median_names_short": 20.0,
+      "n_months": 54,
+      "regime_sharpe": {
+        "bear": 0.9665383444240897,
+        "bull": 1.2676551568612358,
+        "chop": 0.08753263941789437
+      },
+      "sharpe": 0.8260427401204254,
+      "total_cost": 0.397610058456248,
+      "total_funding_pnl": 0.11692278910171192,
+      "total_return": 1.975439189704912
+    }
+  },
+  "schema": 1,
+  "sources_sha256": {
+    "strategy.py": "fcdaa2c1c443efc9f32d8879c74b77ffc9b93053ce1106a13d0291551f2679a1",
+    "test_strategy.py": "b534c3673188734e0fcbdec804b00505e8f822df684b1312addf2148a17d81c8"
+  },
+  "team_id": "team-07"
+}

@@ -1,23 +1,17 @@
 {
   "team_id": "team-09",
   "primary": {
-    "family_id": "t09-liq-squeeze-reversal-v2",
-    "summary": "Liquidation/short-squeeze reversal: continuously score wipeout intensity (extreme range + volume spike + OI collapse) across the top-40 and trade the 1-3 day snap-back of the overshoot.",
-    "mechanism": "Forced deleveraging is mechanical, price-insensitive flow: when a leveraged crowd is stopped out, cascading liquidation market orders push price beyond any information-justified level, visible at the 8h close as extreme range, volume spikes, and OI collapse. The overshoot snaps back over the following 1-3 days as liquidity providers and value-sensitive flow re-enter, and post-cascade funding flips toward paying the reversal side (negative after long-wipeouts), so the engine's native funding stream is a tailwind rather than a drag. Implemented as a continuous cross-sectional flush/squeeze-intensity score with always-ranked tails (price/volume fallback where OI is NaN pre-2020-09), so breadth holds even in quiet weeks.",
-    "falsifier": "If names ranked by flush/squeeze intensity show no positive net IS Sharpe at 1x costs on the snap-back over any 1-9 candle holding horizon - or the effect exists only pre-cost - the family is dead."
+    "family_id": "t09-oi-price-confirmation-v3",
+    "summary": "OI-price confirmation: classify each move by open-interest change - long price-up/OI-up and short price-down/OI-up (new leveraged capital commits, reflexive fuel), avoid or fade moves on OI contraction (terminal closing flow, no fuel).",
+    "mechanism": "Open-interest change identifies the marginal flow behind a price move: OI expansion means NEW positions are being opened (leveraged conviction entering), which both reflects committed capital and creates future forced-flow fuel in the move's direction, while OI contraction means positions are being CLOSED (covering or liquidation) - terminal flow with nothing behind it. The tradable object is the OI-state interaction, not price persistence per se: our own logged e04 result is direct evidence the OI term is load-bearing, since price-down events WITH OI collapse went flat (-15 to -33 bps, fuel spent) while the OI-intact event population continued -153 bps over the same 2022+ window. Honest data window is ~Dec-2021 onward (e01: OI breadth); the strategy is flat before it, and the sealed holdout window has full OI coverage.",
+    "falsifier": "If the OI-conditioned book has no positive net IS Sharpe at 1x costs on its honest 2021-12+ window, OR an OI-ablated control (same construction, OI term removed) matches it within noise - i.e., the OI term is not load-bearing - the family is dead and we do not ship a re-labeled price-continuation book."
   },
   "backups": [
     {
-      "family_id": "t09-short-horizon-reversal-v2",
-      "summary": "Short-horizon cross-sectional reversal: fade 1-3 day relative overreaction within the top-40, with turnover-controlled smoothed ranks.",
-      "mechanism": "Crypto's retail-dominated cross-section overreacts at 1-3 day horizons: attention-driven chasing pushes relative winners too far and panic selling pushes relative losers too far, and with no short-horizon fundamental anchor those relative moves mean-revert as the aggressive flow exhausts. The fade is cross-sectionally hedged, so it pays in bull, bear, and chop alike; the design problem is turnover discipline (rank smoothing, tail holding, partial rebalancing) so the edge survives 8h-cadence taker fees plus slippage.",
-      "falsifier": "If the 1-3 day reversal spread's net IS Sharpe at 1x costs is <= 0 for every turnover-controlled variant (a pre-cost edge that cannot be captured after costs counts as dead), the family is dead."
-    },
-    {
-      "family_id": "t09-dispersion-regime-v2",
-      "summary": "Dispersion/correlation-regime conditioning: trade the relative-value cross-section as noise-fade when pairwise correlation is high (macro regime) and as persistence when correlation is low (idiosyncratic regime).",
-      "mechanism": "When trailing pairwise correlation across the top-40 is high, a single macro factor dominates and relative moves are mostly noise that mean-reverts; when correlation is low, capital is rotating on coin-specific narratives and relative moves persist. Conditioning the sign and sizing of the cross-section on the observable correlation regime harvests the same relative-value spread in the manner matched to the regime that generated it - the registered mechanism is the correlation-regime conditioning itself, not any unconditional momentum or reversal signal.",
-      "falsifier": "If correlation-regime-conditioned variants show neither positive net IS Sharpe at 1x costs nor improvement over their best unconditional counterpart (the conditioning adds nothing), the family is dead."
+      "family_id": "t09-trade-size-composition-v3",
+      "summary": "Trade-size composition cross-section: use avg-trade-size (volume/trades) and trade-count dynamics to identify the marginal participant - fade retail-swarm names (exploding count, shrinking size), side with large-trade flow - over 1-4 week horizons.",
+      "mechanism": "The kline trades field makes participant mix observable: an explosion of trade count with shrinking average trade size marks a retail attention swarm (social-media-driven, price-insensitive, nets long at attention peaks), while rising average trade size marks large or informed flow. Retail-swarm names are systematically overpriced at the margin and underperform over the following 1-4 weeks; large-trade-flow names outperform - a WHO-is-trading mechanism, distinct from aggressor direction (taker-flow), volume-move confirmation (volume-price divergence), and all price-persistence families. Full 2020-01 kline coverage; horizon deliberately beyond the 1-9-candle range our e03 falsification covered.",
+      "falsifier": "If the composition-sorted long-short spread has no positive net IS Sharpe at 1x costs at any 1-4 week horizon, or its edge survives with the trade-size/count term replaced by plain volume (composition not load-bearing), the family is dead."
     }
   ]
 }
