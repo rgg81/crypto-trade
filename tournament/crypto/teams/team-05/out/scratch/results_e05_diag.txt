@@ -1,0 +1,1 @@
+mean_xs_corr_flow_vs_mom_21 = 0.4372

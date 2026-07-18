@@ -35,3 +35,4 @@
 {"event": "team_frozen", "family_id": "t02-breakout-channel-v2", "n_sources": 2, "sharpe_1x": 2.0687461288553433, "team_id": "team-02", "ts": "2026-07-18T19:06:09+00:00"}
 {"event": "team_frozen", "family_id": "t01-funding-carry-xs-v1", "n_sources": 2, "sharpe_1x": 2.406749605639445, "team_id": "team-01", "ts": "2026-07-18T19:07:28+00:00"}
 {"event": "team_frozen", "family_id": "t04-ts-trend-v2", "n_sources": 2, "sharpe_1x": 1.6089567336103308, "team_id": "team-04", "ts": "2026-07-18T19:19:11+00:00"}
+{"event": "team_frozen", "family_id": "t05-taker-flow-imbalance-v2", "n_sources": 2, "sharpe_1x": 1.5013240350201893, "team_id": "team-05", "ts": "2026-07-18T19:20:32+00:00"}

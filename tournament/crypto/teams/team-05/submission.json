@@ -1,0 +1,50 @@
+{
+  "family_id": "t05-taker-flow-imbalance-v2",
+  "frozen_at_utc": "2026-07-18T19:20:32+00:00",
+  "harness": "PASS",
+  "net_is_csv_sha256": "fc4272042631c6337ed385f5fb1b04658996bc6e0b86736ae439145e509d6a26",
+  "reported": {
+    "1x": {
+      "ann_turnover": 173.1484964226449,
+      "maxdd": -0.43008949914899675,
+      "mean_gross": 0.9929110818804406,
+      "mean_net": 1.4586411000418352e-16,
+      "median_names_long": 20.0,
+      "median_names_short": 20.0,
+      "n_months": 54,
+      "regime_sharpe": {
+        "bear": 1.6326715807883523,
+        "bull": 1.8577136152066893,
+        "chop": 0.32960038823291915
+      },
+      "sharpe": 1.5013240350201893,
+      "total_cost": 0.49540288542359906,
+      "total_funding_pnl": 0.36876160054620877,
+      "total_return": 13.445291220020056
+    },
+    "2x": {
+      "ann_turnover": 173.1484964226449,
+      "maxdd": -0.4870153571190613,
+      "mean_gross": 0.9929110818804406,
+      "mean_net": 1.4586411000418352e-16,
+      "median_names_long": 20.0,
+      "median_names_short": 20.0,
+      "n_months": 54,
+      "regime_sharpe": {
+        "bear": 1.337036943512002,
+        "bull": 1.3856837763224779,
+        "chop": -0.24999005031015437
+      },
+      "sharpe": 1.049163345139749,
+      "total_cost": 0.9908057708471981,
+      "total_funding_pnl": 0.36876160054620877,
+      "total_return": 5.144751288155917
+    }
+  },
+  "schema": 1,
+  "sources_sha256": {
+    "strategy.py": "69098a67f209d54d7bc09a93c25b00d02002dc770a04fa0ff7d3cf8973b0adaf",
+    "test_strategy.py": "a72a977e187fc68433937c2a3f503c33ffc96f2918951a998ca4e161709275ed"
+  },
+  "team_id": "team-05"
+}
