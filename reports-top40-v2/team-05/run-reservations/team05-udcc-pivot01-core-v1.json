@@ -1,0 +1,15 @@
+{
+  "candidate_id": "team05-udcc-pivot01-core-v1",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "organizer_journal_head_sha256": "df0d611cee014e034d6791db68652a2557c4ec03854a588a37916e765abeef56",
+  "private_attempt_number": null,
+  "registration_sha256": "c96f8da4da9c0a05e840ed0a7dc8015b37e8c37f64c7fa839764357ce4b8a08c",
+  "reserved_at_utc": "2026-07-18T11:14:05.303188+00:00",
+  "risk_policy_sha256": "2a56f21940baa886f603c635ea53ca39778869577dd35bc53f1c754bf4c2794e",
+  "schema_version": 1,
+  "source_bundle_sha256": "63c8782a70bc5eb990440abba91b7a8add53e225ece1544b353eef170e55275a",
+  "stage": "development",
+  "strategy_sha256": "bff8d9cb65aa445c926decbab45da4f73f229ae744e55c5fd81f0a36e06a234a",
+  "team_id": "team-05",
+  "tournament": "quant-portfolio-blind-top40-v2"
+}
