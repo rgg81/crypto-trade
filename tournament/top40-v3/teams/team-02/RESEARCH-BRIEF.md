@@ -73,6 +73,19 @@ the larger sleeve to longs in bull conditions, shorts in bear conditions, and eq
 when the two horizons disagree. Rankings remain exclusively the single largest seven-day
 median-residual return. This is one fixed revision, not a horizon or threshold search.
 
+Trial 2 (`t02-high-max-vintage-router-7d-v2`) did not rescue MAX. Train Sharpe was -0.320,
+annualized return -3.84%, doubled-cost Sharpe -0.411, and max drawdown 16.28%. Quarter breadth
+improved to 60%, but only bull was positive (+0.973); bear was -1.158 and chop was -2.232. The
+seven-vintage construction reduced arithmetic realized costs from 10.57% in Trial 1 to 4.30%,
+but generated 25,973 small trades through cohort and membership changes.
+
+Its artifact-level sign audit reconciled returns to `1.55e-16`. The candidate was negative even
+before costs (Sharpe -0.151). Exact inversion produced only +0.154 raw Sharpe, -0.016 after the
+same realized costs, and -0.186 after doubled realized costs. Both MAX signs are therefore
+falsified in this frozen universe at the tested daily and seven-vintage holdings. Team 02 is
+parked rather than submitting a losing model; any comeback requires a genuinely new mechanism,
+not another MAX horizon, sleeve tilt, or router.
+
 ## Collision guard
 
 Do not use the full distribution of positive squared residuals or realized skew as the main
