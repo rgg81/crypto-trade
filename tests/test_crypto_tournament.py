@@ -634,3 +634,25 @@ def test_samebar_perturbation_tolerates_int64_oi(tmp_path):
     td = make_team(tmp_path)
     rep = th.audit_strategy(td, dest, man, n_truncations=2)
     assert rep.samebar_ok and rep.corruption_ok, rep.violations
+
+
+def test_amendment1_jittered_boundary_funding_truncation_invariant(tmp_path):
+    """AMENDMENT #1 regression: a same-bar-funding strategy must survive truncation/corruption
+    when boundary funding events carry ms jitter (stamped open[t+1]+3ms, snapped into candle t
+    by the engine). Pre-amendment the harness dropped those events at the cut row."""
+    b = synth_bundle(4, 420)
+    for s in list(b["funding"]):
+        f = b["funding"][s]
+        b["funding"][s] = pd.Series(
+            f.to_numpy(), index=pd.Index(np.asarray(f.index) + 3, name="funding_time")
+        )  # every boundary event jittered +3ms
+    dest, man = tmp_path / "data_is", tmp_path / "MANIFEST.json"
+    write_snapshot_dir(b, dest, man)
+    td = make_team(
+        tmp_path,
+        "def build_raw_weights(pn, aux):\n"
+        "    f = aux['funding'].ewm(halflife=2.0, adjust=True, ignore_na=False).mean()\n"
+        "    return (-f).fillna(0.0)\n",  # same-bar funding signal, charter-legal
+    )
+    rep = th.audit_strategy(td, dest, man, n_truncations=4)
+    assert rep.ok, rep.violations

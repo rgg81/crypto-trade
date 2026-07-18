@@ -188,13 +188,23 @@ def _cut_ms(t) -> int:
 _VOLUME_COLS = ("volume", "quote_volume", "trades", "taker_buy_volume", "taker_buy_quote_volume")
 _OHLC = ("open", "high", "low", "close")
 
+# AMENDMENT #1 (charter §13, journaled 2026-07-18): the funding variant window must mirror the
+# engine's jitter snapping. `funding_candle_panel` snaps events within 60s of an 8h boundary
+# ONTO the boundary and assigns boundary events to the candle they CLOSE — so an event stamped
+# `open[cut+1] + 3ms` legitimately belongs to candle `cut` (same-bar info, knowable at its
+# close). Cutting funding at exactly `open[cut+1]` dropped those events, making aux funding at
+# the cut row non-invariant under truncation/corruption and false-failing every honest
+# same-bar-funding strategy (found by team-01's QE). The window extension is exactly the
+# engine's snap set — nothing beyond `(open[cut+1], open[cut+1]+60s]` can enter candle `cut`.
+_FUNDING_KEEP_MS = tc.STEP_MS + te._FUNDING_SNAP_MS
+
 
 def truncate_bundle(bundle: dict, cut) -> dict:
     """Every source truncated at what is knowable at the CLOSE of the cut candle."""
     ms = _cut_ms(cut)
     return {
         "klines": {s: df[df.index <= ms] for s, df in bundle["klines"].items()},
-        "funding": {s: f[f.index <= ms + tc.STEP_MS] for s, f in bundle["funding"].items()},
+        "funding": {s: f[f.index <= ms + _FUNDING_KEEP_MS] for s, f in bundle["funding"].items()},
         "oi": {s: df[df.index <= ms] for s, df in bundle["oi"].items()},
         "elig": bundle["elig"][bundle["elig"].index <= ms],
     }
@@ -214,7 +224,7 @@ def corrupt_bundle_after(bundle: dict, cut) -> dict:
     funding: dict[str, pd.Series] = {}
     for s, f in bundle["funding"].items():
         g = f.copy()
-        m = g.index > ms + tc.STEP_MS
+        m = g.index > ms + _FUNDING_KEEP_MS  # amendment #1: don't mangle snap-window events
         g[m] = g[m] * 3.0 + 1e-4
         funding[s] = g
     oi: dict[str, pd.DataFrame] = {}
@@ -241,7 +251,12 @@ def perturb_samebar(bundle: dict, t) -> dict:
     funding: dict[str, pd.Series] = {}
     for s, f in bundle["funding"].items():
         g = f.copy()
-        m = (g.index > ms) & (g.index <= ms + tc.STEP_MS)
+        # amendment #1: perturb exactly the raw-ts preimage of "events the engine assigns to
+        # candle t*" — (open[t*]+snap, open[t*]+8h+snap]. A boundary event jittered to
+        # open[t*]+3ms snaps BACK to candle t*-1 and must stay untouched (else weights before
+        # t* legitimately change and the check false-fails).
+        snap = te._FUNDING_SNAP_MS
+        m = (g.index > ms + snap) & (g.index <= ms + tc.STEP_MS + snap)
         g[m] = g[m] + 1e-4
         funding[s] = g
     oi: dict[str, pd.DataFrame] = {}
