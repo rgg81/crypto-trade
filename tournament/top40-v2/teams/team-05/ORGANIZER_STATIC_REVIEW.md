@@ -8,7 +8,7 @@ Disposition: **NO-GO for registration or execution; mechanism concept retained f
 - Exposure is conservative and the fixed neighborhood is one-axis and nonselectable.
 - The package records causal lineage, long/bull and short/bear roles, hard development gates, and
   explicit no-control/single-control/combined risk policies.
-- No material trial or performance view has been consumed.
+- At the time of this initial review, no material trial or performance view had been consumed.
 
 ## Blocking corrections
 
@@ -110,3 +110,24 @@ point-in-time eligible set and declares no local re-expansion.
 
 No test, Python process, evaluator, lifecycle operation, or Git command was run for this authority
 rebind. It records no semantic approval, registration, evaluation, or performance result.
+
+## Amendment 0008 replacement rebind
+
+The later `team05-crtr-core-v2` registration and run are preserved as material trial 1. That run
+failed before strategy initialization with the worker-side A5 protocol import error and recorded no
+model metric or artifact. It therefore is not evidence against CRTR and does not activate a family
+pivot, control rescue, or performance DNF rule.
+
+Frozen Amendment 0008 authorizes only `team05-crtr-core-v2-infra-r1` under the same existing family
+and unchanged no-control model. Its freeze commit is
+`f6003ae687d5a6bf665abb001715b01ea8b10abb`, with SHA-256
+`08bf194c9ade1f66bf38012210ad8604df61ca467cdad00bd3957aa679ea9bdd`. The active A7 runtime
+entrypoint SHA-256 is `8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9`;
+its integration-freeze commit/SHA-256 are `c8b917ca49306d5200a4e08848e73ff6f5a18bf3` and
+`6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51`.
+
+Disposition remains **NO-GO for registration or execution** until serialized organizer validation
+passes and the fresh infra-r1 executable manifest, independent semantic review, and score manifest
+are immutable first-adds in that order. This package edit is an identity/authority preparation only;
+it is not the independent review, does not create any canonical infra-r1 A5 artifact, and does not
+authorize more than the one A8 run.

@@ -21,6 +21,11 @@ implementation, contract schemas, and authority JSON under `src/crypto_trade/tou
 `tournament/top40-v2/amendments/0005/`/`0006/`. No team namespace, report, evaluator artifact, or
 performance source was added to scope.
 
+For the still later A8 administrative replacement rebind, inspection added only the public A7/A8
+authority files and the exact Team05 v2 registration/reservation/empty terminal incident bindings
+named by the A8 freeze. No model metric or market-data artifact existed in that failed result, and
+no other team or performance source entered scope.
+
 The charter path named by the task,
 `tournament/top40-v2/TOURNAMENT-CHARTER-TOP40-V2.md`, was absent. The organizer/root confirmed the
 absence, authorized the exact V2 README as a lifecycle summary, and instructed Team 05 not to
@@ -66,10 +71,17 @@ manifest hashes from the final Team05 bytes before registration.
   declaration must be copied byte-for-byte to root `risk_policy.json` before candidate commit,
   registration, and canonical execution.
 - Universe eligibility is exclusively organizer-owned. Team05 consumes the exact point-in-time
-  `DecisionContext.eligible_symbols` supplied through the active A5 entrypoint and delegated A6
+  `DecisionContext.eligible_symbols` supplied through active A7 and unchanged delegated A5/A6
   pure-crypto enforcement. It has no symbol allowlist, fallback universe, or eligibility expansion.
 
 ## Bound public authorities
+
+- Active A7 runtime entrypoint: `scripts/top40_v2_tournament_runtime_preload_v7.py`, SHA-256
+  `8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9`.
+- Active A7 integration freeze: commit `c8b917ca49306d5200a4e08848e73ff6f5a18bf3`, SHA-256
+  `6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51`.
+- Frozen A8 Team05 one-shot authority: commit `f6003ae687d5a6bf665abb001715b01ea8b10abb`,
+  SHA-256 `08bf194c9ade1f66bf38012210ad8604df61ca467cdad00bd3957aa679ea9bdd`.
 
 - Active A5 entrypoint: `scripts/top40_v2_tournament_score_diagnostics_v5.py`, SHA-256
   `0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4`.
@@ -82,7 +94,7 @@ manifest hashes from the final Team05 bytes before registration.
 - A6 canonical report: 73,777 bytes, SHA-256
   `b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b`, policy SHA-256
   `2c7fb0ff593d06c323517e60df4b28ab9387a2df580b83f82f65ef71c91fc350`, zero
-  violations.
+violations.
 
 The A6 classification is non-negotiable: stablecoins, equities/TradFi, indexes, metals,
 commodities, and any other non-crypto contracts are ineligible even if Binance exposes them as

@@ -43,6 +43,16 @@ Amendment 0005 is active through
 integration-freeze commit is `d2b95f610722aab65b4e67466b34efeaa3554101`, and its file SHA-256
 is `b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c`.
 
+Ordinary development execution now uses the active Amendment 0007 entrypoint
+`scripts/top40_v2_tournament_runtime_preload_v7.py` at SHA-256
+`8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9`. Its integration-freeze
+commit is `c8b917ca49306d5200a4e08848e73ff6f5a18bf3` and its SHA-256 is
+`6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51`. The one-shot
+administrative eligibility for `team05-crtr-core-v2-infra-r1` is the frozen Amendment 0008 at
+commit `f6003ae687d5a6bf665abb001715b01ea8b10abb`, SHA-256
+`08bf194c9ade1f66bf38012210ad8604df61ca467cdad00bd3957aa679ea9bdd`. Neither authority changes
+the score boundary, schedule, label, direction, or statistic below.
+
 The declared diagnostic schedule is every 72 hours from `2020-01-01T00:00:00Z`, matching the
 strategy schedule. Its label is the simple return between the organizer-authoritative executable
 `open` at the score decision and the exact executable `open` 72 hours later. A decision is purged
@@ -60,14 +70,16 @@ acyclic dependency declaration is in `executable_source_manifest.template.json`,
 independent attestation shape is in `semantic_coupling_review.template.json`. Those root templates
 are not the canonical A5 artifacts. The organizer must materialize them respectively as:
 
-1. `score-adapters/team05-crtr-core-v2.executable-source-manifest.json`;
-2. `score-adapters/team05-crtr-core-v2.semantic-coupling-review.json`; and
-3. `score-adapters/team05-crtr-core-v2.json`.
+1. `score-adapters/team05-crtr-core-v2-infra-r1.executable-source-manifest.json`;
+2. `score-adapters/team05-crtr-core-v2-infra-r1.semantic-coupling-review.json`; and
+3. `score-adapters/team05-crtr-core-v2-infra-r1.json`.
 
 They must be canonical pretty JSON and immutable unique first-adds in that order, with the score
-manifest preceding the core registration. All material hashes, byte sizes, reviewer identity, and
-review timestamp remain prospective placeholders. No current Team05 file is a semantic approval,
-registration, diagnostic result, or performance claim.
+manifest preceding the replacement registration. All material hashes, byte sizes, reviewer
+identity, and review timestamp remain prospective placeholders. The existing v2 files remain
+immutable historical controls for the infrastructure-failed event and cannot stand in for any
+replacement artifact. No current infra-r1 file is a semantic approval, registration, diagnostic
+result, or performance claim.
 
 The active entrypoint delegates ordinary tournament behavior through Amendment 0006. Therefore
 the score and target universe is only the A6-certified point-in-time native crypto universe.

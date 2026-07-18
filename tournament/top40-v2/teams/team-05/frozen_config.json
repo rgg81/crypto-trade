@@ -73,7 +73,21 @@
     "executable_source_manifest": "executable_source_manifest.template.json",
     "semantic_coupling_review": "semantic_coupling_review.template.json",
     "amendment_0005_authority_active": true,
-    "registration_preconditions_pending": "accepted family registration is preserved; final Team05 hashes and dependency set, organizer tests, fresh v2 immutable executable-source first-add, independent semantic review first-add, score-manifest first-add, and accepted v2 core trial registration remain pending"
+    "registration_preconditions_pending": "accepted family registration is preserved; final Team05 hashes and dependency set, organizer tests, fresh team05-crtr-core-v2-infra-r1 immutable executable-source first-add, independent semantic review first-add, score-manifest first-add, and accepted replacement trial registration remain pending"
+  },
+  "runtime_and_replacement_authority": {
+    "active_entrypoint_path": "scripts/top40_v2_tournament_runtime_preload_v7.py",
+    "active_entrypoint_sha256": "8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9",
+    "amendment_0007_integration_freeze_commit": "c8b917ca49306d5200a4e08848e73ff6f5a18bf3",
+    "amendment_0007_integration_freeze_sha256": "6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51",
+    "amendment_0008_freeze_commit": "f6003ae687d5a6bf665abb001715b01ea8b10abb",
+    "amendment_0008_freeze_path": "tournament/top40-v2/amendments/0008/freeze.json",
+    "amendment_0008_freeze_sha256": "08bf194c9ade1f66bf38012210ad8604df61ca467cdad00bd3957aa679ea9bdd",
+    "authorized_candidate_id": "team05-crtr-core-v2-infra-r1",
+    "failed_historical_candidate_id": "team05-crtr-core-v2",
+    "maximum_development_runs": 1,
+    "replacement_material_trial_number": 2,
+    "scientific_delta": "none; identity, whitelist, tests, declarations, candidate-bound A5 bytes, and authority bindings only"
   },
   "universe_authority": {
     "amendment_0006_integration_freeze_commit": "ed3af1398543dfee4a50150915dc2e37b3631fc9",
@@ -115,5 +129,5 @@
   "control_activation_gate": "all preregistered broad positive no-control core-alpha minima in ablations.json",
   "neighbor_activation_gate": "combined policy passes every official and Team-05 non-neighborhood gate",
   "selection_rule": "Binary: freeze team05-crtr-base-v1 only if every official and Team-05 gate, including the complete neighborhood, passes. Neighbors are nonselectable stability probes.",
-  "status": "FAMILY_REGISTERED_CORE_V2_TRIAL_UNREGISTERED_ACTIVE_A5_A6_BOUND_DO_NOT_EVALUATE"
+  "status": "FAMILY_REGISTERED_CORE_V2_INFRA_FAILURE_A8_REPLACEMENT_UNREGISTERED_ACTIVE_A5_A6_A7_BOUND_DO_NOT_EVALUATE"
 }

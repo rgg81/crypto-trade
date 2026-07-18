@@ -2,11 +2,12 @@
   "schema_version": 1,
   "team_id": "team-05",
   "family_id": "team05-causal-residual-trend-reversal-v1",
-  "first_candidate_id": "team05-crtr-core-v2",
+  "first_candidate_id": "team05-crtr-core-v2-infra-r1",
+  "historical_infrastructure_failure_candidate_id": "team05-crtr-core-v2",
   "signal_definition_id": "team05-crtr-base-v1",
   "applies_to": "the unchanged CRTR score producer across all declared risk policies and one-axis neighbors",
-  "status": "PROSPECTIVE_UNREGISTERED_ACTIVE_A5_A6_AUTHORITY_BOUND",
-  "candidate_ordinal_within_family": 1,
+  "status": "PROSPECTIVE_A8_REPLACEMENT_UNREGISTERED_ACTIVE_A5_A6_A7_AUTHORITY_BOUND",
+  "candidate_ordinal_within_family": 2,
   "score_boundary": {
     "producer": "strategy.preconstruction_scores",
     "hook_import": "crypto_trade.tournament.score_adapter_protocol_v5.score_boundary exposed as strategy.score_boundary",
@@ -48,14 +49,19 @@
     "byte_invariance": "same causal input must be identical under future append/corruption/truncation, bar-map insertion order, and fresh construction"
   },
   "active_authority": {
-    "entrypoint_path": "scripts/top40_v2_tournament_score_diagnostics_v5.py",
-    "entrypoint_sha256": "0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4",
+    "entrypoint_path": "scripts/top40_v2_tournament_runtime_preload_v7.py",
+    "entrypoint_sha256": "8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9",
     "amendment_0005_integration_freeze_commit": "d2b95f610722aab65b4e67466b34efeaa3554101",
     "amendment_0005_integration_freeze_sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c",
     "amendment_0006_pure_crypto_report_sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
     "amendment_0006_pure_crypto_policy_sha256": "2c7fb0ff593d06c323517e60df4b28ab9387a2df580b83f82f65ef71c91fc350",
-    "amendment_0006_pure_crypto_report_violations": 0
+    "amendment_0006_pure_crypto_report_violations": 0,
+    "amendment_0007_integration_freeze_commit": "c8b917ca49306d5200a4e08848e73ff6f5a18bf3",
+    "amendment_0007_integration_freeze_sha256": "6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51",
+    "amendment_0008_freeze_commit": "f6003ae687d5a6bf665abb001715b01ea8b10abb",
+    "amendment_0008_freeze_path": "tournament/top40-v2/amendments/0008/freeze.json",
+    "amendment_0008_freeze_sha256": "08bf194c9ade1f66bf38012210ad8604df61ca467cdad00bd3957aa679ea9bdd"
   },
   "universe_rule": "Use only A6-certified native crypto coins/tokens in DecisionContext.eligible_symbols; stablecoins, equities/TradFi, indexes, metals, commodities, and all other non-crypto contracts are forbidden even when listed as perpetuals.",
-  "registration_rule": "Do not register or execute Team05 until the final executable-source manifest, independent semantic review, score manifest, material hashes, tests, and organizer registration are complete under the active A5/A6 authority."
+  "registration_rule": "Do not register or execute team05-crtr-core-v2-infra-r1 until the final executable-source manifest, independent semantic review, score manifest, material hashes, tests, A8-bound registration, and organizer acceptance are complete under the active A5/A6/A7 authority."
 }

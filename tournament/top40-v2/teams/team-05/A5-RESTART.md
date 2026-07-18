@@ -20,3 +20,17 @@ that byte change invalidates the v1 dependency chain. The old canonical files ar
 reused. The unregistered replacement identity is `team05-crtr-core-v2`, which must complete a
 fresh executable-manifest, independent-review, score-manifest, and trial-registration ancestry
 after the whole team tree passes the canonical fingerprint.
+
+## Later A7 infrastructure incident and A8 authority
+
+The paragraph above records the earlier v1-to-v2 restart boundary. V2 was subsequently registered
+and reached the frozen worker, where it failed before strategy initialization because the worker
+could not import `crypto_trade.tournament.score_adapter_protocol_v5`. Its empty-metric,
+empty-artifact terminal history remains immutable and charged.
+
+Frozen Amendment 0008 now authorizes exactly one same-family, scientifically unchanged replacement
+identity: `team05-crtr-core-v2-infra-r1`. The A8 freeze commit is
+`f6003ae687d5a6bf665abb001715b01ea8b10abb`, and its SHA-256 is
+`08bf194c9ade1f66bf38012210ad8604df61ca467cdad00bd3957aa679ea9bdd`. Infra-r1 must receive fresh
+candidate-bound executable-manifest, independent-review, score-manifest, and registration
+first-adds; none of the v2 canonical A5 files may be renamed, edited, or reused.

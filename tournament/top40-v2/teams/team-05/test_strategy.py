@@ -516,7 +516,11 @@ def test_canonical_builder_rejects_unregistered_or_mismatched_materialization(
     with pytest.raises(ValueError, match="not preregistered"):
         build_strategy()
 
-    monkeypatch.setattr(candidate_variant_module, "ACTIVE_CANDIDATE_ID", "team05-crtr-core-v2")
+    monkeypatch.setattr(
+        candidate_variant_module,
+        "ACTIVE_CANDIDATE_ID",
+        "team05-crtr-core-v2-infra-r1",
+    )
     monkeypatch.setattr(candidate_variant_module, "ACTIVE_OVERRIDES", {"target_gross": 0.5})
     with pytest.raises(ValueError, match="do not match"):
         build_strategy()
@@ -535,6 +539,7 @@ def test_canonical_builder_rejects_unregistered_or_mismatched_materialization(
     "candidate_id",
     [
         "team05-crtr-core-v2",
+        "team05-crtr-core-v2-infra-r1",
         "team05-crtr-ab-vol",
         "team05-crtr-ab-dd",
         "team05-crtr-ab-stop",
@@ -554,6 +559,23 @@ def test_every_predeclared_base_parameter_cell_uses_canonical_zero_arg_builder(
         PREREGISTERED_RISK_POLICY_TEMPLATES[candidate_id],
     )
     assert build_strategy().parameters == BASE_PARAMETERS
+
+
+def test_infrastructure_replacement_has_no_scientific_or_risk_delta() -> None:
+    historical = "team05-crtr-core-v2"
+    replacement = "team05-crtr-core-v2-infra-r1"
+    assert PREREGISTERED_CANDIDATE_OVERRIDES[historical] == {}
+    assert PREREGISTERED_CANDIDATE_OVERRIDES[replacement] == {}
+    assert (
+        PREREGISTERED_CANDIDATE_OVERRIDES[historical]
+        == PREREGISTERED_CANDIDATE_OVERRIDES[replacement]
+    )
+    assert PREREGISTERED_RISK_POLICY_TEMPLATES[historical] == "risk_ablations/none.json"
+    assert PREREGISTERED_RISK_POLICY_TEMPLATES[replacement] == "risk_ablations/none.json"
+    assert (
+        PREREGISTERED_RISK_POLICY_TEMPLATES[historical]
+        == PREREGISTERED_RISK_POLICY_TEMPLATES[replacement]
+    )
 
 
 def test_every_noncanonical_seed_is_rejected() -> None:

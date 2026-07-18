@@ -40,7 +40,7 @@
     "combined": ["volatility_target", "drawdown_brakes", "position_stop", "turnover_limit"]
   },
   "core_alpha_activation_gate": {
-    "applies_to": "team05-crtr-core-v2 under the no-control policy",
+    "applies_to": "team05-crtr-core-v2-infra-r1 under the unchanged no-control policy",
     "base_cost_net_return_strictly_positive": true,
     "base_cost_net_sharpe_strictly_positive": true,
     "doubled_cost_net_return_strictly_positive": true,
@@ -59,7 +59,7 @@
     {
       "order": 1,
       "trial_suffix": "risk-none",
-      "candidate_id": "team05-crtr-core-v2",
+      "candidate_id": "team05-crtr-core-v2-infra-r1",
       "controls": "none",
       "purpose": "uncontrolled core-alpha test and activation gate",
       "activation": "first and unconditional after active A5/A6 verification, required A5 artifact first-adds, and accepted family/core registration"

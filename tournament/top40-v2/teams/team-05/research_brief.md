@@ -138,10 +138,10 @@ registered trials.
 
 ## Research sequence and stopping rule
 
-1. After verifying the active A5/A6 authority, completing organizer QR/QE, first-adding the complete
+1. After verifying the active A5/A6/A7 authority and frozen A8 one-shot authority, completing organizer QR/QE, first-adding the complete
    executable-source manifest, independent semantic review, and score manifest in strict order,
-   verifying the accepted family registration, and accepting the v2 core trial registration, run
-   only the no-control core.
+   verifying the accepted family registration, and accepting the infra-r1 replacement registration,
+   run only `team05-crtr-core-v2-infra-r1` under the unchanged no-control core.
 2. Activate no risk control unless the core has strictly positive base- and doubled-cost net return
    and Sharpe, at least four positive equal chronological folds, positive bull/bear/chop returns,
    positive long-bull/short-bear/combined-chop roles, and both sleeves meet official activity
@@ -155,6 +155,7 @@ registered trials.
 6. A final family pass exists only if the neighborhood gates also pass. Otherwise falsify this
    family or document a mechanism pivot; never submit the least-bad cell.
 
-Planned maximum for this family is 14 material configurations (6 risk-policy cells and 8
-neighbors), leaving budget for honest interruption or a separately registered pivot. No private
-ticket is authorized by this draft.
+The scientific plan remains 14 configurations (6 risk-policy cells and 8 neighbors). The immutable
+infrastructure-failed v2 event is charged separately as trial 1, so the maximum journal count for
+this unchanged plan is now 15 with infra-r1 as trial 2. No private ticket is authorized by this
+declaration.

@@ -51,14 +51,18 @@ These are evaluator responsibilities and must not be simulated inside team strat
     cumulative trial/compute ledger even on failure or interruption.
 11. Confirm each policy evaluation emits base and doubled costs, the no-control core precedes all
     controls, and the combined full-gate pass precedes all neighbors.
-12. Verify active entrypoint SHA-256
-    `0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4`, A5 integration-freeze
+12. Verify active A7 entrypoint SHA-256
+    `8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9`, A7 integration-freeze
+    commit `c8b917ca49306d5200a4e08848e73ff6f5a18bf3`/SHA-256
+    `6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51`, A5 integration-freeze
     commit `d2b95f610722aab65b4e67466b34efeaa3554101`/SHA-256
     `b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c`, and the delegated A6
-    integration/report authority before any result-bearing command.
+    integration/report authority before any result-bearing command. Require A8 freeze commit
+    `f6003ae687d5a6bf665abb001715b01ea8b10abb`/SHA-256
+    `08bf194c9ade1f66bf38012210ad8604df61ca467cdad00bd3957aa679ea9bdd` for infra-r1.
 13. Recompute the complete executable set from the final Team05 historical tree. Require the
     executable-source commit to precede the independent semantic-review commit, then the score
-    manifest commit, then the core registration commit; require exact executable bytes at all
+    manifest commit, then the infra-r1 registration commit; require exact executable bytes at all
     three downstream boundaries.
     The prospective root set is `candidate_variant.py`, `frozen_config.json`, `risk_policy.json`,
     `strategy.py`, `test_risk_policy_contract.py`, and `test_strategy.py`.
@@ -75,6 +79,7 @@ These are evaluator responsibilities and must not be simulated inside team strat
     `strategy.build_strategy()` exposes exactly those parameters. Verify the declared template was
     materialized byte-for-byte at root `risk_policy.json`; reject any assumption that the lifecycle
     selects a side-path policy.
-17. Register the family before computing the core's final source-bundle fingerprint. Recompute the
-    fingerprint only after the family projection and all three canonical A5 artifacts exist, then
-    bind that exact value in the later core registration.
+17. Preserve and verify the already registered one-row family projection before computing the
+    replacement core's final source-bundle fingerprint; do not register or pivot the family.
+    Recompute the fingerprint only after the family projection and all three fresh infra-r1 A5
+    artifacts exist, then bind that exact value in the later replacement registration.
