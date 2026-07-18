@@ -1,0 +1,72 @@
+{
+  "addendum_id": "top40-v3-amendment-0003-scored-stage-concatenation",
+  "addendum_tests": {
+    "collected": 6,
+    "command": [
+      "env",
+      "PYTHONPATH=src",
+      "PYTHONDONTWRITEBYTECODE=1",
+      "uv",
+      "run",
+      "--frozen",
+      "pytest",
+      "-q",
+      "tests/tournament/test_top40_amendment_0003_stage_stitch.py"
+    ],
+    "output_base64": "Li4uLi4uICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIFsxMDAlXQo2IHBhc3NlZCBpbiAwLjM3cwo=",
+    "output_sha256": "37209a2446978ab2732009c33b8228a835778f235f6affbc475f06c100716e4d",
+    "output_size": 98,
+    "passed": 6
+  },
+  "implementation": {
+    "commit": "b0b01c0e81095b5b8792fd893f124b6577bb00dc",
+    "files": [
+      {
+        "path": "src/crypto_trade/tournament/top40_amendment_0003_stage_stitch.py",
+        "sha256": "08a87ab12ecd176a4d52863c564e476483d6d7cb0c19bef4c4aa8d1183ee97d6",
+        "size": 26276
+      },
+      {
+        "path": "scripts/top40_v3_amendment_0003_stage_stitch.py",
+        "sha256": "289b2ef4fde208e0f57ca99dc66c7df40b87890e63b9874eb0b5703b35b82432",
+        "size": 2433
+      },
+      {
+        "path": "tests/tournament/test_top40_amendment_0003_stage_stitch.py",
+        "sha256": "a476c7506d406401fcb073ef51b813ed4f75477c2cdb858f9bbcb62ad91f3319",
+        "size": 2944
+      },
+      {
+        "path": "tournament/top40-v3/amendments/0003/STAGE-STITCH-ADDENDUM.md",
+        "sha256": "f280d6f7095354dbe6619b855761c568f8125078a666d6c02363f466041dcfc7",
+        "size": 1452
+      }
+    ],
+    "manifest_sha256": "a027994fc4c7fad3f2424a77103a4b7fd8461f4e2d8793a48d5e24d56f9aa4db"
+  },
+  "parent_activation": {
+    "freeze_commit": "81356743ee0c814e677356b1a67616bd89f7bee1",
+    "freeze_file_sha256": "bbeb52060628a09505af374c4fc68d1d604c68d46e0e1f268e183642d89ded2c",
+    "implementation_commit": "e930650335cd03c41807799d2d1611d822849825",
+    "record_sha256": "125cfd1eb4c22763cde64103c60ecda67444bddb55d28758b9fe7744190e9f93",
+    "validation_journal_head_sha256": "92cabb4425537019346f596141f76a4dbe943a9c6d7bc0181bb05615114c30c0",
+    "validation_release_sha256": "92cabb4425537019346f596141f76a4dbe943a9c6d7bc0181bb05615114c30c0"
+  },
+  "record_sha256": "8a139030bff6b1f10a370d6b49838ec85a23d5a14c35876b216f2386f6ebe801",
+  "released_validation": {
+    "cohort_freeze_sha256": "a32e0fe862e9a4579f51e7a13b21eb7a854e761f76e0524a591c424faf3e6365",
+    "journal_file_sha256": "b549828bd7fd77e57d05113b83b5dd86130cc49ef2dc75658fdac1b481eb53e7",
+    "journal_head_sha256": "92cabb4425537019346f596141f76a4dbe943a9c6d7bc0181bb05615114c30c0",
+    "journal_path": "tournament/top40-v3/validation-probe-journal.jsonl",
+    "packet_sha256_by_team": {
+      "team-04": "7e1da335bbe9342396a0e20229ff33280f54e4828fb3b23c8c0980aef9d388cd",
+      "team-05": "6f26e64365fccbfec2faf889fc1596042ebcc0313de176424fb6d338558f60ba",
+      "team-06": "3b02b2174671d709556cc9b6c18ebb4c07f9a74b25bd3bec0702ef45c6a927ee",
+      "team-09": "32e6422dca32033a2121bdb1a20d4352ca2d389aeb4dbca8bdad39022d6a22da"
+    },
+    "parent_activation_freeze_sha256": "dabb6ea5d1370ef48d28a413ac8e99e460a7d42d388a7e60887e220750471033",
+    "parent_durability_freeze_sha256": "3d50a3e4f8f5923696c27ac315c5b01f0610018f33eb28a341c884e968dc4177",
+    "release_record_sha256": "92cabb4425537019346f596141f76a4dbe943a9c6d7bc0181bb05615114c30c0"
+  },
+  "schema_version": 1
+}
