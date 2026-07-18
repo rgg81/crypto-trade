@@ -1,0 +1,179 @@
+{
+  "a6_report_sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
+  "activation_journal": {
+    "event_sequence": 2,
+    "head_sha256": "1737d4431198669b1d5d64962e6d04052620a6e69175eb8f20b029f89b539d64",
+    "path": "tournament/top40-v3/organizer-lab-journal.jsonl",
+    "prefix_sha256": "f522bf1410adb16e9aa36ee388df4757af5377959f4de7ff9f22397e06840f5e"
+  },
+  "amendment_id": "top40-v3-amendment-0001-utc-metric-bounds",
+  "amendment_tests": {
+    "collected": 23,
+    "command": [
+      "env",
+      "PYTHONPATH=src",
+      "PYTHONDONTWRITEBYTECODE=1",
+      "uv",
+      "run",
+      "--frozen",
+      "pytest",
+      "-q",
+      "tests/tournament/test_top40_amendment_0001_utc_bounds.py",
+      "tests/tournament/test_top40_amendment_0001_integration.py"
+    ],
+    "output_base64": "Li4uLi4uLi4uLi4uLi4uLi4uLi4uLi4gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIFsxMDAlXQoyMyBwYXNzZWQgaW4gMC42OHMK",
+    "output_sha256": "91b375923808d0ae2fd847f83af7378031f9797312a64391f84f33314402faac",
+    "output_size": 99,
+    "passed": 23
+  },
+  "base_suite": {
+    "collected": 274,
+    "command": [
+      "env",
+      "PYTHONPATH=src",
+      "PYTHONDONTWRITEBYTECODE=1",
+      "uv",
+      "run",
+      "--frozen",
+      "pytest",
+      "-q",
+      "tests/tournament/test_sandbox_canary_v3.py",
+      "tests/tournament/test_coaching_v3.py",
+      "tests/tournament/test_journal_v3.py",
+      "tests/tournament/test_lab_v3.py",
+      "tests/tournament/test_layout_v3.py",
+      "tests/tournament/test_metrics_v3.py",
+      "tests/tournament/test_orchestrator_v3.py",
+      "tests/tournament/test_phase0_v3.py",
+      "tests/tournament/test_qualification_v3.py",
+      "tests/tournament/test_runner_v3_contract.py",
+      "tests/tournament/test_source_archive_v3.py",
+      "tests/tournament/test_top40_v3_contract.py",
+      "tests/tournament/test_v3_team_bundles.py",
+      "tournament/top40-v3/teams/team-01/test_team01_strategy.py",
+      "tournament/top40-v3/teams/team-02/test_team02_strategy.py",
+      "tournament/top40-v3/teams/team-03/test_team03_strategy.py",
+      "tournament/top40-v3/teams/team-04/incumbents/team-04-utc-reference-001-v3-port/test_team04_utc_incumbent.py",
+      "tournament/top40-v3/teams/team-04/test_team04_strategy.py",
+      "tournament/top40-v3/teams/team-05/incumbents/team05-crtr-ab-dd-v3-port/test_team05_crtr_ab_dd_incumbent.py",
+      "tournament/top40-v3/teams/team-05/test_team05_strategy.py",
+      "tournament/top40-v3/teams/team-06/test_team06_strategy.py",
+      "tournament/top40-v3/teams/team-07/incumbents/t07-two-tape-rank-durability-v1-base-v3-port/test_team07_two_tape_incumbent.py",
+      "tournament/top40-v3/teams/team-07/test_team07_strategy.py",
+      "tournament/top40-v3/teams/team-08/test_team08_strategy.py",
+      "tournament/top40-v3/teams/team-09/incumbents/team09-drp-pivot02-v1-v3-port/test_team09_drp_incumbent.py",
+      "tournament/top40-v3/teams/team-09/test_team09_strategy.py",
+      "tournament/top40-v3/teams/team-10/test_team10_strategy.py"
+    ],
+    "output_base64": "Li4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uIFsgMjYlXQouLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4gWyA1MiVdCi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLiBbIDc4JV0KLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLiAgICAgICAgICAgICAgIFsxMDAlXQoyNzQgcGFzc2VkIGluIDI3Ljk2cwo=",
+    "output_sha256": "98dcae1e87d2dc5f0f4a870a5f9494c44fa5c8623a303c87b9877e5dfd97ae69",
+    "output_size": 341,
+    "passed": 274
+  },
+  "config": {
+    "path": "tournament/top40-v3/config.toml",
+    "sha256": "fd24f2cb5f5575c8c16012844e1b27b7c9bd267bf3ac21c47d65079c97eaf9e2"
+  },
+  "historical_evidence": {
+    "commit": "d1b4f7e233efbdc5cf85d6fff58c2606e40bee8f",
+    "files": [
+      {
+        "path": "tournament/top40-v3/phase0-freeze.json",
+        "sha256": "a4e9b4a0593c65bc94b5eb96858a8e809da803131f103e7ee881e2a13a9cde07",
+        "size": 116552
+      },
+      {
+        "path": "tournament/top40-v3/phase0-targeted-tests.out",
+        "sha256": "a147d66b63a6479a050273ddc8fb077b933101c25bb600cb182a0a3115f9ae7d",
+        "size": 341
+      },
+      {
+        "path": "tournament/top40-v3/organizer-lab-journal.jsonl",
+        "sha256": "f522bf1410adb16e9aa36ee388df4757af5377959f4de7ff9f22397e06840f5e",
+        "size": 3071
+      },
+      {
+        "path": "tournament/top40-v3/run_state.json",
+        "sha256": "c3e664b19b8c3e8e0867dd8817d5229f181930f14b95f6dd5e0a705a453bf4c5",
+        "size": 4636
+      },
+      {
+        "path": "reports-top40-v3/source-archives/sha256/5f9fe7938315dfc59583cf1265d79c453065b1d8202c12984261fc21e08df60f.json",
+        "sha256": "5f9fe7938315dfc59583cf1265d79c453065b1d8202c12984261fc21e08df60f",
+        "size": 32720
+      },
+      {
+        "path": "scripts/top40_v3_tournament.py",
+        "sha256": "88e3cf94281bebd3a8520bf73cd9d2ed536d1c8b665d10206d7bb223f3a6639f",
+        "size": 219
+      }
+    ],
+    "manifest_sha256": "5a330a34eab42454905b5d945bb1b99e8684d6978775694143281b5d144ab1f4"
+  },
+  "implementation": {
+    "commit": "b5426333c3e7e5f1bd7b5de42ddfce77845bac4f",
+    "files": [
+      {
+        "path": "scripts/top40_v3_tournament.py",
+        "sha256": "b6df7d9ff2179fcc272588d9e89816abf85954d7f11e7ab592ad8236ada14113",
+        "size": 328
+      },
+      {
+        "path": "src/crypto_trade/tournament/top40_amendment_0001.py",
+        "sha256": "13b8f7804fa5e52cf74e4b7b4ddd260a61223428d03412a0e7d85e35e3d36160",
+        "size": 5083
+      },
+      {
+        "path": "src/crypto_trade/tournament/top40_amendment_0001_integration.py",
+        "sha256": "ae5b3a2f3bd6a9bb964128a2c1cbc009f358c7c55e4dc8600b6b27284f3b335a",
+        "size": 53000
+      },
+      {
+        "path": "scripts/top40_v3_amendment_0001.py",
+        "sha256": "4a1ba17fe13b7dd8482a4d212b6040f3112f570e475be56744c7423b765711e4",
+        "size": 2862
+      },
+      {
+        "path": "tests/tournament/test_top40_amendment_0001_utc_bounds.py",
+        "sha256": "825d4063b20a5d047b6a0aaa078f08b3963a7ee9b699a795c4fd3bb17b00feda",
+        "size": 8538
+      },
+      {
+        "path": "tests/tournament/test_top40_amendment_0001_integration.py",
+        "sha256": "195a827100258c322e506fcb958c110ad147400c8510b53c0f075dd0c2287ec2",
+        "size": 12006
+      },
+      {
+        "path": "tournament/top40-v3/AMENDMENT-0001-ACTIVE.md",
+        "sha256": "cdd8a8998a13d5f8abf79553c66e4c41465d28682cd6bdb5853f66eef3b25b37",
+        "size": 614
+      },
+      {
+        "path": "tournament/top40-v3/amendments/0001/AMENDMENT.md",
+        "sha256": "1f6dabcbbb2915834b8c64c1a82e13fb706188910236eccd074c9e9ed7b5c154",
+        "size": 3290
+      },
+      {
+        "path": "tournament/top40-v3/amendments/0001/INCIDENT.md",
+        "sha256": "aa7fb689d7673832831b3f1e1d8b70c322275b9afa7c4de309deed07f5b37063",
+        "size": 2553
+      },
+      {
+        "path": "tournament/top40-v3/amendments/0001/REVIEW.md",
+        "sha256": "1ca93b1f44f7b899c5d264b89812bf3e3fa7aa0ac11bdd903f6df0229f566cfb",
+        "size": 2633
+      }
+    ],
+    "manifest_sha256": "c07183c5049b531ec790909bb3a52dadaf4a9ed2ace318f99c71850e98e87399"
+  },
+  "parent_phase0": {
+    "chain_head_sha256": "34f4f351ba4a1495f49721e0cb43888076c4cb4ae828d9ad3512612137ed56b7",
+    "file_sha256": "a4e9b4a0593c65bc94b5eb96858a8e809da803131f103e7ee881e2a13a9cde07",
+    "path": "tournament/top40-v3/phase0-freeze.json",
+    "record_sha256": "4de6efcfb10cab132d3f6430edbaeee7c3070998babec59e009e0175bdc4062f",
+    "scope_file_count": 54,
+    "scope_head_sha256": "1743a5c1819a5672f3eca8757e939d751e79a24171e525b76b265f47007a7d75"
+  },
+  "record_sha256": "88809d2bc26c49e4ec94bcb77a50cd71082dd2b29d117455e5b1a5b22188e795",
+  "schema_version": 1
+}
