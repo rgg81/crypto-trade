@@ -1,0 +1,75 @@
+{
+  "addendum_id": "top40-v3-amendment-0002-first-journal-durability",
+  "addendum_tests": {
+    "collected": 5,
+    "command": [
+      "env",
+      "PYTHONPATH=src",
+      "PYTHONDONTWRITEBYTECODE=1",
+      "uv",
+      "run",
+      "--frozen",
+      "pytest",
+      "-q",
+      "tests/tournament/test_top40_amendment_0002_durability.py"
+    ],
+    "output_base64": "Li4uLi4gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIFsxMDAlXQo1IHBhc3NlZCBpbiAyLjU0cwo=",
+    "output_sha256": "d5e6ec4700692e10fbe71c441be807d79b81137378ee392be9b2bf24be4fe3c5",
+    "output_size": 98,
+    "passed": 5
+  },
+  "implementation": {
+    "commit": "c2437a446e215ec5dac283c686810249353293df",
+    "files": [
+      {
+        "path": "src/crypto_trade/tournament/top40_amendment_0002_durability.py",
+        "sha256": "b160c191774f9f26a238361b2ec57b94848b17601454cf4c3203392303e0a915",
+        "size": 17969
+      },
+      {
+        "path": "scripts/top40_v3_amendment_0002_durability.py",
+        "sha256": "f800752f5abfc2528b499be4aeab49df8a608e8f42ae9eee52b56b6aa0b0e203",
+        "size": 2379
+      },
+      {
+        "path": "tests/tournament/test_top40_amendment_0002_durability.py",
+        "sha256": "f3bf5af06cfbcce3de7b03cb4b3c6c2bcad0b27f34432c1922e177218705ce65",
+        "size": 3506
+      },
+      {
+        "path": "tournament/top40-v3/amendments/0002/DURABILITY-ADDENDUM.md",
+        "sha256": "94b1a85b4904e28c5aff7df8e81fd3be31dde97b3c761ba5c4d6c997f9378e20",
+        "size": 1239
+      }
+    ],
+    "manifest_sha256": "b28e00a8610439c11db0476ecaa53e4d320ff7c5978a86b65e89057583247c73"
+  },
+  "parent_activation": {
+    "cohort_freeze_commit": "e69bf5ee5250c0e5776b68120e8ab4df601f4b97",
+    "cohort_freeze_sha256": "a32e0fe862e9a4579f51e7a13b21eb7a854e761f76e0524a591c424faf3e6365",
+    "freeze_commit": "f7d9e4913229e9626a8d710ee7a346956b720ece",
+    "freeze_file_sha256": "dabb6ea5d1370ef48d28a413ac8e99e460a7d42d388a7e60887e220750471033",
+    "implementation_commit": "9fb69c5ad1af824cdf48048574e9e140f4b1eb63",
+    "record_sha256": "7434f670f31fa8331691392d4db067843591add4abc27eb8e37c955f1eae183c"
+  },
+  "parent_tests": {
+    "collected": 9,
+    "command": [
+      "env",
+      "PYTHONPATH=src",
+      "PYTHONDONTWRITEBYTECODE=1",
+      "uv",
+      "run",
+      "--frozen",
+      "pytest",
+      "-q",
+      "tests/tournament/test_top40_amendment_0002_validation.py"
+    ],
+    "output_base64": "Li4uLi4uLi4uICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIFsxMDAlXQo5IHBhc3NlZCBpbiAxLjgzcwo=",
+    "output_sha256": "a050aa8b9f493e12699942fe92afd07c44bb90bc335f409670a45b3f50590e68",
+    "output_size": 98,
+    "passed": 9
+  },
+  "record_sha256": "fbde51ae436f7d700304fe10e3a91ed4574332af5bf5371dfc5d11c2a13e6ded",
+  "schema_version": 1
+}
