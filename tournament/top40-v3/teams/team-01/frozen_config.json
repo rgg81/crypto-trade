@@ -1,7 +1,7 @@
 {
   "artifact": "frozen_reference_config",
-  "candidate_id": "t01-weekday-residual-13-v1",
-  "candidate_status": "transparent_baseline_not_yet_evaluated",
+  "candidate_id": "t01-weekday-residual-13-v2-cached",
+  "candidate_status": "transparent_efficiency_revision_not_yet_evaluated",
   "data_contract": {
     "allowed_bar_fields": [
       "open_time",
@@ -27,7 +27,7 @@
   "implementation": {
     "build_factory": "build_strategy",
     "entrypoint": "strategy.py",
-    "stateful": false
+    "stateful": true
   },
   "parameters": {
     "decision_hour_utc": 0,
@@ -46,5 +46,8 @@
   },
   "schema_version": 1,
   "seed": 20260718,
-  "team_id": "team-01"
+  "team_id": "team-01",
+  "v3_parent": {
+    "candidate_id": "t01-weekday-residual-13-v1"
+  }
 }

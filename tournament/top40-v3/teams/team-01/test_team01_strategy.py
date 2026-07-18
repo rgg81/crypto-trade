@@ -13,7 +13,6 @@ import pandas as pd
 
 from crypto_trade.tournament.protocol import DecisionContext
 
-
 TEAM_DIR = Path(__file__).resolve().parent
 DECISION_TIME = pd.Timestamp("2023-06-26T00:00:00Z")
 SEED = 20260718
@@ -105,6 +104,22 @@ def test_deterministic_order_independent_targets() -> None:
         eligible_symbols=tuple(reversed(context.eligible_symbols)),
     )
     assert first == second == _weights(reordered)
+
+
+def test_stateful_cache_is_idempotent_for_an_unchanged_append_only_context() -> None:
+    context = _context()
+    strategy = strategy_module.build_strategy()
+
+    first = strategy.target_weights(context, seed=SEED)
+    cursors = {symbol: cache.cursor for symbol, cache in strategy._caches.items()}
+    second = strategy.target_weights(context, seed=SEED)
+
+    assert first == second
+    assert cursors
+    assert cursors == {
+        symbol: cache.cursor for symbol, cache in strategy._caches.items()
+    }
+    assert all(cursor == len(context.bars[symbol]) for symbol, cursor in cursors.items())
 
 
 def test_weights_are_broad_bounded_and_neutral() -> None:

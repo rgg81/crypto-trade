@@ -55,6 +55,18 @@ changes across nearby lookbacks are repair signals that lower robustness, not st
 Weak fold or role evidence is treated the same way. Risk controls cannot rescue a negative
 calendar core.
 
+## Opening-probe coaching record
+
+The first V3 invocation (`t01-weekday-residual-13-v1`) produced no metric: its worker exhausted
+the 900-second CPU budget while repeatedly reconstructing every historical daily return at every
+decision. That is an implementation failure, not evidence for or against weekday seasonality.
+
+Revision `t01-weekday-residual-13-v2-cached` keeps the signal, schedule, 13-occurrence estimator,
+portfolio, and risk limits unchanged. It consumes the worker's append-only bar stream once into
+per-symbol daily-return caches and computes cross-sectional medians only on dates that can enter a
+current score. Repeated calls on unchanged history are idempotent. The revision must now earn its
+IS result normally; no trial counter is reset.
+
 ## Collision guard
 
 Do not model within-day UTC slots, previous-bar continuation/reversal, funding, taker flow,
