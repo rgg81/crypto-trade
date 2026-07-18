@@ -1,0 +1,156 @@
+{
+  "config_path": "tournament/top40-v3/config.toml",
+  "config_sha256": "fd24f2cb5f5575c8c16012844e1b27b7c9bd267bf3ac21c47d65079c97eaf9e2",
+  "created_at_utc": "2026-07-18T15:50:08Z",
+  "locks": {
+    "diagnostic_rubric": {
+      "locked_at_utc": "2026-07-18T15:50:08Z",
+      "path": "tournament/top40-v3/DIAGNOSTIC-RUBRIC.md",
+      "sha256": "a2e9846b04d3cf70016d8db0c73d4cdaeddc347de3d5c7f5056ed2f44fec17b9"
+    },
+    "final_reveal": null,
+    "infrastructure": {
+      "locked_at_utc": "2026-07-18T15:50:08Z",
+      "path": "tournament/top40-v3/phase0-freeze.json",
+      "sha256": "a4e9b4a0593c65bc94b5eb96858a8e809da803131f103e7ee881e2a13a9cde07"
+    },
+    "metric_schema": {
+      "locked_at_utc": "2026-07-18T15:50:08Z",
+      "path": "tournament/top40-v3/config.toml",
+      "sha256": "fd24f2cb5f5575c8c16012844e1b27b7c9bd267bf3ac21c47d65079c97eaf9e2"
+    },
+    "nomination_registry": null,
+    "private_qualification": null,
+    "public_qualification": null,
+    "schedule": {
+      "locked_at_utc": "2026-07-18T15:50:08Z",
+      "path": "tournament/top40-v3/config.toml",
+      "sha256": "fd24f2cb5f5575c8c16012844e1b27b7c9bd267bf3ac21c47d65079c97eaf9e2"
+    }
+  },
+  "phase": "lab_open",
+  "schema_version": 1,
+  "teams": {
+    "team-01": {
+      "comeback_probe_count": 0,
+      "final_oos_observation_count": 0,
+      "lab_run_count": 0,
+      "material_trial_count": 0,
+      "nomination_count": 0,
+      "nominee_lock": null,
+      "opening_probe_count": 0,
+      "private_run_count": 0,
+      "probe_locks": [],
+      "validation_probe_count": 0
+    },
+    "team-02": {
+      "comeback_probe_count": 0,
+      "final_oos_observation_count": 0,
+      "lab_run_count": 0,
+      "material_trial_count": 0,
+      "nomination_count": 0,
+      "nominee_lock": null,
+      "opening_probe_count": 0,
+      "private_run_count": 0,
+      "probe_locks": [],
+      "validation_probe_count": 0
+    },
+    "team-03": {
+      "comeback_probe_count": 0,
+      "final_oos_observation_count": 0,
+      "lab_run_count": 0,
+      "material_trial_count": 0,
+      "nomination_count": 0,
+      "nominee_lock": null,
+      "opening_probe_count": 0,
+      "private_run_count": 0,
+      "probe_locks": [],
+      "validation_probe_count": 0
+    },
+    "team-04": {
+      "comeback_probe_count": 0,
+      "final_oos_observation_count": 0,
+      "lab_run_count": 1,
+      "material_trial_count": 1,
+      "nomination_count": 0,
+      "nominee_lock": null,
+      "opening_probe_count": 0,
+      "private_run_count": 0,
+      "probe_locks": [],
+      "validation_probe_count": 0
+    },
+    "team-05": {
+      "comeback_probe_count": 0,
+      "final_oos_observation_count": 0,
+      "lab_run_count": 0,
+      "material_trial_count": 0,
+      "nomination_count": 0,
+      "nominee_lock": null,
+      "opening_probe_count": 0,
+      "private_run_count": 0,
+      "probe_locks": [],
+      "validation_probe_count": 0
+    },
+    "team-06": {
+      "comeback_probe_count": 0,
+      "final_oos_observation_count": 0,
+      "lab_run_count": 0,
+      "material_trial_count": 0,
+      "nomination_count": 0,
+      "nominee_lock": null,
+      "opening_probe_count": 0,
+      "private_run_count": 0,
+      "probe_locks": [],
+      "validation_probe_count": 0
+    },
+    "team-07": {
+      "comeback_probe_count": 0,
+      "final_oos_observation_count": 0,
+      "lab_run_count": 0,
+      "material_trial_count": 0,
+      "nomination_count": 0,
+      "nominee_lock": null,
+      "opening_probe_count": 0,
+      "private_run_count": 0,
+      "probe_locks": [],
+      "validation_probe_count": 0
+    },
+    "team-08": {
+      "comeback_probe_count": 0,
+      "final_oos_observation_count": 0,
+      "lab_run_count": 0,
+      "material_trial_count": 0,
+      "nomination_count": 0,
+      "nominee_lock": null,
+      "opening_probe_count": 0,
+      "private_run_count": 0,
+      "probe_locks": [],
+      "validation_probe_count": 0
+    },
+    "team-09": {
+      "comeback_probe_count": 0,
+      "final_oos_observation_count": 0,
+      "lab_run_count": 0,
+      "material_trial_count": 0,
+      "nomination_count": 0,
+      "nominee_lock": null,
+      "opening_probe_count": 0,
+      "private_run_count": 0,
+      "probe_locks": [],
+      "validation_probe_count": 0
+    },
+    "team-10": {
+      "comeback_probe_count": 0,
+      "final_oos_observation_count": 0,
+      "lab_run_count": 0,
+      "material_trial_count": 0,
+      "nomination_count": 0,
+      "nominee_lock": null,
+      "opening_probe_count": 0,
+      "private_run_count": 0,
+      "probe_locks": [],
+      "validation_probe_count": 0
+    }
+  },
+  "tournament": "quant-portfolio-blind-top40-v3"
+}
