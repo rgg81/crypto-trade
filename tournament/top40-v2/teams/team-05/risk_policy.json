@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "policy_id": "team-05-crtr-none-v1",
+  "policy_id": "team-05-crtr-volatility-only-v1",
   "same_boundary_reentry": false,
   "volatility_target": {
-    "enabled": false,
+    "enabled": true,
     "lookback_days": 30,
     "annualized_target": 0.18,
     "minimum_scale": 0.35,

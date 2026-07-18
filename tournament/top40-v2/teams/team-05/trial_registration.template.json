@@ -2,22 +2,12 @@
   "timestamp_utc": "REPLACE_WITH_REGISTRATION_TIMESTAMP_Z",
   "team_id": "team-05",
   "family_id": "team05-causal-residual-trend-reversal-v1",
-  "candidate_id": "team05-crtr-core-v2-infra-r1",
+  "candidate_id": "team05-crtr-ab-vol",
   "strategy_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
   "source_bundle_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
   "risk_config_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
   "config_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
   "parameters": {
-    "_top40_v2_administrative_replacement": {
-      "amendment_id": "top40-v2-amendment-0008-team05-infrastructure-replacement",
-      "failed_candidate_id": "team05-crtr-core-v2",
-      "freeze_commit": "f6003ae687d5a6bf665abb001715b01ea8b10abb",
-      "freeze_path": "tournament/top40-v2/amendments/0008/freeze.json",
-      "freeze_sha256": "08bf194c9ade1f66bf38012210ad8604df61ca467cdad00bd3957aa679ea9bdd",
-      "maximum_development_runs": 1,
-      "replacement_material_trial_number": 2,
-      "scientific_delta": "none"
-    },
     "_top40_v2_score_adapter": {
       "adapter_id": "top40-v2-declared-score-boundary-v1",
       "manifest_sha256": "REPLACE_WITH_CANONICAL_SCORE_MANIFEST_64_LOWERCASE_HEX",
@@ -33,10 +23,10 @@
     },
     "base_candidate_id": "team05-crtr-base-v1",
     "strategy_parameters": "frozen_config.json",
-    "risk_policy_cell": "ablations.json:risk-none using risk_policy.json",
+    "risk_policy_cell": "ablations.json:risk-vol using risk_policy.json",
     "evaluator_cost_outputs": [1.0, 2.0],
     "fold_plan": "walk_forward_plan.json",
-    "activation_precondition": "existing family preserved; active A5/A6/A7 authority and frozen A8 one-shot replacement authority verified; executable-source manifest, independent semantic review, and score manifest immutable first-adds accepted in strict order"
+    "activation_precondition": "the preregistered no-control core activation gate passed at reports-top40-v2/team-05/post-result/team05-crtr-core-v2-infra-r1-core-activation.json; active A5/A6/A7 authority verified; executable-source manifest, independent semantic review, and score manifest immutable first-adds accepted in strict order"
   },
   "seed": 20260801,
   "thesis": "CRTR intermediate relative continuation plus direction-conditioned short reversal should support bull-long, bear-short, and combined-chop roles at conservative exposure.",
