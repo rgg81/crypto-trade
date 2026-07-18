@@ -188,6 +188,26 @@ catch them and liveness in between) and `prompt` = the same monitor instruction 
 next firing repeats it. To **stop**, the user says so — then omit the ScheduleWakeup and mark
 task #189 done. Keep the cadence at 2700s unless the user asks for tighter/looser watch.
 
+### Session-cron alternative (CronCreate) — how the v2-track loop is currently driven (2026-07-18)
+Instead of ScheduleWakeup, the loop can be driven by a **CronCreate session cron** when the user asks
+for a fixed wall-clock cadence ("every 2 hours"). The **v2-track monitor currently runs this way**:
+a recurring cron fires **every 2h at :13 local** (off the :00 mark so the fleet doesn't hammer the API
+in lockstep) whose `prompt` is the full v2-only tick instruction (healthcheck + pnl + log scan, HANDS-OFF
+interpretation — the verbatim block quoted in the v2 section below). Gotchas, all load-bearing:
+- **The cron IS the cadence — the fired prompt must NOT also call ScheduleWakeup** (that spawns a
+  competing loop). The v2 prompt says so explicitly.
+- **Session-only + in-memory.** A CronCreate job lives only in the current Claude session; it does NOT
+  survive a session resume/reset, and it auto-expires after ~7 days. **If `CronList` shows "No scheduled
+  jobs", the loop has stopped — recreate it.** (Happened 2026-07-18: the cron silently dropped on a
+  session reset while the engine kept trading fine; the ticks had been cron-driven, so the loop just
+  ended. Recreated as a fresh job.) Re-run `CronList` whenever the user asks "is the monitor still
+  looping / looping here?".
+- **Recreate recipe:** `CronCreate` with `cron: "13 */2 * * *"`, `recurring: true`, `prompt` = the
+  verbatim v2-only tick instruction. Stop early with `CronDelete <id>`.
+- **Worktree/session separation still applies** ([[project_monitor_session_separation]]): launch the v2
+  cron from the quant-portfolio worktree session so it watches the v2 book and never cross-fires with
+  the v1/metals crons. Keep it v2-ONLY (do not run the v1/quant-research checks from it).
+
 ## Key files & facts
 - Health check: `scripts/portfolio_healthcheck.py`
 - Engine runner: `run_portfolio_testnet.py` (equity $10k, leverage 3x, db `data/portfolio_testnet.db`)
@@ -303,6 +323,25 @@ ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regi
 auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
+- **2026-07-18 v23** — V2-TRACK MONITOR now driven by a **CronCreate session cron** + WSL-reboot recovery
+  documented (user directive: "this must be tracked by the skill"). Two additions. (1) **Session-cron
+  loop** (see "Session-cron alternative" under Self-paced loop): the v2 monitor runs every 2h at :13
+  local via a recurring CronCreate job whose payload is the verbatim v2-only tick prompt; the cron is the
+  cadence (no ScheduleWakeup). It's session-only/in-memory → does NOT survive a session reset and
+  auto-expires ~7 days, so `CronList` returning "No scheduled jobs" means the loop stopped → recreate
+  with `cron:"13 */2 * * *"`. This is exactly what happened 2026-07-18 (cron silently dropped on a session
+  reset; engine kept trading; recreated). (2) **WSL-reboot recovery (2026-07-13, v2)** — the healthcheck
+  correctly flagged `STATUS: ALERT proc=DOWN` after the **WSL host rebooted ~19:53 UTC** (`uptime` showed
+  `up 3:04`; both v1+v2 engines gone; v2 log ended cleanly on the 16:00 rebalance with NO traceback → host
+  kill, not a crash). Recovery per the v16 playbook: verified IP clear (`curl … klines → HTTP 200`), then
+  relaunched v2 **KEEPING the DB** + **appending** the log (`[relaunch] … WSL host reboot …`). Came back
+  `STATUS: OK`; the v20 startup reconcile un-stuck SIRENUSDT (frozen paper since Jul 10) back to strategy-
+  managed; the next 00:00 rebalance fired clean (`540 klines ok`, errors=0) → recovery confirmed. Lessons
+  reinforced: (a) a **host reboot kills BOTH engines** — after any WSL restart, check v1 AND v2 (v1 lives
+  in the quant-research worktree/session, out of the v2 cron's mandate — flag it to the user, don't touch
+  it); (b) `proc=DOWN` + a clean final log line = host kill (relaunch, KEEP DB, append log), distinct from
+  a crash (traceback) or a hang (proc=up, log frozen mid-storm); (c) relaunching a reboot-killed engine is
+  PRO-test recovery, not interference.
 - **2026-07-09 v22** — MIN-NOTIONAL BUFFER + -4164 classified benign. The 00:00 Jul 9 rebalance sent a
   SELL SKYAIUSDT leg sized $5.31 at the close-proxy price (just above Binance's $5 MIN_NOTIONAL floor);
   by the staggered execution (~00:15) SKYAI's price had drifted down and Binance re-evaluated the notional
