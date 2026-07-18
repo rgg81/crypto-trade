@@ -1,0 +1,154 @@
+{
+  "schema_version": "top40-v3-is-cohort-freeze-v1",
+  "selected_at_utc": "2026-07-18T20:41:28Z",
+  "selection_commit": "34c1817e9b5daa1604bb0b5d335b7cf333f22eb1",
+  "selection_rule": {
+    "eligible_status": "GREEN",
+    "maximum_advancers": 4,
+    "green_candidate_count": 4,
+    "ranking_key": "public_core_eligibility_then_robustness_score",
+    "discretionary_override": false
+  },
+  "authorities": {
+    "amendment_0001_integration_freeze_sha256": "563e3dbd6de3439c93cbf19c3efc14ec72ed1e322292becaf27b8b4beeb278be",
+    "data_manifest_sha256": "077eb036d262befec80f7013084fe6906859f7c3bbe2f8c193c9d9ec68e367c3",
+    "dependency_lock_sha256": "869cd3380346a9c9a219fc762868e23cd494a18e22dd9b314ba18621d991faa5",
+    "evaluator_sha256": "bbde67b3aa36f206f0226ac0bf863852ca341ea7daed1d90d938c9b1989bdc17",
+    "organizer_lab_journal_head_sha256": "f3133027d3358649a165e961ba5947e3bb61a576572fc9a72a68c685b621adba",
+    "organizer_lab_journal_file_sha256": "c7351211237a88b0a65a85efb4e452154528092e3da9c8bc2625085d0d1a28a3",
+    "pure_crypto_audit_report_sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
+    "run_state_sha256": "06e2923c1c26f62c63f30a285718d5e7bcf3b2eb260eb58a52390498a36a3bcd",
+    "tournament_config_sha256": "fd24f2cb5f5575c8c16012844e1b27b7c9bd267bf3ac21c47d65079c97eaf9e2"
+  },
+  "validation_source_policy": {
+    "source": "immutable_train_source_archive_only",
+    "current_working_tree_is_authoritative": false,
+    "candidate_identity_must_match_train": true,
+    "one_opening_probe_per_frozen_candidate": true,
+    "validation_metrics_are_sealed_until_terminal_packet": true
+  },
+  "advancers": [
+    {
+      "rank": 1,
+      "team_id": "team-06",
+      "candidate_id": "t06-own-coin-momentum-consensus-v1",
+      "candidate_identity_sha256": "0ceb8420c33fa891d5c9008ffe10439af7e764c5b933faa04aecb7ab832a26e0",
+      "source_bundle_sha256": "9ead481e2282cf98e1ea6292080694e9d73a749a8db3741cd3a84136f355b2f2",
+      "source_archive_path": "reports-top40-v3/source-archives/sha256/71452fd65f23cefdfeafc81e6711e2a92fc05f695dff7b4ccee965a681f1d9a7.json",
+      "source_archive_sha256": "71452fd65f23cefdfeafc81e6711e2a92fc05f695dff7b4ccee965a681f1d9a7",
+      "entrypoint": "tournament/top40-v3/teams/team-06/strategy.py",
+      "train_run_id": "v3-team06-lab-000001-9ead481e2282",
+      "train_metric_packet_path": "reports-top40-v3/labs/team-06/v3-team06-lab-000001-9ead481e2282/metric_packet.json",
+      "train_metric_packet_sha256": "fa3b42c47d4ba995cb4db5e40b539644b64e01b38c47a4f3bb63b4cfea59aacb",
+      "robustness_score": 98.61634681761264,
+      "train_metrics": {
+        "net_sharpe": 1.670949968744549,
+        "double_cost_sharpe": 1.4477205667939534,
+        "annualized_return": 0.355004496315402,
+        "max_drawdown": 0.1064232191499167,
+        "positive_quarter_fraction": 0.9
+      },
+      "regime_sharpe": {
+        "bear": 1.5655518604518364,
+        "bull": 2.2496507845928737,
+        "chop": 0.4794264761569186,
+        "stress": 1.8939600321766976
+      }
+    },
+    {
+      "rank": 2,
+      "team_id": "team-05",
+      "candidate_id": "team05-crtr-ab-dd-v3-port",
+      "candidate_identity_sha256": "aad6cafb9636d83ca58ec639e2e651c6f262a451391a0ab86b528c832908429b",
+      "source_bundle_sha256": "b0525f466e4190bce9cb15eb6351fffd9e1916b2e152e9b66fd0ab75f27d6334",
+      "source_archive_path": "reports-top40-v3/source-archives/sha256/fe5a76f2d16fa5244f4f31d819097d139bbf72184f4c8c59c41615ed4bc10240.json",
+      "source_archive_sha256": "fe5a76f2d16fa5244f4f31d819097d139bbf72184f4c8c59c41615ed4bc10240",
+      "entrypoint": "tournament/top40-v3/teams/team-05/incumbents/team05-crtr-ab-dd-v3-port/strategy.py",
+      "train_run_id": "v3-team05-lab-000001-b0525f466e41",
+      "train_metric_packet_path": "reports-top40-v3/labs/team-05/v3-team05-lab-000001-b0525f466e41/metric_packet.json",
+      "train_metric_packet_sha256": "6f61fdd5a7886fae280a3f64602798b06973e9365ec64ca536ee05067e248795",
+      "robustness_score": 87.17654692106564,
+      "train_metrics": {
+        "net_sharpe": 1.4062343520851166,
+        "double_cost_sharpe": 1.2711915388913853,
+        "annualized_return": 0.2910051229737258,
+        "max_drawdown": 0.1531478964619427,
+        "positive_quarter_fraction": 0.7
+      },
+      "regime_sharpe": {
+        "bear": 0.0713713813,
+        "bull": 1.7153526512,
+        "chop": 0.6518623873,
+        "stress": 1.9468528218
+      }
+    },
+    {
+      "rank": 3,
+      "team_id": "team-04",
+      "candidate_id": "team-04-utc-reference-001-v3-port",
+      "candidate_identity_sha256": "0e4bde9f0180fbaff944dc9f001f53d50875740f0013d5be4dd442d871ef32df",
+      "source_bundle_sha256": "e58b2f905a70acfd88d6450f9fe394d642aacd7b7b61d1848f969f1c6ffe6cfb",
+      "source_archive_path": "reports-top40-v3/source-archives/sha256/5f9fe7938315dfc59583cf1265d79c453065b1d8202c12984261fc21e08df60f.json",
+      "source_archive_sha256": "5f9fe7938315dfc59583cf1265d79c453065b1d8202c12984261fc21e08df60f",
+      "entrypoint": "tournament/top40-v3/teams/team-04/incumbents/team-04-utc-reference-001-v3-port/strategy.py",
+      "train_run_id": "v3-team04-lab-000002-e58b2f905a70",
+      "train_metric_packet_path": "reports-top40-v3/labs/team-04/v3-team04-lab-000002-e58b2f905a70/metric_packet.json",
+      "train_metric_packet_sha256": "7c06a6a9900154f77fc357b3739fbb33cd427d5d5e0da425859ea3fbc91f8135",
+      "robustness_score": 78.78335762177466,
+      "train_metrics": {
+        "net_sharpe": 1.9068805120795578,
+        "double_cost_sharpe": 1.7394910586071721,
+        "annualized_return": 0.3359727703069051,
+        "max_drawdown": 0.15948658451650777,
+        "positive_quarter_fraction": 0.5
+      },
+      "regime_sharpe": {
+        "bear": 0.2234554382,
+        "bull": 2.3971830725,
+        "chop": 3.7172335219,
+        "stress": 1.5637631497
+      }
+    },
+    {
+      "rank": 4,
+      "team_id": "team-09",
+      "candidate_id": "team09-drp-pivot02-v1-v3-port",
+      "candidate_identity_sha256": "29750c668c9b8c7d95d27cb86ea948a41f0dbb148aecb771172ae3a88084f880",
+      "source_bundle_sha256": "005a88d6ebdbf18ccf658a02d3400a66157b30bd0a95ee7a6ab55d6cadaa990a",
+      "source_archive_path": "reports-top40-v3/source-archives/sha256/72351eedf1213020aff73e42e30711ceef6d9532dfe0055eef5b366793565eaf.json",
+      "source_archive_sha256": "72351eedf1213020aff73e42e30711ceef6d9532dfe0055eef5b366793565eaf",
+      "entrypoint": "tournament/top40-v3/teams/team-09/incumbents/team09-drp-pivot02-v1-v3-port/strategy.py",
+      "train_run_id": "v3-team09-lab-000001-005a88d6ebdb",
+      "train_metric_packet_path": "reports-top40-v3/labs/team-09/v3-team09-lab-000001-005a88d6ebdb/metric_packet.json",
+      "train_metric_packet_sha256": "311926bf719c3d1c9ef8b5831d0b16c701ea192673eb82d144e3390aad6145cc",
+      "robustness_score": 57.95504686646987,
+      "train_metrics": {
+        "net_sharpe": 1.067699537798052,
+        "double_cost_sharpe": 0.9157865146395469,
+        "annualized_return": 0.0403735877694007,
+        "max_drawdown": 0.03598691089597483,
+        "positive_quarter_fraction": 0.7
+      },
+      "regime_sharpe": {
+        "bear": -0.6630686975,
+        "bull": 2.7608854364,
+        "chop": 2.3765237296,
+        "stress": -0.5637232166
+      }
+    }
+  ],
+  "reserves": [
+    {
+      "team_id": "team-07",
+      "candidate_id": "t07-two-tape-rank-durability-v1-base-v3-port",
+      "status": "AMBER",
+      "reason": "worst_regime_sharpe_below_floor"
+    },
+    {
+      "team_id": "team-08",
+      "candidate_id": "t08-residual-momentum-21-63-126-3d-v2",
+      "status": "AMBER",
+      "reason": "net_sharpe_below_floor"
+    }
+  ]
+}
