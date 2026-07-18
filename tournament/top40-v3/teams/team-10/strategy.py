@@ -11,8 +11,8 @@ strictly earlier than the decision timestamp.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping
 
 import numpy as np
 import pandas as pd
@@ -71,23 +71,6 @@ def _completed_close_history(
 
     if not {"open_time", "close"}.issubset(frame.columns):
         return None
-
-    local = frame.loc[:, ["open_time", "close"]].copy()
-    local["open_time"] = pd.to_datetime(local["open_time"], utc=True, errors="coerce")
-    local["close"] = pd.to_numeric(local["close"], errors="coerce")
-    local = local.dropna(subset=["open_time", "close"])
-    local = local.loc[
-        (local["open_time"] + pd.Timedelta(hours=params.bar_hours) <= decision_time)
-        & np.isfinite(local["close"])
-        & (local["close"] > 0.0)
-    ]
-    if local.empty:
-        return None
-
-    # A repeated timestamp is ambiguous and must not be resolved using row order.
-    if local["open_time"].duplicated(keep=False).any():
-        return None
-
     required_closes = params.lookback_return_bars + 2
     expected_end = decision_time - pd.Timedelta(hours=params.bar_hours)
     expected_index = pd.date_range(
@@ -96,10 +79,34 @@ def _completed_close_history(
         freq=pd.Timedelta(hours=params.bar_hours),
         tz="UTC",
     )
-    close = local.set_index("open_time")["close"].reindex(expected_index)
-    if close.isna().any() or not np.isfinite(close.to_numpy(dtype=float)).all():
-        return None
-    return close.astype(float)
+
+    def extract(candidate: pd.DataFrame) -> pd.Series | None:
+        local = candidate.loc[:, ["open_time", "close"]].copy()
+        local["open_time"] = pd.to_datetime(
+            local["open_time"], utc=True, errors="coerce"
+        )
+        local["close"] = pd.to_numeric(local["close"], errors="coerce")
+        local = local.dropna(subset=["open_time", "close"])
+        local = local.loc[
+            (local["open_time"] + pd.Timedelta(hours=params.bar_hours) <= decision_time)
+            & np.isfinite(local["close"])
+            & (local["close"] > 0.0)
+        ]
+        if local.empty or local["open_time"].duplicated(keep=False).any():
+            return None
+        close = local.set_index("open_time")["close"].reindex(expected_index)
+        if close.isna().any() or not np.isfinite(close.to_numpy(dtype=float)).all():
+            return None
+        return close.astype(float)
+
+    # Canonical worker histories are strictly increasing, append-only, and already closed. The
+    # exact fixed window plus three defensive boundary rows therefore succeeds without scanning
+    # the expanding tape. Standalone shuffled or otherwise noncanonical frames retain the full
+    # defensive path below, which also preserves order-independent synthetic tests.
+    fast = extract(frame.tail(required_closes + 3))
+    if fast is not None:
+        return fast
+    return extract(frame)
 
 
 def _residual_return_frame(
