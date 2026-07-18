@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "team_id": "team-05",
+  "family_id": "team05-liquidity-depth-migration-v1",
+  "candidate_id": "team05-ldm-pivot02-core-v1",
+  "stage": "development",
+  "registration_sha256": "8059da7985b1be583571388073c75aa0c45db729d80eb96ccbb337cf6a870433",
+  "runner_record_path": "reports-top40-v2/team-05/qualification-attempts/team05-ldm-pivot02-core-v1.runner-record.json",
+  "runner_record_sha256": "73f8142d3d817c4419443760cb5f72895179c2a1ddfcd169d765655137a3b700",
+  "result_commit": "8f740c65410ae67b9aa954a9022118611eeb3bdd",
+  "official_metrics": {
+    "net_sharpe": 0.22369448913977236,
+    "annualized_return": 0.018415495536289406,
+    "calmar": 0.15565285860046574,
+    "max_drawdown": 0.11831132239953801,
+    "double_cost_sharpe": 0.08331000848964885,
+    "positive_quarter_fraction": 0.5,
+    "regime_sharpe": {
+      "bear": 0.028566474253795073,
+      "bull": 0.348375650229462,
+      "chop": -0.46722633437230665,
+      "stress": 0.656140320446444
+    },
+    "trade_count": 3887
+  },
+  "central_gate_results": {
+    "minimum_net_sharpe": {
+      "actual": 0.22369448913977236,
+      "operator": ">=",
+      "threshold": 0.75,
+      "pass": false
+    },
+    "minimum_annualized_return": {
+      "actual": 0.018415495536289406,
+      "operator": ">",
+      "threshold": 0.0,
+      "pass": true
+    },
+    "minimum_calmar": {
+      "actual": 0.15565285860046574,
+      "operator": ">=",
+      "threshold": 0.4,
+      "pass": false
+    },
+    "maximum_drawdown": {
+      "actual": 0.11831132239953801,
+      "operator": "<=",
+      "threshold": 0.25,
+      "pass": true
+    },
+    "minimum_double_cost_sharpe": {
+      "actual": 0.08331000848964885,
+      "operator": ">=",
+      "threshold": 0.35,
+      "pass": false
+    },
+    "minimum_positive_quarter_fraction": {
+      "actual": 0.5,
+      "operator": ">=",
+      "threshold": 0.55,
+      "pass": false
+    },
+    "minimum_positive_sharpe_regimes": {
+      "actual": 3,
+      "operator": ">=",
+      "threshold": 3,
+      "pass": true
+    },
+    "minimum_worst_regime_sharpe": {
+      "actual": -0.46722633437230665,
+      "operator": ">=",
+      "threshold": -0.25,
+      "pass": false
+    }
+  },
+  "failed_gate_names": [
+    "minimum_net_sharpe",
+    "minimum_calmar",
+    "minimum_double_cost_sharpe",
+    "minimum_positive_quarter_fraction",
+    "minimum_worst_regime_sharpe"
+  ],
+  "decision": "team-05-dnf-final-pivot-rejected",
+  "decision_reason": "The exact final no-control LDM core fails five independently noncompensatory official central or regime gates. Positive annualized return, acceptable drawdown, and three positive regime Sharpes cannot compensate.",
+  "controls_authorized": false,
+  "neighbors_authorized": false,
+  "same_family_replacement_authorized": false,
+  "further_pivot_authorized": false,
+  "further_diagnostics_can_rescue": false,
+  "private_data_authorized": false,
+  "final_pivot_status": "consumed_and_terminal"
+}
