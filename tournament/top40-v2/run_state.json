@@ -52,7 +52,7 @@
   "critic_lock": null,
   "final_oos_lock": null,
   "finalist_cohort_lock": null,
-  "legacy_projection_sha256": "37a28d80b6a45c808f7d032fcf9d7276a8a199455fbe20e5bd4b2ad77bd4a045",
+  "legacy_projection_sha256": "b581daad9e3b6a85a882e133964a0b82e03d36a01480eeca06163c1526c0aa59",
   "legacy_state_sha256": "8c858495fde6ddde203124a055e40ebad5d8d5a684cd20f0e55f6c88f7360b07",
   "objective_lock": null,
   "organizer_audit": {
@@ -161,14 +161,19 @@
       "active_family_id": "team05-liquidity-depth-migration-v1",
       "canonical_result": null,
       "development_assessment": null,
-      "dnf": null,
+      "dnf": {
+        "previous_status": "researching",
+        "reason": "Final pivot-02 LDM core failed noncompensatory development Sharpe, Calmar, doubled-cost Sharpe, quarter-breadth, and worst-regime gates; no controls, neighbors, replacement, or further pivot are authorized.",
+        "reason_code": "withdrawn",
+        "recorded_at_utc": "2026-07-18T12:26:43.417023+00:00"
+      },
       "family_count": 3,
       "finalist_freeze": null,
       "pivot_count": 2,
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
-      "status": "researching",
+      "status": "dnf",
       "trial_count": 9
     },
     "team-06": {
