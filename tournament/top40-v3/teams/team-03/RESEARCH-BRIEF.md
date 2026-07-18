@@ -51,6 +51,20 @@ nearby windows, illiquid micro-cohorts, regimes, and sleeve roles triggers diagn
 robustness rather than automatically killing a strong aggregate system. If low-MAX alone explains
 the result, concede collision and pivot rather than renaming it.
 
+## Opening-probe coaching record
+
+Trial 1 (`t03-residual-positive-jump-skew-126-v1`) was RED: train Sharpe -0.490,
+annualized return -4.47%, doubled-cost Sharpe -0.817, and 20% positive quarters. Bull and chop
+Sharpes were mildly positive, but bear and stress Sharpes were -1.518 and -1.095. The run made
+21,283 trades.
+
+The mandatory artifact-level sign audit reconciled evaluator returns to within `1.86e-16`.
+The original signal was already slightly negative before costs (Sharpe -0.101). Its exact raw
+inversion produced only +0.103 Sharpe; unchanged realized costs reduced that to -0.285 and
+doubled costs to -0.673. Neither sign is an economic candidate. Team 03 is parked after one
+trial and may return only with a genuinely different distributional jump-asymmetry mechanism,
+not a sign flip or risk-scale disguise.
+
 ## Collision guard
 
 Team 03 must measure a distributional positive-tail characteristic. It may not rank the single
