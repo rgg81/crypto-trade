@@ -1,0 +1,136 @@
+{
+  "a6_report_sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
+  "amendment_id": "top40-v3-amendment-0002-sealed-validation",
+  "amendment_tests": {
+    "collected": 9,
+    "command": [
+      "env",
+      "PYTHONPATH=src",
+      "PYTHONDONTWRITEBYTECODE=1",
+      "uv",
+      "run",
+      "--frozen",
+      "pytest",
+      "-q",
+      "tests/tournament/test_top40_amendment_0002_validation.py"
+    ],
+    "output_base64": "Li4uLi4uLi4uICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIFsxMDAlXQo5IHBhc3NlZCBpbiAxLjcycwo=",
+    "output_sha256": "0dd9d93d2a37d437a82b4fe8376cc8c094bc53775f52e2123493ab6d14219281",
+    "output_size": 98,
+    "passed": 9
+  },
+  "base_suite": {
+    "collected": 278,
+    "command": [
+      "env",
+      "PYTHONPATH=src",
+      "PYTHONDONTWRITEBYTECODE=1",
+      "uv",
+      "run",
+      "--frozen",
+      "pytest",
+      "-q",
+      "tests/tournament/test_sandbox_canary_v3.py",
+      "tests/tournament/test_coaching_v3.py",
+      "tests/tournament/test_journal_v3.py",
+      "tests/tournament/test_lab_v3.py",
+      "tests/tournament/test_layout_v3.py",
+      "tests/tournament/test_metrics_v3.py",
+      "tests/tournament/test_orchestrator_v3.py",
+      "tests/tournament/test_phase0_v3.py",
+      "tests/tournament/test_qualification_v3.py",
+      "tests/tournament/test_runner_v3_contract.py",
+      "tests/tournament/test_source_archive_v3.py",
+      "tests/tournament/test_top40_v3_contract.py",
+      "tournament/top40-v3/teams/team-01/test_team01_strategy.py",
+      "tournament/top40-v3/teams/team-02/test_team02_strategy.py",
+      "tournament/top40-v3/teams/team-03/test_team03_strategy.py",
+      "tournament/top40-v3/teams/team-04/incumbents/team-04-utc-reference-001-v3-port/test_team04_utc_incumbent.py",
+      "tournament/top40-v3/teams/team-04/test_team04_strategy.py",
+      "tournament/top40-v3/teams/team-05/incumbents/team05-crtr-ab-dd-v3-port/test_team05_crtr_ab_dd_incumbent.py",
+      "tournament/top40-v3/teams/team-05/test_team05_strategy.py",
+      "tournament/top40-v3/teams/team-06/test_team06_strategy.py",
+      "tournament/top40-v3/teams/team-07/incumbents/t07-two-tape-rank-durability-v1-base-v3-port/test_team07_two_tape_incumbent.py",
+      "tournament/top40-v3/teams/team-07/test_team07_strategy.py",
+      "tournament/top40-v3/teams/team-08/test_team08_strategy.py",
+      "tournament/top40-v3/teams/team-09/incumbents/team09-drp-pivot02-v1-v3-port/test_team09_drp_incumbent.py",
+      "tournament/top40-v3/teams/team-09/test_team09_strategy.py",
+      "tournament/top40-v3/teams/team-10/test_team10_strategy.py"
+    ],
+    "output_base64": "Li4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uIFsgMjUlXQouLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4gWyA1MSVdCi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLiBbIDc3JV0KLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4gICAgICAgICAgIFsxMDAlXQoyNzggcGFzc2VkIGluIDE5Ljgxcwo=",
+    "output_sha256": "a5313023dd7d78d99d04bde31b616d3c8a8e44d49b023eea1b7ae61dcbdf37a2",
+    "output_size": 341,
+    "passed": 278
+  },
+  "cohort": {
+    "candidate_identity_sha256": [
+      "0ceb8420c33fa891d5c9008ffe10439af7e764c5b933faa04aecb7ab832a26e0",
+      "aad6cafb9636d83ca58ec639e2e651c6f262a451391a0ab86b528c832908429b",
+      "0e4bde9f0180fbaff944dc9f001f53d50875740f0013d5be4dd442d871ef32df",
+      "29750c668c9b8c7d95d27cb86ea948a41f0dbb148aecb771172ae3a88084f880"
+    ],
+    "commit": "e69bf5ee5250c0e5776b68120e8ab4df601f4b97",
+    "file_sha256": "a32e0fe862e9a4579f51e7a13b21eb7a854e761f76e0524a591c424faf3e6365",
+    "path": "tournament/top40-v3/is-cohort-freeze.json"
+  },
+  "implementation": {
+    "commit": "9fb69c5ad1af824cdf48048574e9e140f4b1eb63",
+    "files": [
+      {
+        "path": "src/crypto_trade/tournament/top40_amendment_0002_validation.py",
+        "sha256": "5d1148e9dbd1b1acee0ce46960e6dd20d6023072596d9e4a24b5941675618dd5",
+        "size": 92971
+      },
+      {
+        "path": "scripts/top40_v3_amendment_0002.py",
+        "sha256": "7347c548b9d7096ae20e4112d488c3af15728d1d49ad31440a85cf57e6cf6189",
+        "size": 2758
+      },
+      {
+        "path": "tests/tournament/test_top40_amendment_0002_validation.py",
+        "sha256": "70722fc21d7dfbf8160c5d7e701f1ebfe687619095610e2ef5fa26122cc82dd4",
+        "size": 15341
+      },
+      {
+        "path": "tournament/top40-v3/amendments/0002/AMENDMENT.md",
+        "sha256": "a48fd58a6766ee35d668253426f81cbea6ca8e7fe0fcafae8007ff2732aa0165",
+        "size": 3464
+      }
+    ],
+    "manifest_sha256": "56db99493d6ddc4c416f8486f79a0de270735e04822a9201db9d7d4976782519"
+  },
+  "parent_amendment": {
+    "activation_journal_head_sha256": "1737d4431198669b1d5d64962e6d04052620a6e69175eb8f20b029f89b539d64",
+    "config_sha256": "fd24f2cb5f5575c8c16012844e1b27b7c9bd267bf3ac21c47d65079c97eaf9e2",
+    "freeze_commit": "3bee33ae5ec074bb3f0cd769485584996dc0ac2e",
+    "freeze_file_sha256": "563e3dbd6de3439c93cbf19c3efc14ec72ed1e322292becaf27b8b4beeb278be",
+    "implementation_commit": "b5426333c3e7e5f1bd7b5de42ddfce77845bac4f",
+    "parent_phase0_record_sha256": "4de6efcfb10cab132d3f6430edbaeee7c3070998babec59e009e0175bdc4062f",
+    "record_sha256": "88809d2bc26c49e4ec94bcb77a50cd71082dd2b29d117455e5b1a5b22188e795"
+  },
+  "parent_amendment_tests": {
+    "collected": 8,
+    "command": [
+      "env",
+      "PYTHONPATH=src",
+      "PYTHONDONTWRITEBYTECODE=1",
+      "uv",
+      "run",
+      "--frozen",
+      "pytest",
+      "-q",
+      "tests/tournament/test_top40_amendment_0001_utc_bounds.py"
+    ],
+    "output_base64": "Li4uLi4uLi4gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIFsxMDAlXQo4IHBhc3NlZCBpbiAwLjUxcwo=",
+    "output_sha256": "07ac87eb87a4f71525b1af5908dfa76321c202efa37a22660d5638c32a78544e",
+    "output_size": 98,
+    "passed": 8
+  },
+  "record_sha256": "7434f670f31fa8331691392d4db067843591add4abc27eb8e37c955f1eae183c",
+  "schema_version": 1,
+  "train_boundary": {
+    "file_sha256": "c7351211237a88b0a65a85efb4e452154528092e3da9c8bc2625085d0d1a28a3",
+    "head_sha256": "f3133027d3358649a165e961ba5947e3bb61a576572fc9a72a68c685b621adba",
+    "path": "tournament/top40-v3/organizer-lab-journal.jsonl"
+  }
+}
