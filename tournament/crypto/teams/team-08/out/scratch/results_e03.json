@@ -1,0 +1,54 @@
+[
+  {
+    "config": {
+      "L": 1,
+      "volnorm": false,
+      "kernel": "zclip",
+      "H": 0.0
+    },
+    "sharpe_gross": 0.245,
+    "sharpe_1x": -2.435,
+    "sharpe_2x": -4.907,
+    "ann_turnover": 1516.1,
+    "maxdd_1x": -0.993,
+    "total_return_1x": -0.991,
+    "regime_1x": {
+      "bull": -1.87,
+      "bear": -2.07,
+      "chop": -2.81
+    },
+    "breadth_ls": [
+      22.0,
+      17.0
+    ],
+    "mean_net": 0.0414,
+    "funding_pnl": -0.1127,
+    "cost": 4.2805
+  },
+  {
+    "config": {
+      "L": 1,
+      "volnorm": false,
+      "kernel": "rank3",
+      "H": 0.0
+    },
+    "sharpe_gross": 0.163,
+    "sharpe_1x": -2.588,
+    "sharpe_2x": -4.938,
+    "ann_turnover": 1643.7,
+    "maxdd_1x": -0.996,
+    "total_return_1x": -0.995,
+    "regime_1x": {
+      "bull": -2.07,
+      "bear": -2.13,
+      "chop": -2.79
+    },
+    "breadth_ls": [
+      20.0,
+      20.0
+    ],
+    "mean_net": -0.0,
+    "funding_pnl": -0.0616,
+    "cost": 4.6392
+  }
+]

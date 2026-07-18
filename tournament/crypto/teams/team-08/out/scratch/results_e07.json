@@ -1,0 +1,58 @@
+[
+  {
+    "config": {
+      "structure": "S1g0",
+      "disp": "z",
+      "L": 18,
+      "M": 18,
+      "H": 2.0,
+      "gate_off": false
+    },
+    "act_gross": 1.18,
+    "act_1x": 0.939,
+    "act_2x": 0.578,
+    "full_1x": 0.46,
+    "ann_turnover": 231.6,
+    "maxdd_act_1x": -0.289,
+    "regime_act_1x": {
+      "bull": 2.55,
+      "bear": 0.75,
+      "chop": 0.07
+    },
+    "breadth_ls": [
+      24.0,
+      15.0
+    ],
+    "mean_net": 0.1631,
+    "funding_pnl_act": 0.0862,
+    "cost_act": 0.3514
+  },
+  {
+    "config": {
+      "structure": "S1g0",
+      "disp": "z",
+      "L": 18,
+      "M": 6,
+      "H": 2.0,
+      "gate_off": false
+    },
+    "act_gross": 0.737,
+    "act_1x": 0.238,
+    "act_2x": -0.401,
+    "full_1x": -0.048,
+    "ann_turnover": 320.4,
+    "maxdd_act_1x": -0.343,
+    "regime_act_1x": {
+      "bull": 1.89,
+      "bear": 0.56,
+      "chop": -0.55
+    },
+    "breadth_ls": [
+      21.0,
+      18.0
+    ],
+    "mean_net": 0.0447,
+    "funding_pnl_act": 0.1036,
+    "cost_act": 0.4858
+  }
+]
