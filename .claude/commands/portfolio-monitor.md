@@ -304,6 +304,58 @@ A SECOND book runs ALONGSIDE v1, fully isolated, on a SEPARATE testnet account. 
   deliberate clean reset (e.g. universe change). The crash on 2026-06-23 (2× `ConnectError [Errno 104]
   Connection reset by peer` during a kline fetch) is what this hardening prevents from recurring.
 
+## TOURNAMENT PAPER DESK — crypto-cup-01 winner (added 2026-07-19)
+A THIRD desk, PAPER-ONLY (dry-run engine — NEVER places exchange orders; no creds, no account).
+Runs the crypto-cup-01 winner **team-02 breakout-channel** for a 6-month forward test
+(T0 = 2026-07-18; review ~2027-01-18). Fully isolated from the v1/v2/metals desks.
+- **Worktree:** `/home/roberto/crypto-trade/.worktrees/quant-portfolio-tournament` (monitor cron
+  lives in THIS worktree's session — [[project_monitor_session_separation]]; keep it
+  tournament-ONLY, never run v1/v2/metals checks from it). **Runner:**
+  `run_portfolio_tournament_paper.py` (equity $10k, lev 1x, dry-run HARDCODED) ·
+  **Log:** `logs/portfolio_tournament_paper.log` · **DB:** `data/portfolio_tournament_paper.db` ·
+  **proc:** `run_portfolio_tournament_paper` · rebalance stagger **+25 min** past the 8h boundary
+  (v1 fires at 0, v2 at +15 — no kline-refresh contention).
+- **Strategy** = the FROZEN team-02 submission (`tournament/crypto/teams/team-02/`, Donchian
+  channel-position N=60/D=0.25/K=6) scored through the tournament evaluator pipeline
+  (`src/crypto_trade/portfolio/strategy_tournament.py`): full-pool weekly PIT top-40 mask →
+  `build_raw_weights` → 0.10/0.25 caps → shift(1) → vol-target scale. Parity vs the sealed-holdout
+  Run-B book proven to 1.4e-16. **`check_submission_shas` runs on EVERY recompute** — a SHA
+  integrity failure means the frozen bundle was edited: that is a hard ALERT, halt-and-tell-user,
+  NEVER "fix" the bundle. Holdout reference: +2.113; honest paper expectation nearer +1.1
+  (recent-half run-rate); chop is the declared weak regime — bleed there is EXPECTED, not an alert.
+- **Health check:** `scripts/tournament_paper_healthcheck.py` — STATUS OK|ALERT: proc alive, log
+  freshness/tracebacks, frozen-submission SHA, DB-held vs recomputed-target drift (paper desks must
+  never drift; threshold 5e-3 absorbs the between-candle recompute gap). **PnL:**
+  `scripts/tournament_paper_pnl.py` — evaluator-exact recompute-from-data (taker + liquidity
+  slippage + native funding, the tournament cost model); no DB state trusted for scoring.
+- **ALERT set (tournament-specific):** engine down · Traceback in log · SHA integrity failure ·
+  held-vs-target drift > 5e-3 · log silent past a rebalance boundary (+25 min stagger + compute ≈
+  expect activity by :40 past 00/08/16 UTC) · healthcheck itself crashing. BENIGN: drawdowns/PnL of
+  any size (HANDS-OFF mandate applies identically — this is a forward TEST; a losing month is DATA),
+  chop-regime bleed, `tick error #N` one-liners (network self-heal), small held-vs-target drift
+  from the forming-candle gap.
+- **Crash/reboot recovery:** same rules as v2 — relaunch KEEPING the DB:
+  `cd /home/roberto/crypto-trade/.worktrees/quant-portfolio-tournament && PYTHONUNBUFFERED=1
+  nohup uv run python run_portfolio_tournament_paper.py > logs/portfolio_tournament_paper.log 2>&1 &`
+  (no creds needed). After a WSL reboot check ALL desks, then relaunch each from its own worktree.
+- **Loop:** driven by a **CronCreate session cron** in this worktree's session —
+  `cron: "55 */4 * * *"`, recurring, prompt = the verbatim tournament-only tick instruction below.
+  The cron IS the cadence (no ScheduleWakeup from the fired prompt). Session-only/in-memory: if
+  `CronList` shows no job, the loop stopped — recreate it with the same recipe.
+
+  VERBATIM TOURNAMENT TICK PROMPT (keep byte-stable across recreations):
+  "TOURNAMENT-DESK MONITOR TICK (crypto-cup-01 paper desk ONLY — never touch v1/v2/metals from
+  this session). From /home/roberto/crypto-trade/.worktrees/quant-portfolio-tournament run:
+  `uv run python scripts/tournament_paper_healthcheck.py` and read the last ~40 lines of
+  logs/portfolio_tournament_paper.log. On the first tick after 00:00 UTC also run
+  `uv run python scripts/tournament_paper_pnl.py` and note the running Sharpe/return one-liner.
+  Interpret per the TOURNAMENT PAPER DESK section of .claude/commands/portfolio-monitor.md:
+  HANDS-OFF (observe+inform only; PnL/drawdown are never alerts), alert ONLY on engine down /
+  Traceback / SHA integrity failure / held-vs-target drift >5e-3 / missed rebalance. On ALERT:
+  investigate, apply the documented recovery if it is one of the known-safe recoveries (relaunch
+  keeping DB), and PushNotification the user with a one-line summary. On OK: no user ping; keep a
+  one-line note. Do NOT call ScheduleWakeup (the cron is the cadence)."
+
 ## Intelligence roadmap (the living backlog — build these into the skill over time)
 Prioritized; each becomes a committed helper script + a section here when built.
 1. **Parity / drift check (HIGH).** ✅ DONE 2026-06-21 — `scripts/portfolio_parity_check.py`.
@@ -323,6 +375,15 @@ ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regi
 auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
+- **2026-07-19 v24** — TOURNAMENT PAPER DESK track added (crypto-cup-01 winner team-02
+  breakout-channel, 6-month forward test from 2026-07-18). Third desk, PAPER-ONLY dry-run engine
+  (no creds/orders), own runner/log/DB in the quant-portfolio-tournament worktree, +25-min stagger.
+  New scripts: `tournament_paper_healthcheck.py` (adds a frozen-submission SHA integrity check —
+  a failure is halt-and-tell-user, never repair) + `tournament_paper_pnl.py` (evaluator-exact
+  recompute-from-data scoring). Loop = CronCreate session cron `"55 */4 * * *"` in the tournament
+  worktree session, verbatim tick prompt in the new section; same session-only/expiry caveats as
+  the v2 cron (CronList empty ⇒ recreate). HANDS-OFF applies fully — this desk is a forward TEST;
+  losing stretches (esp. chop regime) are data, not incidents.
 - **2026-07-18 v23** — V2-TRACK MONITOR now driven by a **CronCreate session cron** + WSL-reboot recovery
   documented (user directive: "this must be tracked by the skill"). Two additions. (1) **Session-cron
   loop** (see "Session-cron alternative" under Self-paced loop): the v2 monitor runs every 2h at :13
