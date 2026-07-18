@@ -61,6 +61,19 @@ validation, or doubled-cost performance is nonpositive. BTC or episode concentra
 horizon fragility, and persistent short-bear or chop weakness demand repair and reduce
 robustness, but none is an independent veto.
 
+## Opening-probe coaching record
+
+Trial 1 (`t06-own-coin-momentum-consensus-v1`) is GREEN with no open core gap: train Sharpe
+1.671, annualized return 35.50%, doubled-cost Sharpe 1.448, max drawdown 10.64%, and 90%
+positive quarters. All four frozen regimes were positive: bear 1.566, bull 2.250, chop 0.479,
+and stress 1.894. Its 95% train-Sharpe interval was `[0.555, 2.726]`, and even the doubled-cost
+interval had a positive lower endpoint of 0.311.
+
+The candidate passes every public-core IS target with robustness score 98.62. No IS revision is
+authorized: changing a strong, broad result after inspection would add selection risk without a
+diagnosed failure. This exact source, risk policy, and parameter set is the Team 06 leader for
+subsequent sealed validation.
+
 ## Collision guard
 
 Use own-coin history only for direction. Do not rank residual winners and losers as Team 08 does,
