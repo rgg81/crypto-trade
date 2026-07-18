@@ -1,135 +1,26 @@
 {
-  "active_public_authority": {
-    "amendment_0005": {
-      "active_entrypoint_path": "scripts/top40_v2_tournament_score_diagnostics_v5.py",
-      "active_entrypoint_sha256": "0dc9228f3b9c6fe41b2655055f766fc92f323a289a050e6bdf4e48a30b0105f4",
-      "integration_freeze_commit": "d2b95f610722aab65b4e67466b34efeaa3554101",
-      "integration_freeze_path": "tournament/top40-v2/amendments/0005/integration-freeze.json",
-      "integration_freeze_sha256": "b3b2b96245a479ccfff95b5cd5b5cd0aef3b2d0aac0fc9faf5367d3e6772958c",
-      "score_adapter_protocol_path": "src/crypto_trade/tournament/score_adapter_protocol_v5.py",
-      "score_adapter_protocol_sha256": "8f8f5db3be3069cce7c7c0605fb15b31c4f28af7c2e0f2e24d79d861a65ae4ff",
-      "status": "active"
-    },
-    "amendment_0006_delegated_pure_crypto": {
-      "canonical_report_bytes": 73777,
-      "canonical_report_policy_sha256": "2c7fb0ff593d06c323517e60df4b28ab9387a2df580b83f82f65ef71c91fc350",
-      "canonical_report_sha256": "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b",
-      "canonical_report_violations": 0,
-      "integration_freeze_commit": "ed3af1398543dfee4a50150915dc2e37b3631fc9",
-      "integration_freeze_path": "tournament/top40-v2/amendments/0006/integration-freeze.json",
-      "integration_freeze_sha256": "3e93bdfe031e2589888c3bbcaae583437bbd074fa9d86c6dc0a54187bc0f1e34",
-      "rule": "Only certified native crypto coins/tokens are eligible; stablecoins, equities/TradFi, indexes, metals, commodities, and every other non-crypto contract are excluded even when Binance lists a perpetual.",
-      "status": "active-delegated-by-amendment-0005"
-    },
-    "amendment_0007_runtime_preload": {
-      "active_entrypoint_path": "scripts/top40_v2_tournament_runtime_preload_v7.py",
-      "active_entrypoint_sha256": "8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9",
-      "integration_freeze_commit": "c8b917ca49306d5200a4e08848e73ff6f5a18bf3",
-      "integration_freeze_path": "tournament/top40-v2/amendments/0007/integration-freeze.json",
-      "integration_freeze_sha256": "6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51",
-      "status": "active"
-    },
-    "amendment_0008_team05_replacement": {
-      "authorized_candidate_id": "team05-crtr-core-v2-infra-r1",
-      "failed_historical_candidate_id": "team05-crtr-core-v2",
-      "freeze_commit": "f6003ae687d5a6bf665abb001715b01ea8b10abb",
-      "freeze_path": "tournament/top40-v2/amendments/0008/freeze.json",
-      "freeze_sha256": "08bf194c9ade1f66bf38012210ad8604df61ca467cdad00bd3957aa679ea9bdd",
-      "maximum_development_runs": 1,
-      "replacement_material_trial_number": 2,
-      "scientific_delta": "none",
-      "status": "active-one-shot-administrative-authority"
-    }
-  },
-  "binding_scope": "Active public A5/A6/A7 authority and frozen A8 one-shot Team05 replacement authority are exact. Replacement material bytes and result artifacts remain prospective and must be computed by the organizer from the final immutable tree.",
-  "candidate_score_contract": {
-    "path": "candidate_score_contract.json",
-    "sha256": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES"
-  },
-  "core_score_adapter_artifacts": {
-    "canonical_executable_source_manifest_path": "tournament/top40-v2/teams/team-05/score-adapters/team05-crtr-core-v2-infra-r1.executable-source-manifest.json",
-    "canonical_score_manifest_path": "tournament/top40-v2/teams/team-05/score-adapters/team05-crtr-core-v2-infra-r1.json",
-    "canonical_semantic_review_path": "tournament/top40-v2/teams/team-05/score-adapters/team05-crtr-core-v2-infra-r1.semantic-coupling-review.json",
-    "materialization_order": [
-      "executable-source-manifest",
-      "independent-semantic-coupling-review",
-      "score-adapter-manifest",
-      "core-trial-registration"
-    ],
-    "sha256": {
-      "executable_source_manifest": "REPLACE_AFTER_CANONICAL_FIRST_ADD",
-      "score_manifest": "REPLACE_AFTER_CANONICAL_FIRST_ADD",
-      "semantic_coupling_review": "REPLACE_AFTER_INDEPENDENT_REVIEW_FIRST_ADD"
-    },
-    "template_paths": {
-      "executable_source_manifest": "executable_source_manifest.template.json",
-      "score_manifest": "candidate_score_manifest.template.json",
-      "semantic_coupling_review": "semantic_coupling_review.template.json"
-    }
-  },
-  "frozen_config": {
-    "path": "frozen_config.json",
-    "sha256": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES"
-  },
-  "historical_v2_infrastructure_failure": {
-    "canonical_executable_source_manifest_path": "tournament/top40-v2/teams/team-05/score-adapters/team05-crtr-core-v2.executable-source-manifest.json",
-    "canonical_score_manifest_path": "tournament/top40-v2/teams/team-05/score-adapters/team05-crtr-core-v2.json",
-    "canonical_semantic_review_path": "tournament/top40-v2/teams/team-05/score-adapters/team05-crtr-core-v2.semantic-coupling-review.json",
-    "candidate_id": "team05-crtr-core-v2",
-    "history_mutation_authorized": false,
-    "model_metrics_or_artifacts_observed": false,
-    "terminal_result_record_sha256": "15e4d3453ee1fdaae0a4f1439f8a5bf57c4cf16c99fa73ff9992c29fa64aa09f"
-  },
-  "candidate_variant": {
-    "path": "candidate_variant.py",
-    "sha256": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
-    "materialization_rule": "Bind the exact preregistered candidate ID, overrides, and risk-policy template at every material candidate commit; zero-argument strategy.py:build_strategy rejects undeclared or mismatched values."
-  },
-  "initial_no_control_policy": {
-    "path": "risk_policy.json",
-    "sha256": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES"
-  },
-  "canonical_runtime_materialization": {
-    "strategy_entrypoint": "strategy.py:build_strategy",
-    "risk_policy_path": "risk_policy.json",
-    "rule": "For controlled and neighbor candidates, copy the selected risk_ablations declaration byte-for-byte to root risk_policy.json before commit, hash binding, registration, and run."
-  },
-  "neighbor_parameter_artifacts": {
-    "team05-crtr-n01-slow-50d": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
-    "team05-crtr-n02-slow-70d": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
-    "team05-crtr-n03-selection-020": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
-    "team05-crtr-n04-selection-030": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
-    "team05-crtr-n05-gross-050": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
-    "team05-crtr-n06-gross-070": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
-    "team05-crtr-n07-chop-reversal-015": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
-    "team05-crtr-n08-chop-reversal-025": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES"
-  },
-  "pending_organizer_material": [
-    "complete_executable_source_set_rederived_from_final_historical_team_tree",
-    "exact_team05_file_sha256_and_byte_size_values",
-    "independent_semantic_review_identity_timestamp_findings_and_hash",
-    "score_manifest_hash_and_registration_opt_in",
-    "organizer_source_bundle_sha256",
-    "dependency_lock_sha256",
-    "organizer_equal_fold_derivation_sha256",
-    "fold_target_and_model_sha256_values",
-    "stitched_daily_returns_sha256",
-    "declared_score_diagnostic_artifact_sha256_values",
-    "neighbor_daily_returns_sha256_values"
-  ],
-  "risk_ablation_policies": {
-    "combined": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
-    "drawdown_only": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
-    "none": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
-    "position_stop_only": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
-    "turnover_only": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES",
-    "volatility_only": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES"
-  },
   "schema_version": 1,
-  "status": "A8_REPLACEMENT_PROSPECTIVE_UNREGISTERED_ACTIVE_AUTHORITY_BOUND_MATERIAL_HASHES_PENDING",
-  "strategy": {
-    "path": "strategy.py",
-    "sha256": "RECOMPUTE_FROM_FINAL_TEAM05_BYTES"
-  },
-  "team_id": "team-05"
+  "team_id": "team-05",
+  "family_id": "team05-up-down-capture-convexity-v1",
+  "candidate_id": "team05-udcc-pivot01-core-v1",
+  "status": "DRAFT_NOT_REGISTRATION_OR_EVIDENCE",
+  "materialization_commit": "REPLACE_AFTER_COMPLETE_VALIDATED_MATERIALIZATION",
+  "executable_files": [
+    "candidate_variant.py",
+    "frozen_config.json",
+    "risk_policy.json",
+    "strategy.py",
+    "test_risk_policy_contract.py",
+    "test_strategy.py"
+  ],
+  "strategy_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
+  "source_bundle_sha256": "REPLACE_AFTER_A7_FAMILY_APPEND_WITH_64_LOWERCASE_HEX",
+  "risk_policy_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "executable_source_manifest_path": "score-adapters/team05-udcc-pivot01-core-v1.executable-source-manifest.json",
+  "semantic_review_path": "score-adapters/team05-udcc-pivot01-core-v1.semantic-coupling-review.json",
+  "score_manifest_path": "score-adapters/team05-udcc-pivot01-core-v1.json",
+  "binding_rule": "The executable manifest, semantic review, and score manifest are immutable first-adds in that order. A7 then appends the family. The complete source fingerprint is recomputed after that append and bound in the trial registration.",
+  "amendment_authority": ["0005", "0006", "0007"],
+  "amendment_0008_authorized": false
 }

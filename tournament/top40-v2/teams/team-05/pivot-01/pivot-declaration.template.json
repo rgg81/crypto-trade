@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "team_id": "team-05",
+  "pivot_number": 1,
+  "status": "prospective_unregistered",
+  "parent_family_id": "team05-causal-residual-trend-reversal-v1",
+  "new_family_id": "team05-up-down-capture-convexity-v1",
+  "new_candidate_id": "team05-udcc-pivot01-core-v1",
+  "diagnosis_scope": "Mechanism-level: the fixed CRTR combined candidate failed positive-quarter, chronological-fold, trial-adjusted-confidence, chop-return, worst-regime-Sharpe, and PnL-concentration gates, so no control or parameter neighbor can rescue it.",
+  "pivot_reason": "Replace direction-conditioned multi-horizon return forecasting with an order-invariant structural up/down common-tape capture asymmetry and an exactly balanced weekly book.",
+  "failure_action": "reject_udcc_family_without_controls_neighbors_or_same_family_replacement",
+  "registered_at_utc": "REPLACE_WITH_ACTUAL_PIVOT_FAMILY_REGISTRATION_TIMESTAMP_Z"
+}

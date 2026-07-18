@@ -1,10 +1,10 @@
 {
-  "candidate_id": "team05-crtr-base-v1",
+  "candidate_id": "team05-udcc-pivot01-core-v1",
   "decision": "approve",
   "declared_capture_boundary": "candidate-declared-post-transform-pre-selection-weight-cap-risk",
-  "executable_source_manifest_path": "tournament/top40-v2/teams/team-05/score-adapters/team05-crtr-base-v1.executable-source-manifest.json",
+  "executable_source_manifest_path": "tournament/top40-v2/teams/team-05/score-adapters/team05-udcc-pivot01-core-v1.executable-source-manifest.json",
   "executable_source_manifest_sha256": "REPLACE_WITH_EXECUTABLE_SOURCE_MANIFEST_64_LOWERCASE_HEX",
-  "family_id": "team05-causal-residual-trend-reversal-v1",
+  "family_id": "team05-up-down-capture-convexity-v1",
   "findings": {
     "direct_hook_call_found": true,
     "hook_after_declared_score_transform": true,

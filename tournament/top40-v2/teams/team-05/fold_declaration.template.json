@@ -1,20 +1,20 @@
 {
   "schema_version": 1,
   "team_id": "team-05",
-  "family_id": "team05-causal-residual-trend-reversal-v1",
-  "candidate_id": "REPLACE_WITH_EXACT_REGISTERED_CANDIDATE_ID",
-  "candidate_role": "REPLACE_WITH_no-control-core_OR_eventual-combined-base",
+  "family_id": "team05-up-down-capture-convexity-v1",
+  "candidate_id": "team05-udcc-pivot01-core-v1",
+  "candidate_role": "pivot-01-no-control-core",
   "candidate_registration_sha256": "REPLACE_WITH_ACCEPTED_CANDIDATE_REGISTRATION_64_LOWERCASE_HEX",
-  "risk_policy_path": "REPLACE_WITH_EXACT_REGISTERED_CANDIDATE_RISK_POLICY_PATH",
+  "risk_policy_path": "risk_policy.json",
   "risk_policy_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
   "fold_id": "REPLACE_WITH_fold-1_THROUGH_fold-6",
-  "fold_ordinal": "REPLACE_WITH_INTEGER_1_THROUGH_6",
+  "fold_ordinal": 0,
   "walk_forward_plan_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
   "fold_derivation_manifest_sha256": "REPLACE_WITH_ORGANIZER_DERIVATION_MANIFEST_64_LOWERCASE_HEX",
   "organizer_fold_boundary_declaration": "REPLACE_WITH_EXACT_EQUAL_CHRONOLOGICAL_FOLD_DECLARATION",
   "past_only_replay_state_cutoff": "REPLACE_FROM_ORGANIZER_FOLD_DECLARATION",
   "test_slice_start": "REPLACE_FROM_ORGANIZER_FOLD_DECLARATION",
   "test_slice_end": "REPLACE_FROM_ORGANIZER_FOLD_DECLARATION",
-  "identity_rule": "Materialize one declaration for exactly one accepted candidate and fold. The no-control core and eventual combined base require separate declarations even when they use the same organizer-derived boundary slice.",
-  "status": "TEMPLATE_NOT_EVIDENCE_UNTIL_CANDIDATE_REGISTRATION_POLICY_BOUNDARY_AND_HASHES_ARE_BOUND"
+  "a5_label_purge_hours": 168,
+  "status": "TEMPLATE_NOT_EVIDENCE_UNTIL_REGISTRATION_BOUNDARY_AND_HASHES_ARE_BOUND"
 }

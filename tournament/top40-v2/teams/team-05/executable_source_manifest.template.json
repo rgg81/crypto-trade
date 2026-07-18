@@ -1,37 +1,13 @@
 {
-  "candidate_id": "team05-crtr-base-v1",
-  "family_id": "team05-causal-residual-trend-reversal-v1",
+  "candidate_id": "team05-udcc-pivot01-core-v1",
+  "family_id": "team05-up-down-capture-convexity-v1",
   "files": [
-    {
-      "path": "candidate_variant.py",
-      "sha256": "REPLACE_WITH_EXACT_64_LOWERCASE_HEX",
-      "size": "REPLACE_WITH_EXACT_BYTE_SIZE_INTEGER"
-    },
-    {
-      "path": "frozen_config.json",
-      "sha256": "REPLACE_WITH_EXACT_64_LOWERCASE_HEX",
-      "size": "REPLACE_WITH_EXACT_BYTE_SIZE_INTEGER"
-    },
-    {
-      "path": "risk_policy.json",
-      "sha256": "REPLACE_WITH_EXACT_64_LOWERCASE_HEX",
-      "size": "REPLACE_WITH_EXACT_BYTE_SIZE_INTEGER"
-    },
-    {
-      "path": "strategy.py",
-      "sha256": "REPLACE_WITH_EXACT_64_LOWERCASE_HEX",
-      "size": "REPLACE_WITH_EXACT_BYTE_SIZE_INTEGER"
-    },
-    {
-      "path": "test_risk_policy_contract.py",
-      "sha256": "REPLACE_WITH_EXACT_64_LOWERCASE_HEX",
-      "size": "REPLACE_WITH_EXACT_BYTE_SIZE_INTEGER"
-    },
-    {
-      "path": "test_strategy.py",
-      "sha256": "REPLACE_WITH_EXACT_64_LOWERCASE_HEX",
-      "size": "REPLACE_WITH_EXACT_BYTE_SIZE_INTEGER"
-    }
+    {"path": "candidate_variant.py", "sha256": "cd2fac7a85944ed540c4f1c41231cc1a80df0befef3d68553de5999e5c6af574", "size": 238},
+    {"path": "frozen_config.json", "sha256": "5503de8a87edd6cc8ea6fb3506e4b781dc93834adc0c3204d3629943c7919195", "size": 4858},
+    {"path": "risk_policy.json", "sha256": "2a56f21940baa886f603c635ea53ca39778869577dd35bc53f1c754bf4c2794e", "size": 638},
+    {"path": "strategy.py", "sha256": "bff8d9cb65aa445c926decbab45da4f73f229ae744e55c5fd81f0a36e06a234a", "size": 19663},
+    {"path": "test_risk_policy_contract.py", "sha256": "f561606a08d9406b91121f276efd446b657facc48484321574b6428bbb2a637b", "size": 2129},
+    {"path": "test_strategy.py", "sha256": "a9189ef0315356fc8e7f69b217dccc1dbfd96ee5041e5a3201664c433e5295bd", "size": 14428}
   ],
   "manifest_kind": "top40-v2-executable-source-manifest-v1",
   "schema_version": 1,

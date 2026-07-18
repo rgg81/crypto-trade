@@ -1,25 +1,25 @@
 {
   "adapter_id": "top40-v2-declared-score-boundary-v1",
-  "candidate_id": "team05-crtr-base-v1",
+  "candidate_id": "team05-udcc-pivot01-core-v1",
   "capture_boundary": "candidate-declared-post-transform-pre-selection-weight-cap-risk",
-  "family_id": "team05-causal-residual-trend-reversal-v1",
+  "family_id": "team05-up-down-capture-convexity-v1",
   "hook": "strategy.score_boundary",
   "label": {
     "executable_price_column": "open",
-    "holding_horizon_hours": 72,
+    "holding_horizon_hours": 168,
     "label_id": "manifest-horizon-simple-executable-open-to-open-return-v1",
-    "minimum_pairs": 12,
+    "minimum_pairs": 240,
     "purge_cross_fold_endpoints": true,
     "return_definition": "simple-executable-open-to-open",
     "score_direction": "higher-score-higher-return",
     "statistic_id": "globally-pooled-pearson-v1"
   },
   "schedule_utc": {
-    "anchor_timestamp_utc": "2020-01-01T00:00:00Z",
-    "interval_hours": 72
+    "anchor_timestamp_utc": "1970-01-01T00:00:00Z",
+    "interval_hours": 168
   },
   "schema_version": 1,
-  "score_description": "Final finite CRTR cross-sectional ranking score after volatility normalization, cross-sectional ranking, direction-conditioned reversal blending, alignment discount, reliability scaling, and clipping. The direct A5 hook return is validated and consumed before score-span checks, selection, sleeve weighting, caps, and organizer-owned risk. Higher values declare higher expected 72-hour simple executable-open-to-open returns.",
+  "score_description": "Final finite UDCC long-desirability score after conditional common-tape slope estimation and centered average-ranking: 0.50 times upside-capture rank minus downside-capture rank. The direct A5 hook return is validated and consumed before score-span checks, selection, capture-separation gates, equal sizing, caps, and organizer-owned risk. Higher values declare higher expected 168-hour simple executable-open-to-open returns.",
   "semantic_coupling_review_sha256": "REPLACE_WITH_CANONICAL_SEMANTIC_REVIEW_64_LOWERCASE_HEX",
   "stage": "development",
   "team_id": "team-05"

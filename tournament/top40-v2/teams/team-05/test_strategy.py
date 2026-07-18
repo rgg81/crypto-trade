@@ -1,18 +1,13 @@
-"""Focused synthetic tests for Team 05.
-
-These tests use generated bars only.  They are authored for later organizer/QE execution and are
-not executed during clean-room design.
-"""
+"""Focused synthetic tests for Team05 UDCC pivot-01."""
 
 from __future__ import annotations
 
 import dataclasses
-import json
 import math
 from collections import OrderedDict
-from pathlib import Path
 
 import candidate_variant as candidate_variant_module
+import numpy as np
 import pandas as pd
 import pytest
 import strategy as strategy_module
@@ -21,6 +16,7 @@ from strategy import (
     CANONICAL_SEED,
     PREREGISTERED_CANDIDATE_OVERRIDES,
     PREREGISTERED_RISK_POLICY_TEMPLATES,
+    PreconstructionScore,
     build_strategy,
     build_strategy_from_parameters,
     candidate_score_payload_bytes,
@@ -31,40 +27,47 @@ from strategy import (
 
 from crypto_trade.tournament.protocol import DecisionContext
 
-UTC_START = pd.Timestamp(year=2020, month=1, day=1, tz="UTC")
-DECISION = pd.Timestamp(year=2020, month=7, day=17, tz="UTC")
-TEAM_ROOT = Path(__file__).resolve().parent
+DECISION = pd.Timestamp(year=2024, month=1, day=4, tz="UTC")
+SYMBOLS = tuple(f"S{number:02d}USDT" for number in range(20))
+MARKET_RETURNS = np.asarray(
+    [
+        (0.0045 + 0.0005 * math.sin(index / 7.0))
+        if index % 2 == 0
+        else (-0.0040 + 0.0004 * math.cos(index / 9.0))
+        for index in range(252)
+    ],
+    dtype=float,
+)
 
 
-def _bars(symbol_number: int, *, future_days: int = 0) -> pd.DataFrame:
-    end = DECISION + pd.Timedelta(days=future_days)
-    open_times = pd.date_range(UTC_START, end=end, freq="8h")
-    centered = symbol_number - 9.5
-    drift = centered * 0.000018
-    close = [
-        100.0
-        * math.exp(
-            drift * step
-            + 0.004 * math.sin(step / (5.0 + (symbol_number % 4)))
-            + 0.0015 * math.cos(step / 2.7 + symbol_number)
-        )
-        for step in range(len(open_times))
-    ]
+def _frame(
+    symbol_number: int,
+    *,
+    return_order: np.ndarray | None = None,
+) -> pd.DataFrame:
+    centered = (symbol_number - 9.5) / 9.5
+    beta_up = 1.0 + 0.55 * centered
+    beta_down = 1.0 - 0.55 * centered
+    market = MARKET_RETURNS if return_order is None else MARKET_RETURNS[return_order]
+    returns = np.where(market > 0.0, beta_up * market, beta_down * market)
+    prices = 100.0 * np.exp(np.concatenate(([0.0], np.cumsum(returns))))
+    close_times = pd.date_range(end=DECISION, periods=253, freq="8h")
+    open_times = close_times - pd.Timedelta(hours=8)
     return pd.DataFrame(
         {
             "open_time": open_times,
-            "open": [value * (1.0 + 0.0005) for value in close],
-            "high": [value * (1.0 + 0.0020) for value in close],
-            "low": [value * (1.0 - 0.0020) for value in close],
-            "close": close,
-            "quote_volume": [1_000_000.0 + symbol_number for _ in close],
+            "open": prices * 1.0001,
+            "high": prices * 1.002,
+            "low": prices * 0.998,
+            "close": prices,
+            "quote_volume": np.full(len(prices), 1_000_000.0 + symbol_number),
         }
     )
 
 
-def _frames(*, future_days: int = 0) -> OrderedDict[str, pd.DataFrame]:
+def _frames(*, return_order: np.ndarray | None = None) -> OrderedDict[str, pd.DataFrame]:
     return OrderedDict(
-        (f"S{number:02d}USDT", _bars(number, future_days=future_days)) for number in range(20)
+        (symbol, _frame(number, return_order=return_order)) for number, symbol in enumerate(SYMBOLS)
     )
 
 
@@ -85,8 +88,8 @@ def _context(
     )
 
 
-def _targets(context: DecisionContext, *, seed: int = 20260801) -> dict[str, float]:
-    result = build_strategy().target_weights(context, seed=seed)
+def _targets(context: DecisionContext) -> dict[str, float]:
+    result = build_strategy().target_weights(context, seed=CANONICAL_SEED)
     assert result is not None
     return dict(result)
 
@@ -95,62 +98,107 @@ def _score_bytes(context: DecisionContext) -> bytes:
     return candidate_score_payload_bytes(preconstruction_scores(context))
 
 
-def test_future_append_truncation_and_corruption_invariance() -> None:
-    with_future = _frames(future_days=5)
-    truncated = OrderedDict(
-        (
-            symbol,
-            frame.loc[
-                pd.to_datetime(frame["open_time"], utc=True) + pd.Timedelta(hours=8) <= DECISION
-            ]
-            .copy()
-            .reset_index(drop=True),
-        )
-        for symbol, frame in with_future.items()
-    )
-    corrupted = OrderedDict((symbol, frame.copy()) for symbol, frame in with_future.items())
-    for frame in corrupted.values():
-        unavailable = (
-            pd.to_datetime(frame["open_time"], utc=True) + pd.Timedelta(hours=8) > DECISION
-        )
-        frame.loc[unavailable, "close"] = [
-            float("nan") if i % 2 else 1e100 for i in range(unavailable.sum())
-        ]
-        frame.loc[unavailable, "open"] = -1e100
+def test_synthetic_convex_and_concave_assets_have_expected_order_and_book() -> None:
+    context = _context(_frames())
+    scores = preconstruction_scores(context)
+    assert len(scores) == 20
+    assert scores["S19USDT"].score == pytest.approx(1.0)
+    assert scores["S00USDT"].score == pytest.approx(-1.0)
+    assert scores["S19USDT"].beta_up > scores["S00USDT"].beta_up
+    assert scores["S19USDT"].beta_down < scores["S00USDT"].beta_down
 
-    baseline_scores = preconstruction_scores(_context(truncated))
-    assert preconstruction_scores(_context(with_future)) == baseline_scores
-    assert preconstruction_scores(_context(corrupted)) == baseline_scores
-    assert _score_bytes(_context(with_future)) == _score_bytes(_context(truncated))
-    assert _score_bytes(_context(corrupted)) == _score_bytes(_context(truncated))
-    assert _targets(_context(with_future)) == _targets(_context(truncated))
-    assert _targets(_context(corrupted)) == _targets(_context(truncated))
+    targets = _targets(context)
+    assert set(targets) == {
+        "S00USDT",
+        "S01USDT",
+        "S02USDT",
+        "S03USDT",
+        "S04USDT",
+        "S15USDT",
+        "S16USDT",
+        "S17USDT",
+        "S18USDT",
+        "S19USDT",
+    }
+    assert all(targets[symbol] > 0.0 for symbol in SYMBOLS[15:])
+    assert all(targets[symbol] < 0.0 for symbol in SYMBOLS[:5])
+    assert sum(abs(weight) for weight in targets.values()) == pytest.approx(0.48)
+    assert sum(targets.values()) == pytest.approx(0.0, abs=1e-15)
+    assert max(abs(weight) for weight in targets.values()) <= 0.05
+
+
+def test_paired_observation_permutation_does_not_change_scores_or_targets() -> None:
+    permutation = np.arange(252, dtype=int)[::-1]
+    baseline = _context(_frames())
+    permuted = _context(_frames(return_order=permutation))
+    assert _score_bytes(permuted) == _score_bytes(baseline)
+    assert _targets(permuted) == _targets(baseline)
+
+
+def test_global_return_sign_inversion_swaps_capture_order_and_sleeves() -> None:
+    frames = _frames()
+    inverted = OrderedDict((symbol, frame.copy()) for symbol, frame in frames.items())
+    for frame in inverted.values():
+        frame.loc[:, "close"] = 10_000.0 / frame["close"].to_numpy(dtype=float)
+    original_scores = preconstruction_scores(_context(frames))
+    inverted_scores = preconstruction_scores(_context(inverted))
+    for symbol in SYMBOLS:
+        assert inverted_scores[symbol].score == pytest.approx(-original_scores[symbol].score)
+    original_targets = _targets(_context(frames))
+    inverted_targets = _targets(_context(inverted))
+    assert {symbol for symbol, weight in original_targets.items() if weight > 0.0} == {
+        symbol for symbol, weight in inverted_targets.items() if weight < 0.0
+    }
+    assert {symbol for symbol, weight in original_targets.items() if weight < 0.0} == {
+        symbol for symbol, weight in inverted_targets.items() if weight > 0.0
+    }
+
+
+def test_future_append_and_corruption_are_irrelevant() -> None:
+    baseline = _frames()
+    with_future = OrderedDict((symbol, frame.copy()) for symbol, frame in baseline.items())
+    for frame in with_future.values():
+        future = pd.DataFrame(
+            {
+                "open_time": [DECISION, DECISION + pd.Timedelta(hours=8)],
+                "open": [-1e100, -1e100],
+                "high": [1e100, 1e100],
+                "low": [-1e100, -1e100],
+                "close": [float("nan"), 1e100],
+                "quote_volume": [float("nan"), float("nan")],
+            }
+        )
+        frame.loc[len(frame)] = future.iloc[0]
+        frame.loc[len(frame)] = future.iloc[1]
+    assert _score_bytes(_context(with_future)) == _score_bytes(_context(baseline))
+    assert _targets(_context(with_future)) == _targets(_context(baseline))
 
 
 def test_open_time_plus_eight_hours_is_the_exact_availability_boundary() -> None:
     frames = _frames()
-    assert all(isinstance(frame.index, pd.RangeIndex) for frame in frames.values())
-    baseline_bytes = _score_bytes(_context(frames))
+    with_unclosed = OrderedDict((symbol, frame.copy()) for symbol, frame in frames.items())
+    for frame in with_unclosed.values():
+        frame.loc[len(frame)] = {
+            "open_time": DECISION,
+            "open": 1e100,
+            "high": 1e100,
+            "low": -1e100,
+            "close": 1e100,
+            "quote_volume": 0.0,
+        }
+    assert _score_bytes(_context(with_unclosed)) == _score_bytes(_context(frames))
 
-    not_closed = OrderedDict((symbol, frame.copy()) for symbol, frame in frames.items())
-    for frame in not_closed.values():
-        row = pd.to_datetime(frame["open_time"], utc=True) == DECISION
-        assert row.sum() == 1
-        frame.loc[row, "close"] = 1e100
-    assert _score_bytes(_context(not_closed)) == baseline_bytes
-
-    last_closed_changed = OrderedDict((symbol, frame.copy()) for symbol, frame in frames.items())
-    changed_frame = last_closed_changed["S19USDT"]
-    row = pd.to_datetime(changed_frame["open_time"], utc=True) + pd.Timedelta(hours=8) == DECISION
-    assert row.sum() == 1
-    changed_frame.loc[row, "close"] *= 1.50
-    assert _score_bytes(_context(last_closed_changed)) != baseline_bytes
+    changed = OrderedDict((symbol, frame.copy()) for symbol, frame in frames.items())
+    changed["S19USDT"].loc[252, "close"] *= 1.10
+    changed_beta = preconstruction_scores(_context(changed))["S19USDT"].beta_down
+    baseline_beta = preconstruction_scores(_context(frames))["S19USDT"].beta_down
+    assert changed_beta != baseline_beta
 
 
-def test_numeric_millisecond_open_time_has_identical_score_and_target_bytes() -> None:
+def test_numeric_millisecond_timestamps_match_datetime_timestamps() -> None:
     frames = _frames()
-    numeric_milliseconds = OrderedDict((symbol, frame.copy()) for symbol, frame in frames.items())
-    for frame in numeric_milliseconds.values():
+    numeric = OrderedDict((symbol, frame.copy()) for symbol, frame in frames.items())
+    for frame in numeric.values():
         frame["open_time"] = pd.Series(
             [
                 int(timestamp.value // 1_000_000)
@@ -158,161 +206,78 @@ def test_numeric_millisecond_open_time_has_identical_score_and_target_bytes() ->
             ],
             dtype="int64",
         )
-
-    assert _score_bytes(_context(numeric_milliseconds)) == _score_bytes(_context(frames))
-    assert _targets(_context(numeric_milliseconds)) == _targets(_context(frames))
-
-
-def test_stale_and_sparse_histories_each_fail_closed() -> None:
-    stale = _frames()
-    for symbol, frame in tuple(stale.items()):
-        close_times = pd.to_datetime(frame["open_time"], utc=True) + pd.Timedelta(hours=8)
-        stale[symbol] = (
-            frame.loc[close_times <= DECISION - pd.Timedelta(hours=16)]
-            .copy()
-            .reset_index(drop=True)
-        )
-    assert preconstruction_scores(_context(stale)) == {}
-    assert _targets(_context(stale)) == {}
-
-    sparse = _frames()
-    for symbol, frame in tuple(sparse.items()):
-        closed = pd.to_datetime(frame["open_time"], utc=True) + pd.Timedelta(hours=8) <= DECISION
-        keep = ~closed | (frame.index % 2 == 0)
-        sparse[symbol] = frame.loc[keep].copy().reset_index(drop=True)
-    assert preconstruction_scores(_context(sparse)) == {}
-    assert _targets(_context(sparse)) == {}
+    assert _score_bytes(_context(numeric)) == _score_bytes(_context(frames))
+    assert _targets(_context(numeric)) == _targets(_context(frames))
 
 
-def test_malformed_timestamp_and_close_each_fail_closed_without_raising() -> None:
-    malformed_timestamp = _frames()
-    for frame in malformed_timestamp.values():
-        frame["open_time"] = ["not-a-timestamp"] * len(frame)
-    assert preconstruction_scores(_context(malformed_timestamp)) == {}
-    assert _targets(_context(malformed_timestamp)) == {}
-
-    malformed_close = _frames()
-    for frame in malformed_close.values():
-        frame["close"] = ["not-a-close"] * len(frame)
-    assert preconstruction_scores(_context(malformed_close)) == {}
-    assert _targets(_context(malformed_close)) == {}
-
-
-def test_duplicate_open_time_uses_the_last_input_row_before_stable_time_sort() -> None:
+@pytest.mark.parametrize("failure", ["stale", "gap", "duplicate", "nonpositive"])
+def test_invalid_or_noncontiguous_histories_fail_closed(failure: str) -> None:
     frames = _frames()
-    duplicated = OrderedDict((symbol, frame.copy()) for symbol, frame in frames.items())
-    reference = OrderedDict((symbol, frame.copy()) for symbol, frame in frames.items())
-    symbol = "S19USDT"
-    duplicate_open_time = DECISION - pd.Timedelta(hours=8)
-    duplicate_mask = (
-        pd.to_datetime(duplicated[symbol]["open_time"], utc=True) == duplicate_open_time
-    )
-    assert duplicate_mask.sum() == 1
-    duplicate_row = duplicated[symbol].loc[duplicate_mask].copy()
-    duplicate_row.loc[:, "close"] *= 1.10
-    duplicated[symbol] = pd.concat(
-        [duplicated[symbol], duplicate_row],
-        ignore_index=True,
-    )
-    reference[symbol].loc[duplicate_mask, "close"] *= 1.10
-
-    assert _score_bytes(_context(duplicated)) == _score_bytes(_context(reference))
-    assert _targets(_context(duplicated)) == _targets(_context(reference))
-    assert _score_bytes(_context(duplicated)) != _score_bytes(_context(frames))
+    for symbol, frame in tuple(frames.items()):
+        if failure == "stale":
+            frames[symbol] = frame.iloc[:-2].copy().reset_index(drop=True)
+        elif failure == "gap":
+            frames[symbol] = frame.drop(index=120).reset_index(drop=True)
+        elif failure == "duplicate":
+            duplicate = frame.iloc[[120]].copy()
+            frames[symbol] = pd.concat([frame, duplicate], ignore_index=True)
+        else:
+            frame.loc[120, "close"] = 0.0
+    assert preconstruction_scores(_context(frames)) == {}
+    assert _targets(_context(frames)) == {}
 
 
-def test_missing_open_time_or_canonical_range_index_fails_closed() -> None:
-    missing_open_time = _frames()
-    for frame in missing_open_time.values():
-        frame.drop(columns=["open_time"], inplace=True)
-    assert preconstruction_scores(_context(missing_open_time)) == {}
-    assert _targets(_context(missing_open_time)) == {}
-
-    datetime_indexed = _frames()
-    for symbol, frame in tuple(datetime_indexed.items()):
-        datetime_indexed[symbol] = frame.set_index("open_time", drop=False)
-    assert preconstruction_scores(_context(datetime_indexed)) == {}
-    assert _targets(_context(datetime_indexed)) == {}
-
-
-def test_non_close_fields_funding_and_auxiliary_cannot_change_targets() -> None:
+def test_point_in_time_membership_controls_common_tape_and_targets() -> None:
     frames = _frames()
-    altered = OrderedDict((symbol, frame.copy()) for symbol, frame in frames.items())
-    for frame in altered.values():
-        frame.loc[:, "open"] = -999999.0
-        frame.loc[:, "high"] = 1e50
-        frame.loc[:, "low"] = -1e50
-        frame.loc[:, "quote_volume"] = float("nan")
-    hostile_funding = pd.DataFrame(
-        {"symbol": ["S00USDT"], "funding_rate": [999.0]},
-        index=[DECISION - pd.Timedelta(hours=1)],
-    )
-    hostile_auxiliary = {"oracle": pd.DataFrame({"future_target": [1e100]}, index=[DECISION])}
-    assert _targets(_context(frames)) == _targets(
-        _context(
-            altered,
-            funding=hostile_funding,
-            auxiliary=hostile_auxiliary,
-        )
-    )
-
-
-def test_point_in_time_membership_excludes_ineligible_symbol() -> None:
-    frames = _frames()
-    frames["HOTUSDT"] = _bars(40)
-    eligible = [symbol for symbol in frames if symbol != "HOTUSDT"]
-    scores = preconstruction_scores(_context(frames, eligible=eligible))
-    targets = _targets(_context(frames, eligible=eligible))
-    assert "HOTUSDT" not in scores
+    augmented = OrderedDict((symbol, frame.copy()) for symbol, frame in frames.items())
+    augmented["HOTUSDT"] = _frame(100)
+    eligible = list(SYMBOLS)
+    assert _score_bytes(_context(augmented, eligible=eligible)) == _score_bytes(_context(frames))
+    targets = _targets(_context(augmented, eligible=eligible))
     assert "HOTUSDT" not in targets
     assert set(targets) <= set(eligible)
 
 
-def test_reserved_rebalance_key_is_excluded_from_scores_and_targets() -> None:
+def test_mapping_and_eligible_order_do_not_change_bytes_or_targets() -> None:
     frames = _frames()
-    with_reserved_key = OrderedDict((symbol, frame.copy()) for symbol, frame in frames.items())
-    with_reserved_key["__crypto_trade_rebalance__"] = _bars(99)
+    reversed_frames = OrderedDict(reversed(tuple(frames.items())))
+    baseline = _context(frames)
+    reordered = _context(reversed_frames, eligible=list(reversed(SYMBOLS)))
+    assert _score_bytes(reordered) == _score_bytes(baseline)
+    assert _targets(reordered) == _targets(baseline)
 
-    assert preconstruction_scores(_context(with_reserved_key)) == preconstruction_scores(
+
+def test_non_close_fields_funding_auxiliary_and_positions_have_no_effect() -> None:
+    frames = _frames()
+    altered = OrderedDict((symbol, frame.copy()) for symbol, frame in frames.items())
+    for frame in altered.values():
+        frame.loc[:, "open"] = -1e100
+        frame.loc[:, "high"] = 1e100
+        frame.loc[:, "low"] = -1e100
+        frame.loc[:, "quote_volume"] = float("nan")
+    funding = pd.DataFrame(
+        {"symbol": ["S19USDT"], "funding_rate": [999.0]},
+        index=[DECISION - pd.Timedelta(hours=1)],
+    )
+    auxiliary = {
+        "future_oracle": pd.DataFrame({"target": [1e100]}, index=[DECISION]),
+        "positions": pd.DataFrame({"quantity": [1e100]}, index=[DECISION]),
+    }
+    assert _score_bytes(_context(altered, funding=funding, auxiliary=auxiliary)) == _score_bytes(
         _context(frames)
     )
-    assert _score_bytes(_context(with_reserved_key)) == _score_bytes(_context(frames))
-    assert _targets(_context(with_reserved_key)) == _targets(_context(frames))
-
-
-def test_mapping_order_and_fresh_instance_reproducibility() -> None:
-    frames = _frames()
-    reversed_frames = OrderedDict(reversed(list(frames.items())))
-    first = build_strategy().target_weights(_context(frames), seed=CANONICAL_SEED)
-    second = build_strategy().target_weights(_context(reversed_frames), seed=CANONICAL_SEED)
-    third = build_strategy().target_weights(_context(frames), seed=CANONICAL_SEED)
-    assert first == second == third
-
-
-def test_fresh_instances_emit_exactly_equal_candidate_score_payload_bytes() -> None:
-    context = _context(_frames())
-    first = build_strategy_from_parameters()
-    second = build_strategy_from_parameters({})
-    first_bytes = candidate_score_payload_bytes(
-        preconstruction_scores(context, parameters=first.parameters)
+    assert _targets(_context(altered, funding=funding, auxiliary=auxiliary)) == _targets(
+        _context(frames)
     )
-    second_bytes = candidate_score_payload_bytes(
-        preconstruction_scores(context, parameters=second.parameters)
-    )
-    assert first is not second
-    assert first.parameters is not second.parameters
-    assert first.parameters == second.parameters
-    assert first_bytes
-    assert first_bytes == second_bytes
 
 
-def test_a5_boundary_gets_builtin_finite_floats_and_return_is_consumed(
+def test_a5_receives_builtin_final_scores_and_its_return_is_consumed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     scores = preconstruction_scores(_context(_frames()))
     observed: dict[str, float] = {}
 
-    def diagnostic_boundary(values: dict[str, float]) -> dict[str, float]:
+    def flat_boundary(values: dict[str, float]) -> dict[str, float]:
         assert type(values) is dict
         assert list(values) == sorted(values)
         assert all(type(symbol) is str for symbol in values)
@@ -320,267 +285,84 @@ def test_a5_boundary_gets_builtin_finite_floats_and_return_is_consumed(
         observed.update(values)
         return {symbol: 0.0 for symbol in values}
 
-    monkeypatch.setattr(strategy_module, "score_boundary", diagnostic_boundary)
+    monkeypatch.setattr(strategy_module, "score_boundary", flat_boundary)
     assert scores_to_target_weights(scores) == {}
-    assert observed == {symbol: float(scores[symbol].score) for symbol in sorted(scores)}
+    assert observed == {symbol: scores[symbol].score for symbol in sorted(scores)}
 
 
-def test_a5_identity_and_score_payload_bytes_are_order_invariant() -> None:
-    frames = _frames()
-    scores = preconstruction_scores(_context(frames))
-    values = candidate_score_values(scores)
-    assert values == {symbol: float(scores[symbol].score) for symbol in sorted(scores)}
-    assert all(type(value) is float and math.isfinite(value) for value in values.values())
-
-    reversed_frames = OrderedDict(reversed(list(frames.items())))
-    reversed_scores = preconstruction_scores(_context(reversed_frames))
-    assert candidate_score_payload_bytes(scores) == candidate_score_payload_bytes(reversed_scores)
-
-
-def test_adapter_emits_finite_two_sided_conservative_targets() -> None:
-    scores = preconstruction_scores(_context(_frames()))
-    targets = scores_to_target_weights(scores)
-    assert targets
-    assert all(math.isfinite(weight) for weight in targets.values())
-    assert any(weight > 0 for weight in targets.values())
-    assert any(weight < 0 for weight in targets.values())
-    gross = sum(abs(weight) for weight in targets.values())
-    net = sum(targets.values())
-    assert gross <= BASE_PARAMETERS.target_gross + 1e-12
-    assert abs(net) <= BASE_PARAMETERS.maximum_abs_net_tilt + 1e-12
-    assert max(abs(weight) for weight in targets.values()) <= (
-        BASE_PARAMETERS.maximum_symbol_weight + 1e-12
-    )
-    assert list(targets) == sorted(targets)
-
-
-def test_adapter_rejects_an_invalid_score_record_instead_of_imputing() -> None:
-    scores = preconstruction_scores(_context(_frames()))
-    first_symbol = sorted(scores)[0]
-    corrupted = dict(scores)
-    corrupted[first_symbol] = dataclasses.replace(corrupted[first_symbol], score=float("inf"))
-    assert candidate_score_values(corrupted) == {}
-    assert candidate_score_payload_bytes(corrupted) == b""
-    assert scores_to_target_weights(corrupted) == {}
-
-
-@pytest.mark.parametrize(
-    ("field_name", "malformed_value"),
-    [
-        ("symbol", 7),
-        ("score", "0.25"),
-        ("short_log_return", None),
-        ("medium_log_return", True),
-        ("slow_log_return", 0),
-        ("realized_bar_volatility", "0.01"),
-        ("market_direction_log_return", 0j),
-        ("score", float("nan")),
-        ("score", 1.01),
-        ("realized_bar_volatility", 0.0),
-    ],
-)
-def test_every_malformed_score_field_fails_closed_to_empty_values_and_bytes(
-    field_name: str,
-    malformed_value: object,
+@pytest.mark.parametrize("bad_value", [True, float("nan"), float("inf"), 2.0])
+def test_a5_invalid_value_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+    bad_value: object,
 ) -> None:
     scores = preconstruction_scores(_context(_frames()))
-    first_symbol = sorted(scores)[0]
-    corrupted = dict(scores)
-    corrupted[first_symbol] = dataclasses.replace(
-        corrupted[first_symbol],
-        **{field_name: malformed_value},
-    )
 
-    assert candidate_score_values(corrupted) == {}
-    assert candidate_score_payload_bytes(corrupted) == b""
-    assert scores_to_target_weights(corrupted) == {}
+    def bad_boundary(values: dict[str, float]) -> dict[str, float]:
+        result = dict(values)
+        result[sorted(result)[0]] = bad_value  # type: ignore[assignment]
+        return result
+
+    monkeypatch.setattr(strategy_module, "score_boundary", bad_boundary)
+    assert candidate_score_values(scores) == {}
+    assert scores_to_target_weights(scores) == {}
 
 
-def test_score_order_identifies_relative_winner_and_loser() -> None:
+def test_a5_key_change_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
     scores = preconstruction_scores(_context(_frames()))
-    assert scores["S19USDT"].score > scores["S00USDT"].score
+
+    def missing_key(values: dict[str, float]) -> dict[str, float]:
+        return {symbol: value for symbol, value in values.items() if symbol != "S00USDT"}
+
+    monkeypatch.setattr(strategy_module, "score_boundary", missing_key)
+    assert scores_to_target_weights(scores) == {}
 
 
-def test_insufficient_or_degenerate_history_fails_closed_to_flat() -> None:
-    too_small = OrderedDict(list(_frames().items())[:11])
-    assert preconstruction_scores(_context(too_small)) == {}
-    assert _targets(_context(too_small)) == {}
-
-    constant = OrderedDict()
-    open_times = pd.date_range(UTC_START, end=DECISION, freq="8h")
-    for number in range(20):
-        constant[f"C{number:02d}USDT"] = pd.DataFrame(
-            {
-                "open_time": open_times,
-                "close": [100.0] * len(open_times),
-            }
-        )
-    assert preconstruction_scores(_context(constant)) == {}
-    assert _targets(_context(constant)) == {}
+def test_schedule_seed_and_fresh_instance_contract() -> None:
+    context = _context(_frames())
+    first = build_strategy()
+    second = build_strategy_from_parameters({})
+    assert first is not second
+    assert first.parameters == second.parameters == BASE_PARAMETERS
+    assert first.target_weights(context, seed=CANONICAL_SEED)
+    off_schedule = _context(_frames(), decision=DECISION + pd.Timedelta(hours=8))
+    assert first.target_weights(off_schedule, seed=CANONICAL_SEED) is None
+    with pytest.raises(ValueError, match="canonical seed"):
+        first.target_weights(context, seed=CANONICAL_SEED + 1)
 
 
-def test_every_sparse_scheduled_decision_crosses_the_empty_a5_hook_once(
+def test_candidate_identity_and_parameter_bindings_are_exact(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls: list[dict[str, float]] = []
-
-    def recording_boundary(values: dict[str, float]) -> dict[str, float]:
-        calls.append(dict(values))
-        return dict(values)
-
-    monkeypatch.setattr(strategy_module, "score_boundary", recording_boundary)
-    too_small = OrderedDict(list(_frames().items())[:11])
-    assert _targets(_context(too_small)) == {}
-    assert calls == [{}]
-
-
-def test_non_rebalance_boundary_returns_none_not_flat() -> None:
-    off_schedule = DECISION + pd.Timedelta(days=1)
-    frames = OrderedDict(
-        (symbol, _bars(number, future_days=1)) for number, symbol in enumerate(_frames())
-    )
-    result = build_strategy().target_weights(
-        _context(frames, decision=off_schedule),
-        seed=20260801,
-    )
-    assert result is None
-
-
-def test_neighbor_override_is_explicit_and_unknown_axis_is_rejected() -> None:
-    neighbor = build_strategy_from_parameters({"slow_horizon_days": 50})
-    assert neighbor.parameters.slow_horizon_days == 50
-    assert neighbor.parameters.selection_fraction == BASE_PARAMETERS.selection_fraction
+    assert candidate_variant_module.ACTIVE_CANDIDATE_ID == "team05-udcc-pivot01-core-v1"
+    assert candidate_variant_module.ACTIVE_OVERRIDES == {}
+    assert candidate_variant_module.ACTIVE_RISK_POLICY_TEMPLATE == "risk_policies/no-control.json"
+    assert PREREGISTERED_CANDIDATE_OVERRIDES == {"team05-udcc-pivot01-core-v1": {}}
+    assert PREREGISTERED_RISK_POLICY_TEMPLATES == {
+        "team05-udcc-pivot01-core-v1": "risk_policies/no-control.json"
+    }
     with pytest.raises(ValueError, match="unknown strategy parameters"):
         build_strategy_from_parameters({"secret_parameter": 1})
-
-
-@pytest.mark.parametrize(
-    ("artifact_name", "axis", "neighbor_value"),
-    [
-        ("team05-crtr-n01-slow-50d.json", "slow_horizon_days", 50),
-        ("team05-crtr-n02-slow-70d.json", "slow_horizon_days", 70),
-        ("team05-crtr-n03-selection-020.json", "selection_fraction", 0.20),
-        ("team05-crtr-n04-selection-030.json", "selection_fraction", 0.30),
-        ("team05-crtr-n05-gross-050.json", "target_gross", 0.50),
-        ("team05-crtr-n06-gross-070.json", "target_gross", 0.70),
-        ("team05-crtr-n07-chop-reversal-015.json", "chop_reversal_weight", 0.15),
-        ("team05-crtr-n08-chop-reversal-025.json", "chop_reversal_weight", 0.25),
-    ],
-)
-def test_every_declared_neighbor_changes_exactly_its_one_registered_axis(
-    artifact_name: str,
-    axis: str,
-    neighbor_value: int | float,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    artifact = json.loads((TEAM_ROOT / "neighbors" / artifact_name).read_text(encoding="utf-8"))
-    expected_override = {axis: neighbor_value}
-    assert artifact["one_axis"] == axis
-    assert artifact["overrides"] == expected_override
-    assert artifact["canonical_materialization"] == {
-        "active_candidate_id": artifact["neighbor_id"],
-        "active_overrides": expected_override,
-        "active_risk_policy_template": "risk_ablations/combined.json",
-        "path": "candidate_variant.py",
-    }
-    assert PREREGISTERED_CANDIDATE_OVERRIDES[artifact["neighbor_id"]] == expected_override
-
-    monkeypatch.setattr(
-        candidate_variant_module,
-        "ACTIVE_CANDIDATE_ID",
-        artifact["canonical_materialization"]["active_candidate_id"],
-    )
-    monkeypatch.setattr(
-        candidate_variant_module,
-        "ACTIVE_OVERRIDES",
-        artifact["canonical_materialization"]["active_overrides"],
-    )
-    monkeypatch.setattr(
-        candidate_variant_module,
-        "ACTIVE_RISK_POLICY_TEMPLATE",
-        artifact["canonical_materialization"]["active_risk_policy_template"],
-    )
-    neighbor = build_strategy()
-    changed = {
-        field.name: getattr(neighbor.parameters, field.name)
-        for field in dataclasses.fields(BASE_PARAMETERS)
-        if getattr(neighbor.parameters, field.name) != getattr(BASE_PARAMETERS, field.name)
-    }
-    assert changed == expected_override
-
-
-def test_canonical_builder_rejects_unregistered_or_mismatched_materialization(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(candidate_variant_module, "ACTIVE_CANDIDATE_ID", "team05-undeclared-v1")
+    monkeypatch.setattr(candidate_variant_module, "ACTIVE_CANDIDATE_ID", "unregistered")
     with pytest.raises(ValueError, match="not preregistered"):
         build_strategy()
 
-    monkeypatch.setattr(
-        candidate_variant_module,
-        "ACTIVE_CANDIDATE_ID",
-        "team05-crtr-core-v2-infra-r1",
+
+def test_malformed_preconstruction_record_fails_closed() -> None:
+    scores = preconstruction_scores(_context(_frames()))
+    corrupted = dict(scores)
+    corrupted["S00USDT"] = dataclasses.replace(
+        corrupted["S00USDT"],
+        score=float("nan"),
     )
-    monkeypatch.setattr(candidate_variant_module, "ACTIVE_OVERRIDES", {"target_gross": 0.5})
-    with pytest.raises(ValueError, match="do not match"):
-        build_strategy()
+    assert candidate_score_values(corrupted) == {}
+    assert candidate_score_payload_bytes(corrupted) == b""
+    assert scores_to_target_weights(corrupted) == {}
 
-    monkeypatch.setattr(candidate_variant_module, "ACTIVE_OVERRIDES", {})
-    monkeypatch.setattr(
-        candidate_variant_module,
-        "ACTIVE_RISK_POLICY_TEMPLATE",
-        "risk_ablations/combined.json",
+    wrong_symbol = dict(scores)
+    wrong_symbol["S00USDT"] = PreconstructionScore(
+        symbol="OTHERUSDT",
+        score=-1.0,
+        beta_up=0.5,
+        beta_down=1.5,
     )
-    with pytest.raises(ValueError, match="risk template does not match"):
-        build_strategy()
-
-
-@pytest.mark.parametrize(
-    "candidate_id",
-    [
-        "team05-crtr-core-v2",
-        "team05-crtr-core-v2-infra-r1",
-        "team05-crtr-ab-vol",
-        "team05-crtr-ab-dd",
-        "team05-crtr-ab-stop",
-        "team05-crtr-ab-turnover",
-        "team05-crtr-base-v1",
-    ],
-)
-def test_every_predeclared_base_parameter_cell_uses_canonical_zero_arg_builder(
-    candidate_id: str,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(candidate_variant_module, "ACTIVE_CANDIDATE_ID", candidate_id)
-    monkeypatch.setattr(candidate_variant_module, "ACTIVE_OVERRIDES", {})
-    monkeypatch.setattr(
-        candidate_variant_module,
-        "ACTIVE_RISK_POLICY_TEMPLATE",
-        PREREGISTERED_RISK_POLICY_TEMPLATES[candidate_id],
-    )
-    assert build_strategy().parameters == BASE_PARAMETERS
-
-
-def test_infrastructure_replacement_has_no_scientific_or_risk_delta() -> None:
-    historical = "team05-crtr-core-v2"
-    replacement = "team05-crtr-core-v2-infra-r1"
-    assert PREREGISTERED_CANDIDATE_OVERRIDES[historical] == {}
-    assert PREREGISTERED_CANDIDATE_OVERRIDES[replacement] == {}
-    assert (
-        PREREGISTERED_CANDIDATE_OVERRIDES[historical]
-        == PREREGISTERED_CANDIDATE_OVERRIDES[replacement]
-    )
-    assert PREREGISTERED_RISK_POLICY_TEMPLATES[historical] == "risk_ablations/none.json"
-    assert PREREGISTERED_RISK_POLICY_TEMPLATES[replacement] == "risk_ablations/none.json"
-    assert (
-        PREREGISTERED_RISK_POLICY_TEMPLATES[historical]
-        == PREREGISTERED_RISK_POLICY_TEMPLATES[replacement]
-    )
-
-
-def test_every_noncanonical_seed_is_rejected() -> None:
-    context = _context(_frames())
-    assert build_strategy().target_weights(context, seed=CANONICAL_SEED)
-    for seed in (-1, 0, 1, 20260800, 20260802, True, 20260801.0):
-        with pytest.raises(ValueError, match="canonical seed"):
-            build_strategy().target_weights(context, seed=seed)  # type: ignore[arg-type]
+    assert scores_to_target_weights(wrong_symbol) == {}

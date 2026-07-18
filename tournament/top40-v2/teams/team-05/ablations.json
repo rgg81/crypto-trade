@@ -1,130 +1,17 @@
 {
   "schema_version": 1,
   "team_id": "team-05",
-  "family_id": "team05-causal-residual-trend-reversal-v1",
-  "base_candidate_id": "team05-crtr-base-v1",
-  "predeclared_before_results": true,
-  "organizer_registration_pending": true,
-  "selection_after_results_forbidden": true,
-  "signal_parameters": "frozen_config.json",
-  "initial_policy": "risk_policy.json",
-  "combined_policy": "risk_ablations/combined.json",
-  "canonical_runtime_policy_path": "risk_policy.json",
-  "policy_materialization_rule": "For every controlled material candidate, copy its declared policy_artifact bytes to root risk_policy.json before commit, hash binding, registration, and run; side-path declarations are never selected by the frozen lifecycle.",
-  "policy_artifacts": {
-    "none": "risk_policy.json",
-    "volatility_only": "risk_ablations/volatility_only.json",
-    "drawdown_only": "risk_ablations/drawdown_only.json",
-    "position_stop_only": "risk_ablations/position_stop_only.json",
-    "turnover_only": "risk_ablations/turnover_only.json",
-    "combined": "risk_ablations/combined.json"
-  },
-  "policy_sha256": {
-    "none": "RECOMPUTE_AFTER_REMEDIATION",
-    "volatility_only": "RECOMPUTE_AFTER_REMEDIATION",
-    "drawdown_only": "RECOMPUTE_AFTER_REMEDIATION",
-    "position_stop_only": "RECOMPUTE_AFTER_REMEDIATION",
-    "turnover_only": "RECOMPUTE_AFTER_REMEDIATION",
-    "combined": "RECOMPUTE_AFTER_REMEDIATION"
-  },
-  "evaluator_cost_evidence_per_policy_run": [
-    {"cost_class": "base", "cost_multiplier": 1.0},
-    {"cost_class": "doubled", "cost_multiplier": 2.0}
-  ],
-  "control_definitions": {
-    "none": [],
-    "volatility_only": ["volatility_target"],
-    "drawdown_only": ["drawdown_brakes"],
-    "position_stop_only": ["position_stop"],
-    "turnover_only": ["turnover_limit"],
-    "combined": ["volatility_target", "drawdown_brakes", "position_stop", "turnover_limit"]
-  },
-  "core_alpha_activation_gate": {
-    "applies_to": "team05-crtr-core-v2-infra-r1 under the unchanged no-control policy",
-    "base_cost_net_return_strictly_positive": true,
-    "base_cost_net_sharpe_strictly_positive": true,
-    "doubled_cost_net_return_strictly_positive": true,
-    "doubled_cost_net_sharpe_strictly_positive": true,
-    "minimum_positive_equal_chronological_folds": 4,
-    "required_positive_return_regimes": ["bull", "bear", "chop"],
-    "required_positive_roles": [
-      "long_bull_positive",
-      "short_bear_positive",
-      "combined_chop_positive"
-    ],
-    "both_sleeves_meet_official_activity_floors": true,
-    "activation_rule": "All minima must pass on the no-control core before any controlled policy is registered or executed; a negative or one-regime core is falsified and controls cannot rescue it."
-  },
-  "cells": [
-    {
-      "order": 1,
-      "trial_suffix": "risk-none",
-      "candidate_id": "team05-crtr-core-v2-infra-r1",
-      "controls": "none",
-      "purpose": "uncontrolled core-alpha test and activation gate",
-      "activation": "first and unconditional after active A5/A6 verification, required A5 artifact first-adds, and accepted family/core registration"
-    },
-    {
-      "order": 2,
-      "trial_suffix": "risk-vol",
-      "candidate_id": "team05-crtr-ab-vol",
-      "controls": "volatility_only",
-      "purpose": "isolate exposure scaling during high realized portfolio volatility",
-      "activation": "only after the no-control core-alpha gate passes"
-    },
-    {
-      "order": 3,
-      "trial_suffix": "risk-dd",
-      "candidate_id": "team05-crtr-ab-dd",
-      "controls": "drawdown_only",
-      "purpose": "isolate path-dependent loss containment",
-      "activation": "only after the no-control core-alpha gate passes"
-    },
-    {
-      "order": 4,
-      "trial_suffix": "risk-stop",
-      "candidate_id": "team05-crtr-ab-stop",
-      "controls": "position_stop_only",
-      "purpose": "isolate idiosyncratic persistent-position crash containment",
-      "activation": "only after the no-control core-alpha gate passes"
-    },
-    {
-      "order": 5,
-      "trial_suffix": "risk-turnover",
-      "candidate_id": "team05-crtr-ab-turnover",
-      "controls": "turnover_only",
-      "purpose": "isolate capacity and churn restraint",
-      "activation": "only after the no-control core-alpha gate passes"
-    },
-    {
-      "order": 6,
-      "trial_suffix": "risk-combined",
-      "candidate_id": "team05-crtr-base-v1",
-      "controls": "combined",
-      "purpose": "canonical controlled candidate; must pass every official and Team-05 non-neighborhood gate",
-      "activation": "only after the no-control core-alpha gate passes"
-    }
-  ],
-  "required_central_outputs": [
-    "base_and_doubled_cost_metrics_from_each_policy_run",
-    "net_return",
-    "net_sharpe",
-    "maximum_drawdown",
-    "tail_loss",
-    "turnover",
-    "bull_return_and_sharpe",
-    "bear_return_and_sharpe",
-    "chop_return_and_sharpe",
-    "stress_return_and_sharpe",
-    "long_bull_attribution",
-    "short_bear_attribution",
-    "combined_chop_attribution",
-    "stop_count",
-    "brake_count",
-    "cooldown_time",
-    "requested_risk_notional",
-    "filled_risk_notional",
-    "same_boundary_reentry_prevention"
-  ],
-  "interpretation_rule": "The no-control core is first. Controlled cells are diagnostics only until the fixed combined policy passes every full non-neighborhood gate; no single control or neighbor can replace the combined base."
+  "family_id": "team05-up-down-capture-convexity-v1",
+  "candidate_id": "team05-udcc-pivot01-core-v1",
+  "status": "pivot-01-prospective-no-results",
+  "authorized_candidates": ["team05-udcc-pivot01-core-v1"],
+  "risk_policy": "risk_policy.json byte-identical to risk_policies/no-control.json",
+  "authorized_ablations": [],
+  "authorized_controls": [],
+  "authorized_neighbors": [],
+  "authorized_sign_flips": [],
+  "authorized_same_family_replacements": [],
+  "reason": "UDCC is one exact structural-capture core. A failed center rejects the family and cannot be repaired by downstream risk, parameter, sign, or construction changes.",
+  "historical_crtr_notice": "Files under risk_ablations/ and neighbors/ are immutable evidence for the terminal parent family only. They are not UDCC templates or authorization.",
+  "second_pivot_rule": "The unused second mechanism pivot could be activated only by a separately documented thesis genuinely distinct from both CRTR and UDCC."
 }

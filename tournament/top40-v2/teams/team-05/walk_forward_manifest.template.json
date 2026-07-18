@@ -1,24 +1,23 @@
 {
   "schema_version": 1,
   "team_id": "team-05",
-  "family_id": "team05-causal-residual-trend-reversal-v1",
-  "candidate_id": "REPLACE_WITH_EXACT_REGISTERED_CANDIDATE_ID",
-  "candidate_role": "REPLACE_WITH_no-control-core_OR_eventual-combined-base",
+  "family_id": "team05-up-down-capture-convexity-v1",
+  "candidate_id": "team05-udcc-pivot01-core-v1",
+  "candidate_role": "pivot-01-no-control-core",
   "candidate_registration_sha256": "REPLACE_WITH_ACCEPTED_CANDIDATE_REGISTRATION_64_LOWERCASE_HEX",
-  "risk_policy_path": "REPLACE_WITH_EXACT_REGISTERED_CANDIDATE_RISK_POLICY_PATH",
+  "risk_policy_path": "risk_policy.json",
   "risk_policy_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
-  "candidate_identity_rule": "Materialize a separate manifest for team05-crtr-core-v2-infra-r1 with the unchanged initial no-control root risk_policy.json and for team05-crtr-base-v1 after risk_ablations/combined.json has been copied byte-for-byte to root risk_policy.json. The failed infrastructure-only team05-crtr-core-v2 event has no admissible model artifacts. Candidate-specific fold, model, target, return paths and hashes cannot be reused across declarations.",
   "evidence_class": "organizer-derived-equal-chronological-folds",
   "fold_derivation_manifest_sha256": "REPLACE_WITH_ORGANIZER_DERIVATION_MANIFEST_64_LOWERCASE_HEX",
   "stitched_daily_returns_path": "REPLACE_WITH_CANDIDATE_SPECIFIC_STITCHED_DAILY_RETURNS_PATH",
   "stitched_daily_returns_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
   "folds": [
-    {"fold_id": "fold-1", "fold_declaration_path": "REPLACE_WITH_CANDIDATE_SPECIFIC_FOLD_1_DECLARATION_PATH", "fold_declaration_sha256": "REPLACE_WITH_64_LOWERCASE_HEX", "model_artifact_path": "REPLACE_WITH_CANDIDATE_SPECIFIC_FOLD_1_MODEL_ARTIFACT_PATH", "model_artifact_sha256": "REPLACE_WITH_64_LOWERCASE_HEX"},
-    {"fold_id": "fold-2", "fold_declaration_path": "REPLACE_WITH_CANDIDATE_SPECIFIC_FOLD_2_DECLARATION_PATH", "fold_declaration_sha256": "REPLACE_WITH_64_LOWERCASE_HEX", "model_artifact_path": "REPLACE_WITH_CANDIDATE_SPECIFIC_FOLD_2_MODEL_ARTIFACT_PATH", "model_artifact_sha256": "REPLACE_WITH_64_LOWERCASE_HEX"},
-    {"fold_id": "fold-3", "fold_declaration_path": "REPLACE_WITH_CANDIDATE_SPECIFIC_FOLD_3_DECLARATION_PATH", "fold_declaration_sha256": "REPLACE_WITH_64_LOWERCASE_HEX", "model_artifact_path": "REPLACE_WITH_CANDIDATE_SPECIFIC_FOLD_3_MODEL_ARTIFACT_PATH", "model_artifact_sha256": "REPLACE_WITH_64_LOWERCASE_HEX"},
-    {"fold_id": "fold-4", "fold_declaration_path": "REPLACE_WITH_CANDIDATE_SPECIFIC_FOLD_4_DECLARATION_PATH", "fold_declaration_sha256": "REPLACE_WITH_64_LOWERCASE_HEX", "model_artifact_path": "REPLACE_WITH_CANDIDATE_SPECIFIC_FOLD_4_MODEL_ARTIFACT_PATH", "model_artifact_sha256": "REPLACE_WITH_64_LOWERCASE_HEX"},
-    {"fold_id": "fold-5", "fold_declaration_path": "REPLACE_WITH_CANDIDATE_SPECIFIC_FOLD_5_DECLARATION_PATH", "fold_declaration_sha256": "REPLACE_WITH_64_LOWERCASE_HEX", "model_artifact_path": "REPLACE_WITH_CANDIDATE_SPECIFIC_FOLD_5_MODEL_ARTIFACT_PATH", "model_artifact_sha256": "REPLACE_WITH_64_LOWERCASE_HEX"},
-    {"fold_id": "fold-6", "fold_declaration_path": "REPLACE_WITH_CANDIDATE_SPECIFIC_FOLD_6_DECLARATION_PATH", "fold_declaration_sha256": "REPLACE_WITH_64_LOWERCASE_HEX", "model_artifact_path": "REPLACE_WITH_CANDIDATE_SPECIFIC_FOLD_6_MODEL_ARTIFACT_PATH", "model_artifact_sha256": "REPLACE_WITH_64_LOWERCASE_HEX"}
+    {"fold_id": "fold-1", "fold_declaration_path": "REPLACE_WITH_FOLD_1_DECLARATION_PATH", "fold_declaration_sha256": "REPLACE_WITH_64_LOWERCASE_HEX", "model_artifact_path": "REPLACE_WITH_FOLD_1_MODEL_PATH", "model_artifact_sha256": "REPLACE_WITH_64_LOWERCASE_HEX"},
+    {"fold_id": "fold-2", "fold_declaration_path": "REPLACE_WITH_FOLD_2_DECLARATION_PATH", "fold_declaration_sha256": "REPLACE_WITH_64_LOWERCASE_HEX", "model_artifact_path": "REPLACE_WITH_FOLD_2_MODEL_PATH", "model_artifact_sha256": "REPLACE_WITH_64_LOWERCASE_HEX"},
+    {"fold_id": "fold-3", "fold_declaration_path": "REPLACE_WITH_FOLD_3_DECLARATION_PATH", "fold_declaration_sha256": "REPLACE_WITH_64_LOWERCASE_HEX", "model_artifact_path": "REPLACE_WITH_FOLD_3_MODEL_PATH", "model_artifact_sha256": "REPLACE_WITH_64_LOWERCASE_HEX"},
+    {"fold_id": "fold-4", "fold_declaration_path": "REPLACE_WITH_FOLD_4_DECLARATION_PATH", "fold_declaration_sha256": "REPLACE_WITH_64_LOWERCASE_HEX", "model_artifact_path": "REPLACE_WITH_FOLD_4_MODEL_PATH", "model_artifact_sha256": "REPLACE_WITH_64_LOWERCASE_HEX"},
+    {"fold_id": "fold-5", "fold_declaration_path": "REPLACE_WITH_FOLD_5_DECLARATION_PATH", "fold_declaration_sha256": "REPLACE_WITH_64_LOWERCASE_HEX", "model_artifact_path": "REPLACE_WITH_FOLD_5_MODEL_PATH", "model_artifact_sha256": "REPLACE_WITH_64_LOWERCASE_HEX"},
+    {"fold_id": "fold-6", "fold_declaration_path": "REPLACE_WITH_FOLD_6_DECLARATION_PATH", "fold_declaration_sha256": "REPLACE_WITH_64_LOWERCASE_HEX", "model_artifact_path": "REPLACE_WITH_FOLD_6_MODEL_PATH", "model_artifact_sha256": "REPLACE_WITH_64_LOWERCASE_HEX"}
   ],
   "status": "TEMPLATE_NOT_EVIDENCE_UNTIL_ALL_ORGANIZER_FIELDS_ARE_BOUND"
 }

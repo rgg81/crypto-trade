@@ -1,8 +1,8 @@
 {
   "timestamp_utc": "REPLACE_WITH_RESULT_TIMESTAMP_Z",
   "team_id": "team-05",
-  "family_id": "team05-causal-residual-trend-reversal-v1",
-  "candidate_id": "REPLACE_WITH_EXACT_REGISTERED_CANDIDATE_ID",
+  "family_id": "team05-up-down-capture-convexity-v1",
+  "candidate_id": "team05-udcc-pivot01-core-v1",
   "registration_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
   "status": "REPLACE_WITH_completed_failed_OR_interrupted",
   "failure_reason": null,
@@ -10,14 +10,15 @@
     "development_evidence": "REPLACE_WITH_64_LOWERCASE_HEX",
     "walk_forward_manifest": "REPLACE_WITH_64_LOWERCASE_HEX",
     "base_cost_daily_returns": "REPLACE_WITH_64_LOWERCASE_HEX",
-    "doubled_cost_daily_returns": "REPLACE_WITH_64_LOWERCASE_HEX"
+    "doubled_cost_daily_returns": "REPLACE_WITH_64_LOWERCASE_HEX",
+    "a5_score_diagnostic": "REPLACE_WITH_64_LOWERCASE_HEX",
+    "udcc_conditional_tape_diagnostic": "REPLACE_WITH_64_LOWERCASE_HEX"
   },
   "metrics_summary": {
-    "report_only_central_gate_names_and_permitted_development_metrics": true,
-    "all_hard_gates_pass": "REPLACE_WITH_BOOLEAN",
+    "all_hard_gates_pass": false,
     "failed_gate_names": [],
-    "both_cost_outputs_present": "REPLACE_WITH_BOOLEAN"
+    "both_cost_outputs_present": false
   },
-  "cpu_hours": "REPLACE_WITH_NONNEGATIVE_NUMBER",
-  "wall_clock_hours": "REPLACE_WITH_NONNEGATIVE_NUMBER"
+  "cpu_hours": 0.0,
+  "wall_clock_hours": 0.0
 }

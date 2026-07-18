@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "team_id": "team-05",
+  "status": "prospective_binding_pivot_01_no_evidence",
+  "development": {
+    "minimum_net_sharpe": {"operator": ">=", "threshold": 0.75},
+    "minimum_annualized_return": {"operator": ">", "threshold": 0.0},
+    "minimum_calmar": {"operator": ">=", "threshold": 0.4},
+    "maximum_drawdown": {"operator": "<=", "threshold": 0.25},
+    "minimum_double_cost_return": {"operator": ">", "threshold": 0.0},
+    "minimum_double_cost_sharpe": {"operator": ">=", "threshold": 0.35},
+    "minimum_positive_folds": {"operator": ">=", "threshold": 5, "total_folds": 6},
+    "minimum_worst_fold_return": {"operator": ">=", "threshold": -0.05},
+    "minimum_positive_quarter_fraction": {"operator": ">=", "threshold": 0.55},
+    "minimum_trial_adjusted_probability_positive": {"operator": ">=", "threshold": 0.9}
+  },
+  "regimes_and_roles": {
+    "required_positive_return_regimes": {
+      "operator": ">",
+      "threshold": 0.0,
+      "regimes": ["bull", "bear", "chop"]
+    },
+    "minimum_positive_sharpe_regimes": {"operator": ">=", "threshold": 3},
+    "minimum_worst_regime_sharpe": {"operator": ">=", "threshold": -0.25},
+    "long_bull_net_return": {"operator": ">", "threshold": 0.0},
+    "short_bear_net_return": {"operator": ">", "threshold": 0.0},
+    "combined_chop_net_return": {"operator": ">", "threshold": 0.0}
+  },
+  "sleeves": {
+    "minimum_side_active_bar_fraction": {"operator": ">=", "threshold": 0.1},
+    "minimum_mean_side_exposure": {"operator": ">=", "threshold": 0.01},
+    "minimum_side_exposure": {"operator": ">=", "threshold": 0.01},
+    "minimum_side_executed_notional_usdt": {"operator": ">=", "threshold": 1000.0}
+  },
+  "stability": {
+    "maximum_positive_pnl_concentration": {"operator": "<=", "threshold": 0.35},
+    "parameter_neighbors_required": false,
+    "reason": "Pivot-01 freezes one exact structural-capture mechanism; neighbors and same-family alternatives are forbidden rather than waived as evidence."
+  },
+  "udcc_mechanism": {
+    "positive_common_tape_bar_portfolio_return": {"operator": ">", "threshold": 0.0},
+    "negative_common_tape_bar_portfolio_return": {"operator": ">", "threshold": 0.0},
+    "minimum_folds_positive_on_positive_common_tape_bars": {"operator": ">=", "threshold": 4, "total_folds": 6},
+    "minimum_folds_positive_on_negative_common_tape_bars": {"operator": ">=", "threshold": 4, "total_folds": 6}
+  },
+  "a5_score_diagnostic": {
+    "independent_semantic_coupling_approval_required": true,
+    "complete_manifest_scheduled_score_coverage_required": true,
+    "schedule_anchor_timestamp_utc": "1970-01-01T00:00:00Z",
+    "schedule_interval_hours": 168,
+    "holding_horizon_hours": 168,
+    "executable_price_column": "open",
+    "return_definition": "simple-executable-open-to-open",
+    "score_direction": "higher-score-higher-return",
+    "statistic_id": "globally-pooled-pearson-v1",
+    "minimum_pairs": 240,
+    "pooled_development_pearson": {"operator": ">", "threshold": 0.0},
+    "minimum_positive_fold_pearson_count": {"operator": ">=", "threshold": 4, "total_folds": 6},
+    "purge_cross_fold_endpoints": true
+  },
+  "pivot_01_disposition": {
+    "all_gates_noncompensatory": true,
+    "controls_permitted": false,
+    "neighbor_runs_permitted": false,
+    "same_family_replacement_permitted": false,
+    "core_failure_action": "reject_family",
+    "second_pivot_rule": "A second pivot remains available only through a separately preregistered genuinely different mechanism; it cannot be a UDCC rescue variant.",
+    "qualification_claim_without_all_evidence": false
+  },
+  "private_qualifier": {
+    "maximum_attempts": {"operator": "<=", "threshold": 1},
+    "minimum_net_sharpe": {"operator": ">=", "threshold": 0.5},
+    "minimum_annualized_return": {"operator": ">=", "threshold": 0.0},
+    "maximum_drawdown": {"operator": "<=", "threshold": 0.3},
+    "minimum_double_cost_sharpe": {"operator": ">=", "threshold": 0.0},
+    "minimum_positive_quarter_fraction": {"operator": ">=", "threshold": 0.5}
+  }
+}

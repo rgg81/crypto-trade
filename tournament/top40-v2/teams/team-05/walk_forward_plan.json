@@ -1,57 +1,44 @@
 {
   "schema_version": 1,
   "team_id": "team-05",
-  "family_id": "team05-causal-residual-trend-reversal-v1",
-  "candidate_scope": "candidate-generic derivation plan; never itself a candidate evidence manifest",
+  "family_id": "team05-up-down-capture-convexity-v1",
+  "candidate_id": "team05-udcc-pivot01-core-v1",
   "evidence_class": "prospective-organizer-derived-equal-chronological-folds",
   "fold_count": 6,
   "boundary_owner": "central evaluator",
-  "boundary_derivation": "Use the organizer's canonical equal chronological six-slice derivation over the complete visible-development evaluation index. Team-05 supplies no hand-dated boundaries.",
+  "boundary_derivation": "Use the organizer's canonical six equal chronological slices over the complete visible-development index; Team05 supplies no hand-dated boundaries.",
   "required_partition_properties": [
-    "six folds in strict chronological order",
-    "contiguous and pairwise-disjoint test slices",
+    "six contiguous pairwise-disjoint test slices in chronological order",
     "complete visible-development coverage exactly once",
-    "slice sizes equal under the organizer rule",
-    "expanding past-only replay state with no test observation entering prior state"
+    "expanding past-only replay state",
+    "no test observation enters prior fold state",
+    "purge every 168-hour A5 label that crosses a fold endpoint"
   ],
-  "construction": "After the evaluator materializes exact boundaries, instantiate this plan separately for each required candidate role. Each candidate gets its own walk-forward manifest, six candidate-specific fold declarations, six candidate-specific model artifacts, target hashes, and stitched-return hash. The model is a frozen deterministic rule with no learned coefficients, but every replay remains past-only and distinct.",
-  "candidate_identity_rule": "The organizer-derived boundary derivation may be shared, but no candidate manifest, fold declaration, model artifact, target artifact, return artifact, path, or artifact hash may stand in for another candidate. Candidate ID, accepted registration hash, exact risk-policy path/hash, fold ID, and candidate-specific upstream declarations must be bound before evidence is admissible.",
-  "required_candidate_instances": [
-    {
-      "candidate_role": "no-control-core",
-      "candidate_id": "team05-crtr-core-v2-infra-r1",
-      "risk_policy_path": "risk_policy.json",
-      "evidence_purpose": "preregistered core-alpha control-activation gate",
-      "positive_fold_requirement": "at least four of six before any controlled candidate may activate",
-      "artifact_requirement": "one distinct candidate-specific walk-forward manifest plus six fold declarations and six model artifacts"
-    },
-    {
-      "candidate_role": "eventual-combined-base",
-      "candidate_id": "team05-crtr-base-v1",
-      "risk_policy_path": "risk_policy.json",
-      "risk_policy_template": "risk_ablations/combined.json",
-      "evidence_purpose": "full combined-policy non-neighborhood qualification",
-      "positive_fold_requirement": "official minimum four of six and Team-05 minimum five of six",
-      "artifact_requirement": "a second distinct candidate-specific walk-forward manifest plus six fold declarations and six model artifacts; core artifacts are inadmissible substitutes"
-    }
-  ],
-  "label_policy": "The strategy has no training label. Team05's prospective use of the active A5 diagnostic is evaluation-only and cannot enter fold state, selection, or targets.",
-  "stitching_rule": "Stitch organizer-derived test returns once in fold order; include no training return and permit no gap, overlap, local boundary substitution, or hand-dated fallback.",
-  "candidate_generic_fold_templates": [
-    {"fold_id": "fold-1", "ordinal": 1, "boundary_source": "REPLACE_WITH_ORGANIZER_DERIVED_FOLD_DECLARATION"},
-    {"fold_id": "fold-2", "ordinal": 2, "boundary_source": "REPLACE_WITH_ORGANIZER_DERIVED_FOLD_DECLARATION"},
-    {"fold_id": "fold-3", "ordinal": 3, "boundary_source": "REPLACE_WITH_ORGANIZER_DERIVED_FOLD_DECLARATION"},
-    {"fold_id": "fold-4", "ordinal": 4, "boundary_source": "REPLACE_WITH_ORGANIZER_DERIVED_FOLD_DECLARATION"},
-    {"fold_id": "fold-5", "ordinal": 5, "boundary_source": "REPLACE_WITH_ORGANIZER_DERIVED_FOLD_DECLARATION"},
-    {"fold_id": "fold-6", "ordinal": 6, "boundary_source": "REPLACE_WITH_ORGANIZER_DERIVED_FOLD_DECLARATION"}
-  ],
-  "fold_hard_gates": {
-    "official_minimum_positive_folds": 4,
-    "team05_minimum_positive_folds": 5,
-    "maximum_single_positive_pnl_concentration": 0.35,
-    "failure_is_noncompensatory": true
+  "model_rule": "Instantiate a clean frozen deterministic UDCC strategy in each fold. It has no fitted coefficients or learned state; each artifact still binds exact source, config, seed, risk policy, schedule, and fold dates.",
+  "stitching_rule": "Stitch test returns once in fold order with no gap, overlap, discarded fold, or training return.",
+  "performance_gates": {
+    "minimum_positive_folds": 5,
+    "minimum_worst_fold_return": -0.05,
+    "maximum_positive_pnl_concentration": 0.35
   },
+  "a5_gates": {
+    "holding_horizon_hours": 168,
+    "minimum_pooled_pearson": 0.0,
+    "pooled_operator": ">",
+    "minimum_positive_fold_pearson_count": 4
+  },
+  "udcc_conditional_gates": {
+    "minimum_folds_positive_on_positive_common_tape_bars": 4,
+    "minimum_folds_positive_on_negative_common_tape_bars": 4
+  },
+  "folds": [
+    {"fold_id": "fold-1", "ordinal": 1, "boundary_source": "organizer-derived"},
+    {"fold_id": "fold-2", "ordinal": 2, "boundary_source": "organizer-derived"},
+    {"fold_id": "fold-3", "ordinal": 3, "boundary_source": "organizer-derived"},
+    {"fold_id": "fold-4", "ordinal": 4, "boundary_source": "organizer-derived"},
+    {"fold_id": "fold-5", "ordinal": 5, "boundary_source": "organizer-derived"},
+    {"fold_id": "fold-6", "ordinal": 6, "boundary_source": "organizer-derived"}
+  ],
   "qualification_evidence_admissible": false,
-  "admissibility_condition": "For the candidate being evaluated, its accepted registration, exact root risk_policy.json bytes, evaluator-derived boundaries, six candidate-specific fold/model/target hashes, and candidate-specific stitched-return hash are materialized and organizer-bound before metrics are recorded. A risk_ablations path identifies only the immutable template copied to root before registration.",
-  "status": "CANDIDATE_GENERIC_DECLARATION_ONLY_TWO_CANDIDATE_INSTANTIATIONS_BOUNDARIES_AND_HASHES_PENDING"
+  "admissibility_condition": "A7 must accept the exact candidate registration, then the official run must bind all candidate-specific fold, target, return, A5, and conditional-tape artifacts."
 }
