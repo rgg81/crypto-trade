@@ -94,7 +94,15 @@ def _liquid_complete_history(
     parameters: StrategyParameters,
 ) -> pd.DataFrame:
     interval = pd.Timedelta(hours=parameters.interval_hours)
-    bars = _completed_bars(frame, decision_time=decision_time, interval=interval)
+    # Only the fixed liquidity window and a possible incomplete daily triplet can affect the
+    # seven-day MAX score. Bounding the input avoids rebuilding irrelevant expanding history at
+    # every daily decision while preserving every return and liquidity observation used below.
+    maximum_input_bars = parameters.liquidity_history_bars + (24 // parameters.interval_hours)
+    bars = _completed_bars(
+        frame.tail(maximum_input_bars),
+        decision_time=decision_time,
+        interval=interval,
+    )
     if len(bars) < parameters.liquidity_history_bars:
         return pd.DataFrame(columns=["open_time", "close", "quote_volume"])
     expected = pd.date_range(
@@ -114,7 +122,7 @@ def _liquid_complete_history(
         or float(positive.median()) <= 0.0
     ):
         return pd.DataFrame(columns=["open_time", "close", "quote_volume"])
-    return bars
+    return recent.reset_index(drop=True)
 
 
 def _daily_returns(bars: pd.DataFrame) -> pd.Series:
