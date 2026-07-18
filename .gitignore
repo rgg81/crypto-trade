@@ -72,3 +72,8 @@ notebooks/.ipynb_checkpoints/
 !.claude/commands/
 !.claude/skills/
 !.claude/agents/
+# crypto-cup-01 tournament — snapshot data + organizer scratch stay out of git
+# (MANIFEST.sha256.json IS committed; the evaluator package under analysis/ is git add -f'd)
+tournament/crypto/data_is/
+tournament/crypto/_build/
+analysis/portfolio_tournament/__pycache__/

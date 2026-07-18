@@ -1,0 +1,61 @@
+# crypto-cup-01 — machine-readable tournament parameters (mirror of constants.py; FROZEN at
+# the Phase-0 commit; constants.py is authoritative if they ever diverge — that would be a bug)
+
+[tournament]
+name = "crypto-cup-01"
+branch = "quant-portfolio-tournament"
+teams = 10
+advance_to_stage2 = 4
+
+[windows]
+is_start = "2020-01-01"
+is_end = "2024-06-30"        # inclusive; last IS candle opens 2024-06-30 16:00 UTC
+holdout_start = "2024-07-01" # sealed
+holdout_end = "2026-06-30"   # inclusive; exactly 24 monthly Sharpe points
+quarantine = "2026-07-01 .. paper start"
+
+[grid]
+interval = "8h"
+step_ms = 28800000
+candles_per_year = 1095
+
+[universe]
+top_n = 40
+ranking = "trailing 7-day (21-candle) mean quote-volume, shift(1), full-pool"
+dvol_win = 21
+dvol_min_periods = 18
+refresh = "Monday 00:00 UTC candles, list in force for the week"
+pool = "USDT-quoted, ascii, ex-stablecoin, ex-NON_COIN_PERPS (pure crypto only)"
+survivorship = "delisted coins included while ranked (PIT)"
+
+[costs]
+taker_side = 0.0005
+slip_model = "clip(1.0 + 20.0/dvol_$M, 1.0, 10.0) bps/side, trailing 90-candle liq, past-only"
+funding = "native: sum of events in (open[t], open[t+1]] charged to the held book, -w*f"
+stress_tier = "2x doubles taker AND slippage"
+
+[caps]
+per_name = 0.10
+net = 0.25
+target_vol_per_candle = 0.01
+port_vol_win = 84
+max_leverage = 3.0
+breadth_floor_median_names_per_side = 5
+
+[discipline]
+max_experiments = 40
+experiment_ledger = "cli.py log-experiment (evaluator-stamped, append-only)"
+pivots_per_team = 1
+submissions_per_team = 1
+holdout_feedback = "none"
+
+[metric]
+objective = "net Sharpe, monthly-summed, sqrt(12)-annualised, after all costs + funding"
+stage1_rank = "IS Sharpe @1x; ties: 2x-stress Sharpe, then maxDD less negative"
+stage2_rank = "holdout Sharpe @1x funding-on (LOCKED); sensitivities informational"
+
+[paths]
+evaluator = "analysis/portfolio_tournament/"
+cli = "analysis/portfolio_tournament/cli.py"
+snapshot = "tournament/crypto/data_is/"
+manifest = "tournament/crypto/MANIFEST.sha256.json"
