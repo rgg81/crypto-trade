@@ -1,0 +1,138 @@
+[
+  {
+    "config": {
+      "apply_funding": true,
+      "cost_mult": 1.0,
+      "slip_mult": 1.0
+    },
+    "is_replay_identical": true,
+    "label": "canonical",
+    "metrics": {
+      "ann_turnover": 144.6273536755346,
+      "maxdd": -0.26117260419732935,
+      "mean_gross": 0.9440919816443372,
+      "mean_net": -0.07500737365155205,
+      "median_names_long": 13.0,
+      "median_names_short": 26.0,
+      "n_months": 24,
+      "regime_sharpe": {
+        "bear": NaN,
+        "bull": NaN,
+        "chop": NaN
+      },
+      "sharpe": 2.112788933821764,
+      "total_cost": 0.17704740597270102,
+      "total_funding_pnl": 0.5917175767956262,
+      "total_return": 2.61742369622081
+    },
+    "n_universe_symbols": 430,
+    "schema": 1,
+    "team_id": "team-02",
+    "window": {
+      "hi_exclusive": "2026-07-01",
+      "lo": "2024-07-01"
+    }
+  },
+  {
+    "config": {
+      "apply_funding": true,
+      "cost_mult": 1.0,
+      "slip_mult": 1.0
+    },
+    "is_replay_identical": true,
+    "label": "canonical",
+    "metrics": {
+      "ann_turnover": 210.11834833795012,
+      "maxdd": -0.35533132743132045,
+      "mean_gross": 1.0,
+      "mean_net": 1.6447614294127086e-16,
+      "median_names_long": 20.0,
+      "median_names_short": 20.0,
+      "n_months": 24,
+      "regime_sharpe": {
+        "bear": NaN,
+        "bull": NaN,
+        "chop": NaN
+      },
+      "sharpe": 1.5509506623995717,
+      "total_cost": 0.2562008330888007,
+      "total_funding_pnl": 0.6185453547034627,
+      "total_return": 2.3150037373347825
+    },
+    "n_universe_symbols": 430,
+    "schema": 1,
+    "team_id": "team-05",
+    "window": {
+      "hi_exclusive": "2026-07-01",
+      "lo": "2024-07-01"
+    }
+  },
+  {
+    "config": {
+      "apply_funding": true,
+      "cost_mult": 1.0,
+      "slip_mult": 1.0
+    },
+    "is_replay_identical": true,
+    "label": "canonical",
+    "metrics": {
+      "ann_turnover": 137.83922792882368,
+      "maxdd": -0.31788546976691,
+      "mean_gross": 0.9474224520283201,
+      "mean_net": -0.0386339355586501,
+      "median_names_long": 16.5,
+      "median_names_short": 22.5,
+      "n_months": 24,
+      "regime_sharpe": {
+        "bear": NaN,
+        "bull": NaN,
+        "chop": NaN
+      },
+      "sharpe": 1.4989438790799212,
+      "total_cost": 0.16906559826098433,
+      "total_funding_pnl": 0.5717974315312464,
+      "total_return": 1.3176823806187428
+    },
+    "n_universe_symbols": 430,
+    "schema": 1,
+    "team_id": "team-04",
+    "window": {
+      "hi_exclusive": "2026-07-01",
+      "lo": "2024-07-01"
+    }
+  },
+  {
+    "config": {
+      "apply_funding": true,
+      "cost_mult": 1.0,
+      "slip_mult": 1.0
+    },
+    "is_replay_identical": true,
+    "label": "canonical",
+    "metrics": {
+      "ann_turnover": 241.50473356850296,
+      "maxdd": -0.3893653415217043,
+      "mean_gross": 0.9999999907564059,
+      "mean_net": -0.018693251850569075,
+      "median_names_long": 20.0,
+      "median_names_short": 20.0,
+      "n_months": 24,
+      "regime_sharpe": {
+        "bear": NaN,
+        "bull": NaN,
+        "chop": NaN
+      },
+      "sharpe": 0.15237406433599918,
+      "total_cost": 0.29430261876710484,
+      "total_funding_pnl": 0.7413143909600344,
+      "total_return": -0.021922699690422598
+    },
+    "n_universe_symbols": 430,
+    "schema": 1,
+    "team_id": "team-01",
+    "window": {
+      "hi_exclusive": "2026-07-01",
+      "lo": "2024-07-01"
+    }
+  }
+]

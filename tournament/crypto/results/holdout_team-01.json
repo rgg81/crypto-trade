@@ -1,0 +1,34 @@
+{
+  "config": {
+    "apply_funding": true,
+    "cost_mult": 1.0,
+    "slip_mult": 1.0
+  },
+  "is_replay_identical": true,
+  "label": "canonical",
+  "metrics": {
+    "ann_turnover": 241.50473356850296,
+    "maxdd": -0.3893653415217043,
+    "mean_gross": 0.9999999907564059,
+    "mean_net": -0.018693251850569075,
+    "median_names_long": 20.0,
+    "median_names_short": 20.0,
+    "n_months": 24,
+    "regime_sharpe": {
+      "bear": NaN,
+      "bull": NaN,
+      "chop": NaN
+    },
+    "sharpe": 0.15237406433599918,
+    "total_cost": 0.29430261876710484,
+    "total_funding_pnl": 0.7413143909600344,
+    "total_return": -0.021922699690422598
+  },
+  "n_universe_symbols": 430,
+  "schema": 1,
+  "team_id": "team-01",
+  "window": {
+    "hi_exclusive": "2026-07-01",
+    "lo": "2024-07-01"
+  }
+}
