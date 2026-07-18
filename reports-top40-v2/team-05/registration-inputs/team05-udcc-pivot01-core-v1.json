@@ -1,0 +1,51 @@
+{
+  "timestamp_utc": "2026-07-18T11:10:51Z",
+  "team_id": "team-05",
+  "family_id": "team05-up-down-capture-convexity-v1",
+  "candidate_id": "team05-udcc-pivot01-core-v1",
+  "strategy_sha256": "bff8d9cb65aa445c926decbab45da4f73f229ae744e55c5fd81f0a36e06a234a",
+  "source_bundle_sha256": "63c8782a70bc5eb990440abba91b7a8add53e225ece1544b353eef170e55275a",
+  "risk_config_sha256": "2a56f21940baa886f603c635ea53ca39778869577dd35bc53f1c754bf4c2794e",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "parameters": {
+    "_top40_v2_score_adapter": {
+      "adapter_id": "top40-v2-declared-score-boundary-v1",
+      "manifest_sha256": "f2f2df8e8902e78cba5360544c197ebd8693332701aa1b7f701f05659350976c",
+      "schema_version": 1
+    },
+    "_top40_v2_runtime_authority": {
+      "active_entrypoint_path": "scripts/top40_v2_tournament_runtime_preload_v7.py",
+      "active_entrypoint_sha256": "8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9",
+      "amendment_id": "top40-v2-amendment-0007-frozen-worker-a5-protocol-preload",
+      "integration_freeze_commit": "c8b917ca49306d5200a4e08848e73ff6f5a18bf3",
+      "integration_freeze_path": "tournament/top40-v2/amendments/0007/integration-freeze.json",
+      "integration_freeze_sha256": "6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51"
+    },
+    "algorithm_id": "team05-udcc-v1",
+    "rebalance_anchor_utc": "1970-01-01T00:00:00Z",
+    "bar_interval_hours": 8,
+    "decision_interval_hours": 168,
+    "price_count": 253,
+    "maximum_latest_staleness_hours": 12,
+    "minimum_symbols": 12,
+    "minimum_up_observations": 63,
+    "minimum_down_observations": 63,
+    "minimum_beta_denominator": 1e-8,
+    "maximum_abs_beta": 5.0,
+    "minimum_score_span": 0.5,
+    "selection_fraction": 0.2,
+    "minimum_side_symbols": 5,
+    "maximum_side_symbols": 8,
+    "minimum_up_capture_separation": 0.1,
+    "minimum_down_capture_separation": 0.1,
+    "target_gross": 0.48,
+    "maximum_symbol_weight": 0.05,
+    "maximum_abs_net": 1e-12,
+    "risk_policy": "risk_policy.json byte-identical to risk_policies/no-control.json",
+    "evaluator_cost_outputs": [1.0, 2.0],
+    "fold_plan": "walk_forward_plan.json"
+  },
+  "seed": 20260801,
+  "thesis": "Structural upside-minus-downside common-tape capture asymmetry should create a balanced convex-minus-concave native-crypto spread with positive bull-long, bear-short, and chop-combined roles.",
+  "falsifier": "Reject this exact no-control core and the UDCC family on insolvency, missing evidence, or any failed causality, A5, A6, return, Sharpe, annual-return, doubled-cost, drawdown, Calmar, quarter, fold, confidence, regime, role, sleeve, concentration, conditional-common-tape, or score-IC gate in qualification_thresholds.json. Controls, ablations, sign flips, neighbors, and same-family replacements cannot rescue failure."
+}
