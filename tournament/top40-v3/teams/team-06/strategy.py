@@ -59,23 +59,37 @@ def _log_close_history(
 ) -> pd.Series:
     if not {"open_time", "close"}.issubset(frame.columns):
         return pd.Series(dtype=float)
-    times = pd.to_datetime(frame["open_time"], utc=True, errors="coerce")
     interval = pd.Timedelta(hours=parameters.interval_hours)
-    complete = times.notna() & ((times + interval) <= decision_time)
-    if not bool(complete.any()):
+    required_closes = max(
+        parameters.slow_horizon_bars + 1,
+        parameters.volatility_return_bars + 1,
+    )
+    end = decision_time - interval
+    start = end - (required_closes - 1) * interval
+
+    # Worker histories are strictly increasing append-only DatetimeTZ streams. Locate the exact
+    # fixed window before numeric conversion so replay work does not grow with accumulated data.
+    raw_times = frame["open_time"]
+    if isinstance(raw_times.dtype, pd.DatetimeTZDtype):
+        left = int(raw_times.searchsorted(start, side="left"))
+        right = int(raw_times.searchsorted(end, side="right"))
+        candidate = frame.iloc[left:right]
+        times = pd.to_datetime(candidate["open_time"], utc=True, errors="coerce")
+    else:
+        all_times = pd.to_datetime(raw_times, utc=True, errors="coerce")
+        in_window = all_times.notna() & all_times.between(start, end, inclusive="both")
+        candidate = frame.loc[in_window]
+        times = all_times.loc[in_window]
+    if candidate.empty:
         return pd.Series(dtype=float)
-    data = frame.loc[complete, ["open_time", "close"]].copy()
-    data["open_time"] = times.loc[complete]
+    data = candidate.loc[:, ["open_time", "close"]].copy()
+    data["open_time"] = times
     data["close"] = pd.to_numeric(data["close"], errors="coerce")
     finite = np.isfinite(data["close"].to_numpy(dtype=float)) & (data["close"] > 0.0)
     data = (
         data.loc[finite]
         .sort_values("open_time", kind="mergesort")
         .drop_duplicates("open_time", keep="last")
-    )
-    required_closes = max(
-        parameters.slow_horizon_bars + 1,
-        parameters.volatility_return_bars + 1,
     )
     expected = pd.date_range(
         end=decision_time - interval,
