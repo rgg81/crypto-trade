@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "team_id": "team-05",
+  "family_id": "team05-up-down-capture-convexity-v1",
+  "parent_family_id": "team05-causal-residual-trend-reversal-v1",
+  "registered_at_utc": "2026-07-18T11:08:25Z",
+  "mechanism": "On a 168-hour Unix-epoch schedule, form 252 contemporaneous eight-hour return pairs from exactly 253 past-closed prices for each A6-eligible native-crypto contract. At each timestamp use the cross-sectional median return as the common tape. Estimate separate conditional slopes on positive and negative common-tape bars, average-rank each slope, and set final long desirability to 0.50 times upside-capture rank minus downside-capture rank. Expose that complete finite score dictionary once to A5, then select equal-weight top and bottom sleeves in an exactly dollar-balanced 0.48-gross book.",
+  "economic_thesis": "Deep, broadly held and collateral-useful native crypto assets can capture more of common market advances while transmitting less of common declines, whereas fragile leverage-sensitive assets can exhibit the opposite asymmetry. A convex-minus-concave spread can therefore support long-bull, short-bear, and alternating-move chop roles without predicting the sign of the next market move.",
+  "expected_regime_roles": {
+    "bull": "High-upside-capture, low-downside-capture contracts populate the long sleeve and should earn more of broad advances than the short sleeve surrenders.",
+    "bear": "High-downside-capture fragile contracts populate the short sleeve while resilient long contracts should lose less.",
+    "chop": "Repeated positive and negative common-tape moves should repeatedly favor the same convex-minus-concave spread without a directional forecast.",
+    "stress": "No crisis-alpha claim is made beyond measured downside-capture separation; broad equal sleeves, exact dollar balance, 0.48 gross, and 5% caps limit concentration without an optional risk overlay.",
+    "long_sleeve": "Top A5-returned scores with both higher median upside capture and lower median downside capture than the selected shorts; required to contribute positively in bull.",
+    "short_sleeve": "Bottom A5-returned scores with both lower median upside capture and higher median downside capture than the selected longs; required to contribute positively in bear."
+  },
+  "falsifier": "Reject the exact no-control UDCC core if it is insolvent, lacks required evidence, or fails any causality, A5, A6, return, Sharpe, cost, drawdown, Calmar, quarter, fold, trial-adjusted-confidence, regime, role, sleeve, concentration, conditional-common-tape, or score-IC gate in qualification_thresholds.json. Controls, sign flips, neighbors, and same-family replacements cannot rescue failure.",
+  "parameter_ranges": {
+    "bar_interval_hours": [8],
+    "decision_interval_hours": [168],
+    "price_count": [253],
+    "maximum_latest_staleness_hours": [12],
+    "minimum_symbols": [12],
+    "minimum_up_observations": [63],
+    "minimum_down_observations": [63],
+    "minimum_beta_denominator": [1e-8],
+    "maximum_abs_beta": [5.0],
+    "minimum_score_span": [0.5],
+    "selection_fraction": [0.2],
+    "minimum_side_symbols": [5],
+    "maximum_side_symbols": [8],
+    "minimum_up_capture_separation": [0.1],
+    "minimum_down_capture_separation": [0.1],
+    "target_gross": [0.48],
+    "maximum_symbol_weight": [0.05]
+  },
+  "selection_metric": "No within-family selection occurs: one exact no-control core is eligible only if every noncompensatory development, A5, regime, role, sleeve, concentration, and UDCC mechanism gate passes.",
+  "risk_policy_plan": "Root risk_policy.json is byte-identical to risk_policies/no-control.json. No volatility target, drawdown brake, position or time stop, turnover control, side scaling, combined policy, ablation, parameter neighbor, or sign flip is authorized before or after the result."
+}

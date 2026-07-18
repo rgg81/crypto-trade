@@ -52,7 +52,7 @@
   "critic_lock": null,
   "final_oos_lock": null,
   "finalist_cohort_lock": null,
-  "legacy_projection_sha256": "32c582757557ed1f9b6c90b04839fab601949acf6564647e2f74db3e249eb9be",
+  "legacy_projection_sha256": "9284f9bc301c7bc10491b2e5d57fdd47e83e049b5effadfa83d3f843e78532cc",
   "legacy_state_sha256": "8c858495fde6ddde203124a055e40ebad5d8d5a684cd20f0e55f6c88f7360b07",
   "objective_lock": null,
   "organizer_audit": {
@@ -158,13 +158,13 @@
       "trial_count": 3
     },
     "team-05": {
-      "active_family_id": "team05-causal-residual-trend-reversal-v1",
+      "active_family_id": "team05-up-down-capture-convexity-v1",
       "canonical_result": null,
       "development_assessment": null,
       "dnf": null,
-      "family_count": 1,
+      "family_count": 2,
       "finalist_freeze": null,
-      "pivot_count": 0,
+      "pivot_count": 1,
       "private_attempts": 0,
       "private_result": null,
       "qualifier_candidate": null,
