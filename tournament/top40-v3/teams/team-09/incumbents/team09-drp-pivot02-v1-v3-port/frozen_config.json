@@ -1,0 +1,50 @@
+{
+  "artifact": "grandfathered_incumbent_port_config",
+  "candidate_id": "team09-drp-pivot02-v1-v3-port",
+  "candidate_status": "grandfathered_incumbent_not_yet_evaluated",
+  "family_id": "team09-defensive-residual-persistence-v1",
+  "team_id": "team-09",
+  "schema_version": 1,
+  "seed": 20260718,
+  "implementation": {
+    "entrypoint": "strategy.py",
+    "build_factory": "build_strategy",
+    "stateful": false,
+    "score_boundary_hook": "score_adapter_identity.py"
+  },
+  "risk_policy": {
+    "path": "risk_policy.json",
+    "policy_id": "team09-risk-none"
+  },
+  "v2_parent": {
+    "candidate_id": "team09-drp-pivot02-v1",
+    "commit": "c1c8eb2ec3003c86ef25f64edd0b9bccf3ed41ea",
+    "strategy_sha256": "c99529728368c9eda6a0ae92a676885e894d0f607053e3efa21a6d5a41445b15",
+    "frozen_config_sha256": "dcc37167524f5b0ccecb4b9172cbe46266f223cd6d984633349c01b1ca02c563",
+    "risk_policy_sha256": "f75a2e05cda7ba87a865527f7c95c03a734c1398e8be251f50074ad00163875e",
+    "source_bundle_sha256": "7a1ea138fbfc414d674a27d07931095c694d28a114f123cce940c94ec966a26b",
+    "executable_source_manifest": "tournament/top40-v2/teams/team-09/score-adapters/team09-drp-pivot02-v1.executable-source-manifest.json"
+  },
+  "port_changes": [
+    "canonical runtime seed changed from 20260801 to 20260718",
+    "V2 organizer score hook import replaced by a candidate-local exact identity hook",
+    "score adapter identifier relabeled for the V3 candidate-local hook"
+  ],
+  "parameters": {
+    "interval_hours": 8,
+    "rebalance_every_bars": 9,
+    "persistence_block_count": 3,
+    "persistence_block_bars": 90,
+    "fragility_bars": 90,
+    "minimum_cross_section": 20,
+    "fragility_exclusion_quantile": 0.8,
+    "downside_semideviation_weight": 0.4,
+    "jump_risk_weight": 0.35,
+    "drawdown_weight": 0.25,
+    "fragility_shrink_strength": 0.6,
+    "minimum_symbols_per_side": 6,
+    "maximum_symbols_per_side": 8,
+    "target_side_gross": 0.1,
+    "maximum_symbol_weight": 0.015
+  }
+}

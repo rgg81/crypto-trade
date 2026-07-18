@@ -1,0 +1,298 @@
+schema_version = 3
+name = "quant-portfolio-blind-top40-v3"
+policy_status = "active"
+charter_path = "TOURNAMENT-CHARTER-TOP40-V3.md"
+teams = [
+  "team-01", "team-02", "team-03", "team-04", "team-05",
+  "team-06", "team-07", "team-08", "team-09", "team-10",
+]
+
+[lifecycle]
+v2_is_immutable = true
+inherit_v2_state = false
+reuse_snapshot_read_only = true
+active_entrypoint = "scripts/top40_v3_tournament.py"
+schedule_authority = "tournament/top40-v3/phase0-freeze.json#config-splits-labs-seeds"
+
+[paths]
+tournament_root = "tournament/top40-v3"
+reports_root = "reports-top40-v3"
+team_root = "tournament/top40-v3/teams"
+lab_reports_root = "reports-top40-v3/labs"
+organizer_lab_journal = "tournament/top40-v3/organizer-lab-journal.jsonl"
+validation_probe_journal = "tournament/top40-v3/validation-probe-journal.jsonl"
+nomination_registry = "tournament/top40-v3/nomination-registry.jsonl"
+stage_transition_journal = "tournament/top40-v3/stage-transitions.jsonl"
+result_root = "reports-top40-v3/results"
+snapshot_dir = "data/top40/snapshot-v1"
+shared_snapshot_manifest = "tournament/top40/data_manifest.json"
+
+[data]
+source = "binance-public-usdm"
+venue = "binance-usdm"
+instrument = "linear-usdt-perpetual"
+transaction_interval = "8h"
+mark_price_interval = "1h"
+warmup_start = "2020-01-01T00:00:00Z"
+hard_end_exclusive = "2026-07-01T00:00:00Z"
+checksum_policy = "require-frozen-sha256-authority"
+parser_version = "top40-snapshot-v1"
+
+[splits.train]
+start = "2020-02-03T00:00:00Z"
+end_exclusive = "2022-07-01T00:00:00Z"
+raw_data_visible_to_teams = true
+feedback = "full-standardized-metric-packet"
+
+[splits.validation]
+start = "2022-07-01T00:00:00Z"
+end_exclusive = "2023-07-01T00:00:00Z"
+raw_data_visible_to_teams = false
+feedback = "fixed-aggregate-packet-only"
+
+[splits.private]
+start = "2023-07-01T00:00:00Z"
+end_exclusive = "2024-07-01T00:00:00Z"
+raw_data_visible_to_teams = false
+feedback = "single-gate-decision-after-public-selection"
+
+[splits.final_oos]
+start = "2024-07-01T00:00:00Z"
+end_exclusive = "2026-07-01T00:00:00Z"
+raw_data_visible_to_teams = false
+feedback = "one-simultaneous-final-reveal"
+
+[universe]
+size = 40
+reconstitution = "weekly-monday-00:00-utc"
+liquidity_measure = "frozen-median-daily-quote-volume"
+trailing_days = 30
+minimum_history_days = 30
+membership_path = "data/top40/snapshot-v1/membership.parquet"
+eligibility_mode = "fail-closed-a6-native-crypto"
+allowed_economic_exposure = "native-crypto-only"
+forbidden_exposures = [
+  "stablecoin", "leveraged-token", "tokenized-metal", "tokenized-commodity",
+  "direct-metal", "direct-commodity", "equity", "stock", "etf", "index",
+  "forex", "fx", "premarket", "tradfi",
+]
+unknown_classification_is_ineligible = true
+
+[universe.a6_authority]
+policy_id = "top40-v2-pure-crypto-usdt-perpetual-v1"
+policy_sha256 = "2c7fb0ff593d06c323517e60df4b28ab9387a2df580b83f82f65ef71c91fc350"
+audit_module_path = "src/crypto_trade/tournament/pure_crypto_universe_v6.py"
+audit_module_sha256 = "fc93c0f26dcbf6304abe028736693ab2bee7430a56c14a8547defff472008192"
+audit_dependency_path = "src/crypto_trade/tournament/amendment_integrity_v2.py"
+audit_dependency_sha256 = "e3a4f60aa955ebcf461026527da5b6b28b87e9e7ec057dd2e10a1e884612a8ab"
+audit_report_sha256 = "b9c55b40fef331861af068272159f45860870182a58c93652eff2a819b3d5d1b"
+data_manifest_path = "tournament/top40/data_manifest.json"
+data_manifest_sha256 = "077eb036d262befec80f7013084fe6906859f7c3bbe2f8c193c9d9ec68e367c3"
+membership_sha256 = "f51c9eb207c1da51cc4b9ff6045bb5e914828015b5c9c214f0e2673cd868eb14"
+contract_metadata_sha256 = "0995d50011e73de880358b994031fdf8bb58e75ab8901de2c5601e7abed05243"
+exchange_info_sha256 = "aab4219452e61cfa5e135518ed182c98fd7e527d13bc240e891bb6b550deeb64"
+required_before_and_after_every_result_command = true
+expected_contract_metadata_symbols = 667
+expected_distinct_membership_symbols = 321
+expected_membership_rows = 12866
+expected_violations = 0
+expected_audit_status = "passed"
+
+[execution]
+base_interval = "8h"
+initial_equity_usdt = 100000.0
+taker_fee_bps_per_side = 5.0
+slippage_bps_per_side = 2.5
+max_gross_exposure = 1.0
+max_abs_net_exposure = 0.25
+max_symbol_exposure = 0.10
+max_bar_participation = 0.001
+double_cost_multiplier = 2.0
+annualization_days = 365
+fill_timing = "next-executable-open"
+funding_at_rebalance_order = "funding-on-carried-position-then-rebalance"
+
+[regimes]
+names = ["bull", "bear", "chop", "stress"]
+source = "frozen-lagged-btc-regimes"
+stress_trailing_days = 30
+stress_annualized_btc_vol = 0.80
+direction_trailing_days = 60
+bull_btc_return = 0.10
+bear_btc_return = -0.10
+lag_days = 1
+positive_sharpe_comparison = "strictly-greater-than-zero"
+
+[statistics]
+bootstrap_samples = 2000
+bootstrap_block_days = 10
+bootstrap_seed = 20260718
+maximum_drawdown_is_positive_magnitude = true
+trade_count_definition = "nonzero-executed-symbol-boundary-fills-after-evaluator-netting"
+funding_counts_as_trade = false
+
+[labs]
+train_run_limit = "unbounded-but-fully-logged"
+strategy_seed = 20260718
+append_before_metric_release = true
+log_success_failure_and_abort = true
+exact_train_replay_mode = "not-activated-every-invocation-counts-as-material-trial"
+journal_is_append_only = true
+material_trial_counter_never_resets = true
+full_standardized_metric_packet = true
+
+[labs.required_journal_bindings]
+fields = [
+  "schema_version", "event_sequence", "previous_sha256", "record_sha256", "event_type",
+  "team_id", "run_sequence", "run_id", "candidate_id", "parent_candidate_id", "purpose",
+  "accepted_at_utc", "source_bundle_sha256", "source_archive_path", "source_archive_sha256",
+  "strategy_sha256", "dependency_lock_sha256",
+  "config_sha256", "risk_policy_sha256", "data_authority_sha256", "evaluator_sha256", "seed",
+  "material_parameters", "train_window", "cost_model", "output_path",
+  "cumulative_material_trial_count", "request_sha256", "completed_at_utc", "cpu_seconds",
+  "wall_seconds", "gate_vector", "metric_packet_sha256", "artifact_hashes", "failure_reason",
+]
+
+[validation]
+maximum_opening_probes_per_team = 3
+maximum_comeback_probes_per_eligible_team = 2
+maximum_total_probes_when_comeback_triggers = 5
+counter_is_organizer_owned_append_only = true
+counter_consumed_on_accepted_request = true
+counter_reset_on_failure_crash_withdrawal_or_comeback = false
+candidate_must_be_hash_frozen_before_probe = true
+raw_rows_returns_positions_trades_targets_and_regime_dates_released = false
+interactive_queries_allowed = false
+fixed_aggregate_packet_only = true
+changed_candidate_requires_new_probe = true
+exact_organizer_replay_may_verify_without_new_disclosure = true
+
+[candidate]
+risk_controls_may_be_developed_before_lock = true
+full_system_must_be_frozen_at_probe = true
+maximum_formal_nominees_per_team = 1
+nominee_must_exactly_match_a_probed_candidate = true
+nominee_must_pass_public_core = true
+withdrawal_restores_nomination_slot = false
+post_lock_changes_allowed = false
+
+[candidate.readiness]
+hard_gates_must_pass_on_train_and_validation = true
+minimum_train_net_sharpe_exclusive = 0.0
+minimum_train_annualized_return_exclusive = 0.0
+minimum_train_double_cost_sharpe_exclusive = 0.0
+minimum_validation_net_sharpe_exclusive = 0.0
+minimum_validation_annualized_return_exclusive = 0.0
+minimum_validation_double_cost_sharpe_exclusive = 0.0
+missing_nonfinite_incomplete_or_dnf_is_ineligible = true
+
+[hard_gates]
+veto = true
+required = [
+  "integrity-and-deterministic-reproducibility",
+  "frozen-data-and-a6-native-crypto-universe",
+  "causality-and-future-corruption-invariance",
+  "frozen-execution-contract",
+  "solvency-reconciliation-and-window-completeness",
+]
+missing_gate_is_failure = true
+
+[qualification.public]
+record = "deterministic-concatenation-of-train-and-validation-scored-returns-before-lock"
+report_train_and_validation_separately = true
+hard_gates_run_before_performance = true
+all_core_floors_required = true
+
+[qualification.public.core]
+minimum_net_sharpe_inclusive = 0.75
+minimum_annualized_return_exclusive = 0.0
+maximum_drawdown_inclusive = 0.30
+minimum_double_cost_sharpe_inclusive = 0.35
+minimum_positive_quarter_fraction_inclusive = 0.50
+minimum_executed_trades_inclusive = 1000
+minimum_positive_regime_count_inclusive = 2
+regime_count = 4
+minimum_worst_regime_sharpe_inclusive = -0.75
+missing_or_nonfinite_is_failure = true
+
+[ranking.robustness]
+eligible_population = "public-core-passers-only"
+range_min = 0.0
+range_max = 100.0
+clamp = "C(x)=min(1,max(0,x))"
+formula = "25*C((net_sharpe-0.75)/0.75) + 15*C(annualized_return/0.30) + 15*C((0.30-max_drawdown)/0.20) + 15*C((double_cost_sharpe-0.35)/0.65) + 15*C((positive_quarter_fraction-0.50)/0.25) + 10*(positive_regime_count/4) + 5*C((worst_regime_sharpe+0.75)/1.50)"
+score_is_additional_veto = false
+sort = "descending-unrounded-score"
+advance_count = 4
+advance_all_when_fewer = true
+tie_breaks = [
+  "lower-max-drawdown", "higher-double-cost-sharpe",
+  "higher-worst-regime-sharpe", "lexicographically-smaller-team-id",
+]
+
+[diagnostics]
+computed_scored_and_disclosed = true
+veto = false
+affects_public_core = false
+affects_robustness_rank = false
+affects_private_gate = false
+normalization_rubric_must_be_hash_frozen_before_first_lab = true
+components = [
+  "role-and-sign-agreement", "fold-and-walk-forward-consistency",
+  "information-coefficient-level-sign-and-decay", "trial-adjusted-confidence",
+  "parameter-neighborhood-stability", "position-sleeve-sector-and-return-concentration",
+]
+component_weights = [15.0, 20.0, 15.0, 20.0, 15.0, 15.0]
+total_points = 100.0
+
+[comeback]
+trigger_checkpoint = "after-ordinary-probes-before-formal-nomination-lock"
+trigger_when_public_core_qualifying_teams_below = 3
+maximum_rounds = 1
+eligible_teams = "teams-without-a-readiness-eligible-public-core-passer"
+allows_additional_fully_logged_train_runs = true
+validation_probe_opening_cap_unchanged = true
+grants_additional_validation_probes = 2
+trial_counter_resets = false
+grants_second_nominee = false
+lowers_or_changes_floors_costs_windows_gates_or_ranking = false
+access_to_private_or_final_data = false
+
+[qualification.private]
+runs_per_advancing_nominee = 1
+hard_integrity_data_causality_execution_solvency_gates_required = true
+minimum_net_sharpe_exclusive = 0.0
+minimum_annualized_return_exclusive = 0.0
+minimum_double_cost_sharpe_exclusive = 0.0
+maximum_drawdown_inclusive = 0.35
+annualized_return_is_veto = true
+trade_count_is_veto = false
+positive_quarter_fraction_is_veto = false
+per_regime_metrics_are_veto = false
+repair_replacement_or_fallthrough_allowed = false
+
+[final_oos]
+observations_per_finalist = 1
+simultaneous_complete_release = true
+interim_disclosure_allowed = false
+repair_or_replacement_allowed = false
+exact_nondisclosing_replay_for_infrastructure_verification = true
+leaderboard_formula = "ranking.robustness.formula-on-final-oos-only"
+public_core_thresholds_are_reference_flags_not_final_vetoes = true
+no_finalists_outcome = "no-qualified-finalist"
+
+[integrity]
+all_registries_and_journals_append_only = true
+all_stage_transitions_hash_bound = true
+all_disclosures_attributable_to_organizer_event = true
+missing_output_is_submission = false
+dnf_is_submission = false
+rounding_may_change_gate_or_rank = false
+
+[activation]
+run_evaluators_now = true
+requires_independent_implementation_review = true
+requires_hash_frozen_metric_schema = true
+requires_hash_frozen_diagnostic_rubric = true
+requires_hash_frozen_schedule_and_seeds = true
+requires_v3_only_active_entrypoint = true

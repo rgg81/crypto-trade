@@ -1,0 +1,50 @@
+{
+  "artifact": "grandfathered_incumbent_port_config",
+  "candidate_id": "t07-two-tape-rank-durability-v1-base-v3-port",
+  "candidate_status": "grandfathered_incumbent_not_yet_evaluated",
+  "family_id": "t07-two-tape-rank-durability-v1",
+  "team_id": "team-07",
+  "schema_version": 1,
+  "seed": 20260718,
+  "implementation": {
+    "entrypoint": "strategy.py",
+    "build_factory": "build_strategy",
+    "stateful": false,
+    "candidate_variant": "candidate_variant.py",
+    "score_boundary_hook": "score_adapter_identity.py"
+  },
+  "risk_policy": {
+    "path": "risk_policy.json",
+    "policy_id": "team-07-no-control"
+  },
+  "v2_parent": {
+    "candidate_id": "t07-two-tape-rank-durability-v1-base",
+    "commit": "be5bd81b68b8da424b1e8aae531183446eeaa555",
+    "strategy_sha256": "bb5b45c3c0de5846463bc8b3164a5921a319ee5a17663ad93b3b6cc7e2224506",
+    "candidate_variant_sha256": "7aaed418826d38667e44ff26bdd73a4658bb329b02e0f379ab46218cdc8f80c8",
+    "frozen_config_sha256": "10859e9a405ecccccab3712eb0db362f060a8cc0e8fbc473817c029ac3b40bb5",
+    "risk_policy_sha256": "d3b918f600f2b548b6a2c8dc44a3077b7b34d8c911ecc6e9c776eada8ad77b6c",
+    "source_bundle_sha256": "119981c805c575a42b7fb2bf36885e4c2310311e848871cb5676a3eea887439b",
+    "executable_source_manifest": "tournament/top40-v2/teams/team-07/score-adapters/t07-two-tape-rank-durability-v1-base.executable-source-manifest.json"
+  },
+  "port_changes": [
+    "canonical runtime seed changed from 20260801 to 20260718",
+    "V2 organizer score hook import replaced by a candidate-local exact identity hook"
+  ],
+  "parameters": {
+    "bar_interval_hours": 8,
+    "rebalance_interval_bars": 21,
+    "history_return_bars": 126,
+    "time_block_count": 3,
+    "time_block_bars": 42,
+    "minimum_tape_bars": 18,
+    "minimum_valid_symbols": 24,
+    "minimum_positions_per_side": 8,
+    "selected_fraction_per_side": "1/5",
+    "gross_target": 0.36,
+    "maximum_symbol_exposure": 0.025,
+    "tape_core_weight": 0.7,
+    "block_core_weight": 0.3,
+    "cross_tape_disagreement_shrink": 0.15
+  }
+}

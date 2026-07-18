@@ -1,0 +1,75 @@
+{
+  "artifact": "frozen_reference_config",
+  "candidate_id": "t09-settled-funding-carry-continuous-overlay-v2",
+  "candidate_status": "transparent_baseline_not_yet_evaluated",
+  "data_contract": {
+    "allowed_bar_fields": [
+      "open_time",
+      "close"
+    ],
+    "allowed_funding_fields": [
+      "funding_time",
+      "funding_rate",
+      "symbol"
+    ],
+    "eligible_symbols": "exact_context_membership_only",
+    "external_data": false,
+    "funding_interval_source": "inferred_from_strictly_past_settled_timestamps"
+  },
+  "dependencies": {
+    "numpy": "2.2.6",
+    "pandas": "3.0.0",
+    "python": "3.13.12"
+  },
+  "execution_contract": {
+    "bar_interval": "8h",
+    "funding_availability": "funding_time-strictly-before-decision",
+    "insufficient_or_stale_history": "flat_empty_mapping",
+    "non_rebalance_request": "hold_none",
+    "rebalance_boundary_utc": "daily-00:00",
+    "target_execution": "organizer_owned_next_executable_open"
+  },
+  "family_id": "t09-funding-carry-crash-confirmation-v2",
+  "implementation": {
+    "build_factory": "build_strategy",
+    "entrypoint": "strategy.py",
+    "stateful": false
+  },
+  "parameters": {
+    "decision_hour_utc": 0,
+    "funding_window_long_days": 28,
+    "funding_window_medium_days": 14,
+    "funding_window_short_days": 7,
+    "interval_hours": 8,
+    "long_collapse_maximum_discount": 0.25,
+    "long_collapse_nine_bar_scale": 0.08,
+    "long_collapse_three_bar_scale": 0.05,
+    "long_window_weight": 0.2,
+    "maximum_abs_funding_rate": 0.01,
+    "maximum_abs_net": 0.05,
+    "maximum_funding_staleness_hours": 12.0,
+    "maximum_gap_multiple": 2.5,
+    "maximum_interval_hours": 24.0,
+    "maximum_symbol_weight": 0.03,
+    "medium_window_weight": 0.3,
+    "minimum_event_coverage": 0.75,
+    "minimum_expected_daily_carry": 1e-10,
+    "minimum_interval_hours": 1.0,
+    "minimum_positions_per_side": 8,
+    "minimum_valid_symbols": 20,
+    "price_return_bars": 9,
+    "selected_fraction_per_side": 0.25,
+    "short_crowding_overlay_strength": 0.5,
+    "short_weakness_nine_bar_scale": 0.08,
+    "short_weakness_three_bar_scale": 0.04,
+    "short_window_weight": 0.5,
+    "target_side_gross": 0.16
+  },
+  "risk_policy": {
+    "path": "risk_policy.json",
+    "policy_id": "team-09-v3-controlled"
+  },
+  "schema_version": 1,
+  "seed": 20260718,
+  "team_id": "team-09"
+}

@@ -1,0 +1,64 @@
+{
+  "artifact": "frozen_reference_config",
+  "candidate_id": "t05-dynamic-cointegration-beta-hedged-v2",
+  "candidate_status": "transparent_baseline_not_yet_evaluated",
+  "data_contract": {
+    "allowed_bar_fields": [
+      "open_time",
+      "close"
+    ],
+    "eligible_symbols": "exact_context_membership_only",
+    "external_data": false,
+    "funding_used_by_signal": false
+  },
+  "dependencies": {
+    "numpy": "2.2.6",
+    "pandas": "3.0.0",
+    "python": "3.13.12"
+  },
+  "execution_contract": {
+    "bar_interval": "8h",
+    "extreme_spread_handling": "maximum_abs_z-is-winsorized-sizing-cap-not-entry-veto",
+    "insufficient_scheduled_history": "flat_empty_mapping",
+    "non_rebalance_request": "hold_none",
+    "rebalance_boundary_utc": "weekly-monday-00:00",
+    "target_execution": "organizer_owned_next_executable_open"
+  },
+  "family_id": "t05-dynamic-cointegration-convergence-v2",
+  "implementation": {
+    "build_factory": "build_strategy",
+    "entrypoint": "strategy.py",
+    "stateful": false
+  },
+  "parameters": {
+    "ar1_maximum": 0.985,
+    "ar1_minimum": 0.1,
+    "beta_maximum": 4.0,
+    "beta_minimum": 0.25,
+    "correlation_return_bars": 126,
+    "decision_hour_utc": 0,
+    "decision_weekday_utc": 0,
+    "entry_z": 1.5,
+    "formation_bars": 252,
+    "interval_hours": 8,
+    "maximum_abs_net": 0.05,
+    "maximum_abs_z": 5.0,
+    "maximum_half_life_bars": 42.0,
+    "maximum_symbol_weight": 0.03,
+    "minimum_active_per_side": 2,
+    "minimum_correlation": 0.65,
+    "minimum_half_life_bars": 1.0,
+    "minimum_valid_symbols": 8,
+    "minimum_zero_crossings": 6,
+    "neighbors_per_symbol": 2,
+    "spread_scale_bars": 63,
+    "target_side_gross": 0.2
+  },
+  "risk_policy": {
+    "path": "risk_policy.json",
+    "policy_id": "team-05-v3-controlled"
+  },
+  "schema_version": 1,
+  "seed": 20260718,
+  "team_id": "team-05"
+}

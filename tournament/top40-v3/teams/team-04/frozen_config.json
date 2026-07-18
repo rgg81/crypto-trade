@@ -1,0 +1,60 @@
+{
+  "artifact": "frozen_reference_config",
+  "candidate_id": "t04-downside-net-lottery-126-v1",
+  "candidate_status": "transparent_baseline_not_yet_evaluated",
+  "data_contract": {
+    "allowed_bar_fields": [
+      "open_time",
+      "close",
+      "quote_volume"
+    ],
+    "eligible_symbols": "exact_context_membership_only",
+    "external_data": false,
+    "funding_used_by_signal": false
+  },
+  "dependencies": {
+    "numpy": "2.2.6",
+    "pandas": "3.0.0",
+    "python": "3.13.12"
+  },
+  "execution_contract": {
+    "bar_interval": "8h",
+    "insufficient_scheduled_history": "flat_empty_mapping",
+    "non_rebalance_request": "hold_none",
+    "rebalance_boundary_utc": "weekly-monday-00:00",
+    "target_execution": "organizer_owned_next_executable_open"
+  },
+  "family_id": "t04-compensated-downside-net-lottery-risk-v1",
+  "implementation": {
+    "build_factory": "build_strategy",
+    "entrypoint": "strategy.py",
+    "stateful": false
+  },
+  "parameters": {
+    "decision_hour_utc": 0,
+    "decision_weekday_utc": 0,
+    "downside_rank_weight": 1.0,
+    "interval_hours": 8,
+    "lookback_bars": 126,
+    "lottery_rank_weight": 0.75,
+    "maximum_abs_beta": 2.5,
+    "maximum_abs_net": 0.05,
+    "maximum_symbol_weight": 0.03,
+    "minimum_market_variance": 1e-12,
+    "minimum_median_quote_volume": 1000000.0,
+    "minimum_positions_per_side": 8,
+    "minimum_positive_volume_fraction": 0.9,
+    "minimum_valid_symbols": 24,
+    "positive_jump_mad_threshold": 1.5,
+    "selected_fraction_per_side": 0.3,
+    "total_gross": 0.36,
+    "winsor_mad_multiplier": 5.0
+  },
+  "risk_policy": {
+    "path": "risk_policy.json",
+    "policy_id": "team-04-v3-controlled"
+  },
+  "schema_version": 1,
+  "seed": 20260718,
+  "team_id": "team-04"
+}

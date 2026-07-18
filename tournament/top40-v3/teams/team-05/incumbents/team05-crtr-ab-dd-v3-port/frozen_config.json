@@ -1,0 +1,61 @@
+{
+  "artifact": "grandfathered_incumbent_port_config",
+  "candidate_id": "team05-crtr-ab-dd-v3-port",
+  "candidate_status": "grandfathered_incumbent_not_yet_evaluated",
+  "family_id": "team05-causal-residual-trend-reversal-v1",
+  "team_id": "team-05",
+  "schema_version": 1,
+  "seed": 20260718,
+  "implementation": {
+    "entrypoint": "strategy.py",
+    "build_factory": "build_strategy",
+    "stateful": false,
+    "candidate_variant": "candidate_variant.py",
+    "score_boundary_hook": "score_adapter_identity.py"
+  },
+  "risk_policy": {
+    "path": "risk_policy.json",
+    "policy_id": "team-05-crtr-drawdown-only-v1"
+  },
+  "v2_parent": {
+    "candidate_id": "team05-crtr-ab-dd",
+    "commit": "0aac6cedab60e49dfbfd4c4e5ecee53771b3a95f",
+    "strategy_sha256": "4188181fbf28f805c9df0c11e5eb0244235aedc7938f5beb27d3614b86dc58c0",
+    "candidate_variant_sha256": "5e8ba32d457ae777eae3b4ba67ab2ec89cc4ed88e2a365824a4de07ecf2fb6d4",
+    "frozen_config_sha256": "d7247dad2a78f932e85a4014d8045135279e324dc0417ba94a34537a6f3ab7a8",
+    "risk_policy_sha256": "bec52447fa9d60fb32a0a4fca19c4a7b8367514d9abc898c1d65c0c9f91c9c95",
+    "source_bundle_sha256": "3d54f221ed2f1e17a2adec3eac2646194e517ef90a5f0e4306acf95917c6992d",
+    "executable_source_manifest": "tournament/top40-v2/teams/team-05/score-adapters/team05-crtr-ab-dd.executable-source-manifest.json"
+  },
+  "port_changes": [
+    "canonical runtime seed changed from 20260801 to 20260718",
+    "V2 organizer score hook import replaced by a candidate-local exact identity hook"
+  ],
+  "parameters": {
+    "rebalance_anchor_utc": "2020-01-01T00:00:00Z",
+    "rebalance_every_days": 3,
+    "short_horizon_days": 3,
+    "medium_horizon_days": 20,
+    "slow_horizon_days": 60,
+    "bars_per_day": 3,
+    "minimum_coverage_fraction": 0.85,
+    "maximum_latest_staleness_hours": 12,
+    "maximum_anchor_gap_hours": 16,
+    "minimum_symbols": 12,
+    "selection_fraction": 0.25,
+    "minimum_side_symbols": 4,
+    "target_gross": 0.6,
+    "maximum_abs_net_tilt": 0.08,
+    "maximum_symbol_weight": 0.04,
+    "market_tilt_scale": 0.12,
+    "directional_full_scale": 0.1,
+    "medium_score_weight": 0.35,
+    "chop_reversal_weight": 0.2,
+    "directional_reversal_weight": 0.05,
+    "alignment_discount": 0.65,
+    "volatility_reliability_penalty": 0.15,
+    "trend_gate_log_return": 0.02,
+    "equal_weight_fraction": 0.7,
+    "minimum_score_span": 0.1
+  }
+}

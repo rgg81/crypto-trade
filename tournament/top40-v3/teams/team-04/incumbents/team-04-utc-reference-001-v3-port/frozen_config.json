@@ -1,0 +1,52 @@
+{
+  "artifact": "grandfathered_incumbent_port_config",
+  "candidate_id": "team-04-utc-reference-001-v3-port",
+  "candidate_status": "grandfathered_incumbent_not_yet_evaluated",
+  "family_id": "team-04-uncrowded-trend-carry-v1",
+  "team_id": "team-04",
+  "schema_version": 1,
+  "seed": 20260718,
+  "implementation": {
+    "entrypoint": "strategy.py",
+    "build_factory": "build_strategy",
+    "stateful": false
+  },
+  "risk_policy": {
+    "path": "risk_policy.json",
+    "policy_id": "team-04-utc-reference-no-control"
+  },
+  "v2_parent": {
+    "candidate_id": "team-04-utc-reference-001",
+    "commit": "c1a1a96dac5004f89b7883e9b821ee7e50c9c333",
+    "strategy_sha256": "0e63f868f99684bef394bc1996a6034032c0657b76eceefc1b1b052fdd0e02cc",
+    "frozen_config_sha256": "a7dc06d00affa46b6c8dc82edc5342f31d289a14330333d0239e39c5e0796d05",
+    "risk_policy_sha256": "850e792495dd1861fbf61377d3131e4b43ecf3794b2f9545f6b9897c184b0fd2",
+    "source_bundle_sha256": "8c3ba47894bbc45664ee1d7e56190f64e2c1dee1e8a9c749d4f0ec3344443520"
+  },
+  "port_changes": [
+    "canonical runtime seed changed from 20260801 to 20260718"
+  ],
+  "parameters": {
+    "slow_trend_days": 42,
+    "slow_skip_days": 2,
+    "fast_trend_days": 14,
+    "fast_skip_days": 1,
+    "funding_lookback_days": 7,
+    "minimum_funding_events": 7,
+    "maximum_funding_staleness_hours": 16,
+    "maximum_absolute_funding_rate": 0.05,
+    "volatility_lookback_days": 30,
+    "volatility_keep_fraction": "4/5",
+    "slow_weight": 0.5,
+    "fast_weight": 0.3,
+    "funding_weight": 0.2,
+    "minimum_prefilter_cross_section": 30,
+    "minimum_cross_section": 24,
+    "selected_fraction_per_side": "1/4",
+    "minimum_names_per_sleeve": 6,
+    "gross_target": 0.6,
+    "side_budget": 0.3,
+    "symbol_cap": 0.04,
+    "rebalance_bars": 9
+  }
+}

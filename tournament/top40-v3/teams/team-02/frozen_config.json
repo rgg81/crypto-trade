@@ -1,0 +1,55 @@
+{
+  "artifact": "frozen_reference_config",
+  "candidate_id": "t02-residual-low-max-7d-v1",
+  "candidate_status": "transparent_baseline_not_yet_evaluated",
+  "data_contract": {
+    "allowed_bar_fields": [
+      "open_time",
+      "close",
+      "quote_volume"
+    ],
+    "eligible_symbols": "exact_context_membership_only",
+    "external_data": false,
+    "funding_used_by_signal": false
+  },
+  "dependencies": {
+    "numpy": "2.2.6",
+    "pandas": "3.0.0",
+    "python": "3.13.12"
+  },
+  "execution_contract": {
+    "bar_interval": "8h",
+    "insufficient_scheduled_history": "flat_empty_mapping",
+    "non_rebalance_request": "hold_none",
+    "rebalance_boundary_utc": "daily-00:00",
+    "target_execution": "organizer_owned_next_executable_open"
+  },
+  "family_id": "t02-low-max-anti-lottery-v1",
+  "implementation": {
+    "build_factory": "build_strategy",
+    "entrypoint": "strategy.py",
+    "stateful": false
+  },
+  "parameters": {
+    "decision_hour_utc": 0,
+    "high_max_short_symbol_cap": 0.02,
+    "interval_hours": 8,
+    "liquidity_history_bars": 90,
+    "long_side_gross": 0.2,
+    "max_lookback_days": 7,
+    "maximum_abs_net": 0.05,
+    "maximum_symbol_weight": 0.03,
+    "minimum_positions_per_side": 8,
+    "minimum_positive_volume_fraction": 0.9,
+    "minimum_valid_symbols": 20,
+    "selected_fraction_per_side": 0.25,
+    "short_side_gross": 0.16
+  },
+  "risk_policy": {
+    "path": "risk_policy.json",
+    "policy_id": "team-02-v3-controlled"
+  },
+  "schema_version": 1,
+  "seed": 20260718,
+  "team_id": "team-02"
+}

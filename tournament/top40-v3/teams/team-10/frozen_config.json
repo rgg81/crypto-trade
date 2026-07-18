@@ -1,0 +1,65 @@
+{
+  "artifact": "frozen_reference_config",
+  "candidate_id": "t10-three-slot-cost-aware-pooled-response-26w-v2",
+  "candidate_status": "transparent_baseline_not_yet_evaluated",
+  "data_contract": {
+    "allowed_bar_fields": [
+      "open_time",
+      "close"
+    ],
+    "eligible_symbols": "exact_context_membership_only",
+    "external_data": false,
+    "funding_used_by_signal": false
+  },
+  "dependencies": {
+    "numpy": "2.2.6",
+    "pandas": "3.0.0",
+    "python": "3.13.12"
+  },
+  "execution_contract": {
+    "bar_interval": "8h",
+    "forecast_cost_hurdle": "each-admitted-coin-clears-15bp-round-trip-and-sleeve-spread-clears-30bp",
+    "insufficient_scheduled_history": "flat_empty_mapping",
+    "non_rebalance_request": "hold_none",
+    "rebalance_boundary_utc": "00:00-08:00-16:00",
+    "target_execution": "organizer_owned_next_executable_open"
+  },
+  "family_id": "t10-utc-slot-conditioned-response-v2",
+  "implementation": {
+    "build_factory": "build_strategy",
+    "entrypoint": "strategy.py",
+    "stateful": false
+  },
+  "parameters": {
+    "asset_pooled_prior_weight": 0.5,
+    "bar_hours": 8,
+    "fee_bps_per_side": 5.0,
+    "gross_per_side": 0.2,
+    "lookback_return_bars": 546,
+    "maximum_absolute_net": 0.05,
+    "maximum_symbol_weight": 0.03,
+    "minimum_pooled_pairs": 300,
+    "minimum_positions_per_side": 8,
+    "minimum_slot_pairs": 80,
+    "minimum_slot_pool_symbols": 20,
+    "minimum_symbols": 20,
+    "reference_weeks": 26,
+    "selection_fraction": 0.25,
+    "round_trip_cost_multiple": 1.0,
+    "shrinkage_prior_observations": 104,
+    "slippage_bps_per_side": 2.5,
+    "slope_clip": 0.75,
+    "utc_slots": [
+      0,
+      8,
+      16
+    ]
+  },
+  "risk_policy": {
+    "path": "risk_policy.json",
+    "policy_id": "team-10-v3-controlled"
+  },
+  "schema_version": 1,
+  "seed": 20260718,
+  "team_id": "team-10"
+}

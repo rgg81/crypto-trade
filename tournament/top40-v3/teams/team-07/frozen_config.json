@@ -1,0 +1,64 @@
+{
+  "artifact": "frozen_reference_config",
+  "candidate_id": "t07-liquidity-residual-router-3x63-v1",
+  "candidate_status": "transparent_baseline_not_yet_evaluated",
+  "data_contract": {
+    "allowed_bar_fields": [
+      "open_time",
+      "open",
+      "high",
+      "low",
+      "close",
+      "volume",
+      "quote_volume",
+      "trade_count",
+      "taker_buy_quote_volume"
+    ],
+    "eligible_symbols": "exact_context_membership_only",
+    "external_data": false,
+    "funding_used_by_signal": false
+  },
+  "dependencies": {
+    "numpy": "2.2.6",
+    "pandas": "3.0.0",
+    "python": "3.13.12"
+  },
+  "execution_contract": {
+    "bar_interval": "8h",
+    "insufficient_scheduled_history": "flat_empty_mapping",
+    "non_rebalance_request": "hold_none",
+    "rebalance_boundary_utc": "daily-00:00",
+    "target_execution": "organizer_owned_next_executable_open"
+  },
+  "family_id": "t07-liquidity-conditioned-residual-router-v1",
+  "implementation": {
+    "build_factory": "build_strategy",
+    "entrypoint": "strategy.py",
+    "stateful": false
+  },
+  "parameters": {
+    "decision_hour_utc": 0,
+    "interval_hours": 8,
+    "liquidity_state_bars": 63,
+    "maximum_abs_net": 0.05,
+    "maximum_symbol_weight": 0.03,
+    "minimum_median_quote_volume": 1000000.0,
+    "minimum_positions_per_side": 8,
+    "minimum_valid_symbols": 24,
+    "recent_move_bars": 3,
+    "router_flow_weight": 0.1,
+    "router_impact_weight": 0.3,
+    "router_trade_weight": 0.25,
+    "router_volume_weight": 0.35,
+    "selected_fraction_per_side": 0.3,
+    "state_z_cap": 3.0,
+    "total_gross": 0.4
+  },
+  "risk_policy": {
+    "path": "risk_policy.json",
+    "policy_id": "team-07-v3-controlled"
+  },
+  "schema_version": 1,
+  "seed": 20260718,
+  "team_id": "team-07"
+}

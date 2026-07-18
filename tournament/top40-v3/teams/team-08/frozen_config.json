@@ -1,0 +1,60 @@
+{
+  "artifact": "frozen_reference_config",
+  "candidate_id": "t08-residual-momentum-21-63-126-v1",
+  "candidate_status": "transparent_baseline_not_yet_evaluated",
+  "data_contract": {
+    "allowed_bar_fields": [
+      "open_time",
+      "close",
+      "quote_volume"
+    ],
+    "eligible_symbols": "exact_context_membership_only",
+    "external_data": false,
+    "funding_used_by_signal": false
+  },
+  "dependencies": {
+    "numpy": "2.2.6",
+    "pandas": "3.0.0",
+    "python": "3.13.12"
+  },
+  "execution_contract": {
+    "bar_interval": "8h",
+    "insufficient_scheduled_history": "flat_empty_mapping",
+    "non_rebalance_request": "hold_none",
+    "rebalance_boundary_utc": "daily-00:00",
+    "target_execution": "organizer_owned_next_executable_open"
+  },
+  "family_id": "t08-market-neutral-multi-horizon-residual-momentum-v1",
+  "implementation": {
+    "build_factory": "build_strategy",
+    "entrypoint": "strategy.py",
+    "stateful": false
+  },
+  "parameters": {
+    "consensus_weight": 0.2,
+    "decision_hour_utc": 0,
+    "fast_horizon_bars": 21,
+    "fast_weight": 0.4,
+    "interval_hours": 8,
+    "maximum_abs_net": 0.05,
+    "maximum_symbol_weight": 0.03,
+    "medium_horizon_bars": 63,
+    "medium_weight": 0.35,
+    "minimum_median_quote_volume": 1000000.0,
+    "minimum_positions_per_side": 8,
+    "minimum_positive_volume_fraction": 0.9,
+    "minimum_valid_symbols": 24,
+    "selected_fraction_per_side": 0.3,
+    "slow_horizon_bars": 126,
+    "slow_weight": 0.25,
+    "total_gross": 0.44,
+    "volatility_floor": 0.000001
+  },
+  "risk_policy": {
+    "path": "risk_policy.json",
+    "policy_id": "team-08-v3-controlled"
+  },
+  "schema_version": 1,
+  "seed": 20260718,
+  "team_id": "team-08"
+}
