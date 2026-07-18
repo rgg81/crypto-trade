@@ -220,13 +220,29 @@ def evaluate_holdout(
 
     is_replay = None
     if label == "canonical":
+        # AMENDMENT #2 (charter §13, journaled 2026-07-18): the causality bit-compare scores
+        # the REPLAY RUN'S WEIGHTS through the IS-LENGTH scoring path. Scoring the extended
+        # panel directly diverges from the frozen net by 1 ULP on most rows — numpy's
+        # reduction blocking changes with frame length — which false-failed all four
+        # finalists while their raw weights were bit-identical. Team causality is exactly
+        # "weights on IS rows unchanged when data extends"; organizer-side summation order
+        # carries no integrity information, so both sides of the compare now score
+        # identical-length frames over the frozen snapshot's own panels.
         bundle_a = load_replay_bundle(src_data_dir, snapshot_dir, manifest_path, mask)
-        net_a, _w, _parts = _run_on_bundle(td, bundle_a)
+        pn_a, aux_a, _sc_a = te.build_panels(bundle_a)
+        mod = tp.load_strategy(td)
+        raw_a = te.conform_raw(
+            mod.build_raw_weights(te.team_view(pn_a), te.make_team_aux(aux_a)), pn_a
+        )
+        tp.purge_team_modules()
+        pn_is, _aux_is, sc_is = te.load_is_panels(snapshot_dir, manifest_path, verify=False)
+        raw_a_is = raw_a.reindex(index=pn_is["open"].index, columns=pn_is["open"].columns)
+        net_a, _w_a, _parts_a = te.net_series(raw_a_is, pn_is, sc_is)
         is_replay = _check_is_replay(td, net_a)
         if not is_replay:
             raise ReplayMismatchError(
-                f"{team_id}: IS rows of the holdout run do not reproduce out/net_is.csv "
-                "— causality break or tampered artifacts (integrity finding)"
+                f"{team_id}: IS-row weights of the holdout run do not reproduce the frozen "
+                "stage-1 net — causality break or tampered artifacts (integrity finding)"
             )
 
     bundle_b = load_score_bundle(src_data_dir, mask)
