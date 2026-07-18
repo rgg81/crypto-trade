@@ -1,0 +1,535 @@
+{
+  "activation_freeze_sha256": "9c91c02101a5213f03f5b21ff53142e0ee31bc72332c67f0cba56d8161adfee9",
+  "amendment_id": "top40-v3-amendment-0003-end-boundary-trade-count",
+  "cohort_freeze_sha256": "a32e0fe862e9a4579f51e7a13b21eb7a854e761f76e0524a591c424faf3e6365",
+  "comeback_reason": "fewer-than-three-nomination-ready-teams",
+  "comeback_triggered": true,
+  "nomination_ready_count": 1,
+  "nomination_ready_ranking": [
+    "team-09"
+  ],
+  "parent_activation_freeze_sha256": "f280f57f25ddb9528447b72543db0f0b4358de8f8ae3750aadc23c361aa8cf88",
+  "public_window": {
+    "construction": "immutable-scored-train-plus-released-scored-validation",
+    "end_exclusive_utc": "2023-07-01T00:00:00Z",
+    "start_utc": "2020-02-03T00:00:00Z"
+  },
+  "record_sha256": "25229898975f20a61f2ca6b8d3f2d808eb9849702d7e3c25afe0f8cdf45b8128",
+  "results": [
+    {
+      "candidate_id": "t06-own-coin-momentum-consensus-v1",
+      "candidate_identity_sha256": "0ceb8420c33fa891d5c9008ffe10439af7e764c5b933faa04aecb7ab832a26e0",
+      "nomination_ready": false,
+      "public_assessment": {
+        "core_checks": [
+          {
+            "name": "net_sharpe",
+            "observed": 1.3777552603190752,
+            "operator": ">=",
+            "passed": true,
+            "threshold": 0.75
+          },
+          {
+            "name": "annualized_return",
+            "observed": 0.25639364759217265,
+            "operator": ">",
+            "passed": true,
+            "threshold": 0.0
+          },
+          {
+            "name": "max_drawdown",
+            "observed": 0.1064232191499157,
+            "operator": "<=",
+            "passed": true,
+            "threshold": 0.3
+          },
+          {
+            "name": "double_cost_sharpe",
+            "observed": 1.1143147050098154,
+            "operator": ">=",
+            "passed": true,
+            "threshold": 0.35
+          },
+          {
+            "name": "positive_quarter_fraction",
+            "observed": 0.7857142857142857,
+            "operator": ">=",
+            "passed": true,
+            "threshold": 0.5
+          },
+          {
+            "name": "trade_count",
+            "observed": 32594,
+            "operator": ">=",
+            "passed": true,
+            "threshold": 1000
+          },
+          {
+            "name": "positive_regime_count",
+            "observed": 4,
+            "operator": ">=",
+            "passed": true,
+            "threshold": 2
+          },
+          {
+            "name": "worst_regime_sharpe",
+            "observed": 1.0648350573237004,
+            "operator": ">=",
+            "passed": true,
+            "threshold": -0.75
+          }
+        ],
+        "eligible": true,
+        "failed_core_floor_names": [],
+        "positive_regime_count": 4,
+        "robustness_score": 93.26311628733413,
+        "worst_regime_sharpe": 1.0648350573237004
+      },
+      "rank": 1,
+      "readiness_eligible": false,
+      "stitched_public": {
+        "annualized_return": 0.25639364759217265,
+        "calmar": 2.4091889875178216,
+        "cumulative_double_cost_return": 0.8516732410128611,
+        "cumulative_net_return": 1.1769187527142981,
+        "double_cost_sharpe": 1.1143147050098154,
+        "max_drawdown": 0.1064232191499157,
+        "net_sharpe": 1.3777552603190752,
+        "net_sortino": 2.1534418515721385,
+        "positive_quarter_fraction": 0.7857142857142857,
+        "regime_sharpe": {
+          "bear": 1.2963592496223308,
+          "bull": 1.6929932915972377,
+          "chop": 1.0648350573237004,
+          "stress": 1.3245827907513412
+        },
+        "trade_count": 32594
+      },
+      "team_id": "team-06",
+      "train": {
+        "annualized_return": 0.3550044963154133,
+        "calmar": 3.335780473012449,
+        "cumulative_double_cost_return": 0.8709764759099001,
+        "cumulative_net_return": 1.0784625876573681,
+        "double_cost_sharpe": 1.4477205667939546,
+        "max_drawdown": 0.1064232191499157,
+        "net_sharpe": 1.6709499687445464,
+        "net_sortino": 2.6323324493909612,
+        "positive_quarter_fraction": 0.9,
+        "regime_sharpe": {
+          "bear": 1.565551860451838,
+          "bull": 2.249650784592865,
+          "chop": 0.4794264761569239,
+          "stress": 1.8939600321766958
+        },
+        "trade_count": 22284
+      },
+      "validation": {
+        "annualized_return": 0.04736970761061299,
+        "calmar": 0.49093048850852716,
+        "cumulative_double_cost_return": -0.010317198075752598,
+        "cumulative_net_return": 0.04736970761061299,
+        "double_cost_sharpe": -0.0171506742413405,
+        "max_drawdown": 0.09648964307457186,
+        "net_sharpe": 0.4193662057095666,
+        "net_sortino": 0.6288501832085864,
+        "positive_quarter_fraction": 0.5,
+        "regime_sharpe": {
+          "bear": 0.903549808432914,
+          "bull": -0.20131372693850627,
+          "chop": 2.5351544474694676,
+          "stress": -7.913989641071426
+        },
+        "trade_count": 10310
+      }
+    },
+    {
+      "candidate_id": "team05-crtr-ab-dd-v3-port",
+      "candidate_identity_sha256": "aad6cafb9636d83ca58ec639e2e651c6f262a451391a0ab86b528c832908429b",
+      "nomination_ready": false,
+      "public_assessment": {
+        "core_checks": [
+          {
+            "name": "net_sharpe",
+            "observed": 1.1190468269040812,
+            "operator": ">=",
+            "passed": true,
+            "threshold": 0.75
+          },
+          {
+            "name": "annualized_return",
+            "observed": 0.18946983519426341,
+            "operator": ">",
+            "passed": true,
+            "threshold": 0.0
+          },
+          {
+            "name": "max_drawdown",
+            "observed": 0.17544153200303947,
+            "operator": "<=",
+            "passed": true,
+            "threshold": 0.3
+          },
+          {
+            "name": "double_cost_sharpe",
+            "observed": 1.0058485660177217,
+            "operator": ">=",
+            "passed": true,
+            "threshold": 0.35
+          },
+          {
+            "name": "positive_quarter_fraction",
+            "observed": 0.5714285714285714,
+            "operator": ">=",
+            "passed": true,
+            "threshold": 0.5
+          },
+          {
+            "name": "trade_count",
+            "observed": 17174,
+            "operator": ">=",
+            "passed": true,
+            "threshold": 1000
+          },
+          {
+            "name": "positive_regime_count",
+            "observed": 4,
+            "operator": ">=",
+            "passed": true,
+            "threshold": 2
+          },
+          {
+            "name": "worst_regime_sharpe",
+            "observed": 0.25017123016030174,
+            "operator": ">=",
+            "passed": true,
+            "threshold": -0.75
+          }
+        ],
+        "eligible": true,
+        "failed_core_floor_names": [],
+        "positive_regime_count": 4,
+        "robustness_score": 63.736556142536536,
+        "worst_regime_sharpe": 0.25017123016030174
+      },
+      "rank": 2,
+      "readiness_eligible": false,
+      "stitched_public": {
+        "annualized_return": 0.18946983519426341,
+        "calmar": 1.0799599902660502,
+        "cumulative_double_cost_return": 0.6835326411284712,
+        "cumulative_net_return": 0.8064294920806114,
+        "double_cost_sharpe": 1.0058485660177217,
+        "max_drawdown": 0.17544153200303947,
+        "net_sharpe": 1.1190468269040812,
+        "net_sortino": 1.7418414504568933,
+        "positive_quarter_fraction": 0.5714285714285714,
+        "regime_sharpe": {
+          "bear": 0.25017123016030174,
+          "bull": 1.3676076160758006,
+          "chop": 0.27305035771140773,
+          "stress": 1.8152298975268437
+        },
+        "trade_count": 17174
+      },
+      "team_id": "team-05",
+      "train": {
+        "annualized_return": 0.29100512297373693,
+        "calmar": 1.9001574928328036,
+        "cumulative_double_cost_return": 0.7269961439645094,
+        "cumulative_net_return": 0.8498599685139141,
+        "double_cost_sharpe": 1.2711915388913864,
+        "max_drawdown": 0.1531478964619396,
+        "net_sharpe": 1.406234352085122,
+        "net_sortino": 2.195439034291107,
+        "positive_quarter_fraction": 0.7,
+        "regime_sharpe": {
+          "bear": 0.07137138125635162,
+          "bull": 1.7153526511927004,
+          "chop": 0.6518623873491733,
+          "stress": 1.946852821833441
+        },
+        "trade_count": 8688
+      },
+      "validation": {
+        "annualized_return": -0.023477710298360543,
+        "calmar": -0.5871249740570986,
+        "cumulative_double_cost_return": -0.02516711052768339,
+        "cumulative_net_return": -0.023477710298360543,
+        "double_cost_sharpe": -0.40393837446493164,
+        "max_drawdown": 0.03998758583905393,
+        "net_sharpe": -0.3525606420854094,
+        "net_sortino": -0.5057400444726472,
+        "positive_quarter_fraction": 0.25,
+        "regime_sharpe": {
+          "bear": 0.7490855534864368,
+          "bull": -0.7338031064719143,
+          "chop": -1.1923466824098787,
+          "stress": -1.649909554844268
+        },
+        "trade_count": 8486
+      }
+    },
+    {
+      "candidate_id": "team-04-utc-reference-001-v3-port",
+      "candidate_identity_sha256": "0e4bde9f0180fbaff944dc9f001f53d50875740f0013d5be4dd442d871ef32df",
+      "nomination_ready": false,
+      "public_assessment": {
+        "core_checks": [
+          {
+            "name": "net_sharpe",
+            "observed": 1.524331262602303,
+            "operator": ">=",
+            "passed": true,
+            "threshold": 0.75
+          },
+          {
+            "name": "annualized_return",
+            "observed": 0.2294681596314092,
+            "operator": ">",
+            "passed": true,
+            "threshold": 0.0
+          },
+          {
+            "name": "max_drawdown",
+            "observed": 0.15948658451650521,
+            "operator": "<=",
+            "passed": true,
+            "threshold": 0.3
+          },
+          {
+            "name": "double_cost_sharpe",
+            "observed": 1.3245734772933417,
+            "operator": ">=",
+            "passed": true,
+            "threshold": 0.35
+          },
+          {
+            "name": "positive_quarter_fraction",
+            "observed": 0.5,
+            "operator": ">=",
+            "passed": true,
+            "threshold": 0.5
+          },
+          {
+            "name": "trade_count",
+            "observed": 5780,
+            "operator": ">=",
+            "passed": true,
+            "threshold": 1000
+          },
+          {
+            "name": "positive_regime_count",
+            "observed": 4,
+            "operator": ">=",
+            "passed": true,
+            "threshold": 2
+          },
+          {
+            "name": "worst_regime_sharpe",
+            "observed": 0.7867376412555727,
+            "operator": ">=",
+            "passed": true,
+            "threshold": -0.75
+          }
+        ],
+        "eligible": true,
+        "failed_core_floor_names": [],
+        "positive_regime_count": 4,
+        "robustness_score": 77.01191414283257,
+        "worst_regime_sharpe": 0.7867376412555727
+      },
+      "rank": 3,
+      "readiness_eligible": false,
+      "stitched_public": {
+        "annualized_return": 0.2294681596314092,
+        "calmar": 1.4387928635318015,
+        "cumulative_double_cost_return": 0.8359765829269521,
+        "cumulative_net_return": 1.0219768304274703,
+        "double_cost_sharpe": 1.3245734772933417,
+        "max_drawdown": 0.15948658451650521,
+        "net_sharpe": 1.524331262602303,
+        "net_sortino": 2.447381735327409,
+        "positive_quarter_fraction": 0.5,
+        "regime_sharpe": {
+          "bear": 0.7867376412555727,
+          "bull": 1.816452818911945,
+          "chop": 2.5636916917000883,
+          "stress": 1.3239041254780637
+        },
+        "trade_count": 5780
+      },
+      "team_id": "team-04",
+      "train": {
+        "annualized_return": 0.33597277030691175,
+        "calmar": 2.1065895374550583,
+        "cumulative_double_cost_return": 0.8850703693829343,
+        "cumulative_net_return": 1.0088532337083151,
+        "double_cost_sharpe": 1.7394910586071697,
+        "max_drawdown": 0.15948658451650521,
+        "net_sharpe": 1.9068805120795551,
+        "net_sortino": 3.12083111135348,
+        "positive_quarter_fraction": 0.5,
+        "regime_sharpe": {
+          "bear": 0.22345543815380842,
+          "bull": 2.397183072542894,
+          "chop": 3.717233521938627,
+          "stress": 1.5637631497128923
+        },
+        "trade_count": 3798
+      },
+      "validation": {
+        "annualized_return": 0.006532879803731184,
+        "calmar": 0.10981079428711639,
+        "cumulative_double_cost_return": -0.026043476813045863,
+        "cumulative_net_return": 0.006532879803731184,
+        "double_cost_sharpe": -0.2454830292012361,
+        "max_drawdown": 0.059492145978381816,
+        "net_sharpe": 0.11704757452154352,
+        "net_sortino": 0.16533810313354425,
+        "positive_quarter_fraction": 0.5,
+        "regime_sharpe": {
+          "bear": 1.4671836928122972,
+          "bull": -0.31924395406754436,
+          "chop": 0.1440477424298329,
+          "stress": -4.2319977346092434
+        },
+        "trade_count": 1982
+      }
+    },
+    {
+      "candidate_id": "team09-drp-pivot02-v1-v3-port",
+      "candidate_identity_sha256": "29750c668c9b8c7d95d27cb86ea948a41f0dbb148aecb771172ae3a88084f880",
+      "nomination_ready": true,
+      "public_assessment": {
+        "core_checks": [
+          {
+            "name": "net_sharpe",
+            "observed": 0.919280390907184,
+            "operator": ">=",
+            "passed": true,
+            "threshold": 0.75
+          },
+          {
+            "name": "annualized_return",
+            "observed": 0.03161989538776644,
+            "operator": ">",
+            "passed": true,
+            "threshold": 0.0
+          },
+          {
+            "name": "max_drawdown",
+            "observed": 0.05239192690034544,
+            "operator": "<=",
+            "passed": true,
+            "threshold": 0.3
+          },
+          {
+            "name": "double_cost_sharpe",
+            "observed": 0.7406825169432071,
+            "operator": ">=",
+            "passed": true,
+            "threshold": 0.35
+          },
+          {
+            "name": "positive_quarter_fraction",
+            "observed": 0.6428571428571429,
+            "operator": ">=",
+            "passed": true,
+            "threshold": 0.5
+          },
+          {
+            "name": "trade_count",
+            "observed": 7521,
+            "operator": ">=",
+            "passed": true,
+            "threshold": 1000
+          },
+          {
+            "name": "positive_regime_count",
+            "observed": 2,
+            "operator": ">=",
+            "passed": true,
+            "threshold": 2
+          },
+          {
+            "name": "worst_regime_sharpe",
+            "observed": -0.3697797850269021,
+            "operator": ">=",
+            "passed": true,
+            "threshold": -0.75
+          }
+        ],
+        "eligible": true,
+        "failed_core_floor_names": [],
+        "positive_regime_count": 2,
+        "robustness_score": 46.078254145297116,
+        "worst_regime_sharpe": -0.3697797850269021
+      },
+      "rank": 4,
+      "readiness_eligible": true,
+      "stitched_public": {
+        "annualized_return": 0.03161989538776644,
+        "calmar": 0.6035261014146429,
+        "cumulative_double_cost_return": 0.08888033428070674,
+        "cumulative_net_return": 0.11193175218457552,
+        "double_cost_sharpe": 0.7406825169432071,
+        "max_drawdown": 0.05239192690034544,
+        "net_sharpe": 0.919280390907184,
+        "net_sortino": 1.3756016651382612,
+        "positive_quarter_fraction": 0.6428571428571429,
+        "regime_sharpe": {
+          "bear": -0.3049453243206179,
+          "bull": 2.1589620638911264,
+          "chop": 1.887528338530986,
+          "stress": -0.3697797850269021
+        },
+        "trade_count": 7521
+      },
+      "team_id": "team-09",
+      "train": {
+        "annualized_return": 0.04037358776940869,
+        "calmar": 1.1218964552449266,
+        "cumulative_double_cost_return": 0.08497570972348378,
+        "cumulative_net_return": 0.10000749823840449,
+        "double_cost_sharpe": 0.9157865146395142,
+        "max_drawdown": 0.03598691089597439,
+        "net_sharpe": 1.0676995377980352,
+        "net_sortino": 1.621481935478695,
+        "positive_quarter_fraction": 0.7,
+        "regime_sharpe": {
+          "bear": -0.6630686974697511,
+          "bull": 2.760885436435839,
+          "chop": 2.3765237296104527,
+          "stress": -0.563723216649172
+        },
+        "trade_count": 5077
+      },
+      "validation": {
+        "annualized_return": 0.010840156967353298,
+        "calmar": 0.4272969455304409,
+        "cumulative_double_cost_return": 0.00359881287869368,
+        "cumulative_net_return": 0.010840156967353298,
+        "double_cost_sharpe": 0.1554293421658771,
+        "max_drawdown": 0.02536914218728259,
+        "net_sharpe": 0.441905826333896,
+        "net_sortino": 0.6146871889262334,
+        "positive_quarter_fraction": 0.5,
+        "regime_sharpe": {
+          "bear": 0.09193605886771578,
+          "bull": -0.2552940054752769,
+          "chop": 1.1327236449216462,
+          "stress": 3.7816883556578977
+        },
+        "trade_count": 2444
+      }
+    }
+  ],
+  "schema_version": "top40-v3-public-development-assessment-v1",
+  "trade_boundary_policy": {
+    "rows_after_end_exclusive_rejected": true,
+    "scored_interval": "[2020-02-03T00:00:00Z,2023-07-01T00:00:00Z)",
+    "terminal_rows_at_end_exclusive_excluded": true
+  },
+  "validation_journal_head_sha256": "92cabb4425537019346f596141f76a4dbe943a9c6d7bc0181bb05615114c30c0"
+}
