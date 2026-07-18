@@ -1,0 +1,99 @@
+{
+  "assessed_at_utc": "2026-07-18T10:20:51Z",
+  "assessment_kind": "team05-preregistered-combined-policy-nonneighborhood-gate-v1",
+  "candidate_id": "team05-crtr-base-v1",
+  "decision": "fail-neighbors-forbidden-genuine-pivot-permitted",
+  "family_id": "team05-causal-residual-trend-reversal-v1",
+  "failed_gates": {
+    "combined_chop_net_return_strictly_positive": {
+      "observed": -0.030468122007120235,
+      "required": "> 0"
+    },
+    "minimum_official_positive_folds": {
+      "observed": 3,
+      "required": 4
+    },
+    "minimum_official_positive_quarter_fraction": {
+      "observed": 0.5,
+      "required": 0.55
+    },
+    "minimum_team05_positive_folds": {
+      "observed": 3,
+      "required": 5
+    },
+    "minimum_trial_adjusted_probability_positive": {
+      "observed": 0.5977141057438432,
+      "required": 0.9
+    },
+    "minimum_worst_regime_sharpe": {
+      "observed": -0.3688538325710823,
+      "required": -0.25
+    },
+    "positive_pnl_concentration_official_maximum": {
+      "observed": 0.7663954516421113,
+      "required": 0.4
+    },
+    "positive_pnl_concentration_team05_maximum": {
+      "observed": 0.7663954516421113,
+      "required": 0.35
+    },
+    "required_positive_chop_return": {
+      "observed": -0.030468122007120235,
+      "required": "> 0"
+    }
+  },
+  "observed": {
+    "aggregate": {
+      "annualized_return": 0.11773169081699164,
+      "calmar": 0.6207013330552039,
+      "double_cost_net_return": 0.3899031430531352,
+      "double_cost_sharpe": 0.7863450490780294,
+      "max_drawdown": 0.18967526658513045,
+      "net_return": 0.4613189447436685,
+      "net_sharpe": 0.8850201213331204,
+      "positive_quarter_fraction": 0.5
+    },
+    "fold_returns": {
+      "fold-1": 0.057791401595720604,
+      "fold-2": 0.4756182292905977,
+      "fold-3": -0.001357491970391811,
+      "fold-4": 0.08718151206934244,
+      "fold-5": -0.1329098895951466,
+      "fold-6": -0.0055232576083789064
+    },
+    "maximum_positive_pnl_concentration": 0.7663954516421113,
+    "positive_fold_count": 3,
+    "regimes": {
+      "bear": {
+        "net_return": 0.013143696472557087,
+        "net_sharpe": 0.2112239931777324
+      },
+      "bull": {
+        "net_return": 0.33540269935569267,
+        "net_sharpe": 1.6692312678771366
+      },
+      "chop": {
+        "net_return": -0.030468122007120235,
+        "net_sharpe": -0.3688538325710823
+      },
+      "stress": {
+        "net_return": 0.114037025271293,
+        "net_sharpe": 1.0200577033617684
+      }
+    },
+    "roles": {
+      "combined_chop_net_return": -0.030468122007120235,
+      "long_bull_net_return": 0.41532383904426773,
+      "short_bear_net_return": 0.032979262052147
+    },
+    "trial_adjusted_probability_positive": 0.5977141057438432
+  },
+  "provenance": {
+    "diagnostic": "read-only organizer derivation from sealed combined-policy development artifacts using evidence_v2 formulas",
+    "registration_sha256": "ef72eb0b10e8996488543a122a8e56aa6c59dc428bf43e535f678b029f09fea6",
+    "runner_record_path": "reports-top40-v2/team-05/qualification-attempts/team05-crtr-base-v1.runner-record.json",
+    "runner_record_sha256": "2aa4a1e0806e78fdbf0e7242b6db135db6176ad10913fe7793f3b4d4126252ff"
+  },
+  "schema_version": 1,
+  "team_id": "team-05"
+}
