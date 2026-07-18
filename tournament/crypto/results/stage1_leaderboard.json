@@ -1,0 +1,196 @@
+{
+  "advance": 4,
+  "failures": [],
+  "ranked": [
+    {
+      "ann_turnover": 188.35889268945584,
+      "finalist": true,
+      "maxdd": -0.24155424907440404,
+      "median_names_long": 20.0,
+      "median_names_short": 20.0,
+      "rank": 1,
+      "regime_sharpe": {
+        "bear": 1.9996820092457808,
+        "bull": 3.2122179486256695,
+        "chop": 0.8280121596361972
+      },
+      "sharpe_1x": 2.406749605639445,
+      "sharpe_2x": 1.7022614276817054,
+      "sharpe_se": 0.5252199157059128,
+      "team_id": "team-01",
+      "total_cost": 0.5314325289229673,
+      "total_funding_pnl": 0.7134679330892657
+    },
+    {
+      "ann_turnover": 123.87949936661776,
+      "finalist": true,
+      "maxdd": -0.28835012815691297,
+      "median_names_long": 17.0,
+      "median_names_short": 18.0,
+      "rank": 2,
+      "regime_sharpe": {
+        "bear": 1.4887676124587617,
+        "bull": 3.02353481840587,
+        "chop": 0.31296861598635084
+      },
+      "sharpe_1x": 2.0687461288553433,
+      "sharpe_2x": 1.8213643945446496,
+      "sharpe_se": 0.5117120007572797,
+      "team_id": "team-02",
+      "total_cost": 0.35031605508067265,
+      "total_funding_pnl": 0.02571628591393059
+    },
+    {
+      "ann_turnover": 125.42852296955769,
+      "finalist": true,
+      "maxdd": -0.3725805684449175,
+      "median_names_long": 18.0,
+      "median_names_short": 17.0,
+      "rank": 3,
+      "regime_sharpe": {
+        "bear": 1.0200045217382938,
+        "bull": 2.547885374469125,
+        "chop": 0.06323870428310335
+      },
+      "sharpe_1x": 1.6089567336103308,
+      "sharpe_2x": 1.315518449533359,
+      "sharpe_se": 0.49617744147810616,
+      "team_id": "team-04",
+      "total_cost": 0.3560530413540657,
+      "total_funding_pnl": 0.06507097831056327
+    },
+    {
+      "ann_turnover": 173.1484964226449,
+      "finalist": true,
+      "maxdd": -0.43008949914899675,
+      "median_names_long": 20.0,
+      "median_names_short": 20.0,
+      "rank": 4,
+      "regime_sharpe": {
+        "bear": 1.6326715807883523,
+        "bull": 1.8577136152066893,
+        "chop": 0.32960038823291915
+      },
+      "sharpe_1x": 1.5013240350201893,
+      "sharpe_2x": 1.049163345139749,
+      "sharpe_se": 0.4930439641028316,
+      "team_id": "team-05",
+      "total_cost": 0.49540288542359906,
+      "total_funding_pnl": 0.36876160054620877
+    },
+    {
+      "ann_turnover": 276.52007498941873,
+      "finalist": false,
+      "maxdd": -0.35995702664851204,
+      "median_names_long": 20.0,
+      "median_names_short": 18.0,
+      "rank": 5,
+      "regime_sharpe": {
+        "bear": 0.9306828835550032,
+        "bull": 2.8840475102491943,
+        "chop": -0.4080624923531176
+      },
+      "sharpe_1x": 1.4185615877351152,
+      "sharpe_2x": 0.9920391569582074,
+      "sharpe_se": 0.49076958629805356,
+      "team_id": "team-10",
+      "total_cost": 0.7946264515501038,
+      "total_funding_pnl": -0.05081335302822981
+    },
+    {
+      "ann_turnover": 118.564484386353,
+      "finalist": false,
+      "maxdd": -0.36745078701967215,
+      "median_names_long": 19.0,
+      "median_names_short": 19.0,
+      "rank": 6,
+      "regime_sharpe": {
+        "bear": 1.3263357797691124,
+        "bull": 1.928818068320526,
+        "chop": -0.21283127585283784
+      },
+      "sharpe_1x": 1.3040332429671746,
+      "sharpe_2x": 0.927253703641577,
+      "sharpe_se": 0.48781924683343864,
+      "team_id": "team-03",
+      "total_cost": 0.336916688877632,
+      "total_funding_pnl": 0.11061511560782564
+    },
+    {
+      "ann_turnover": 93.8004870617056,
+      "finalist": false,
+      "maxdd": -0.32631583302004685,
+      "median_names_long": 20.0,
+      "median_names_short": 20.0,
+      "rank": 7,
+      "regime_sharpe": {
+        "bear": 1.0239578125354234,
+        "bull": 1.3854108928175701,
+        "chop": 0.9519218091381404
+      },
+      "sharpe_1x": 1.1756997396808886,
+      "sharpe_2x": 0.7437039200090628,
+      "sharpe_se": 0.48478966303731214,
+      "team_id": "team-06",
+      "total_cost": 0.2576178613798183,
+      "total_funding_pnl": 0.0701095731185052
+    },
+    {
+      "ann_turnover": 70.46534003001695,
+      "finalist": false,
+      "maxdd": -0.31133210352397733,
+      "median_names_long": 20.0,
+      "median_names_short": 20.0,
+      "rank": 8,
+      "regime_sharpe": {
+        "bear": 1.2029350550080404,
+        "bull": 1.4398631831954924,
+        "chop": 0.28243384978796826
+      },
+      "sharpe_1x": 1.024682326266311,
+      "sharpe_2x": 0.8260427401204254,
+      "sharpe_se": 0.48160585803933204,
+      "team_id": "team-07",
+      "total_cost": 0.198805029228124,
+      "total_funding_pnl": 0.11692278910171192
+    },
+    {
+      "ann_turnover": 80.72469261462595,
+      "finalist": false,
+      "maxdd": -0.4392672787496801,
+      "median_names_long": 19.0,
+      "median_names_short": 19.0,
+      "rank": 9,
+      "regime_sharpe": {
+        "bear": 1.0531642332564572,
+        "bull": 1.2064685264558712,
+        "chop": -0.2849196488912142
+      },
+      "sharpe_1x": 0.8298696332986752,
+      "sharpe_2x": 0.5900227969052059,
+      "sharpe_se": 0.47812019649750015,
+      "team_id": "team-09",
+      "total_cost": 0.23047624573491438,
+      "total_funding_pnl": 0.1147044080370345
+    },
+    {
+      "ann_turnover": 131.85306609425544,
+      "finalist": false,
+      "maxdd": -0.28888510372369214,
+      "median_names_long": 24.0,
+      "median_names_short": 15.0,
+      "rank": 10,
+      "regime_sharpe": {
+        "bear": 0.11480702925817805,
+        "bull": 1.052695367531694,
+        "chop": 0.06591764132160334
+      },
+      "sharpe_1x": 0.459646717238972,
+      "sharpe_2x": 0.20491405716527997,
+      "sharpe_se": 0.4734748918278303,
+      "team_id": "team-08",
+      "total_cost": 0.360396103725745,
+      "total_funding_pnl": 0.08475985053117195
+    }
+  ]
+}
