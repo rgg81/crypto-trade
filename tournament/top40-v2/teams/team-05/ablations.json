@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "team_id": "team-05",
-  "family_id": "team05-up-down-capture-convexity-v1",
-  "candidate_id": "team05-udcc-pivot01-core-v1",
-  "status": "pivot-01-prospective-no-results",
-  "authorized_candidates": ["team05-udcc-pivot01-core-v1"],
+  "family_id": "team05-liquidity-depth-migration-v1",
+  "candidate_id": "team05-ldm-pivot02-core-v1",
+  "status": "final-pivot-02-prospective-no-results",
+  "authorized_candidates": ["team05-ldm-pivot02-core-v1"],
   "risk_policy": "risk_policy.json byte-identical to risk_policies/no-control.json",
   "authorized_ablations": [],
   "authorized_controls": [],
   "authorized_neighbors": [],
   "authorized_sign_flips": [],
   "authorized_same_family_replacements": [],
-  "reason": "UDCC is one exact structural-capture core. A failed center rejects the family and cannot be repaired by downstream risk, parameter, sign, or construction changes.",
-  "historical_crtr_notice": "Files under risk_ablations/ and neighbors/ are immutable evidence for the terminal parent family only. They are not UDCC templates or authorization.",
-  "second_pivot_rule": "The unused second mechanism pivot could be activated only by a separately documented thesis genuinely distinct from both CRTR and UDCC."
+  "reason": "LDM is the one exact final-pivot liquidity-depth-migration core. A failed center makes Team 05 DNF and cannot be repaired by downstream risk, parameter, sign, or construction changes.",
+  "historical_notice": "Files under risk_ablations/, neighbors/, pivot-01/, and canonical CRTR or UDCC score-adapter records are immutable evidence for terminal prior families only. They are not LDM templates or authorization.",
+  "further_pivot_rule": "Both permitted mechanism pivots are consumed when A7 registers this family; no further mechanism pivot is available."
 }

@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "team_id": "team-05",
+  "pivot_number": 2,
+  "status": "prospective_unregistered_final",
+  "parent_family_id": "team05-up-down-capture-convexity-v1",
+  "new_family_id": "team05-liquidity-depth-migration-v1",
+  "new_candidate_id": "team05-ldm-pivot02-core-v1",
+  "diagnosis_scope": "Mechanism-level: the fixed UDCC core had positive overall return and acceptable drawdown but failed minimum net Sharpe, positive-regime-count, and worst-regime-Sharpe gates. Its bear and bull Sharpes were negative, so no forbidden control, neighbor, sign flip, or same-family replacement can establish an all-conditions model.",
+  "evidence": {
+    "candidate_id": "team05-udcc-pivot01-core-v1",
+    "registration_sha256": "c96f8da4da9c0a05e840ed0a7dc8015b37e8c37f64c7fa839764357ce4b8a08c",
+    "metrics": {
+      "net_sharpe": 0.5583944387931704,
+      "annualized_return": 0.05868751909741898,
+      "calmar": 0.5132522989456555,
+      "max_drawdown": 0.11434438621702692,
+      "double_cost_sharpe": 0.4761601356877956,
+      "positive_quarter_fraction": 0.7142857142857143,
+      "regime_sharpe": {
+        "bear": -0.4086133338358585,
+        "bull": -0.20185116137313475,
+        "chop": 1.8303723361195101,
+        "stress": 1.4416504213606915
+      }
+    }
+  },
+  "pivot_reason": "Replace conditional common-tape price capture with a direction-free temporal liquidity-capacity mechanism: migration in unsigned range per contemporaneous quote-volume share over disjoint baseline and recent windows.",
+  "failure_action": "team_05_dnf_without_controls_neighbors_replacement_or_further_pivot",
+  "registered_at_utc": "REPLACE_WITH_ACTUAL_PIVOT_FAMILY_REGISTRATION_TIMESTAMP_Z"
+}

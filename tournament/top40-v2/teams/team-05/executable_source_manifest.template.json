@@ -1,13 +1,13 @@
 {
-  "candidate_id": "team05-udcc-pivot01-core-v1",
-  "family_id": "team05-up-down-capture-convexity-v1",
+  "candidate_id": "team05-ldm-pivot02-core-v1",
+  "family_id": "team05-liquidity-depth-migration-v1",
   "files": [
-    {"path": "candidate_variant.py", "sha256": "cd2fac7a85944ed540c4f1c41231cc1a80df0befef3d68553de5999e5c6af574", "size": 238},
-    {"path": "frozen_config.json", "sha256": "5503de8a87edd6cc8ea6fb3506e4b781dc93834adc0c3204d3629943c7919195", "size": 4858},
-    {"path": "risk_policy.json", "sha256": "2a56f21940baa886f603c635ea53ca39778869577dd35bc53f1c754bf4c2794e", "size": 638},
-    {"path": "strategy.py", "sha256": "bff8d9cb65aa445c926decbab45da4f73f229ae744e55c5fd81f0a36e06a234a", "size": 19663},
-    {"path": "test_risk_policy_contract.py", "sha256": "f561606a08d9406b91121f276efd446b657facc48484321574b6428bbb2a637b", "size": 2129},
-    {"path": "test_strategy.py", "sha256": "a9189ef0315356fc8e7f69b217dccc1dbfd96ee5041e5a3201664c433e5295bd", "size": 14428}
+    {"path": "candidate_variant.py", "sha256": "c6e9bb702b4f94cbc39de4cc76c040d3e5d09a24e3c12e335aa65c8b619cc094", "size": 243},
+    {"path": "frozen_config.json", "sha256": "0059e14e61d1517480acfbc8efc9fcaf0e3ed1cfc18ce36f0c179b9f5331469a", "size": 5396},
+    {"path": "risk_policy.json", "sha256": "91b7300b43cbc189cc133836253e2921d5c2a34fbb645de89cb08e45dcc10be9", "size": 637},
+    {"path": "strategy.py", "sha256": "33d8a4ffd762d514a31e509e07ab455bdba3e389a23f79acbcc3c497cfec1696", "size": 21023},
+    {"path": "test_risk_policy_contract.py", "sha256": "55c5aaf94965882deb07263a3ebe3169c878db03b69405a00272f059c02422be", "size": 2129},
+    {"path": "test_strategy.py", "sha256": "472036bf31b455cdb733686978cace49797f60b60dafe1f1d25ee809176fc22d", "size": 20029}
   ],
   "manifest_kind": "top40-v2-executable-source-manifest-v1",
   "schema_version": 1,

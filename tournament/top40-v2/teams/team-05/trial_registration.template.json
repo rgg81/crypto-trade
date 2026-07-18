@@ -1,8 +1,8 @@
 {
   "timestamp_utc": "REPLACE_WITH_REGISTRATION_TIMESTAMP_Z",
   "team_id": "team-05",
-  "family_id": "team05-up-down-capture-convexity-v1",
-  "candidate_id": "team05-udcc-pivot01-core-v1",
+  "family_id": "team05-liquidity-depth-migration-v1",
+  "candidate_id": "team05-ldm-pivot02-core-v1",
   "strategy_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
   "source_bundle_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
   "risk_config_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
@@ -25,9 +25,9 @@
     "risk_policy": "risk_policy.json byte-identical to risk_policies/no-control.json",
     "evaluator_cost_outputs": [1.0, 2.0],
     "fold_plan": "walk_forward_plan.json",
-    "activation_precondition": "A7 pivot-team accepted the new parent-linked family; the fresh executable-source manifest, independent semantic review, and score manifest were immutable first-adds in strict order. Amendment 0008 supplies no authority."
+    "activation_precondition": "A7 pivot-team accepted the final parent-linked family; the fresh executable-source manifest, independent semantic review, and score manifest were immutable first-adds in strict order. Amendment 0008 supplies no authority."
   },
   "seed": 20260801,
-  "thesis": "Structural upside-minus-downside common-tape capture asymmetry should create a balanced convex-minus-concave native-crypto spread with positive bull-long, bear-short, and chop-combined roles.",
-  "falsifier": "Reject this no-control core and the UDCC family if any qualification_thresholds.json gate fails. No control, ablation, sign flip, neighbor, or same-family replacement may rescue it."
+  "thesis": "Temporal improvement in unsigned range per contemporaneous quote-volume share should identify native-crypto contracts gaining effective depth relative to contracts losing depth, creating a direction-free balanced spread with positive bull-long, bear-short, and chop-combined roles.",
+  "falsifier": "Reject this final no-control core, reject the LDM family, and mark Team 05 DNF if any qualification_thresholds.json gate fails. No control, ablation, sign flip, neighbor, same-family replacement, or further pivot may rescue it."
 }

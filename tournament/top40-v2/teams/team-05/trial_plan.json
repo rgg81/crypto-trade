@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
   "team_id": "team-05",
-  "family_id": "team05-up-down-capture-convexity-v1",
-  "parent_family_id": "team05-causal-residual-trend-reversal-v1",
-  "pivot_number": 1,
-  "candidate_id": "team05-udcc-pivot01-core-v1",
-  "expected_material_trial_number": 8,
+  "family_id": "team05-liquidity-depth-migration-v1",
+  "parent_family_id": "team05-up-down-capture-convexity-v1",
+  "pivot_number": 2,
+  "candidate_id": "team05-ldm-pivot02-core-v1",
+  "expected_material_trial_number": 9,
   "status": "prospective_unregistered",
   "candidate_count": 1,
-  "candidate_role": "pivot-01-no-control-core",
+  "candidate_role": "final-pivot-02-no-control-core",
   "seed": 20260801,
   "schedule": {"anchor_utc": "1970-01-01T00:00:00Z", "interval_hours": 168},
   "risk_policy": {
@@ -18,17 +18,17 @@
     "enabled_controls": []
   },
   "required_order": [
-    "materialize and validate the complete prospective UDCC package without changing ledgers",
+    "materialize and validate the complete prospective LDM package without changing ledgers",
     "commit the materialization",
     "first-add and commit the candidate executable-source manifest",
     "obtain, first-add, and commit an independent semantic-coupling approval",
     "first-add and commit the 168-hour candidate score manifest",
-    "register the parent-linked family with A7 pivot-team",
+    "register the final parent-linked family with A7 pivot-team",
     "recompute source, strategy, risk, and config hashes after the family append",
     "register the exact material trial with A7",
     "run one development window through A7",
     "apply every noncompensatory qualification_thresholds.json gate"
   ],
-  "failure_rule": "Reject the UDCC family without controls, ablations, sign flips, neighbors, or same-family replacement. Do not access private data.",
-  "success_rule": "Advance only after complete official development, A5, regime, role, sleeve, concentration, fold, and UDCC mechanism evidence passes."
+  "failure_rule": "Reject the LDM family and mark Team 05 DNF without controls, ablations, sign flips, neighbors, same-family replacement, or another pivot. Do not access private data.",
+  "success_rule": "Advance only after complete official development, A5, regime, role, sleeve, concentration, fold, and LDM mechanism evidence passes."
 }

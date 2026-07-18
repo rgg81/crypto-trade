@@ -1,8 +1,8 @@
 {
   "adapter_id": "top40-v2-declared-score-boundary-v1",
-  "candidate_id": "team05-udcc-pivot01-core-v1",
+  "candidate_id": "team05-ldm-pivot02-core-v1",
   "capture_boundary": "candidate-declared-post-transform-pre-selection-weight-cap-risk",
-  "family_id": "team05-up-down-capture-convexity-v1",
+  "family_id": "team05-liquidity-depth-migration-v1",
   "hook": "strategy.score_boundary",
   "label": {
     "executable_price_column": "open",
@@ -19,7 +19,7 @@
     "interval_hours": 168
   },
   "schema_version": 1,
-  "score_description": "Final finite UDCC long-desirability score after conditional common-tape slope estimation and centered average-ranking: 0.50 times upside-capture rank minus downside-capture rank. The direct A5 hook return is validated and consumed before score-span checks, selection, capture-separation gates, equal sizing, caps, and organizer-owned risk. Higher values declare higher expected 168-hour simple executable-open-to-open returns.",
+  "score_description": "Final finite LDM long-desirability score: the centered cross-sectional fractional rank of log(baseline median unsigned-range-per-contemporaneous-quote-volume-share divided by recent median impact), using disjoint 105-bar and 21-bar windows. The direct A5 hook return is validated and consumed before score-span checks, selection, raw-separation checks, equal sizing, caps, and organizer-owned risk. Higher values declare higher expected 168-hour simple executable-open-to-open returns.",
   "semantic_coupling_review_sha256": "REPLACE_WITH_CANONICAL_SEMANTIC_REVIEW_64_LOWERCASE_HEX",
   "stage": "development",
   "team_id": "team-05"

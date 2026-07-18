@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "team_id": "team-05",
-  "family_id": "team05-up-down-capture-convexity-v1",
-  "candidate_id": "team05-udcc-pivot01-core-v1",
+  "family_id": "team05-liquidity-depth-migration-v1",
+  "candidate_id": "team05-ldm-pivot02-core-v1",
   "status": "DRAFT_NOT_REGISTRATION_OR_EVIDENCE",
   "materialization_commit": "REPLACE_AFTER_COMPLETE_VALIDATED_MATERIALIZATION",
   "executable_files": [
@@ -17,9 +17,9 @@
   "source_bundle_sha256": "REPLACE_AFTER_A7_FAMILY_APPEND_WITH_64_LOWERCASE_HEX",
   "risk_policy_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
   "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
-  "executable_source_manifest_path": "score-adapters/team05-udcc-pivot01-core-v1.executable-source-manifest.json",
-  "semantic_review_path": "score-adapters/team05-udcc-pivot01-core-v1.semantic-coupling-review.json",
-  "score_manifest_path": "score-adapters/team05-udcc-pivot01-core-v1.json",
+  "executable_source_manifest_path": "score-adapters/team05-ldm-pivot02-core-v1.executable-source-manifest.json",
+  "semantic_review_path": "score-adapters/team05-ldm-pivot02-core-v1.semantic-coupling-review.json",
+  "score_manifest_path": "score-adapters/team05-ldm-pivot02-core-v1.json",
   "binding_rule": "The executable manifest, semantic review, and score manifest are immutable first-adds in that order. A7 then appends the family. The complete source fingerprint is recomputed after that append and bound in the trial registration.",
   "amendment_authority": ["0005", "0006", "0007"],
   "amendment_0008_authorized": false

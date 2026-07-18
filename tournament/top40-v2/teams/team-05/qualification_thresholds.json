@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "team_id": "team-05",
-  "status": "prospective_binding_pivot_01_no_evidence",
+  "status": "prospective_binding_final_pivot_02_no_evidence",
   "development": {
     "minimum_net_sharpe": {"operator": ">=", "threshold": 0.75},
     "minimum_annualized_return": {"operator": ">", "threshold": 0.0},
@@ -35,13 +35,15 @@
   "stability": {
     "maximum_positive_pnl_concentration": {"operator": "<=", "threshold": 0.35},
     "parameter_neighbors_required": false,
-    "reason": "Pivot-01 freezes one exact structural-capture mechanism; neighbors and same-family alternatives are forbidden rather than waived as evidence."
+    "reason": "Final pivot-02 freezes one exact liquidity-depth-migration mechanism; neighbors and same-family alternatives are forbidden rather than waived as evidence."
   },
-  "udcc_mechanism": {
-    "positive_common_tape_bar_portfolio_return": {"operator": ">", "threshold": 0.0},
-    "negative_common_tape_bar_portfolio_return": {"operator": ">", "threshold": 0.0},
-    "minimum_folds_positive_on_positive_common_tape_bars": {"operator": ">=", "threshold": 4, "total_folds": 6},
-    "minimum_folds_positive_on_negative_common_tape_bars": {"operator": ">=", "threshold": 4, "total_folds": 6}
+  "ldm_mechanism": {
+    "minimum_selected_raw_depth_improvement_separation": {"operator": ">=", "threshold": 0.1},
+    "minimum_valid_baseline_impacts_per_scored_symbol": {"operator": ">=", "threshold": 95, "window_bars": 105},
+    "minimum_valid_recent_impacts_per_scored_symbol": {"operator": ">=", "threshold": 19, "window_bars": 21},
+    "minimum_valid_symbols_per_impact_timestamp": {"operator": ">=", "threshold": 12},
+    "invalid_or_zero_volume_used_as_denominator": false,
+    "price_direction_close_location_signed_flow_or_funding_input": false
   },
   "a5_score_diagnostic": {
     "independent_semantic_coupling_approval_required": true,
@@ -58,13 +60,13 @@
     "minimum_positive_fold_pearson_count": {"operator": ">=", "threshold": 4, "total_folds": 6},
     "purge_cross_fold_endpoints": true
   },
-  "pivot_01_disposition": {
+  "final_pivot_02_disposition": {
     "all_gates_noncompensatory": true,
     "controls_permitted": false,
     "neighbor_runs_permitted": false,
     "same_family_replacement_permitted": false,
-    "core_failure_action": "reject_family",
-    "second_pivot_rule": "A second pivot remains available only through a separately preregistered genuinely different mechanism; it cannot be a UDCC rescue variant.",
+    "further_pivot_permitted": false,
+    "core_failure_action": "team_05_dnf",
     "qualification_claim_without_all_evidence": false
   },
   "private_qualifier": {

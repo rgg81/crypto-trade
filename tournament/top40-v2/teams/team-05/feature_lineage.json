@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "team_id": "team-05",
-  "family_id": "team05-up-down-capture-convexity-v1",
-  "candidate_id": "team05-udcc-pivot01-core-v1",
+  "family_id": "team05-liquidity-depth-migration-v1",
+  "candidate_id": "team05-ldm-pivot02-core-v1",
   "schedule": {"anchor_utc": "1970-01-01T00:00:00Z", "interval_hours": 168},
   "universe": {
     "source": "DecisionContext.eligible_symbols",
@@ -10,25 +10,45 @@
     "local_ticker_classification": false
   },
   "raw_inputs": {
-    "used": ["bars[symbol].open_time", "bars[symbol].close"],
-    "unused": ["open", "high", "low", "quote_volume", "funding", "auxiliary", "positions", "regime_labels"]
+    "used": [
+      "bars[symbol].open_time",
+      "bars[symbol].high",
+      "bars[symbol].low",
+      "bars[symbol].quote_volume"
+    ],
+    "unused": [
+      "open",
+      "close",
+      "taker_buy_quote_volume",
+      "funding",
+      "auxiliary",
+      "positions",
+      "regime_labels"
+    ]
   },
-  "availability": "A bar is available only when open_time + 8h <= decision_time. Future rows are ignored. Each admitted symbol requires one exact contiguous 253-price suffix on the selected common grid.",
+  "availability": "A bar is available only when open_time + 8h <= decision_time. Future rows are ignored. Each admitted symbol requires one exact contiguous 126-bar timestamp suffix on the selected modal grid; invalid high, low, or quote-volume values remain unavailable and are never imputed.",
   "transforms": [
-    "252 eight-hour symbol log returns",
-    "timestamp-wise median return across currently eligible valid native-crypto symbols",
-    "conditional OLS slope through the origin on positive common-return observations",
-    "conditional OLS slope through the origin on negative common-return observations",
-    "centered average ranks for each conditional slope",
-    "final score = 0.50 * (upside-capture rank - downside-capture rank)"
+    "unsigned log(high / low) for each valid past-closed bar",
+    "timestamp-wise quote-volume share across currently eligible valid native-crypto symbols",
+    "impact proxy = unsigned log range / max(valid positive quote-volume share, 1e-5)",
+    "per-symbol median impact over a 105-bar baseline window and disjoint 21-bar recent window",
+    "raw depth improvement = log(baseline median impact / recent median impact)",
+    "final score = centered cross-sectional fractional rank of raw depth improvement"
   ],
   "causality_properties": {
     "future_rows_used": false,
-    "paired_observation_order_matters": false,
     "future_market_direction_forecast": false,
-    "funding_or_return_rank_history_used": false,
+    "price_direction_or_close_location_used": false,
+    "taker_side_flow_used": false,
+    "funding_beta_residual_shock_or_return_rank_history_used": false,
     "state_or_learned_coefficients": false
   },
-  "a5_boundary": "The complete final finite built-in dict[str,float] crosses strategy.score_boundary once. Returned values determine span and selection; raw conditional betas are used only for the preregistered post-selection role-separation gate.",
+  "validity_floors": {
+    "minimum_symbols_per_timestamp": 12,
+    "minimum_valid_baseline_impacts_per_symbol": 95,
+    "minimum_valid_recent_impacts_per_symbol": 19,
+    "zero_or_missing_volume_is_a_valid_denominator": false
+  },
+  "a5_boundary": "The complete final finite built-in rank-score dict[str,float] crosses strategy.score_boundary once. Returned values determine score span and selection; raw depth improvement is used only for the preregistered post-selection sleeve-separation gate.",
   "execution_owner": "The organizer owns orders, fills, costs, funding cashflows, risk state, membership exits, and next-open execution."
 }

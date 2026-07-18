@@ -1,4 +1,4 @@
-"""Exact no-control risk-policy contract for Team05 UDCC pivot-01."""
+"""Exact no-control risk-policy contract for Team05 final LDM pivot."""
 
 from __future__ import annotations
 
@@ -18,11 +18,11 @@ def test_root_policy_is_byte_identical_to_active_pivot_template() -> None:
     assert POLICY_PATH.read_bytes() == template.read_bytes()
 
 
-def test_udcc_policy_has_no_enabled_control() -> None:
+def test_ldm_policy_has_no_enabled_control() -> None:
     policy = load_risk_policy(POLICY_PATH)
     assert dataclasses.asdict(policy) == {
         "schema_version": 1,
-        "policy_id": "team-05-udcc-none-v1",
+        "policy_id": "team-05-ldm-none-v1",
         "same_boundary_reentry": False,
         "volatility_target": {
             "enabled": False,

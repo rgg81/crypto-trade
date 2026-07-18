@@ -1,8 +1,8 @@
 {
   "timestamp_utc": "REPLACE_WITH_RESULT_TIMESTAMP_Z",
   "team_id": "team-05",
-  "family_id": "team05-up-down-capture-convexity-v1",
-  "candidate_id": "team05-udcc-pivot01-core-v1",
+  "family_id": "team05-liquidity-depth-migration-v1",
+  "candidate_id": "team05-ldm-pivot02-core-v1",
   "registration_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
   "status": "REPLACE_WITH_completed_failed_OR_interrupted",
   "failure_reason": null,
@@ -12,7 +12,7 @@
     "base_cost_daily_returns": "REPLACE_WITH_64_LOWERCASE_HEX",
     "doubled_cost_daily_returns": "REPLACE_WITH_64_LOWERCASE_HEX",
     "a5_score_diagnostic": "REPLACE_WITH_64_LOWERCASE_HEX",
-    "udcc_conditional_tape_diagnostic": "REPLACE_WITH_64_LOWERCASE_HEX"
+    "ldm_mechanism_diagnostic": "REPLACE_WITH_64_LOWERCASE_HEX"
   },
   "metrics_summary": {
     "all_hard_gates_pass": false,

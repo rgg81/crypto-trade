@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "policy_id": "team-05-udcc-none-v1",
+  "policy_id": "team-05-ldm-none-v1",
   "same_boundary_reentry": false,
   "volatility_target": {
     "enabled": false,

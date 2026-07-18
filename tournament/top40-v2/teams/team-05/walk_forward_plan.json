@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "team_id": "team-05",
-  "family_id": "team05-up-down-capture-convexity-v1",
-  "candidate_id": "team05-udcc-pivot01-core-v1",
+  "family_id": "team05-liquidity-depth-migration-v1",
+  "candidate_id": "team05-ldm-pivot02-core-v1",
   "evidence_class": "prospective-organizer-derived-equal-chronological-folds",
   "fold_count": 6,
   "boundary_owner": "central evaluator",
@@ -14,7 +14,7 @@
     "no test observation enters prior fold state",
     "purge every 168-hour A5 label that crosses a fold endpoint"
   ],
-  "model_rule": "Instantiate a clean frozen deterministic UDCC strategy in each fold. It has no fitted coefficients or learned state; each artifact still binds exact source, config, seed, risk policy, schedule, and fold dates.",
+  "model_rule": "Instantiate a clean frozen deterministic LDM strategy in each fold. It has no fitted coefficients or learned state; each artifact still binds exact source, config, seed, risk policy, schedule, and fold dates.",
   "stitching_rule": "Stitch test returns once in fold order with no gap, overlap, discarded fold, or training return.",
   "performance_gates": {
     "minimum_positive_folds": 5,
@@ -27,9 +27,11 @@
     "pooled_operator": ">",
     "minimum_positive_fold_pearson_count": 4
   },
-  "udcc_conditional_gates": {
-    "minimum_folds_positive_on_positive_common_tape_bars": 4,
-    "minimum_folds_positive_on_negative_common_tape_bars": 4
+  "ldm_mechanism_evidence": {
+    "minimum_valid_baseline_impacts_per_scored_symbol": 95,
+    "minimum_valid_recent_impacts_per_scored_symbol": 19,
+    "minimum_valid_symbols_per_timestamp": 12,
+    "minimum_selected_raw_depth_improvement_separation": 0.1
   },
   "folds": [
     {"fold_id": "fold-1", "ordinal": 1, "boundary_source": "organizer-derived"},
@@ -40,5 +42,5 @@
     {"fold_id": "fold-6", "ordinal": 6, "boundary_source": "organizer-derived"}
   ],
   "qualification_evidence_admissible": false,
-  "admissibility_condition": "A7 must accept the exact candidate registration, then the official run must bind all candidate-specific fold, target, return, A5, and conditional-tape artifacts."
+  "admissibility_condition": "A7 must accept the exact candidate registration, then the official run must bind all candidate-specific fold, target, return, A5, and LDM-mechanism artifacts."
 }

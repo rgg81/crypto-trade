@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "team_id": "team-05",
-  "family_id": "team05-up-down-capture-convexity-v1",
-  "candidate_id": "team05-udcc-pivot01-core-v1",
-  "candidate_role": "pivot-01-no-control-core",
+  "family_id": "team05-liquidity-depth-migration-v1",
+  "candidate_id": "team05-ldm-pivot02-core-v1",
+  "candidate_role": "final-pivot-02-no-control-core",
   "candidate_registration_sha256": "REPLACE_WITH_ACCEPTED_CANDIDATE_REGISTRATION_64_LOWERCASE_HEX",
   "fold_id": "REPLACE_WITH_fold-1_THROUGH_fold-6",
   "fold_declaration_path": "REPLACE_WITH_MATCHING_FOLD_DECLARATION_PATH",

@@ -1,15 +1,14 @@
-"""Team 05 pivot-01: up/down capture convexity (UDCC).
+"""Team 05 final pivot-02: liquidity-depth migration (LDM).
 
-UDCC estimates how each organizer-authorized native-crypto contract participated in positive
-and negative moves of the contemporaneous common crypto tape during the preceding 84 days.  A
-contract with high upside capture and low downside capture receives a high long-desirability
-score; the opposite asymmetry receives a low score.  The statistic uses no funding, volume,
-future direction forecast, lagged cross-sectional rank, or cumulative return signal.
+LDM measures whether a native-crypto contract's unsigned intrabar range is becoming smaller or
+larger per unit of contemporaneous cross-sectional quote-volume share.  Falling range-per-share
+means market depth is improving and receives a high long-desirability score; rising impact means
+depth is deteriorating and receives a low score.
 
-Universe classification is organizer-owned.  Amendment 0006 supplies point-in-time membership
-containing native crypto assets only and excludes stablecoin bases plus tokenized or synthetic
-TradFi securities, commodities, metals, and indexes.  This module never guesses asset class from
-ticker text.
+The mechanism uses no price direction, close location, taker-side flow, funding, residual return,
+beta, shock, trend, reversal, volatility rank, diffusion, or lead-lag input.  Universe
+classification is organizer-owned: Amendment 0006 supplies only point-in-time native-crypto
+members and this module never infers asset class from ticker text.
 """
 
 from __future__ import annotations
@@ -33,40 +32,44 @@ _RESERVED_SYMBOL = "__crypto_trade_rebalance__"
 
 @dataclasses.dataclass(frozen=True)
 class StrategyParameters:
-    """Complete fixed material configuration for the UDCC pivot core."""
+    """Complete fixed material configuration for the final LDM core."""
 
-    algorithm_id: str = "team05-udcc-v1"
+    algorithm_id: str = "team05-ldm-v1"
     rebalance_anchor_utc: str = "1970-01-01T00:00:00Z"
     bar_interval_hours: int = 8
     decision_interval_hours: int = 168
-    price_count: int = 253
+    history_bars: int = 126
+    baseline_bars: int = 105
+    recent_bars: int = 21
     maximum_latest_staleness_hours: int = 12
     minimum_symbols: int = 12
-    minimum_up_observations: int = 63
-    minimum_down_observations: int = 63
-    minimum_beta_denominator: float = 1e-8
-    maximum_abs_beta: float = 5.0
+    minimum_valid_baseline_bars: int = 95
+    minimum_valid_recent_bars: int = 19
+    volume_share_floor: float = 1e-5
+    maximum_log_range: float = 0.70
+    maximum_abs_log_impact_ratio: float = 4.0
     minimum_score_span: float = 0.50
     selection_fraction: float = 0.20
     minimum_side_symbols: int = 5
     maximum_side_symbols: int = 8
-    minimum_up_capture_separation: float = 0.10
-    minimum_down_capture_separation: float = 0.10
-    target_gross: float = 0.48
-    maximum_symbol_weight: float = 0.05
+    minimum_raw_separation: float = 0.10
+    target_gross: float = 0.36
+    maximum_symbol_weight: float = 0.04
     maximum_abs_net: float = 1e-12
 
     def __post_init__(self) -> None:
-        if self.algorithm_id != "team05-udcc-v1":
+        if self.algorithm_id != "team05-ldm-v1":
             raise ValueError("unexpected algorithm_id")
         integer_fields = (
             self.bar_interval_hours,
             self.decision_interval_hours,
-            self.price_count,
+            self.history_bars,
+            self.baseline_bars,
+            self.recent_bars,
             self.maximum_latest_staleness_hours,
             self.minimum_symbols,
-            self.minimum_up_observations,
-            self.minimum_down_observations,
+            self.minimum_valid_baseline_bars,
+            self.minimum_valid_recent_bars,
             self.minimum_side_symbols,
             self.maximum_side_symbols,
         )
@@ -74,11 +77,12 @@ class StrategyParameters:
             raise ValueError("integer configuration fields must be positive")
         if self.decision_interval_hours % self.bar_interval_hours:
             raise ValueError("decision interval must be a multiple of the bar interval")
-        if self.price_count != 253:
-            raise ValueError("UDCC requires exactly 253 prices")
-        return_count = self.price_count - 1
-        if self.minimum_up_observations + self.minimum_down_observations > return_count:
-            raise ValueError("conditional observation floors exceed the return sample")
+        if self.history_bars != self.baseline_bars + self.recent_bars:
+            raise ValueError("history must equal the disjoint baseline and recent windows")
+        if self.minimum_valid_baseline_bars > self.baseline_bars:
+            raise ValueError("baseline validity floor exceeds its window")
+        if self.minimum_valid_recent_bars > self.recent_bars:
+            raise ValueError("recent validity floor exceeds its window")
         if self.minimum_symbols < 2 * self.minimum_side_symbols:
             raise ValueError("minimum universe cannot support disjoint sleeves")
         if self.maximum_side_symbols < self.minimum_side_symbols:
@@ -86,43 +90,45 @@ class StrategyParameters:
         if not 0.0 < self.selection_fraction <= 0.5:
             raise ValueError("selection fraction must be inside (0, 0.5]")
         finite_positive = (
-            self.minimum_beta_denominator,
-            self.maximum_abs_beta,
+            self.volume_share_floor,
+            self.maximum_log_range,
+            self.maximum_abs_log_impact_ratio,
             self.minimum_score_span,
-            self.minimum_up_capture_separation,
-            self.minimum_down_capture_separation,
+            self.minimum_raw_separation,
             self.target_gross,
             self.maximum_symbol_weight,
             self.maximum_abs_net,
         )
         if any(not math.isfinite(value) or value <= 0.0 for value in finite_positive):
             raise ValueError("continuous configuration fields must be positive and finite")
+        if self.volume_share_floor >= 1.0 / self.minimum_symbols:
+            raise ValueError("volume-share floor cannot dominate the minimum cross section")
         if self.target_gross > 1.0 or self.maximum_symbol_weight > 0.10:
             raise ValueError("gross exposure or symbol cap exceeds the frozen range")
-        maximum_requested_weight = self.target_gross / (2 * self.minimum_side_symbols)
-        if maximum_requested_weight > self.maximum_symbol_weight:
+        if self.target_gross / (2 * self.minimum_side_symbols) > self.maximum_symbol_weight:
             raise ValueError("minimum sleeve size cannot implement the target gross")
 
 
 BASE_PARAMETERS = StrategyParameters()
 
 PREREGISTERED_CANDIDATE_OVERRIDES: dict[str, dict[str, object]] = {
-    "team05-udcc-pivot01-core-v1": {},
+    "team05-ldm-pivot02-core-v1": {},
 }
 
 PREREGISTERED_RISK_POLICY_TEMPLATES: dict[str, str] = {
-    "team05-udcc-pivot01-core-v1": "risk_policies/no-control.json",
+    "team05-ldm-pivot02-core-v1": "risk_policies/no-control.json",
 }
 
 
 @dataclasses.dataclass(frozen=True)
 class PreconstructionScore:
-    """Auditable conditional-capture record produced before portfolio construction."""
+    """Auditable depth-migration record produced before portfolio construction."""
 
     symbol: str
     score: float
-    beta_up: float
-    beta_down: float
+    raw_depth_improvement: float
+    baseline_impact: float
+    recent_impact: float
 
 
 def _as_utc(value: object) -> pd.Timestamp:
@@ -147,17 +153,31 @@ def _parse_open_times(raw: pd.Series) -> pd.DatetimeIndex | None:
     return pd.DatetimeIndex(parsed)
 
 
-def _closed_price_suffix(
+def _numeric_or_nan(values: list[object]) -> np.ndarray:
+    result: list[float] = []
+    for value in values:
+        if isinstance(value, (bool, np.bool_)):
+            result.append(math.nan)
+            continue
+        try:
+            result.append(float(value))
+        except (TypeError, ValueError, OverflowError):
+            result.append(math.nan)
+    return np.asarray(result, dtype=float)
+
+
+def _closed_bar_suffix(
     frame: pd.DataFrame,
     *,
     decision_time: pd.Timestamp,
     parameters: StrategyParameters,
-) -> pd.Series | None:
-    """Return one exact contiguous 253-price suffix using only past-closed bars."""
+) -> pd.DataFrame | None:
+    """Return an exact contiguous timestamp suffix; invalid values remain unavailable."""
+    required = {"open_time", "high", "low", "quote_volume"}
     if (
         not isinstance(frame, pd.DataFrame)
         or not isinstance(frame.index, pd.RangeIndex)
-        or not {"open_time", "close"}.issubset(frame.columns)
+        or not required.issubset(frame.columns)
     ):
         return None
     open_times = _parse_open_times(frame["open_time"])
@@ -168,22 +188,18 @@ def _closed_price_suffix(
     closed_mask = close_times <= decision_time
     if not bool(closed_mask.any()):
         return None
-
-    closed_values = frame.loc[closed_mask, "close"].tolist()
-    if any(isinstance(value, (bool, np.bool_)) for value in closed_values):
-        return None
-    try:
-        prices = np.asarray([float(value) for value in closed_values], dtype=float)
-    except (TypeError, ValueError, OverflowError):
-        return None
-    if not np.isfinite(prices).all() or bool((prices <= 0.0).any()):
-        return None
-
     admitted_times = close_times[closed_mask]
     if admitted_times.duplicated().any():
         return None
-    history = pd.Series(prices, index=admitted_times, dtype="float64").sort_index(kind="mergesort")
-    latest_close = history.index[-1]
+    closed = pd.DataFrame(
+        {
+            "high": _numeric_or_nan(frame.loc[closed_mask, "high"].tolist()),
+            "low": _numeric_or_nan(frame.loc[closed_mask, "low"].tolist()),
+            "quote_volume": _numeric_or_nan(frame.loc[closed_mask, "quote_volume"].tolist()),
+        },
+        index=admitted_times,
+    ).sort_index(kind="mergesort")
+    latest_close = closed.index[-1]
     latest_gap = decision_time - latest_close
     if latest_gap < pd.Timedelta(0) or latest_gap > pd.Timedelta(
         hours=parameters.maximum_latest_staleness_hours
@@ -191,12 +207,16 @@ def _closed_price_suffix(
         return None
     expected = pd.date_range(
         end=latest_close,
-        periods=parameters.price_count,
+        periods=parameters.history_bars,
         freq=interval,
     )
-    suffix = history.reindex(expected)
-    if suffix.isna().any():
+    if not bool(expected.isin(closed.index).all()):
         return None
+    suffix = closed.reindex(expected)
+    if len(suffix) != parameters.history_bars or suffix.index.has_duplicates:
+        return None
+    # Invalid field values remain NaN.  Later explicit window counts prevent them from being
+    # imputed or turned into artificial liquidity deterioration.
     return suffix
 
 
@@ -205,21 +225,20 @@ def _modal_grid_histories(
     *,
     decision_time: pd.Timestamp,
     parameters: StrategyParameters,
-) -> dict[str, pd.Series]:
+) -> dict[str, pd.DataFrame]:
     eligible_raw = tuple(context.eligible_symbols)
     if any(type(symbol) is not str or not symbol for symbol in eligible_raw):
         return {}
     if len(eligible_raw) != len(set(eligible_raw)):
         return {}
     eligible = sorted(symbol for symbol in eligible_raw if symbol != _RESERVED_SYMBOL)
-
-    histories: dict[str, pd.Series] = {}
+    histories: dict[str, pd.DataFrame] = {}
     groups: dict[tuple[int, ...], list[str]] = {}
     for symbol in eligible:
         frame = context.bars.get(symbol)
         if frame is None:
             continue
-        history = _closed_price_suffix(
+        history = _closed_bar_suffix(
             frame,
             decision_time=decision_time,
             parameters=parameters,
@@ -231,17 +250,14 @@ def _modal_grid_histories(
         groups.setdefault(signature, []).append(symbol)
     if not groups:
         return {}
-
-    # Prefer the grid shared by the most eligible symbols, then the most recent grid.  The final
-    # signature tie-break makes the choice independent of mapping or eligible-symbol order.
     selected_signature = min(
         groups,
         key=lambda signature: (-len(groups[signature]), -signature[-1], signature),
     )
-    selected_symbols = sorted(groups[selected_signature])
-    if len(selected_symbols) < parameters.minimum_symbols:
+    symbols = sorted(groups[selected_signature])
+    if len(symbols) < parameters.minimum_symbols:
         return {}
-    return {symbol: histories[symbol] for symbol in selected_symbols}
+    return {symbol: histories[symbol] for symbol in symbols}
 
 
 def _centered_fractional_ranks(values: Mapping[str, float]) -> dict[str, float]:
@@ -271,7 +287,7 @@ def preconstruction_scores(
     *,
     parameters: StrategyParameters = BASE_PARAMETERS,
 ) -> dict[str, PreconstructionScore]:
-    """Estimate conditional common-tape captures and return the complete final score map."""
+    """Estimate recent versus baseline unsigned range-per-volume-share migration."""
     decision_time = _as_utc(context.decision_time)
     histories = _modal_grid_histories(
         context,
@@ -280,66 +296,80 @@ def preconstruction_scores(
     )
     if len(histories) < parameters.minimum_symbols:
         return {}
-
     symbols = sorted(histories)
-    log_prices = np.vstack([np.log(histories[symbol].to_numpy(dtype=float)) for symbol in symbols])
-    returns = np.diff(log_prices, axis=1)
-    if returns.shape != (len(symbols), parameters.price_count - 1):
-        return {}
-    if not np.isfinite(returns).all():
-        return {}
-    common_returns = np.median(returns, axis=0)
-    up_mask = common_returns > 0.0
-    down_mask = common_returns < 0.0
-    if int(up_mask.sum()) < parameters.minimum_up_observations:
-        return {}
-    if int(down_mask.sum()) < parameters.minimum_down_observations:
-        return {}
+    high = np.vstack([histories[symbol]["high"].to_numpy(dtype=float) for symbol in symbols])
+    low = np.vstack([histories[symbol]["low"].to_numpy(dtype=float) for symbol in symbols])
+    volume = np.vstack(
+        [histories[symbol]["quote_volume"].to_numpy(dtype=float) for symbol in symbols]
+    )
+    valid = (
+        np.isfinite(high)
+        & np.isfinite(low)
+        & np.isfinite(volume)
+        & (high > low)
+        & (low > 0.0)
+        & (volume > 0.0)
+    )
+    log_range = np.full(high.shape, np.nan, dtype=float)
+    log_range[valid] = np.log(high[valid]) - np.log(low[valid])
+    valid &= (
+        np.isfinite(log_range) & (log_range > 0.0) & (log_range <= parameters.maximum_log_range)
+    )
 
-    up_denominator = float(np.dot(common_returns[up_mask], common_returns[up_mask]))
-    down_denominator = float(np.dot(common_returns[down_mask], common_returns[down_mask]))
-    if (
-        not math.isfinite(up_denominator)
-        or not math.isfinite(down_denominator)
-        or up_denominator <= parameters.minimum_beta_denominator
-        or down_denominator <= parameters.minimum_beta_denominator
-    ):
-        return {}
+    impact = np.full(high.shape, np.nan, dtype=float)
+    for column in range(parameters.history_bars):
+        column_valid = valid[:, column]
+        if int(column_valid.sum()) < parameters.minimum_symbols:
+            continue
+        total_volume = float(volume[column_valid, column].sum())
+        if not math.isfinite(total_volume) or total_volume <= 0.0:
+            continue
+        shares = volume[column_valid, column] / total_volume
+        denominators = np.maximum(shares, parameters.volume_share_floor)
+        impact[column_valid, column] = log_range[column_valid, column] / denominators
 
-    beta_up: dict[str, float] = {}
-    beta_down: dict[str, float] = {}
+    raw_improvement: dict[str, float] = {}
+    baseline_impact: dict[str, float] = {}
+    recent_impact: dict[str, float] = {}
+    baseline_end = parameters.baseline_bars
     for row_index, symbol in enumerate(symbols):
-        symbol_returns = returns[row_index]
-        up_value = float(np.dot(common_returns[up_mask], symbol_returns[up_mask])) / up_denominator
-        down_value = (
-            float(np.dot(common_returns[down_mask], symbol_returns[down_mask])) / down_denominator
-        )
+        baseline = impact[row_index, :baseline_end]
+        recent = impact[row_index, baseline_end:]
+        finite_baseline = baseline[np.isfinite(baseline) & (baseline > 0.0)]
+        finite_recent = recent[np.isfinite(recent) & (recent > 0.0)]
+        if len(finite_baseline) < parameters.minimum_valid_baseline_bars:
+            continue
+        if len(finite_recent) < parameters.minimum_valid_recent_bars:
+            continue
+        baseline_value = float(np.median(finite_baseline))
+        recent_value = float(np.median(finite_recent))
         if (
-            not math.isfinite(up_value)
-            or not math.isfinite(down_value)
-            or abs(up_value) > parameters.maximum_abs_beta
-            or abs(down_value) > parameters.maximum_abs_beta
+            not math.isfinite(baseline_value)
+            or not math.isfinite(recent_value)
+            or baseline_value <= 0.0
+            or recent_value <= 0.0
         ):
             continue
-        beta_up[symbol] = up_value
-        beta_down[symbol] = down_value
-    if len(beta_up) < parameters.minimum_symbols:
+        raw_value = math.log(baseline_value / recent_value)
+        if not math.isfinite(raw_value) or abs(raw_value) > parameters.maximum_abs_log_impact_ratio:
+            continue
+        raw_improvement[symbol] = raw_value
+        baseline_impact[symbol] = baseline_value
+        recent_impact[symbol] = recent_value
+    if len(raw_improvement) < parameters.minimum_symbols:
         return {}
 
-    up_ranks = _centered_fractional_ranks(beta_up)
-    down_ranks = _centered_fractional_ranks(beta_down)
-    result: dict[str, PreconstructionScore] = {}
-    for symbol in sorted(beta_up):
-        score = 0.50 * (up_ranks[symbol] - down_ranks[symbol])
-        if not math.isfinite(score) or not -1.0 <= score <= 1.0:
-            return {}
-        result[symbol] = PreconstructionScore(
+    ranks = _centered_fractional_ranks(raw_improvement)
+    return {
+        symbol: PreconstructionScore(
             symbol=symbol,
-            score=float(score),
-            beta_up=float(beta_up[symbol]),
-            beta_down=float(beta_down[symbol]),
+            score=float(ranks[symbol]),
+            raw_depth_improvement=float(raw_improvement[symbol]),
+            baseline_impact=float(baseline_impact[symbol]),
+            recent_impact=float(recent_impact[symbol]),
         )
-    return result
+        for symbol in sorted(raw_improvement)
+    }
 
 
 def candidate_score_values(
@@ -353,17 +383,23 @@ def candidate_score_values(
         row = scores[symbol]
         if not isinstance(row, PreconstructionScore) or row.symbol != symbol:
             return {}
-        values = (row.score, row.beta_up, row.beta_down)
+        values = (
+            row.score,
+            row.raw_depth_improvement,
+            row.baseline_impact,
+            row.recent_impact,
+        )
         if any(type(value) is not float or not math.isfinite(value) for value in values):
             return {}
         if not -1.0 <= row.score <= 1.0:
+            return {}
+        if row.baseline_impact <= 0.0 or row.recent_impact <= 0.0:
             return {}
 
     boundary_input = {symbol: float(scores[symbol].score) for symbol in ordered_symbols}
     boundary_output = score_boundary(boundary_input)
     if not isinstance(boundary_output, Mapping) or set(boundary_output) != set(boundary_input):
         return {}
-
     result: dict[str, float] = {}
     for symbol in ordered_symbols:
         value = boundary_output[symbol]
@@ -408,7 +444,6 @@ def scores_to_target_weights(
     score_span = max(adapted_values.values()) - min(adapted_values.values())
     if score_span < parameters.minimum_score_span:
         return {}
-
     count = len(adapted_values)
     side_count = min(
         parameters.maximum_side_symbols,
@@ -424,17 +459,10 @@ def scores_to_target_weights(
     )
     if set(long_symbols) & set(short_symbols):
         return {}
-
-    up_separation = statistics.median(scores[symbol].beta_up for symbol in long_symbols) - (
-        statistics.median(scores[symbol].beta_up for symbol in short_symbols)
-    )
-    down_separation = statistics.median(scores[symbol].beta_down for symbol in short_symbols) - (
-        statistics.median(scores[symbol].beta_down for symbol in long_symbols)
-    )
-    if (
-        up_separation < parameters.minimum_up_capture_separation
-        or down_separation < parameters.minimum_down_capture_separation
-    ):
+    raw_separation = statistics.median(
+        scores[symbol].raw_depth_improvement for symbol in long_symbols
+    ) - statistics.median(scores[symbol].raw_depth_improvement for symbol in short_symbols)
+    if raw_separation < parameters.minimum_raw_separation:
         return {}
 
     side_budget = parameters.target_gross / 2.0
@@ -453,8 +481,8 @@ def scores_to_target_weights(
 
 
 @dataclasses.dataclass
-class UpDownCaptureConvexityStrategy(TargetStrategy):
-    """Stateless weekly UDCC selector."""
+class LiquidityDepthMigrationStrategy(TargetStrategy):
+    """Stateless weekly direction-free liquidity migration selector."""
 
     parameters: StrategyParameters = BASE_PARAMETERS
 
@@ -478,20 +506,20 @@ class UpDownCaptureConvexityStrategy(TargetStrategy):
 
 def build_strategy_from_parameters(
     overrides: Mapping[str, object] | None = None,
-) -> UpDownCaptureConvexityStrategy:
+) -> LiquidityDepthMigrationStrategy:
     """Construct the exact preregistered candidate without hidden state."""
     updates = dict(overrides or {})
     allowed = {field.name for field in dataclasses.fields(StrategyParameters)}
     unknown = sorted(set(updates) - allowed)
     if unknown:
         raise ValueError(f"unknown strategy parameters: {unknown}")
-    return UpDownCaptureConvexityStrategy(
+    return LiquidityDepthMigrationStrategy(
         parameters=dataclasses.replace(BASE_PARAMETERS, **updates)
     )
 
 
 def build_strategy() -> TargetStrategy:
-    """Canonical evaluator entrypoint for the explicitly materialized UDCC candidate."""
+    """Canonical evaluator entrypoint for the explicitly materialized LDM candidate."""
     candidate_id = candidate_variant.ACTIVE_CANDIDATE_ID
     expected_overrides = PREREGISTERED_CANDIDATE_OVERRIDES.get(candidate_id)
     if expected_overrides is None:
