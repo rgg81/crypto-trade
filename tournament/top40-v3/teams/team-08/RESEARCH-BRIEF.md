@@ -78,6 +78,19 @@ by freshly computed daily forecasts. Membership exits are permanently removed fr
 vintages so a re-entry cannot resurrect stale exposure. Survivors are never renormalized; the
 candidate returns flat if an exit would breach its net cap.
 
+Trial 2 (`t08-residual-momentum-21-63-126-3d-v2`) improved the intended cost metrics but
+remained AMBER. Train Sharpe rose from 0.674 to 0.706, annualized return from 7.37% to 8.26%,
+and doubled-cost Sharpe from 0.387 to 0.465. Max drawdown increased from 14.42% to 18.11%,
+trade count rose to 31,908 as small cohort changes were executed, and stress Sharpe declined
+from +0.352 to -0.243; bear, bull, and chop remained positive. The only public-core miss is
+still train Sharpe, now short by 0.044.
+
+Team 08 is stopped after this diagnosis-driven revision. Trying two-day, four-day, or another
+nearby vintage solely to cross 0.75 would be IS parameter mining. V1 remains the lower-drawdown,
+all-regime-positive reference; V2 is the stronger aggregate and doubled-cost reference. Both are
+honest strong-AMBER evidence, but neither is promoted as GREEN or allowed to inherit Team 06's
+qualification.
+
 ## Collision guard
 
 This team owns cross-sectional residual continuation across multi-week horizons. Do not use
