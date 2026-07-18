@@ -49,3 +49,4 @@
 {"event": "team_frozen", "family_id": "t08-oi-price-confirmation-v3", "n_sources": 2, "sharpe_1x": 0.459646717238972, "team_id": "team-08", "ts": "2026-07-18T19:52:39+00:00"}
 {"event": "team_frozen", "family_id": "t10-volume-price-divergence-v1", "n_sources": 2, "sharpe_1x": 1.4185615877351152, "team_id": "team-10", "ts": "2026-07-18T19:53:14+00:00"}
 {"event": "team_frozen", "family_id": "t09-trade-size-composition-v3", "n_sources": 2, "sharpe_1x": 0.8298696332986752, "team_id": "team-09", "ts": "2026-07-18T19:55:16+00:00"}
+{"blocks": 0, "cohort_flags": ["field momentum-correlated (6/10)", "universal front-loaded edge", "noise floor ~0.4", "t06/t08 coverage dilution", "t08/t10 net-long tilts", "orchestrator hygiene: aggregate leaked to t07 pre-freeze (harmless, lesson recorded)"], "event": "critic_phase3_complete", "fails": 0, "ts": "2026-07-18T20:14:36+00:00", "verdicts": "10/10 PASS"}
