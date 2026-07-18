@@ -1,0 +1,15 @@
+{
+  "candidate_id": "team05-ldm-pivot02-core-v1",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "organizer_journal_head_sha256": "5993863b442559057608e1bc15c5272e8786233f60eb24ab8123a60638fa8185",
+  "private_attempt_number": null,
+  "registration_sha256": "8059da7985b1be583571388073c75aa0c45db729d80eb96ccbb337cf6a870433",
+  "reserved_at_utc": "2026-07-18T12:13:37.739897+00:00",
+  "risk_policy_sha256": "91b7300b43cbc189cc133836253e2921d5c2a34fbb645de89cb08e45dcc10be9",
+  "schema_version": 1,
+  "source_bundle_sha256": "4ab85a07f4c18288ce238a25b8232cbf2d0078544712694d9d2add3b2a4989fa",
+  "stage": "development",
+  "strategy_sha256": "33d8a4ffd762d514a31e509e07ab455bdba3e389a23f79acbcc3c497cfec1696",
+  "team_id": "team-05",
+  "tournament": "quant-portfolio-blind-top40-v2"
+}
