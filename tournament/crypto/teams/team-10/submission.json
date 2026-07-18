@@ -1,0 +1,50 @@
+{
+  "family_id": "t10-volume-price-divergence-v1",
+  "frozen_at_utc": "2026-07-18T19:53:14+00:00",
+  "harness": "PASS",
+  "net_is_csv_sha256": "5c318ef1c411c7e1a8f7c8cb29911145c49c73de38de81bc7f698ad2fc8cde4d",
+  "reported": {
+    "1x": {
+      "ann_turnover": 276.52007498941873,
+      "maxdd": -0.35995702664851204,
+      "mean_gross": 0.992720685338914,
+      "mean_net": 0.2117404352487609,
+      "median_names_long": 20.0,
+      "median_names_short": 18.0,
+      "n_months": 54,
+      "regime_sharpe": {
+        "bear": 0.9306828835550032,
+        "bull": 2.8840475102491943,
+        "chop": -0.4080624923531176
+      },
+      "sharpe": 1.4185615877351152,
+      "total_cost": 0.7946264515501038,
+      "total_funding_pnl": -0.05081335302822981,
+      "total_return": 9.816576930837076
+    },
+    "2x": {
+      "ann_turnover": 276.52007498941873,
+      "maxdd": -0.40507683101764735,
+      "mean_gross": 0.992720685338914,
+      "mean_net": 0.2117404352487609,
+      "median_names_long": 20.0,
+      "median_names_short": 18.0,
+      "n_months": 54,
+      "regime_sharpe": {
+        "bear": 0.5574210459481883,
+        "bull": 2.4628258562327177,
+        "chop": -0.8711484540694019
+      },
+      "sharpe": 0.9920391569582074,
+      "total_cost": 1.5892529031002076,
+      "total_funding_pnl": -0.05081335302822981,
+      "total_return": 3.895530459736478
+    }
+  },
+  "schema": 1,
+  "sources_sha256": {
+    "strategy.py": "760ab76a58e6f00c2a29521f166f1d114fec77fa5a9de84ac022533aac578404",
+    "test_strategy.py": "46fd5dd5767ae04c9504367948fa859fbc2d476bae6947ef35272ab1cc258e4e"
+  },
+  "team_id": "team-10"
+}

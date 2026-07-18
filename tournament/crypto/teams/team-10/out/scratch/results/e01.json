@@ -1,0 +1,212 @@
+[
+  {
+    "label": "MOM_L3_H3",
+    "sharpe_1x": -0.5494,
+    "sharpe_2x": -1.8657,
+    "maxdd": -0.8415,
+    "ann_turnover": 629.55,
+    "breadth_ls": [
+      20.0,
+      19.0
+    ],
+    "regimes": {
+      "bull": 0.374,
+      "bear": -0.739,
+      "chop": -2.756
+    },
+    "mean_gross": 0.993,
+    "mean_net": 0.0769,
+    "funding_pnl": 0.0166,
+    "total_cost": 1.7826,
+    "total_return": -0.6973
+  },
+  {
+    "label": "REV_L3_H3",
+    "sharpe_1x": -2.4813,
+    "sharpe_2x": -4.0289,
+    "maxdd": -0.9869,
+    "ann_turnover": 629.55,
+    "breadth_ls": [
+      19.0,
+      20.0
+    ],
+    "regimes": {
+      "bull": -2.59,
+      "bear": -1.896,
+      "chop": -2.025
+    },
+    "mean_gross": 0.993,
+    "mean_net": -0.0769,
+    "funding_pnl": -0.0166,
+    "total_cost": 1.7826,
+    "total_return": -0.9842
+  },
+  {
+    "label": "MOM_L6_H3",
+    "sharpe_1x": 0.4292,
+    "sharpe_2x": -0.4989,
+    "maxdd": -0.5306,
+    "ann_turnover": 410.45,
+    "breadth_ls": [
+      20.0,
+      19.0
+    ],
+    "regimes": {
+      "bull": 1.883,
+      "bear": -0.213,
+      "chop": -1.108
+    },
+    "mean_gross": 0.993,
+    "mean_net": 0.0672,
+    "funding_pnl": 0.0232,
+    "total_cost": 1.1626,
+    "total_return": 0.5474
+  },
+  {
+    "label": "REV_L6_H3",
+    "sharpe_1x": -2.4241,
+    "sharpe_2x": -3.4387,
+    "maxdd": -0.9861,
+    "ann_turnover": 410.45,
+    "breadth_ls": [
+      19.0,
+      20.0
+    ],
+    "regimes": {
+      "bull": -3.727,
+      "bear": -1.343,
+      "chop": -1.014
+    },
+    "mean_gross": 0.993,
+    "mean_net": -0.0672,
+    "funding_pnl": -0.0232,
+    "total_cost": 1.1626,
+    "total_return": -0.9842
+  },
+  {
+    "label": "MOM_L9_H3",
+    "sharpe_1x": 1.261,
+    "sharpe_2x": 0.4893,
+    "maxdd": -0.3781,
+    "ann_turnover": 321.53,
+    "breadth_ls": [
+      20.0,
+      19.0
+    ],
+    "regimes": {
+      "bull": 2.842,
+      "bear": 0.333,
+      "chop": -0.246
+    },
+    "mean_gross": 0.993,
+    "mean_net": 0.0646,
+    "funding_pnl": 0.0365,
+    "total_cost": 0.9097,
+    "total_return": 4.6499
+  },
+  {
+    "label": "REV_L9_H3",
+    "sharpe_1x": -2.8541,
+    "sharpe_2x": -3.6466,
+    "maxdd": -0.9917,
+    "ann_turnover": 321.53,
+    "breadth_ls": [
+      19.0,
+      20.0
+    ],
+    "regimes": {
+      "bull": -4.361,
+      "bear": -1.464,
+      "chop": -1.605
+    },
+    "mean_gross": 0.993,
+    "mean_net": -0.0646,
+    "funding_pnl": -0.0365,
+    "total_cost": 0.9097,
+    "total_return": -0.9911
+  },
+  {
+    "label": "MOM_L12_H3",
+    "sharpe_1x": 1.1223,
+    "sharpe_2x": 0.4841,
+    "maxdd": -0.4266,
+    "ann_turnover": 275.4,
+    "breadth_ls": [
+      20.0,
+      19.0
+    ],
+    "regimes": {
+      "bull": 2.661,
+      "bear": 0.707,
+      "chop": -0.949
+    },
+    "mean_gross": 0.993,
+    "mean_net": 0.0634,
+    "funding_pnl": 0.0458,
+    "total_cost": 0.7789,
+    "total_return": 3.8049
+  },
+  {
+    "label": "REV_L12_H3",
+    "sharpe_1x": -2.4375,
+    "sharpe_2x": -3.0992,
+    "maxdd": -0.9889,
+    "ann_turnover": 275.4,
+    "breadth_ls": [
+      19.0,
+      20.0
+    ],
+    "regimes": {
+      "bull": -3.804,
+      "bear": -1.758,
+      "chop": -0.589
+    },
+    "mean_gross": 0.993,
+    "mean_net": -0.0634,
+    "funding_pnl": -0.0458,
+    "total_cost": 0.7789,
+    "total_return": -0.9851
+  },
+  {
+    "label": "MOM_L21_H3",
+    "sharpe_1x": 1.329,
+    "sharpe_2x": 0.8443,
+    "maxdd": -0.433,
+    "ann_turnover": 209.49,
+    "breadth_ls": [
+      20.0,
+      19.0
+    ],
+    "regimes": {
+      "bull": 2.075,
+      "bear": 1.394,
+      "chop": -0.349
+    },
+    "mean_gross": 0.994,
+    "mean_net": 0.0633,
+    "funding_pnl": 0.0766,
+    "total_cost": 0.592,
+    "total_return": 5.8522
+  },
+  {
+    "label": "REV_L21_H3",
+    "sharpe_1x": -2.3174,
+    "sharpe_2x": -2.814,
+    "maxdd": -0.9862,
+    "ann_turnover": 209.49,
+    "breadth_ls": [
+      19.0,
+      20.0
+    ],
+    "regimes": {
+      "bull": -2.833,
+      "bear": -2.311,
+      "chop": -0.656
+    },
+    "mean_gross": 0.994,
+    "mean_net": -0.0633,
+    "funding_pnl": -0.0766,
+    "total_cost": 0.592,
+    "total_return": -0.9825
+  }
+]

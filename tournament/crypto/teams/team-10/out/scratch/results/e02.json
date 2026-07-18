@@ -1,0 +1,107 @@
+[
+  {
+    "label": "VPD_D1_L3_B90_H3",
+    "sharpe_1x": -1.7318,
+    "sharpe_2x": -3.1961,
+    "maxdd": -0.954,
+    "ann_turnover": 760.95,
+    "breadth_ls": [
+      20.0,
+      16.0
+    ],
+    "regimes": {
+      "bull": -2.046,
+      "bear": -0.476,
+      "chop": -2.23
+    },
+    "mean_gross": 0.992,
+    "mean_net": 0.1405,
+    "funding_pnl": -0.0686,
+    "total_cost": 2.183,
+    "total_return": -0.9512
+  },
+  {
+    "label": "VPD_D1_L6_B90_H3",
+    "sharpe_1x": -0.4542,
+    "sharpe_2x": -1.6078,
+    "maxdd": -0.6856,
+    "ann_turnover": 534.65,
+    "breadth_ls": [
+      21.0,
+      16.0
+    ],
+    "regimes": {
+      "bull": 0.048,
+      "bear": -0.421,
+      "chop": -1.094
+    },
+    "mean_gross": 0.991,
+    "mean_net": 0.1592,
+    "funding_pnl": -0.0811,
+    "total_cost": 1.5329,
+    "total_return": -0.6282
+  },
+  {
+    "label": "VPD_D1_L9_B90_H3",
+    "sharpe_1x": -0.0511,
+    "sharpe_2x": -1.1701,
+    "maxdd": -0.5673,
+    "ann_turnover": 436.93,
+    "breadth_ls": [
+      21.0,
+      15.0
+    ],
+    "regimes": {
+      "bull": 0.684,
+      "bear": 0.125,
+      "chop": -1.531
+    },
+    "mean_gross": 0.991,
+    "mean_net": 0.1643,
+    "funding_pnl": -0.0743,
+    "total_cost": 1.2535,
+    "total_return": -0.2913
+  },
+  {
+    "label": "VPD_D1_L12_B90_H3",
+    "sharpe_1x": -0.0385,
+    "sharpe_2x": -0.9073,
+    "maxdd": -0.5833,
+    "ann_turnover": 380.47,
+    "breadth_ls": [
+      21.0,
+      15.0
+    ],
+    "regimes": {
+      "bull": 1.012,
+      "bear": -0.055,
+      "chop": -1.714
+    },
+    "mean_gross": 0.991,
+    "mean_net": 0.1683,
+    "funding_pnl": -0.0683,
+    "total_cost": 1.0908,
+    "total_return": -0.2844
+  },
+  {
+    "label": "VPD_D1_L21_B90_H3",
+    "sharpe_1x": 0.0843,
+    "sharpe_2x": -0.5295,
+    "maxdd": -0.717,
+    "ann_turnover": 300.57,
+    "breadth_ls": [
+      22.0,
+      14.0
+    ],
+    "regimes": {
+      "bull": 1.14,
+      "bear": -0.663,
+      "chop": -0.437
+    },
+    "mean_gross": 0.991,
+    "mean_net": 0.1816,
+    "funding_pnl": -0.0374,
+    "total_cost": 0.8614,
+    "total_return": -0.1188
+  }
+]
