@@ -1,0 +1,43 @@
+{
+  "timestamp_utc": "2026-07-18T09:42:28Z",
+  "team_id": "team-05",
+  "family_id": "team05-causal-residual-trend-reversal-v1",
+  "candidate_id": "team05-crtr-ab-turnover",
+  "strategy_sha256": "4188181fbf28f805c9df0c11e5eb0244235aedc7938f5beb27d3614b86dc58c0",
+  "source_bundle_sha256": "b927314eeb27313d45fd5a0a9a2fcdc719e234d8e8db037cf6e8da32b2cbcd41",
+  "risk_config_sha256": "b0f58fd66420bc38c4ce0838fbbd785cbec1476faad97bfdb151f55d2c3ce0ca",
+  "config_sha256": "bd0e4f70bcf335b2ac4e44ec049b89b8e8eaf4c6ac6502574d0accf12d9d9947",
+  "parameters": {
+    "_top40_v2_control_activation": {
+      "core_candidate_id": "team05-crtr-core-v2-infra-r1",
+      "decision": "pass-controls-activated",
+      "evidence_path": "reports-top40-v2/team-05/post-result/team05-crtr-core-v2-infra-r1-core-activation.json",
+      "evidence_sha256": "028dfc296f6553c630a0f6ded176e00fbc5e48bfaf590d448fc0dbc29a58baf4"
+    },
+    "_top40_v2_score_adapter": {
+      "adapter_id": "top40-v2-declared-score-boundary-v1",
+      "manifest_sha256": "2320fbaa766f6135d4c923c06073e760c1a410f2fabb1ed010ebb270d1440c62",
+      "schema_version": 1
+    },
+    "_top40_v2_runtime_authority": {
+      "active_entrypoint_path": "scripts/top40_v2_tournament_runtime_preload_v7.py",
+      "active_entrypoint_sha256": "8a4ada10176d2606df3f358fc188e21b45153ad9a7270f36908736f03322a3a9",
+      "amendment_id": "top40-v2-amendment-0007-frozen-worker-a5-protocol-preload",
+      "integration_freeze_commit": "c8b917ca49306d5200a4e08848e73ff6f5a18bf3",
+      "integration_freeze_path": "tournament/top40-v2/amendments/0007/integration-freeze.json",
+      "integration_freeze_sha256": "6f77a146e7b414eabd20c5cc9321a95493bb98116dde07ef79d9eb009b6a6f51"
+    },
+    "base_candidate_id": "team05-crtr-base-v1",
+    "strategy_parameters": "frozen_config.json",
+    "risk_policy_cell": "ablations.json:risk-turnover using risk_policy.json",
+    "evaluator_cost_outputs": [
+      1.0,
+      2.0
+    ],
+    "fold_plan": "walk_forward_plan.json",
+    "activation_precondition": "the preregistered no-control core activation gate passed; active A5/A6/A7 authority and the strict candidate-bound ancestry are verified"
+  },
+  "seed": 20260801,
+  "thesis": "CRTR intermediate relative continuation plus direction-conditioned short reversal should support bull-long, bear-short, and combined-chop roles at conservative exposure.",
+  "falsifier": "Any official or Team-05 hard gate, causal test, declared sleeve role, doubled-cost threshold, fold threshold, or gated neighborhood threshold fails."
+}
