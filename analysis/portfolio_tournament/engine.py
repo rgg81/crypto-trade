@@ -181,8 +181,11 @@ def build_panels(bundle: dict) -> tuple[dict, dict, dict]:
     """
     klines = bundle["klines"]
     cols = sorted(klines)
-    lo = min(int(df.index.min()) for df in klines.values())
-    hi = max(int(df.index.max()) for df in klines.values())
+    nonempty = [df for df in klines.values() if len(df)]
+    if not nonempty:
+        raise ValueError("build_panels: every kline frame is empty")
+    lo = min(int(df.index.min()) for df in nonempty)
+    hi = max(int(df.index.max()) for df in nonempty)
     grid_ms = pd.Index(pd.RangeIndex(lo, hi + tc.STEP_MS, tc.STEP_MS), name="open_time")
     dt = pd.to_datetime(grid_ms, unit="ms")
 

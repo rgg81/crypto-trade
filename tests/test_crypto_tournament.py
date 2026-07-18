@@ -600,3 +600,37 @@ def test_stage1_rank_tiebreakers_and_noise_floor():
     assert [e["team_id"] for e in ranked] == ["c", "b", "a", "d"]
     se = tlb.sharpe_se(1.0, 54)
     assert 0.3 < se < 0.8  # ~sqrt((1+1/24)/54)*sqrt(12) ≈ 0.48
+
+
+# ------------------------------------------------------------------ harness regressions ---------
+def test_truncation_survives_late_listing(tmp_path):
+    """A cut BEFORE a late listing's first candle leaves an empty kline frame — the panel
+    builder must tolerate it (regression: int(NaN) crash on truncated bundles)."""
+    b = synth_bundle(4, 420)
+    late = synth_klines(100, seed=77, start_ms=GRID0 + 320 * STEP)
+    b["klines"]["LATEUSDT"] = late
+    b["funding"]["LATEUSDT"] = pd.Series(
+        0.0001, index=pd.Index(np.asarray(late.index) + STEP, name="funding_time")
+    )
+    b["elig"]["LATEUSDT"] = 0
+    dest, man = tmp_path / "data_is", tmp_path / "MANIFEST.json"
+    write_snapshot_dir(b, dest, man)
+    td = make_team(tmp_path)
+    rep = th.audit_strategy(td, dest, man, n_truncations=2)
+    assert rep.ok, rep.violations  # cuts include pre-listing dates via seeded picks/midpoint
+
+
+def test_samebar_perturbation_tolerates_int64_oi(tmp_path):
+    """OI archives carry int64 columns; the ×1.001 same-bar perturbation must not raise
+    (regression: pandas-3 'Invalid value for dtype int64')."""
+    b = synth_bundle(3, 420)
+    grid = b["klines"]["C00USDT"].index
+    b["oi"]["C00USDT"] = pd.DataFrame(
+        {c: np.arange(len(grid), dtype=np.int64) + 1 for c in te.AUX_OI_COLS.values()},
+        index=grid,
+    )
+    dest, man = tmp_path / "data_is", tmp_path / "MANIFEST.json"
+    write_snapshot_dir(b, dest, man)
+    td = make_team(tmp_path)
+    rep = th.audit_strategy(td, dest, man, n_truncations=2)
+    assert rep.samebar_ok and rep.corruption_ok, rep.violations

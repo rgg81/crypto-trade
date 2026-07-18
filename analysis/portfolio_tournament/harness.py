@@ -205,8 +205,8 @@ def corrupt_bundle_after(bundle: dict, cut) -> dict:
     ms = _cut_ms(cut)
     klines: dict[str, pd.DataFrame] = {}
     for s, df in bundle["klines"].items():
-        d = df.copy()
-        m = d.index > ms
+        d = df.astype(float)  # float-cast: int columns (trades) must accept mangled values;
+        m = d.index > ms  # build_panels float-casts everything anyway, so this is invisible
         d.loc[m, list(_OHLC)] = d.loc[m, list(_OHLC)] * 7.0 + 5.0
         vc = [c for c in _VOLUME_COLS if c in d.columns]
         d.loc[m, vc] = d.loc[m, vc] * 3.0 + 1.0
@@ -219,7 +219,7 @@ def corrupt_bundle_after(bundle: dict, cut) -> dict:
         funding[s] = g
     oi: dict[str, pd.DataFrame] = {}
     for s, df in bundle["oi"].items():
-        d = df.copy()
+        d = df.astype(float)
         m = d.index > ms
         d.loc[m] = d.loc[m] * 3.0 + 1.0
         oi[s] = d
@@ -246,7 +246,7 @@ def perturb_samebar(bundle: dict, t) -> dict:
         funding[s] = g
     oi: dict[str, pd.DataFrame] = {}
     for s, df in bundle["oi"].items():
-        d = df.copy()
+        d = df.astype(float)  # float-cast: ×1.001 must not hit int64 columns (pandas 3 raises)
         if ms in d.index:
             d.loc[ms] = d.loc[ms] * 1.001
         oi[s] = d
