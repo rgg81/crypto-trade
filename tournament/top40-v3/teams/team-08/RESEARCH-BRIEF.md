@@ -55,6 +55,29 @@ exposure explains the return, or the inversion wins. Horizon, coin, or point-in-
 concentration, weak fast/slow consensus, imperfect beta neutrality, and fold, quarter, regime, or
 role weakness reduce robustness and trigger repair but are not individual vetoes.
 
+## Opening-probe coaching record
+
+Trial 1 (`t08-residual-momentum-21-63-126-v1`) is a broad AMBER: train Sharpe 0.674,
+annualized return 7.37%, doubled-cost Sharpe 0.387, max drawdown 14.42%, and 60% positive
+quarters. All four regimes were positive (bear 0.321, bull 1.261, chop 0.107, stress 0.352).
+It missed only the 0.75 train-Sharpe target, by 0.076.
+
+Artifact attribution shows a credible alpha with an execution defect: pre-cost Sharpe was
+1.058, while 21,542 trades accumulated 10.67% arithmetic realized costs. Trial 2 is therefore
+fixed as a holding-structure revision, not an alpha search. It will retain the exact score,
+horizons, ranks, sign, gross, and daily decision schedule, but average three independently dated
+daily cohorts using a constant divisor of three. A cohort expires after three calendar days; an
+invalid current signal clears every vintage and returns flat, preserving the original fail-flat
+data contract. In a stable universe, replacing one cohort bounds one-way signal turnover at
+`0.44 / 3 = 0.1467`.
+
+The candidate's redundant 21-bar organizer time stop is disabled because dated cohorts now own
+signal expiry; repeated valid forecasts may still maintain a position. The close-confirmed 9%
+position stop and its six-bar cooldown remain unchanged; a reopened target must still be backed
+by freshly computed daily forecasts. Membership exits are permanently removed from stored
+vintages so a re-entry cannot resurrect stale exposure. Survivors are never renormalized; the
+candidate returns flat if an exit would breach its net cap.
+
 ## Collision guard
 
 This team owns cross-sectional residual continuation across multi-week horizons. Do not use

@@ -14,7 +14,6 @@ import pandas as pd
 
 from crypto_trade.tournament.protocol import DecisionContext
 
-
 TEAM_DIR = Path(__file__).resolve().parent
 DECISION_TIME = pd.Timestamp("2023-06-26T00:00:00Z")
 SEED = 20260718
@@ -114,6 +113,12 @@ def test_deterministic_order_independent_targets_and_ties() -> None:
     )
     assert list(tied) == sorted(tied)
 
+    stateful = strategy_module.build_strategy()
+    duplicate_first = stateful.target_weights(context, seed=SEED)
+    duplicate_second = stateful.target_weights(context, seed=SEED)
+    assert duplicate_first == duplicate_second
+    assert len(stateful._vintages) == 1
+
 
 def test_weights_are_broad_bounded_exactly_neutral_and_eligible_only() -> None:
     context = _context()
@@ -127,8 +132,69 @@ def test_weights_are_broad_bounded_exactly_neutral_and_eligible_only() -> None:
     assert len(longs) >= 8
     assert len(shorts) >= 8
     assert max(abs(value) for value in weights.values()) <= 0.03 + 1e-12
-    assert math.fsum(abs(value) for value in weights.values()) <= 0.5 + 1e-12
+    assert math.fsum(abs(value) for value in weights.values()) <= 0.44 / 3.0 + 1e-12
     assert abs(math.fsum(weights.values())) <= 1e-12
+
+
+def test_three_daily_vintages_ramp_and_membership_exits_only_reduce_risk() -> None:
+    parameters = strategy_module.StrategyParameters()
+    longs = tuple((f"L{index}USDT", 0.0275) for index in range(8))
+    shorts = tuple((f"S{index}USDT", -0.0275) for index in range(8))
+    cohort = tuple(sorted((*longs, *shorts)))
+    eligible = frozenset(symbol for symbol, _ in cohort)
+    start = DECISION_TIME - pd.Timedelta(days=2)
+    full_vintages = tuple(
+        strategy_module.Vintage(
+            decision_time=start + pd.Timedelta(days=offset),
+            weights=cohort,
+        )
+        for offset in range(3)
+    )
+
+    ramp = strategy_module._aggregate_vintages(
+        full_vintages[:1],
+        eligible_symbols=eligible,
+        parameters=parameters,
+    )
+    mature = strategy_module._aggregate_vintages(
+        full_vintages,
+        eligible_symbols=eligible,
+        parameters=parameters,
+    )
+    one_short_exit = strategy_module._aggregate_vintages(
+        full_vintages,
+        eligible_symbols=eligible - {"S0USDT"},
+        parameters=parameters,
+    )
+    excessive_short_exits = strategy_module._aggregate_vintages(
+        full_vintages,
+        eligible_symbols=frozenset(symbol for symbol, _ in longs),
+        parameters=parameters,
+    )
+
+    assert math.isclose(math.fsum(abs(value) for value in ramp.values()), 0.44 / 3.0)
+    assert math.isclose(math.fsum(abs(value) for value in mature.values()), 0.44)
+    assert "S0USDT" not in one_short_exit
+    assert all(
+        math.isclose(one_short_exit[symbol], mature[symbol])
+        for symbol in one_short_exit
+    )
+    assert excessive_short_exits == {}
+
+
+def test_invalid_current_signal_clears_all_stored_vintages() -> None:
+    context = _context()
+    stateful = strategy_module.build_strategy()
+    assert stateful.target_weights(context, seed=SEED)
+    assert len(stateful._vintages) == 1
+
+    invalid_next_day = dataclasses.replace(
+        context,
+        decision_time=DECISION_TIME + pd.Timedelta(days=1),
+        bars={symbol: frame.tail(100) for symbol, frame in context.bars.items()},
+    )
+    assert stateful.target_weights(invalid_next_day, seed=SEED) == {}
+    assert len(stateful._vintages) == 0
 
 
 def test_three_horizons_agree_on_relative_leaders_and_laggards() -> None:

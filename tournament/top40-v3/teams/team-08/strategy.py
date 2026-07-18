@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import math
+from collections import deque
 
 import numpy as np
 import pandas as pd
@@ -28,6 +29,7 @@ class StrategyParameters:
     minimum_valid_symbols: int = 24
     minimum_positions_per_side: int = 8
     selected_fraction_per_side: float = 0.30
+    vintage_count: int = 3
     total_gross: float = 0.44
     maximum_symbol_weight: float = 0.03
     maximum_abs_net: float = 0.05
@@ -39,6 +41,12 @@ class MomentumFeature:
     medium_scaled_momentum: float
     slow_scaled_momentum: float
     sign_consensus: float
+
+
+@dataclasses.dataclass(frozen=True)
+class Vintage:
+    decision_time: pd.Timestamp
+    weights: tuple[tuple[str, float], ...]
 
 
 _REFERENCE = StrategyParameters()
@@ -277,9 +285,41 @@ def _portfolio(
     return {symbol: result[symbol] for symbol in sorted(result)}
 
 
+def _aggregate_vintages(
+    vintages: tuple[Vintage, ...],
+    *,
+    eligible_symbols: frozenset[str],
+    parameters: StrategyParameters,
+) -> dict[str, float]:
+    totals: dict[str, float] = {}
+    for vintage in vintages:
+        for symbol, weight in vintage.weights:
+            if symbol in eligible_symbols:
+                totals[symbol] = totals.get(symbol, 0.0) + weight / parameters.vintage_count
+    result = {
+        symbol: value
+        for symbol, value in sorted(totals.items())
+        if abs(value) > 1e-15
+    }
+    if not result:
+        return {}
+    gross = math.fsum(abs(value) for value in result.values())
+    net = math.fsum(result.values())
+    if gross > parameters.total_gross + 1e-12:
+        return {}
+    if abs(net) > parameters.maximum_abs_net + 1e-12:
+        return {}
+    if max(abs(value) for value in result.values()) > parameters.maximum_symbol_weight + 1e-12:
+        return {}
+    return result
+
+
 class MultiHorizonResidualMomentum:
     def __init__(self, parameters: StrategyParameters = _REFERENCE):
         self.parameters = parameters
+        self._vintages: deque[Vintage] = deque()
+        self._last_decision_time: pd.Timestamp | None = None
+        self._last_target: dict[str, float] = {}
 
     def target_weights(
         self,
@@ -291,8 +331,52 @@ class MultiHorizonResidualMomentum:
         decision_time = _utc(context.decision_time)
         if not _is_scheduled(decision_time, self.parameters):
             return None
+        if self._last_decision_time is not None:
+            if decision_time == self._last_decision_time:
+                return dict(self._last_target)
+            if decision_time < self._last_decision_time:
+                return {}
+
         scores = _momentum_scores(context, parameters=self.parameters)
-        return _portfolio(scores, parameters=self.parameters)
+        cohort = _portfolio(scores, parameters=self.parameters)
+        if not cohort:
+            self._vintages.clear()
+            self._last_decision_time = decision_time
+            self._last_target = {}
+            return {}
+
+        eligible_symbols = frozenset(str(value) for value in context.eligible_symbols)
+        # Permanently remove membership exits from stored cohorts so a later re-entry cannot
+        # resurrect a stale target that was formed while the symbol was previously eligible.
+        self._vintages = deque(
+            Vintage(
+                decision_time=vintage.decision_time,
+                weights=tuple(
+                    (symbol, weight)
+                    for symbol, weight in vintage.weights
+                    if symbol in eligible_symbols
+                ),
+            )
+            for vintage in self._vintages
+        )
+        self._vintages.append(
+            Vintage(
+                decision_time=decision_time,
+                weights=tuple(sorted(cohort.items())),
+            )
+        )
+        expiry = decision_time - pd.Timedelta(days=self.parameters.vintage_count)
+        while self._vintages and self._vintages[0].decision_time <= expiry:
+            self._vintages.popleft()
+
+        target = _aggregate_vintages(
+            tuple(self._vintages),
+            eligible_symbols=eligible_symbols,
+            parameters=self.parameters,
+        )
+        self._last_decision_time = decision_time
+        self._last_target = target
+        return dict(target)
 
 
 def build_strategy() -> TargetStrategy:

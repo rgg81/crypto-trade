@@ -1,7 +1,7 @@
 {
   "artifact": "frozen_reference_config",
-  "candidate_id": "t08-residual-momentum-21-63-126-v1",
-  "candidate_status": "transparent_baseline_not_yet_evaluated",
+  "candidate_id": "t08-residual-momentum-21-63-126-3d-v2",
+  "candidate_status": "preregistered_turnover_revision_not_yet_evaluated",
   "data_contract": {
     "allowed_bar_fields": [
       "open_time",
@@ -24,11 +24,11 @@
     "rebalance_boundary_utc": "daily-00:00",
     "target_execution": "organizer_owned_next_executable_open"
   },
-  "family_id": "t08-market-neutral-multi-horizon-residual-momentum-v1",
+  "family_id": "t08-market-neutral-multi-horizon-residual-momentum-v2",
   "implementation": {
     "build_factory": "build_strategy",
     "entrypoint": "strategy.py",
-    "stateful": false
+    "stateful": true
   },
   "parameters": {
     "consensus_weight": 0.2,
@@ -48,6 +48,7 @@
     "slow_horizon_bars": 126,
     "slow_weight": 0.25,
     "total_gross": 0.44,
+    "vintage_count": 3,
     "volatility_floor": 0.000001
   },
   "risk_policy": {
@@ -56,5 +57,8 @@
   },
   "schema_version": 1,
   "seed": 20260718,
-  "team_id": "team-08"
+  "team_id": "team-08",
+  "v3_parent": {
+    "candidate_id": "t08-residual-momentum-21-63-126-v1"
+  }
 }

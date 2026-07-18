@@ -27,7 +27,7 @@
   },
   "time_stop": {
     "cooldown_bars": 6,
-    "enabled": true,
+    "enabled": false,
     "maximum_holding_bars": 21
   },
   "turnover_limit": {
