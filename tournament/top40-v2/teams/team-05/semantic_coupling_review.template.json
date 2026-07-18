@@ -1,8 +1,8 @@
 {
-  "candidate_id": "team05-crtr-ab-stop",
+  "candidate_id": "team05-crtr-ab-turnover",
   "decision": "approve",
   "declared_capture_boundary": "candidate-declared-post-transform-pre-selection-weight-cap-risk",
-  "executable_source_manifest_path": "tournament/top40-v2/teams/team-05/score-adapters/team05-crtr-ab-stop.executable-source-manifest.json",
+  "executable_source_manifest_path": "tournament/top40-v2/teams/team-05/score-adapters/team05-crtr-ab-turnover.executable-source-manifest.json",
   "executable_source_manifest_sha256": "REPLACE_WITH_EXECUTABLE_SOURCE_MANIFEST_64_LOWERCASE_HEX",
   "family_id": "team05-causal-residual-trend-reversal-v1",
   "findings": {

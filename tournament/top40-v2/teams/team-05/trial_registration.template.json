@@ -2,7 +2,7 @@
   "timestamp_utc": "REPLACE_WITH_REGISTRATION_TIMESTAMP_Z",
   "team_id": "team-05",
   "family_id": "team05-causal-residual-trend-reversal-v1",
-  "candidate_id": "team05-crtr-ab-stop",
+  "candidate_id": "team05-crtr-ab-turnover",
   "strategy_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
   "source_bundle_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
   "risk_config_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
@@ -23,7 +23,7 @@
     },
     "base_candidate_id": "team05-crtr-base-v1",
     "strategy_parameters": "frozen_config.json",
-    "risk_policy_cell": "ablations.json:risk-stop using risk_policy.json",
+    "risk_policy_cell": "ablations.json:risk-turnover using risk_policy.json",
     "evaluator_cost_outputs": [1.0, 2.0],
     "fold_plan": "walk_forward_plan.json",
     "activation_precondition": "the preregistered no-control core activation gate passed at reports-top40-v2/team-05/post-result/team05-crtr-core-v2-infra-r1-core-activation.json; active A5/A6/A7 authority verified; executable-source manifest, independent semantic review, and score manifest immutable first-adds accepted in strict order"

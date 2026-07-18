@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "policy_id": "team-05-crtr-position-stop-only-v1",
+  "policy_id": "team-05-crtr-turnover-only-v1",
   "same_boundary_reentry": false,
   "volatility_target": {
     "enabled": false,
@@ -11,7 +11,7 @@
   },
   "drawdown_brakes": [],
   "position_stop": {
-    "enabled": true,
+    "enabled": false,
     "loss_fraction": 0.12,
     "cooldown_bars": 6
   },
@@ -21,7 +21,7 @@
     "cooldown_bars": 3
   },
   "turnover_limit": {
-    "enabled": false,
+    "enabled": true,
     "maximum_one_way_turnover": 0.18
   },
   "side_scaling": {
