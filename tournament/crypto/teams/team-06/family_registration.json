@@ -1,0 +1,23 @@
+{
+  "team_id": "team-06",
+  "primary": {
+    "family_id": "t06-btc-residual-momentum-v1",
+    "summary": "Cross-sectional momentum on the component of each coin's return orthogonal to BTC/market beta: long persistent idiosyncratic winners, short persistent idiosyncratic losers.",
+    "mechanism": "Alt-perp returns decompose into a macro BTC factor and an idiosyncratic component driven by coin-specific narrative adoption, listing/attention flows, and reflexive retail chasing (exchange gainers-list dynamics); the idiosyncratic part persists at 1-4 week horizons while the BTC factor is the regime-flippy piece that causes momentum crashes. Residualizing each name's returns against rolling BTC beta and ranking the residual momentum cross-sectionally captures the persistent alt-specific trend in bulls (altseason waves) and the equally persistent alt-bleed shorts in bears and post-FTX chop, without betting on BTC direction. Built from klines only, so it has full 2020-01 history, covers the whole top-40 for breadth, and its weekly-scale lookbacks keep turnover survivable at 8h-cadence taker+slippage costs.",
+    "falsifier": "If net IS Sharpe at 1x costs is <= 0 across the whole 1-4 week lookback plateau, or the sign of the residual-momentum edge flips between adjacent lookbacks/regimes (no stable persistence horizon), the family is dead."
+  },
+  "backups": [
+    {
+      "family_id": "t06-ls-ratio-contrarian-v1",
+      "summary": "Fade per-coin positioning extremes in the Binance long/short-ratio panels: short coins where retail accounts are crowded long versus their own history, long coins where they are crowded short.",
+      "mechanism": "Retail perp accounts pile into longs near local tops and capitulate near bottoms, so a per-coin z-scored extreme in ls_accounts / taker_ls_vol (optionally spread against the smarter tt_ls_positions panel) marks crowded positioning that subsequently unwinds. The trade is structurally funding-aligned: the contrarian side is typically the side the crowd pays, so native funding P&L is a tailwind rather than a drag, which matters when funding is charged over the whole book. Ratios move slowly, keeping turnover moderate, at the cost of losing pre-2020-09 history (COVID regime) where the panels are NaN.",
+      "falsifier": "If per-coin positioning-extreme fades show no monotonic quantile spread in forward returns and net IS Sharpe <= 0 over 2020-09 to 2024-06 across a reasonable z-window plateau, the family is dead."
+    },
+    {
+      "family_id": "t06-oi-crowding-fade-v1",
+      "summary": "Fade open-interest build-ups that occur against stagnant or diverging price: leverage crowding into a non-confirming move positions for the liquidation-driven unwind.",
+      "mechanism": "When open interest rises sharply while price stalls or diverges, leveraged positioning is accumulating without spot confirmation, creating a trapped crowd whose stops and liquidations cluster; the eventual unwind is a forced-flow cascade in the direction that hurts the crowd. Scoring OI growth versus price confirmation continuously across the top-40 (with funding sign or taker-flow resolving which side is crowded) yields a cross-sectional fade signal that exists in bull blow-offs, bear squeezes, and chop alike because liquidation mechanics are regime-independent. Uses aux oi/oi_value, so history starts 2020-09 and NaN-tolerance for dead names is mandatory.",
+      "falsifier": "If the OI-build-versus-price-stagnation crowding score fails to predict negative forward returns for the crowded side (no quantile monotonicity, net IS Sharpe <= 0 at 1x costs over 2020-09 to 2024-06), the family is dead."
+    }
+  ]
+}

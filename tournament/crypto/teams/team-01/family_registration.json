@@ -1,0 +1,23 @@
+{
+  "team_id": "team-01",
+  "primary": {
+    "family_id": "t01-funding-carry-xs-v1",
+    "summary": "Cross-sectional funding-rate carry: short the coins the crowd pays to hold long, long the coins shorts pay for, smoothed to low turnover.",
+    "mechanism": "Perp funding is the market-clearing price of leveraged positioning: persistently positive funding marks crowded longs paying to stay in, persistently negative funding marks crowded or capitulating shorts. Because the engine charges funding P&L natively (-w*f), a smoothed cross-sectional tilt against the funding extremes collects the carry as a direct cash flow, and the price leg aligns with it - crowded-long names carry unwind and liquidation-cascade risk (negative expected forward return), while negative-funding names are positioned for squeeze recovery. Funding is strongly autocorrelated, so percentile-ranked, smoothed signals persist across candles and survive the 8h-cadence cost structure and weekly top-40 churn.",
+    "falsifier": "If a smoothed cross-sectional funding-percentile L/S delivers non-positive net IS Sharpe at 1x costs across the pre-registered lookback plateau, or its entire positive contribution collapses to a single regime tag with the sign flipping at the 2x stress tier, the family is dead."
+  },
+  "backups": [
+    {
+      "family_id": "t01-ts-trend-v1",
+      "summary": "Per-name multi-horizon time-series trend: sign of smoothed medium-term returns per coin, exploiting crypto's reflexive trend persistence.",
+      "mechanism": "Crypto perp trends are reflexive: price advances attract leveraged momentum flow and forced short covering, which extend the move, while breakdowns trigger long liquidations that accelerate it - so medium-horizon trend persists beyond what costs consume. Per-name signed trend needs no cross-sectional stability, making it naturally robust to weekly universe churn and to new listings in the holdout, and long lookbacks keep turnover low on the 8h grid.",
+      "falsifier": "If multi-horizon per-name trend across the pre-registered lookback plateau yields non-positive net IS Sharpe at 1x costs, or all positive contribution comes from the 2020-21 bull with negative Sharpe in the 2022 bear and both chop regimes, the family is dead."
+    },
+    {
+      "family_id": "t01-oi-crowding-fade-v1",
+      "summary": "Fade open-interest crowding: short names where OI builds against stagnant price (trapped late longs), positioning for the unwind.",
+      "mechanism": "Open interest measures the quantity of outstanding leveraged positioning; when OI expands sharply while price stalls, late entrants are accumulating at the top of a move, creating a dense band of liquidation triggers just below price. These crowded builds resolve asymmetrically - a small adverse move cascades through forced liquidations - so fading OI-build-without-price-progress captures the unwind, distinct from funding (price of positioning) and trend (price persistence).",
+      "falsifier": "If the crowding score (OI build vs price stagnation) shows no negative forward-return spread between top and bottom quintiles net of costs over the 2020-09 to 2024-06 window where OI exists, or net IS Sharpe is non-positive at 1x costs, the family is dead."
+    }
+  ]
+}

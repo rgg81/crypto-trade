@@ -1,0 +1,23 @@
+{
+  "team_id": "team-02",
+  "primary": {
+    "family_id": "t02-funding-carry-xs-v1",
+    "summary": "Cross-sectional funding-rate carry: short the coins the levered crowd pays to be long, long the coins where shorts pay, ranked by trailing funding.",
+    "mechanism": "Perp funding is the market-clearing price of leveraged positioning imbalance: coins where inelastic retail leverage demand pays richly to stay long are crowded and overpriced, while negative-funding names pay the uncrowded side to exist. Ranking the top-40 by trailing funding and holding a balanced short-the-payers / long-the-payees book collects the funding stream natively (the tournament metric charges funding P&L directly) and adds the price P&L of crowded books mean-reverting when they unwind. The premium persists because arbitrage capital that would compress Binance perp funding is balance-sheet and mandate constrained, and the signal is sticky (funding autocorrelates over days-to-weeks), keeping turnover low at 8h cadence.",
+    "falsifier": "Net IS Sharpe <= 0 at 1x costs across the pre-registered funding-lookback plateau (neither the collected funding stream nor the unwind price P&L survives costs, or the edge exists only in a single regime tag) kills the family."
+  },
+  "backups": [
+    {
+      "family_id": "t02-btc-residual-momentum-v1",
+      "summary": "Cross-sectional momentum on the return component orthogonal to BTC/market beta: ride alt-specific narrative rotation, market factor stripped out.",
+      "mechanism": "Retail attention herds sequentially into themes (DeFi, L1s, memes, AI), producing multi-week reflexive persistence in individual alts that is masked by the common BTC factor which dominates raw returns. Regressing out rolling BTC/market beta isolates this rotation component; momentum on the residual captures alt-specific persistence without the regime-driven common swings that cause classic momentum crashes at market turning points. The resulting book is naturally long/short balanced, so the engine's 0.25 net cap does not crush it the way it crushes unanimous-direction trend books.",
+      "falsifier": "A long-top / short-bottom residual-momentum book with net IS Sharpe <= 0 at 1x costs across the pre-registered lookback plateau, or edge concentrated entirely in one regime tag, kills the family."
+    },
+    {
+      "family_id": "t02-oi-crowding-fade-v1",
+      "summary": "Fade open-interest build-ups against stagnant or diverging price: leverage accumulating without resolution precedes liquidation-cascade unwinds.",
+      "mechanism": "When open interest rises sharply while price stagnates, leverage is stacking up without conviction being resolved, leaving a dense band of liquidation triggers; mechanical liquidation engines then convert small adverse moves into forced-flow cascades whose price impact is predictable in direction. Positioning against the crowded side (fading the OI build) harvests the cascade/unwind premium, which exists because liquidations are non-discretionary and the crowding is directly observable in the aux oi/oi_value panels while most flow cannot or does not condition on it. NaN-tolerant by design: the signal activates only where OI history exists (post-2020-09, live names).",
+      "falsifier": "No negative relation in-sample between OI-build-vs-price-stagnation and forward returns (fade book net IS Sharpe <= 0 at 1x costs on the post-2020-09 window across the pre-registered build-window plateau) kills the family."
+    }
+  ]
+}

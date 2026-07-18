@@ -1,0 +1,23 @@
+{
+  "team_id": "team-03",
+  "primary": {
+    "family_id": "t03-btc-residual-momentum-v1",
+    "summary": "Cross-sectional momentum on the BTC-beta-residual component of top-40 alt returns: long persistent idiosyncratic winners, short persistent idiosyncratic losers.",
+    "mechanism": "Crypto alt returns are dominated by a single BTC/market factor; the residual component reflects coin-specific narrative flow (sector rotations, listings, ecosystem seasons) that retail chases reflexively, so alt-specific strength and weakness persist for days to weeks. Ranking the top-40 on the return component orthogonal to a rolling BTC beta and going long persistent residual winners against short residual losers isolates that persistence while stripping the market factor, keeping the book near market-neutral across bull, bear, and chop. The construction is rank-based and slow-moving (multi-week formation), so it tolerates weekly universe churn and keeps turnover inside the 8h taker+slippage cost budget.",
+    "falsifier": "Net IS Sharpe <= 0 at 1x costs across the whole 2-8-week formation-lookback plateau, or profitability that exists only inside the 2020-21 bull regime tag, kills the family."
+  },
+  "backups": [
+    {
+      "family_id": "t03-funding-carry-v1",
+      "summary": "Cross-sectional funding-rate carry: short the top smoothed-funding percentile, long the bottom, harvesting the perp funding transfer natively.",
+      "mechanism": "Perp funding is a direct, observable cash transfer from the crowded side of the book to the other; persistently high funding marks over-levered long demand and persistently negative funding marks crowded shorts. Shorting the top funding percentile and longing the bottom harvests that transfer natively (the engine credits -w*funding every candle) while simultaneously fading crowded positioning that tends to mean-revert. Smoothed funding percentiles move slowly, so turnover stays low and the carry accrues every 8h in every regime.",
+      "falsifier": "Over the IS window at 1x costs, if collected funding fails to cover price-leg losses plus trading costs — net Sharpe <= 0 across the funding-percentile and smoothing-window plateau — the family dies."
+    },
+    {
+      "family_id": "t03-oi-crowding-fade-v1",
+      "summary": "Fade open-interest crowding: short stagnant-price OI build-ups, long post-liquidation OI purges, positioning for the leveraged unwind.",
+      "mechanism": "Open-interest build-up without commensurate price progress means leverage is piling into a stagnating trade; that positioning is fragile fuel for liquidation cascades, so crowded builds tend to resolve in sharp adverse unwinds, while OI purges (capitulation flushes) mark exhaustion and snap back. Cross-sectionally ranking names by delta-OI-versus-price divergence and fading crowded builds while buying purged flushes positions the book for unwind mechanics unique to leveraged perp markets.",
+      "falsifier": "On the post-2020-09 IS window at 1x costs, no monotone relation between the crowding rank and forward returns — net Sharpe <= 0 across the delta-OI horizon plateau — kills it."
+    }
+  ]
+}

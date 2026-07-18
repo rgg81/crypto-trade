@@ -1,0 +1,23 @@
+{
+  "team_id": "team-10",
+  "primary": {
+    "family_id": "t10-volume-price-divergence-v1",
+    "summary": "Cross-sectional volume-confirmation: follow price moves backed by expanding participation, fade comparable moves made on thin volume (Amihud-style divergence).",
+    "mechanism": "Crypto perp moves come in two structurally different kinds: moves accompanied by expanding dollar volume and trade participation reflect genuine new-money attention flow, and crypto's reflexive loop (price -> attention -> inflow -> price) makes them persist; comparable moves on thin volume are market-maker inventory shifts, stop-runs, and low-liquidity gaps that mean-revert once real flow returns. Cross-sectionally ranking the top-40 by return interacted with volume confirmation (vs each name's own trailing participation baseline) longs confirmed movers and shorts volume-starved movers. It is relative-value (no directional regime required), uses only kline panels so it covers the full IS window including pre-2020-09, and multi-day lookbacks keep turnover compatible with 8h-cadence costs.",
+    "falsifier": "Killed if, across the pre-registered lookback plateau, the volume-conditioned cross-sectional signal fails to deliver positive net IS Sharpe at 1x costs OR fails to beat its own unconditioned price-only counterpart (i.e., the volume interaction adds nothing over plain momentum/reversal)."
+  },
+  "backups": [
+    {
+      "family_id": "t10-trade-size-composition-v1",
+      "summary": "Participant-composition long/short: fade retail-swarmed names (collapsing average trade size + exploding trade counts), follow whale-clip accumulation.",
+      "mechanism": "The trades and volume panels yield average trade size, a participant-composition proxy: a collapse in average clip size with an explosion in trade count marks a retail attention swarm (Barber-Odean herding, meme pumps) whose buying pressure overprices the name and predicts underperformance, while flow arriving in large average clips marks whale or informed accumulation that precedes continuation. Retail herding into alts is one of the most persistent structural inefficiencies in crypto perps and recurs in every regime, bull or bear. Distinct from volume-price divergence: this ranks on WHO is trading (composition of flow), not on whether volume confirms a price move.",
+      "falsifier": "Killed if the cross-sectional long-whale-flow / short-retail-swarm portfolio delivers non-positive net IS Sharpe at 1x costs across the parameter plateau, or the retail-fade leg's sign flips across the fixed regime tags."
+    },
+    {
+      "family_id": "t10-oi-price-confirmation-v1",
+      "summary": "Momentum-of-OI trend confirmation: long price-up/OI-up, short price-down/OI-up; treat falling-OI moves as position-closing noise with no follow-through.",
+      "mechanism": "Rising open interest alongside a price move means new capital is initiating positions in the move's direction — perp-native trend fuel that persists as latecomers chase and funding recycles attention; a price move on falling OI is position-closing (short-covering rallies, long-liquidation dumps) and carries no follow-through, so it is stood aside or faded. This is explicitly momentum-of-OI (the FAMILY-MENU's own example of a family distinct from price momentum) and the opposite conditional trade from family 2's OI-crowding fade, which shorts OI build-ups against stagnant price — here OI growth WITH price confirms and is followed. OI panels are NaN pre-2020-09 and for dead names; the signal is NaN-tolerant and evaluated on the post-2020-09 portion of IS.",
+      "falsifier": "Killed if the OI-confirmed quadrant portfolio (long up/OI-up, short down/OI-up) fails to produce positive net IS Sharpe at 1x costs on the post-2020-09 window across the lookback plateau, or does no better than a price-only trend signal of the same horizons."
+    }
+  ]
+}

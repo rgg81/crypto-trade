@@ -1,0 +1,23 @@
+{
+  "team_id": "team-05",
+  "primary": {
+    "family_id": "t05-taker-flow-imbalance-v2",
+    "summary": "Cross-sectional taker-flow imbalance: rank names by smoothed aggressive-buyer share (taker_buy_quote_volume / quote_volume) and trade the long-short spread at the pre-registered horizon.",
+    "mechanism": "In a retail-dominated perp market, taker flow measures which side is crossing the spread: sustained one-sided aggressive flow reveals herding demand pressure that price has not yet fully absorbed, producing continuation over short-to-multi-day horizons, while one-sided extremes mark an exhausted crowd and subsequent fade. The signal is klines-derived (full 2020-2024 history, no OI/ratio NaN cliff), continuous-rank and naturally two-sided (breadth-safe under the caps), and its smoothing window gives direct turnover control at 8h cadence. Direction per horizon (continuation vs exhaustion-fade) is pre-registered in the research brief before any experiment is run.",
+    "falsifier": "If, across the whole pre-registered smoothing/horizon plateau, the flow-imbalance long-short spread in the pre-registered direction has net IS Sharpe <= 0 after costs and funding (or is positive only at horizons whose turnover drives it <= 0 at the 2x-stress tier), the family is dead."
+  },
+  "backups": [
+    {
+      "family_id": "t05-ts-trend-v2",
+      "summary": "Per-name multi-horizon time-series trend: signed trend-strength scores per coin, expressed as a capped-net long-short book of strongest up-trends vs strongest down-trends.",
+      "mechanism": "Crypto trends are reflexive: rising prices attract FOMO inflows, forced short-covering, and collateral-value spirals, making per-name returns positively autocorrelated at multi-day-to-multi-week horizons (and symmetrically on the way down). Under the organizer's gross/net caps the book expresses relative trend strength with a capped directional tilt, and ranking signed trend scores keeps both sides populated to respect the breadth floor even in one-directional regimes.",
+      "falsifier": "If the net IS Sharpe of the trend-score long-short book is <= 0 across the whole pre-registered lookback plateau, or its positive Sharpe exists only in the 2020-21 bull tag with negative Sharpe in the majority of other regime tags, the family is dead."
+    },
+    {
+      "family_id": "t05-short-horizon-reversal-v2",
+      "summary": "Short-horizon overreaction fade: long the top-40 names most oversold and short the most overbought over trailing 1-3 day windows.",
+      "mechanism": "Retail chasing and liquidation cascades push short-horizon crypto moves past fair value, and liquidity providers demand compensation for absorbing that one-sided flow, so 1-3 day cross-sectional extremes mean-revert within days. The fade is naturally two-sided and breadth-safe; the known enemy is turnover, so smoothing and rank-persistence are first-class parameters rather than afterthoughts.",
+      "falsifier": "If the reversal spread's net IS Sharpe after full costs is <= 0 at the 1x tier across the whole pre-registered horizon/smoothing plateau (i.e., any gross edge never survives its own turnover), the family is dead."
+    }
+  ]
+}

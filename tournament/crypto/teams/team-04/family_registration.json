@@ -1,0 +1,23 @@
+{
+  "team_id": "team-04",
+  "primary": {
+    "family_id": "t04-ts-trend-v2",
+    "summary": "Per-name multi-horizon time-series trend following: long names in persistent uptrends, short names in persistent downtrends, sized by trend clarity.",
+    "mechanism": "Crypto perp trends are reflexively self-reinforcing: rising prices attract retail flow and leveraged longs, funding and OI build with the move, and adverse moves force liquidation cascades that extend rather than end the trend, so multi-week price direction persists per name in both directions. A slow multi-horizon trend book (2-12 week lookbacks) is direction-agnostic across regimes -- long the 2020-21 and ETF bulls, short the 2022 bear and post-crash bleeds -- and its low turnover survives 8h-cadence taker+slippage costs while the short side collects funding when crowds pay to stay long into downtrends. Kline-only, full 2020-01 IS history, NaN-safe, and robust to weekly top-40 churn since each name's trend is computed from its own history.",
+    "falsifier": "If, across the pre-registered multi-horizon lookback plateau (~21-126 candles), net IS Sharpe at 1x costs is <= 0, or all positive P&L sits in the 2020-21 bull tag while the 2022 bear and both chop tags are jointly strongly negative (i.e., it is a long-only bull artifact, not trend), the family is dead."
+  },
+  "backups": [
+    {
+      "family_id": "t04-taker-flow-v2",
+      "summary": "Cross-sectional taker-flow imbalance: rank names by smoothed aggressive-buyer pressure (taker_buy_volume/volume), following persistent net aggression at multi-day horizons.",
+      "mechanism": "Retail crypto flow executes as taker market orders, so the taker-buy share of volume is a direct, per-candle read on which names the crowd is aggressively accumulating versus dumping; persistent multi-day imbalances mark building narrative flow that reflexively continues before it exhausts. The signal is derivable from kline panels alone (full IS history, no aux NaN gap), is smoothable to cost-viable turnover, and the sign structure across horizons (follow smoothed flow, fade one-candle spikes) is a pre-registered research axis rather than a free parameter.",
+      "falsifier": "If neither the flow-continuation nor the flow-exhaustion orientation yields net IS Sharpe > 0 at 1x costs anywhere on the pre-registered smoothing plateau (~3-42 candles), or the chosen orientation's profit is confined to a single regime tag with the majority of others negative, the family is dead."
+    },
+    {
+      "family_id": "t04-breakout-channel-v2",
+      "summary": "Per-name range breakout / channel: enter in the direction of N-candle high/low breaks out of congestion, flat inside the range.",
+      "mechanism": "Multi-week highs and lows in crypto perps are focal points where resting stops, liquidation clusters, and breakout-chasing retail flow concentrate, so a genuine escape from congestion ignites a reflexive follow-through move rather than mean-reverting. Trading only the post-break state (long above the prior N-candle high band, short below the low band, flat inside) keeps the book out of chop by construction, concentrates turnover at genuinely informative candles, and needs only kline panels over the full IS history.",
+      "falsifier": "If, over the pre-registered channel-length plateau (~30-90 candles), the post-breakout book's net IS Sharpe at 1x costs is <= 0 or the breadth floor (median >= 5 names per side) cannot be met without shrinking channels into cost-bleeding noise, the family is dead."
+    }
+  ]
+}

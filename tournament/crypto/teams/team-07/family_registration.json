@@ -1,0 +1,23 @@
+{
+  "team_id": "team-07",
+  "primary": {
+    "family_id": "t07-btc-residual-momentum-v1",
+    "summary": "Cross-sectional momentum on the return component orthogonal to BTC/market beta: long alts with persistent idiosyncratic strength, short those with idiosyncratic weakness.",
+    "mechanism": "Crypto returns are dominated by one market factor (BTC), but capital rotates between alt narratives (DeFi, L1s, memes, AI) via retail herding and reflexive attention flows that unfold over days-to-weeks, creating persistent coin-specific drift on top of the factor. Residualizing each name's returns against rolling BTC/market beta before ranking isolates that narrative-rotation persistence and strips out the regime factor that causes classical momentum crashes at sharp market turns (COVID rebound, May-2021, FTX). The signal is symmetric across regimes: long the hot narratives in bulls, short the dying ones in bears, roughly market-neutral by construction in chop.",
+    "falsifier": "If the beta-residualized momentum rank portfolio shows no positive net IS Sharpe plateau across formation windows of roughly 1-6 weeks (or its profits are confined to a single regime tag with negative Sharpe elsewhere), the family is dead."
+  },
+  "backups": [
+    {
+      "family_id": "t07-volume-price-divergence-v1",
+      "summary": "Volume-confirmation cross-section: price moves backed by abnormal volume persist, moves on thin volume mean-revert.",
+      "mechanism": "In a retail-driven perp market, volume is the direct footprint of attention, and attention is the marginal flow: a move accompanied by abnormally high dollar volume reflects real crowd engagement that reflexively continues, while an equal-sized move on thin volume is liquidity noise or a small-player push that reverts. Conditioning the sign and size of positions on the divergence between price change and volume abnormality (Amihud-style) separates informed/flow-backed moves from noise across the top-40 cross-section.",
+      "falsifier": "If IS forward returns after volume-confirmed moves show no persistence differential versus unconfirmed moves (conditional spread indistinguishable from zero and no positive net Sharpe plateau across confirmation thresholds), the family is dead."
+    },
+    {
+      "family_id": "t07-vol-structure-v1",
+      "summary": "Realized-volatility cross-section: long the calm tail of the top-40, short the frothy high-vol lottery names, with vol-regime (compression/expansion) conditioning.",
+      "mechanism": "Leverage-hungry retail systematically overpays for high-realized-vol lottery coins — chasing recent pumps, crowding perp longs, and paying their funding — so the high-vol tail of the top-40 is structurally overpriced while boring liquid names carry a positive risk-adjusted premium. Ranking on realized-vol level and its compression/expansion dynamics harvests this lottery-demand premium; the mispricing direction is regime-stable because the lottery-seeking clientele is present in bulls, bears, and chop alike.",
+      "falsifier": "If the low-vol-minus-high-vol rank portfolio has no positive net IS Sharpe plateau across vol-estimation windows (or the spread's sign flips across regime tags), the family is dead."
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "team_id": "team-08",
+  "primary": {
+    "family_id": "t08-short-horizon-reversal-v2",
+    "summary": "Fade 1-3 day cross-sectional overreaction in the top-40: long recent extreme losers, short recent extreme winners, smoothed to survive the 8h cost stack.",
+    "mechanism": "Short-horizon crypto moves overshoot because they are amplified by forced flow — liquidation cascades, margin stops, and leveraged retail chase — rather than by information, and market-maker inventory plus dip-buyer flow pulls prices back over the following 1-3 days. The mechanism is regime-agnostic (overreaction occurs in bull, bear, and chop, and is strongest precisely in the high-vol regimes that break trend signals), and the book is funding-aligned under the engine's native funding P&L: recent winners tend to carry positive funding and recent losers negative, so shorting winners and longing losers COLLECTS funding on both legs on average, cushioning the fee-and-slippage drag of this family's higher turnover.",
+    "falsifier": "If the 3-9-candle (1-3 day) reversal spread shows no positive net IS Sharpe plateau after full costs at 1x — or the turnover-smoothing required to survive the 2x stress tier destroys the alpha entirely — the family is dead."
+  },
+  "backups": [
+    {
+      "family_id": "t08-ts-trend-v2",
+      "summary": "Per-name multi-horizon time-series trend: each coin's own multi-week trend sign/strength sets its weight — long up-trends, short down-trends.",
+      "mechanism": "Crypto trends are reflexive: rising prices attract fresh retail flow, leverage, and attention that push prices further, while down-trends force deleveraging spirals that feed on themselves — so multi-week per-name continuation persists irrespective of the cross-section, in a market with no valuation anchor to arrest it. Multi-week lookbacks keep rebalance turnover low against the 8h cost stack, and the mechanism needs only persistence — not a specific market direction — so it has paid in both bull and bear regimes, with chop as its known and declared weakness.",
+      "falsifier": "If multi-week trend signals (roughly 2-12 week lookbacks) show no positive net IS Sharpe plateau after costs and funding drag, or essentially all P&L comes from one regime tag while both chop tags bleed deeply, the family is dead."
+    },
+    {
+      "family_id": "t08-taker-flow-v2",
+      "summary": "Cross-sectional aggressive-flow imbalance from taker_buy_volume/volume: persistent net aggressor pressure leads price, and extremes fade at longer horizons.",
+      "mechanism": "Taker (market-order) imbalance measures who is paying the spread to get filled NOW — in perp markets that flow is dominated by leveraged retail aggression and squeeze-driven forced orders, so sustained one-sided taker pressure marks demand that either continues (genuine accumulation) or exhausts and reverts (retail chase), depending on horizon and normalization. The signal is derived entirely from the kline panels with complete history from 2020, making it robust to the OI/ratio NaN structure and to weekly universe churn.",
+      "falsifier": "If neither the continuation nor the exhaustion direction of smoothed taker-imbalance ranks yields a positive net IS Sharpe plateau at any horizon from 1 to 20 days, the family is dead."
+    }
+  ]
+}
