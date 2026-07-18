@@ -73,7 +73,7 @@
     "executable_source_manifest": "executable_source_manifest.template.json",
     "semantic_coupling_review": "semantic_coupling_review.template.json",
     "amendment_0005_authority_active": true,
-    "registration_preconditions_pending": "accepted family registration and passed no-control activation gate are preserved; final team05-crtr-ab-turnover hashes and dependency set, organizer tests, fresh immutable executable-source first-add, independent semantic review first-add, score-manifest first-add, and accepted controlled trial registration remain pending"
+    "registration_preconditions_pending": "accepted family registration, passed no-control activation gate, and completed single-control diagnostics are preserved; final team05-crtr-base-v1 hashes and dependency set, organizer tests, fresh immutable executable-source first-add, independent semantic review first-add, score-manifest first-add, and accepted combined-policy registration remain pending"
   },
   "runtime_and_replacement_authority": {
     "active_entrypoint_path": "scripts/top40_v2_tournament_runtime_preload_v7.py",
@@ -88,10 +88,10 @@
     "maximum_development_runs": 1,
     "replacement_material_trial_number": 2,
     "replacement_run_status": "consumed-completed",
-    "active_candidate_id": "team05-crtr-ab-turnover",
-    "active_candidate_role": "preregistered-turnover-only-control-diagnostic",
+    "active_candidate_id": "team05-crtr-base-v1",
+    "active_candidate_role": "preregistered-combined-policy-promotion-candidate",
     "control_activation_evidence_path": "reports-top40-v2/team-05/post-result/team05-crtr-core-v2-infra-r1-core-activation.json",
-    "scientific_delta": "CRTR score model unchanged; only the preregistered turnover-limit risk control is enabled"
+    "scientific_delta": "CRTR score model unchanged; the fixed preregistered volatility, drawdown, position-stop, and turnover controls are combined"
   },
   "universe_authority": {
     "amendment_0006_integration_freeze_commit": "ed3af1398543dfee4a50150915dc2e37b3631fc9",
@@ -133,5 +133,5 @@
   "control_activation_gate": "all preregistered broad positive no-control core-alpha minima in ablations.json",
   "neighbor_activation_gate": "combined policy passes every official and Team-05 non-neighborhood gate",
   "selection_rule": "Binary: freeze team05-crtr-base-v1 only if every official and Team-05 gate, including the complete neighborhood, passes. Neighbors are nonselectable stability probes.",
-  "status": "CORE_ACTIVATION_PASSED_TURNOVER_ONLY_CONTROL_UNREGISTERED_ACTIVE_A5_A6_A7_BOUND_DO_NOT_EVALUATE"
+  "status": "SINGLE_CONTROLS_COMPLETE_COMBINED_POLICY_UNREGISTERED_ACTIVE_A5_A6_A7_BOUND_DO_NOT_EVALUATE"
 }
