@@ -65,6 +65,20 @@ validation, or doubled-cost performance is nonpositive. Cell or day concentratio
 sensitivity, and regime or sleeve weakness reduce the robustness rank and trigger repair but are
 not standalone vetoes.
 
+## Opening-probe coaching record
+
+Trial 1 (`t10-three-slot-cost-aware-pooled-response-26w-v2`) is RED. Train Sharpe was -0.215,
+annualized return -0.18%, doubled-cost Sharpe -0.556, and only 10% of quarters were positive.
+The strict hurdle produced only 920 trades and a small 1.26% drawdown, but bear and stress
+Sharpes were -1.761 and -1.373; bull was the only positive regime at +0.818.
+
+The mandatory artifact-level sign audit reconciled returns to `8.59e-17`. The declared response
+sign had only +0.134 Sharpe and +0.11% annualized return before costs; 0.70% arithmetic realized
+costs erased it. Exact inversion was already negative before costs (Sharpe -0.138) and fell to
+-0.481 after unchanged costs. Relaxing the cost hurdle would admit forecasts weaker than the
+ones that already failed while raising turnover; inversion is worse. Team 10 is therefore parked
+rather than submitting a sparse losing clock model.
+
 ## Collision guard
 
 Do not trade the unconditional weekday mean owned by Team 01, a liquidity-state router owned by
