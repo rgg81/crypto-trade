@@ -1,6 +1,6 @@
 {
   "artifact": "post_tournament_research_candidate_config",
-  "candidate_id": "t06-mom-r1-baseline",
+  "candidate_id": "t06-mom-r1-3d-persist",
   "candidate_status": "development_only_not_frozen",
   "data_contract": {
     "direction_source": "own_coin_history_only",
@@ -9,13 +9,13 @@
   },
   "implementation": {
     "build_factory": "build_strategy",
-    "entrypoint": "strategy_t06_baseline.py",
+    "entrypoint": "strategy_t06_3d_persist.py",
     "stateful": true
   },
   "parameters": {
     "entry_strength": 0.0,
-    "hold_mixed_signal": false,
-    "rebalance_days": 1
+    "hold_mixed_signal": true,
+    "rebalance_days": 3
   },
   "risk_policy": {
     "path": "risk_policy.json",

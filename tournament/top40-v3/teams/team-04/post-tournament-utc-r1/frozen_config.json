@@ -1,17 +1,17 @@
 {
   "artifact": "post_tournament_research_candidate_config",
-  "candidate_id": "t04-utc-r1-baseline",
+  "candidate_id": "t04-utc-r1-weekly-buffer",
   "candidate_status": "development_only_not_frozen",
   "implementation": {
     "build_factory": "build_strategy",
-    "entrypoint": "strategy_t04_baseline.py",
+    "entrypoint": "strategy_t04_weekly_buffer.py",
     "stateful": true
   },
   "parameters": {
     "fast_weight": 0.3,
     "funding_weight": 0.2,
-    "rank_buffer_fraction": 0.25,
-    "rebalance_bars": 9,
+    "rank_buffer_fraction": 0.4,
+    "rebalance_bars": 21,
     "slow_weight": 0.5
   },
   "risk_policy": {

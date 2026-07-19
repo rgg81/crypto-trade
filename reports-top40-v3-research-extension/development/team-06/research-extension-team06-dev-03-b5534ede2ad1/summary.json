@@ -1,0 +1,180 @@
+{
+  "candidate_id": "t06-mom-r1-7d",
+  "candidate_identity": {
+    "config_sha256": "fd24f2cb5f5575c8c16012844e1b27b7c9bd267bf3ac21c47d65079c97eaf9e2",
+    "data_authority_sha256": "077eb036d262befec80f7013084fe6906859f7c3bbe2f8c193c9d9ec68e367c3",
+    "dependency_lock_sha256": "869cd3380346a9c9a219fc762868e23cd494a18e22dd9b314ba18621d991faa5",
+    "entrypoint": "tournament/top40-v3/teams/team-06/post-tournament-momentum-r1/strategy_t06_7d.py",
+    "evaluator_sha256": "9e69b0f3dc283f583b192424854688190c608cd97130cd578fb31a47a5907c34",
+    "risk_policy_sha256": "b9cf7073790db8a1832b838e1768b992344e74cedc1f9675dd4a21a55bebbbca",
+    "source_bundle_sha256": "b5534ede2ad12e990d1dc8d617d81b65d68a840fbd93e23464abb8969f606cef",
+    "strategy_sha256": "2b623ec79c51fe57a28c14923ec2e74e52fdb3299b3cc2696d7a64dea0ce38f3",
+    "team_id": "team-06"
+  },
+  "diagnostics": {
+    "annualized_turnover": 12.789139374428478,
+    "average_gross_exposure": 0.1764101925784956,
+    "base_cost": 0.03269114256531497,
+    "base_cost_share_of_positive_gross_pnl": 0.07078653286727683,
+    "gross_edge_per_turnover_bps": 105.95235698379516,
+    "gross_pnl": 0.4618271476385223,
+    "long_gross_pnl": 0.39241610782914804,
+    "risk_policy_turnover_fraction": 0.27476418339121833,
+    "short_gross_pnl": 0.06941103980937621,
+    "total_one_way_turnover": 43.588190087093224,
+    "trade_count": 7763
+  },
+  "double_cost": {
+    "cumulative_return": 0.45507065184384765,
+    "metrics": {
+      "annualized_return": 0.11632731426383103,
+      "calmar": 0.9321789431179153,
+      "max_drawdown": 0.12479075516847016,
+      "net_sharpe": 0.8460716346603008,
+      "net_sortino": 1.3059830380821544,
+      "positive_quarter_fraction": 0.6428571428571429
+    }
+  },
+  "folds": [
+    {
+      "base_cumulative_return": 0.17623238488146842,
+      "base_metrics": {
+        "annualized_return": 0.19472306289241237,
+        "calmar": 3.531503075595466,
+        "max_drawdown": 0.05513886261010237,
+        "net_sharpe": 1.3002405427601889,
+        "net_sortino": 2.18652283859491,
+        "positive_quarter_fraction": 1.0
+      },
+      "double_cost_cumulative_return": 0.16756423398162879,
+      "double_cost_metrics": {
+        "annualized_return": 0.18507600108014133,
+        "calmar": 3.2920540634561135,
+        "max_drawdown": 0.056219004157496144,
+        "net_sharpe": 1.244456695025186,
+        "net_sortino": 2.0882380988223077,
+        "positive_quarter_fraction": 1.0
+      },
+      "end_exclusive": "2021-01-01T00:00:00Z",
+      "name": "2020",
+      "start": "2020-02-03T00:00:00Z"
+    },
+    {
+      "base_cumulative_return": 0.34037828797475433,
+      "base_metrics": {
+        "annualized_return": 0.34037828797475433,
+        "calmar": 5.428420144254047,
+        "max_drawdown": 0.06270301099207343,
+        "net_sharpe": 1.8255982986299437,
+        "net_sortino": 2.7916952866965565,
+        "positive_quarter_fraction": 1.0
+      },
+      "double_cost_cumulative_return": 0.3259895270136477,
+      "double_cost_metrics": {
+        "annualized_return": 0.3259895270136477,
+        "calmar": 5.157136120613972,
+        "max_drawdown": 0.06321134819587382,
+        "net_sharpe": 1.7609452459070267,
+        "net_sortino": 2.682619917109948,
+        "positive_quarter_fraction": 1.0
+      },
+      "end_exclusive": "2022-01-01T00:00:00Z",
+      "name": "2021",
+      "start": "2021-01-01T00:00:00Z"
+    },
+    {
+      "base_cumulative_return": -0.006290151319247705,
+      "base_metrics": {
+        "annualized_return": -0.006290151319247705,
+        "calmar": -0.060090076447723816,
+        "max_drawdown": 0.1046787038908148,
+        "net_sharpe": 0.01849843616788482,
+        "net_sortino": 0.027614884236651472,
+        "positive_quarter_fraction": 0.5
+      },
+      "double_cost_cumulative_return": -0.007975554242638405,
+      "double_cost_metrics": {
+        "annualized_return": -0.007975554242638405,
+        "calmar": -0.07551104158657586,
+        "max_drawdown": 0.10562103336230866,
+        "net_sharpe": 0.004675387805997628,
+        "net_sortino": 0.007018889459018764,
+        "positive_quarter_fraction": 0.25
+      },
+      "end_exclusive": "2023-01-01T00:00:00Z",
+      "name": "2022",
+      "start": "2022-01-01T00:00:00Z"
+    },
+    {
+      "base_cumulative_return": -0.05076435366891929,
+      "base_metrics": {
+        "annualized_return": -0.09972941261027302,
+        "calmar": -1.2262267050390856,
+        "max_drawdown": 0.08133032187314349,
+        "net_sharpe": -1.157812455486677,
+        "net_sortino": -1.5485211634278548,
+        "positive_quarter_fraction": 0.0
+      },
+      "double_cost_cumulative_return": -0.052583748155526355,
+      "double_cost_metrics": {
+        "annualized_return": -0.1032057096748874,
+        "calmar": -1.2433592495089274,
+        "max_drawdown": 0.08300554302036933,
+        "net_sharpe": -1.203114067354719,
+        "net_sortino": -1.6108842870767042,
+        "positive_quarter_fraction": 0.0
+      },
+      "end_exclusive": "2023-07-01T00:00:00Z",
+      "name": "2023H1",
+      "start": "2023-01-01T00:00:00Z"
+    }
+  ],
+  "regime_sharpe": {
+    "bear": 0.5415826114603992,
+    "bull": 1.4350958398251819,
+    "chop": 0.2250740884678077,
+    "stress": 0.9888692760488466
+  },
+  "run_id": "research-extension-team06-dev-03-b5534ede2ad1",
+  "schema_version": "top40-v3-post-tournament-run-summary-v1",
+  "scored_window": {
+    "base_cumulative_return": 0.4871478575735271,
+    "end_exclusive": "2023-07-01T00:00:00Z",
+    "metrics": {
+      "annualized_return": 0.12349242463212695,
+      "calmar": 1.0014246864441885,
+      "max_drawdown": 0.12331673694865464,
+      "net_sharpe": 0.8895853640648689,
+      "net_sortino": 1.3737414084384876,
+      "positive_quarter_fraction": 0.7142857142857143
+    },
+    "start": "2020-02-03T00:00:00Z"
+  },
+  "selection": {
+    "gates": {
+      "annualized_return": true,
+      "annualized_turnover": true,
+      "base_cost_share": true,
+      "double_cost_sharpe": true,
+      "gross_edge_density": true,
+      "max_drawdown": true,
+      "net_sharpe": true,
+      "positive_base_folds": false,
+      "positive_double_cost_folds": false,
+      "positive_quarters": true,
+      "positive_regimes": true,
+      "trade_count": true,
+      "worst_fold": false,
+      "worst_regime": true
+    },
+    "ranking_vector": {
+      "annualized_turnover": 12.789139374428478,
+      "candidate_id": "t06-mom-r1-7d",
+      "double_cost_sharpe": 0.8460716346603008,
+      "gross_edge_per_turnover_bps": 105.95235698379516,
+      "worst_fold_net_sharpe": -1.157812455486677
+    },
+    "ready": false
+  },
+  "stage": "public"
+}
