@@ -1,0 +1,38 @@
+{
+  "activated_at_utc": "2026-07-19T00:00:00Z",
+  "authority_files": {
+    "scripts/top40_v3_research_extension.py": "d391f951d8df9c40189a08bcd7de8baeb979effc9594e66e4a06fd6231b55e79",
+    "src/crypto_trade/tournament/research_extension_v3.py": "8f361acb3209cb5ddcbc271ca85fe7fe46a1bed33f38b78e1656b1e3bee5e689",
+    "tests/tournament/test_research_extension_v3.py": "177b5dc1cb0429ce0c6c25fbb11433a736d85d10aeae67a67c3dde5ca2d9cd3d",
+    "tournament/top40-v3-research-extension/README.md": "224c808b7ffcce6a1abea3147c829199fc9bc4de19ea5ab4c8463a30bdadfcfe",
+    "tournament/top40-v3/teams/team-04/post-tournament-utc-r1/risk_policy.json": "d9d0d88cf6b86b37b8043fb5e28a9a28a2fdd13f854e6ac9ff7c2c4d3e628358",
+    "tournament/top40-v3/teams/team-04/post-tournament-utc-r1/strategy_common.py": "c4366d8a3bbbc31159befa4e35e799a662b12e2748ce923fd4618175be6ec615",
+    "tournament/top40-v3/teams/team-04/post-tournament-utc-r1/strategy_t04_baseline.py": "763eb9fdd80e342bd7ead5c9972aadc5facf6e4fc867ead680b32324b7346f66",
+    "tournament/top40-v3/teams/team-04/post-tournament-utc-r1/strategy_t04_biweekly.py": "f1cc567d350e568687aa5933edb07b9691b84b058425d18eaf4e1b50fb418e6d",
+    "tournament/top40-v3/teams/team-04/post-tournament-utc-r1/strategy_t04_biweekly_buffer.py": "f8d7c90f3072c1ea9e73712196b894a55bc6678cf8672cbb298a4e6ceff9386e",
+    "tournament/top40-v3/teams/team-04/post-tournament-utc-r1/strategy_t04_weekly.py": "22d52f0f6bf69f394af8e9a0fa37080187f3383641612a4ce98782a1f11bf6a2",
+    "tournament/top40-v3/teams/team-04/post-tournament-utc-r1/strategy_t04_weekly_buffer.py": "9be098ea249b9892babe654d7a5e1d30710a96159308f06cfe58c4428e82649c",
+    "tournament/top40-v3/teams/team-04/post-tournament-utc-r1/strategy_t04_weekly_buffer_slow.py": "0edeb269af3c938f8d45352be0a7aceaa662155f77f81fe83f062b9c3e55737c",
+    "tournament/top40-v3/teams/team-06/post-tournament-momentum-r1/risk_policy.json": "b9cf7073790db8a1832b838e1768b992344e74cedc1f9675dd4a21a55bebbbca",
+    "tournament/top40-v3/teams/team-06/post-tournament-momentum-r1/strategy_common.py": "eb82123caf75cf361212b7bba924d1a88d8256f979f18999ee76812f3bb53e2e",
+    "tournament/top40-v3/teams/team-06/post-tournament-momentum-r1/strategy_t06_3d.py": "1e31ec86f208b498d7bce540a3783bfd9dec970529938cff37698710013ba582",
+    "tournament/top40-v3/teams/team-06/post-tournament-momentum-r1/strategy_t06_3d_persist.py": "fcddd3a76171207a900c3ccf56127f612228eeb80b1604f565eeea817a1c25e6",
+    "tournament/top40-v3/teams/team-06/post-tournament-momentum-r1/strategy_t06_3d_persist_strength.py": "84ba7b84cad30fdb84755511a1823e0e0ae0c890320d0ef2bb6dbdd21beb6cc0",
+    "tournament/top40-v3/teams/team-06/post-tournament-momentum-r1/strategy_t06_7d.py": "2b623ec79c51fe57a28c14923ec2e74e52fdb3299b3cc2696d7a64dea0ce38f3",
+    "tournament/top40-v3/teams/team-06/post-tournament-momentum-r1/strategy_t06_7d_persist.py": "6a413df2ea05e992c650d3e7ce6f4b97af72a8977c5806a5b96b435d27a95f15",
+    "tournament/top40-v3/teams/team-06/post-tournament-momentum-r1/strategy_t06_baseline.py": "effa3d91d6dfbf8f80718b4eb399da552c2f0a19ad415e4c1257fb0578342f76"
+  },
+  "implementation_commit": "b5ad50856fc18b0c157167f614dfb9c4e398d1d7",
+  "mutable_candidate_selectors": [
+    "tournament/top40-v3/teams/team-04/post-tournament-utc-r1/frozen_config.json",
+    "tournament/top40-v3/teams/team-06/post-tournament-momentum-r1/frozen_config.json"
+  ],
+  "parent_evidence_commit": "7d3cf661",
+  "policy_sha256": "96d5e141d1686ee554241eff9c9518b1b5f01fe3af3cde2606260af7770a5bef",
+  "schema_version": "top40-v3-post-tournament-activation-v1",
+  "sealed_state_at_activation": {
+    "final_oos_result_artifacts_present": false,
+    "historical_qualifier_result_artifacts_present": false,
+    "latest_visible_market_result_end_exclusive": "2023-07-01T00:00:00Z"
+  }
+}
