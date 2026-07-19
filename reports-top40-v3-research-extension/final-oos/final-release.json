@@ -1,0 +1,65 @@
+{
+  "schema_version": "top40-v3-post-tournament-final-release-v1",
+  "study_id": "top40-v3-post-tournament-team04-team06-r1",
+  "teams": {
+    "team-06": {
+      "candidate_id": "t06-mom-r1-3d-persist",
+      "candidate_identity": {
+        "config_sha256": "fd24f2cb5f5575c8c16012844e1b27b7c9bd267bf3ac21c47d65079c97eaf9e2",
+        "data_authority_sha256": "077eb036d262befec80f7013084fe6906859f7c3bbe2f8c193c9d9ec68e367c3",
+        "dependency_lock_sha256": "869cd3380346a9c9a219fc762868e23cd494a18e22dd9b314ba18621d991faa5",
+        "entrypoint": "tournament/top40-v3/teams/team-06/post-tournament-momentum-r1/strategy_t06_3d_persist.py",
+        "evaluator_sha256": "9e69b0f3dc283f583b192424854688190c608cd97130cd578fb31a47a5907c34",
+        "risk_policy_sha256": "b9cf7073790db8a1832b838e1768b992344e74cedc1f9675dd4a21a55bebbbca",
+        "source_bundle_sha256": "cd4c3c3b3b0815145d599e36a2ee93d330e51c7d3e6927c17c535e34684f5376",
+        "strategy_sha256": "fcddd3a76171207a900c3ccf56127f612228eeb80b1604f565eeea817a1c25e6",
+        "team_id": "team-06"
+      },
+      "diagnostics": {
+        "annualized_turnover": 25.3471582287446,
+        "average_gross_exposure": 0.2881901767583227,
+        "base_cost": 0.03802073734311093,
+        "base_cost_share_of_positive_gross_pnl": 0.325576849693153,
+        "gross_edge_per_turnover_bps": 23.036035906936753,
+        "gross_pnl": 0.1167796094192336,
+        "long_gross_pnl": -0.044367460705561454,
+        "risk_policy_turnover_fraction": 0.19464555955429783,
+        "short_gross_pnl": 0.1611470701247942,
+        "total_one_way_turnover": 50.6943164574892,
+        "trade_count": 9660
+      },
+      "double_cost": {
+        "cumulative_return": 0.01761641173186801,
+        "metrics": {
+          "annualized_return": 0.008769751594420061,
+          "calmar": 0.07193817035323505,
+          "max_drawdown": 0.1219067923378967,
+          "net_sharpe": 0.13207100232078742,
+          "net_sortino": 0.18691241761391184,
+          "positive_quarter_fraction": 0.5
+        }
+      },
+      "regime_sharpe": {
+        "bear": 0.19350509514246708,
+        "bull": 0.36450072776210146,
+        "chop": 0.35424740635419977,
+        "stress": -1.2669137422864343
+      },
+      "schema_version": "top40-v3-post-tournament-run-summary-v1",
+      "scored_window": {
+        "base_cumulative_return": 0.06250677481049483,
+        "end_exclusive": "2026-07-01T00:00:00Z",
+        "metrics": {
+          "annualized_return": 0.03077969266497238,
+          "calmar": 0.27898952179670145,
+          "max_drawdown": 0.11032562250635858,
+          "net_sharpe": 0.2918696710780835,
+          "net_sortino": 0.41843384550570123,
+          "positive_quarter_fraction": 0.5
+        },
+        "start": "2024-07-01T00:00:00Z"
+      },
+      "stage": "final_oos"
+    }
+  }
+}
