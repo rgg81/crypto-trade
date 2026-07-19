@@ -16,11 +16,18 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from crypto_trade.tournament import metrics_v3, orchestrator_v3, runner_v3, top40_v3
+from crypto_trade.tournament import (
+    metrics_v3,
+    orchestrator_v3,
+    research_extension_v3_compat,
+    runner_v3,
+    top40_v3,
+)
 
 EXTENSION_ROOT = "tournament/top40-v3-research-extension"
 POLICY_PATH = f"{EXTENSION_ROOT}/policy.json"
 ACTIVATION_PATH = f"{EXTENSION_ROOT}/activation-freeze.json"
+AMENDMENT_0001_PATH = f"{EXTENSION_ROOT}/amendments/0001/activation-freeze.json"
 JOURNAL_PATH = f"{EXTENSION_ROOT}/research-journal.jsonl"
 FINALIST_PATH = f"{EXTENSION_ROOT}/finalists.json"
 LOCK_PATH = f"{EXTENSION_ROOT}/.result-command.lock"
@@ -231,8 +238,25 @@ def load_policy(root: str | Path = ".") -> Mapping[str, Any]:
     return policy
 
 
-def _authority_files(root: Path, activation: Mapping[str, Any]) -> None:
-    files = activation.get("authority_files")
+def _authority_files(
+    root: Path,
+    activation: Mapping[str, Any],
+    amendment: Mapping[str, Any],
+) -> None:
+    base_files = activation.get("authority_files")
+    replacements = amendment.get("replacement_authority_files")
+    additions = amendment.get("additional_authority_files")
+    if (
+        not isinstance(base_files, Mapping)
+        or not isinstance(replacements, Mapping)
+        or not isinstance(additions, Mapping)
+    ):
+        raise ResearchExtensionError("activation authority maps are malformed")
+    if not set(replacements).issubset(base_files):
+        raise ResearchExtensionError("amendment replaces an unknown base authority")
+    if set(additions) & set(base_files):
+        raise ResearchExtensionError("amendment addition collides with a base authority")
+    files = {**dict(base_files), **dict(replacements), **dict(additions)}
     if not isinstance(files, Mapping) or not files:
         raise ResearchExtensionError("activation authority_files is empty")
     for relative, expected in files.items():
@@ -257,7 +281,17 @@ def validate(root: str | Path = ".") -> dict[str, object]:
     policy_sha256 = _sha256(_read_bytes(root_path, POLICY_PATH))
     if activation.get("policy_sha256") != policy_sha256:
         raise ResearchExtensionError("activation policy hash changed")
-    _authority_files(root_path, activation)
+    amendment = _read_object(root_path, AMENDMENT_0001_PATH)
+    if (
+        amendment.get("schema_version")
+        != "top40-v3-post-tournament-activation-amendment-v1"
+        or amendment.get("amendment_id") != "0001-pandas3-utc-metric-slice"
+        or amendment.get("parent_activation_sha256")
+        != _sha256(_read_bytes(root_path, ACTIVATION_PATH))
+        or amendment.get("policy_sha256") != policy_sha256
+    ):
+        raise ResearchExtensionError("activation amendment 0001 is invalid")
+    _authority_files(root_path, activation, amendment)
     config = top40_v3.load_config(_path(root_path, V3_CONFIG_PATH))
     if (
         config.raw["splits"]["validation"]["end_exclusive"]
@@ -273,6 +307,9 @@ def validate(root: str | Path = ".") -> dict[str, object]:
         raise ResearchExtensionError("V3 runner windows differ from extension policy")
     return {
         "activation_sha256": _sha256(_read_bytes(root_path, ACTIVATION_PATH)),
+        "activation_amendment_0001_sha256": _sha256(
+            _read_bytes(root_path, AMENDMENT_0001_PATH)
+        ),
         "ok": True,
         "policy_sha256": policy_sha256,
         "study_id": policy["study_id"],
@@ -653,19 +690,20 @@ def _run(
     output_relative: str,
 ) -> runner_v3.TeamWindowRunResult:
     try:
-        return runner_v3.run_team(
-            root,
-            authority.team_id,
-            authority.entrypoint,
-            V3_CONFIG_PATH,
-            DATA_MANIFEST_PATH,
-            stage=stage,
-            _authorization=runner_v3._ORGANIZER_RUN_AUTHORIZATION,
-            _output_relative=output_relative,
-            _candidate_id=authority.candidate_id,
-            _source_archive_relative=authority.source_archive_path,
-            _source_archive_sha256=authority.source_archive_sha256,
-        )
+        with research_extension_v3_compat.utc_metric_slice_compatibility():
+            return runner_v3.run_team(
+                root,
+                authority.team_id,
+                authority.entrypoint,
+                V3_CONFIG_PATH,
+                DATA_MANIFEST_PATH,
+                stage=stage,
+                _authorization=runner_v3._ORGANIZER_RUN_AUTHORIZATION,
+                _output_relative=output_relative,
+                _candidate_id=authority.candidate_id,
+                _source_archive_relative=authority.source_archive_path,
+                _source_archive_sha256=authority.source_archive_sha256,
+            )
     except (OSError, TypeError, ValueError, RuntimeError) as exc:
         raise ResearchExtensionError(f"canonical runner failed: {exc}") from exc
 

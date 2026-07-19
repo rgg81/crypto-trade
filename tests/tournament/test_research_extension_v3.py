@@ -6,10 +6,11 @@ import math
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
-from crypto_trade.tournament import research_extension_v3
+from crypto_trade.tournament import research_extension_v3, research_extension_v3_compat, runner_v3
 from crypto_trade.tournament.protocol import DecisionContext
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -247,3 +248,40 @@ def test_append_only_journal_chain_detects_tampering(tmp_path: Path) -> None:
     journal.write_text("\n".join(rows) + "\n", encoding="ascii")
     with pytest.raises(research_extension_v3.ResearchExtensionError, match="chain"):
         research_extension_v3._journal_records(tmp_path)
+
+
+def test_utc_metric_compatibility_changes_only_bound_normalization() -> None:
+    index = pd.date_range("2020-02-03", periods=120, freq="1D", tz="UTC")
+    base = pd.Series(0.001 + 0.002 * np.sin(np.arange(120) / 4.0), index=index)
+    stressed = base - 0.0001
+    btc = pd.Series(0.003 + 0.001 * np.sin(np.arange(120) / 7.0), index=index)
+    authorized = runner_v3.AuthorizedWindow(
+        stage="public",
+        replay_start="2020-02-03T00:00:00Z",
+        end_exclusive="2020-06-02T00:00:00Z",
+        score_start="2020-02-03T00:00:00Z",
+        score_end_inclusive="2020-06-01",
+    )
+    config = {
+        "statistics": {
+            "bootstrap_samples": 100,
+            "bootstrap_block_days": 10,
+            "bootstrap_seed": 7,
+        }
+    }
+    with pytest.raises(ValueError, match="same UTC offset"):
+        runner_v3._compute_metrics(base, stressed, btc, config, authorized)
+    result = research_extension_v3_compat.compute_metrics_utc_compatible(
+        base, stressed, btc, config, authorized
+    )
+    expected = research_extension_v3.metrics_v3.compute_window_metrics(base)
+    assert result["scored_window"].metrics.net_sharpe == pytest.approx(expected.net_sharpe)
+    assert result["scored_window"].start == authorized.score_start
+    assert result["scored_window"].end == authorized.score_end_inclusive
+    original = runner_v3._compute_metrics
+    with research_extension_v3_compat.utc_metric_slice_compatibility():
+        assert (
+            runner_v3._compute_metrics
+            is research_extension_v3_compat.compute_metrics_utc_compatible
+        )
+    assert runner_v3._compute_metrics is original
