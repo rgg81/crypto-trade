@@ -1,0 +1,22 @@
+{
+  "additional_authority_files": {
+    "src/crypto_trade/tournament/research_extension_v3_compat.py": "c756c88bdf8047780d617c5b6ed61815b4e7ca413ca2916175484bbb99087ec8",
+    "tournament/top40-v3-research-extension/amendments/0001/AMENDMENT.md": "bb04bb2ab389ee742d2b5191b594d07d4643d7e1421f9a852fd99cdd57e5f520"
+  },
+  "amendment_id": "0001-pandas3-utc-metric-slice",
+  "failed_attempt_evidence": {
+    "candidate_id": "t06-mom-r1-baseline",
+    "failure": "ValueError: Both dates must have the same UTC offset",
+    "journal_sha256_before_amendment": "0fd8c669a362ad2b7f9468c04a1c1e246a82124c115c07b5a4195aba315c4f30",
+    "request_record_sha256": "6cb021ce1e7fc6e509808ada8918c637b7462849ae8c6a7cf09b3e5bec9cf584",
+    "terminal_record_sha256": "6dc9f620ca9f4848ffef9574b47aaa4268f923d34379f0fe2ed35aed67674bcf"
+  },
+  "implementation_commit": "0a4a74c27146d27b28013c5427b40e7d82417e10",
+  "parent_activation_sha256": "b7a9e6e847aa400890fb0904ac09cee77339ee6030d86ac45136e4d6db7db54f",
+  "policy_sha256": "96d5e141d1686ee554241eff9c9518b1b5f01fe3af3cde2606260af7770a5bef",
+  "replacement_authority_files": {
+    "src/crypto_trade/tournament/research_extension_v3.py": "1bd5ac4c921fb3ae4ed88b4ff3809d29c0da358aff2942562a052fb1aa55d26a",
+    "tests/tournament/test_research_extension_v3.py": "d6a7ff3b9a72f20732736248920c13934c8b243fcf34d5eddc46e620b66513e3"
+  },
+  "schema_version": "top40-v3-post-tournament-activation-amendment-v1"
+}
