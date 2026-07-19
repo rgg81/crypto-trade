@@ -1,0 +1,28 @@
+{
+  "artifact": "post_tournament_research_candidate_config",
+  "candidate_id": "t04-utc-r1-baseline",
+  "candidate_status": "development_only_not_frozen",
+  "implementation": {
+    "build_factory": "build_strategy",
+    "entrypoint": "strategy_t04_baseline.py",
+    "stateful": true
+  },
+  "parameters": {
+    "fast_weight": 0.3,
+    "funding_weight": 0.2,
+    "rank_buffer_fraction": 0.25,
+    "rebalance_bars": 9,
+    "slow_weight": 0.5
+  },
+  "risk_policy": {
+    "path": "risk_policy.json",
+    "policy_id": "team-04-utc-reference-no-control"
+  },
+  "schema_version": 1,
+  "seed": 20260718,
+  "team_id": "team-04",
+  "v3_parent": {
+    "candidate_id": "team-04-utc-reference-001-v3-port",
+    "source_bundle_sha256": "e58b2f905a70acfd88d6450f9fe394d642aacd7b7b61d1848f969f1c6ffe6cfb"
+  }
+}

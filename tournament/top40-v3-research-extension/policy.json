@@ -1,0 +1,143 @@
+{
+  "candidate_matrix": {
+    "team-04": [
+      {
+        "candidate_id": "t04-utc-r1-baseline",
+        "entrypoint": "strategy_t04_baseline.py",
+        "parameters": {"rank_buffer_fraction": 0.25, "rebalance_bars": 9, "fast_weight": 0.3, "funding_weight": 0.2, "slow_weight": 0.5}
+      },
+      {
+        "candidate_id": "t04-utc-r1-weekly",
+        "entrypoint": "strategy_t04_weekly.py",
+        "parameters": {"rank_buffer_fraction": 0.25, "rebalance_bars": 21, "fast_weight": 0.3, "funding_weight": 0.2, "slow_weight": 0.5}
+      },
+      {
+        "candidate_id": "t04-utc-r1-biweekly",
+        "entrypoint": "strategy_t04_biweekly.py",
+        "parameters": {"rank_buffer_fraction": 0.25, "rebalance_bars": 42, "fast_weight": 0.3, "funding_weight": 0.2, "slow_weight": 0.5}
+      },
+      {
+        "candidate_id": "t04-utc-r1-weekly-buffer",
+        "entrypoint": "strategy_t04_weekly_buffer.py",
+        "parameters": {"rank_buffer_fraction": 0.4, "rebalance_bars": 21, "fast_weight": 0.3, "funding_weight": 0.2, "slow_weight": 0.5}
+      },
+      {
+        "candidate_id": "t04-utc-r1-biweekly-buffer",
+        "entrypoint": "strategy_t04_biweekly_buffer.py",
+        "parameters": {"rank_buffer_fraction": 0.4, "rebalance_bars": 42, "fast_weight": 0.3, "funding_weight": 0.2, "slow_weight": 0.5}
+      },
+      {
+        "candidate_id": "t04-utc-r1-weekly-buffer-slow",
+        "entrypoint": "strategy_t04_weekly_buffer_slow.py",
+        "parameters": {"rank_buffer_fraction": 0.4, "rebalance_bars": 21, "fast_weight": 0.1, "funding_weight": 0.2, "slow_weight": 0.7}
+      }
+    ],
+    "team-06": [
+      {
+        "candidate_id": "t06-mom-r1-baseline",
+        "entrypoint": "strategy_t06_baseline.py",
+        "parameters": {"entry_strength": 0.0, "hold_mixed_signal": false, "rebalance_days": 1}
+      },
+      {
+        "candidate_id": "t06-mom-r1-3d",
+        "entrypoint": "strategy_t06_3d.py",
+        "parameters": {"entry_strength": 0.0, "hold_mixed_signal": false, "rebalance_days": 3}
+      },
+      {
+        "candidate_id": "t06-mom-r1-7d",
+        "entrypoint": "strategy_t06_7d.py",
+        "parameters": {"entry_strength": 0.0, "hold_mixed_signal": false, "rebalance_days": 7}
+      },
+      {
+        "candidate_id": "t06-mom-r1-3d-persist",
+        "entrypoint": "strategy_t06_3d_persist.py",
+        "parameters": {"entry_strength": 0.0, "hold_mixed_signal": true, "rebalance_days": 3}
+      },
+      {
+        "candidate_id": "t06-mom-r1-7d-persist",
+        "entrypoint": "strategy_t06_7d_persist.py",
+        "parameters": {"entry_strength": 0.0, "hold_mixed_signal": true, "rebalance_days": 7}
+      },
+      {
+        "candidate_id": "t06-mom-r1-3d-persist-strength",
+        "entrypoint": "strategy_t06_3d_persist_strength.py",
+        "parameters": {"entry_strength": 0.25, "hold_mixed_signal": true, "rebalance_days": 3}
+      }
+    ]
+  },
+  "candidate_roots": {
+    "team-04": "tournament/top40-v3/teams/team-04/post-tournament-utc-r1",
+    "team-06": "tournament/top40-v3/teams/team-06/post-tournament-momentum-r1"
+  },
+  "development": {
+    "end_exclusive": "2023-07-01T00:00:00Z",
+    "folds": [
+      {"end_exclusive": "2021-01-01T00:00:00Z", "name": "2020", "start": "2020-02-03T00:00:00Z"},
+      {"end_exclusive": "2022-01-01T00:00:00Z", "name": "2021", "start": "2021-01-01T00:00:00Z"},
+      {"end_exclusive": "2023-01-01T00:00:00Z", "name": "2022", "start": "2022-01-01T00:00:00Z"},
+      {"end_exclusive": "2023-07-01T00:00:00Z", "name": "2023H1", "start": "2023-01-01T00:00:00Z"}
+    ],
+    "runner_stage": "public",
+    "start": "2020-02-03T00:00:00Z"
+  },
+  "final_oos": {
+    "end_exclusive": "2026-07-01T00:00:00Z",
+    "interim_disclosure": false,
+    "maximum_observations_per_finalist": 1,
+    "runner_stage": "final_oos",
+    "start": "2024-07-01T00:00:00Z"
+  },
+  "historical_qualifier": {
+    "end_exclusive": "2024-07-01T00:00:00Z",
+    "feedback": "pass-fail-only",
+    "gate": {
+      "maximum_drawdown_inclusive": 0.35,
+      "minimum_annualized_return_exclusive": 0.0,
+      "minimum_double_cost_sharpe_exclusive": 0.0,
+      "minimum_net_sharpe_exclusive": 0.0
+    },
+    "maximum_attempts_per_finalist": 1,
+    "runner_stage": "private",
+    "start": "2023-07-01T00:00:00Z"
+  },
+  "lineages": {
+    "team-04": {
+      "parent_candidate_id": "team-04-utc-reference-001-v3-port",
+      "parent_source_bundle_sha256": "e58b2f905a70acfd88d6450f9fe394d642aacd7b7b61d1848f969f1c6ffe6cfb"
+    },
+    "team-06": {
+      "parent_candidate_id": "t06-own-coin-momentum-consensus-v1",
+      "parent_source_bundle_sha256": "9ead481e2282cf98e1ea6292080694e9d73a749a8db3741cd3a84136f355b2f2"
+    }
+  },
+  "live_forward": {
+    "minimum_observation_days": 365,
+    "start": "2026-08-01T00:00:00Z"
+  },
+  "parent_evidence_commit": "7d3cf661",
+  "ranking": [
+    "higher_double_cost_sharpe",
+    "higher_worst_fold_net_sharpe",
+    "higher_gross_edge_per_turnover",
+    "lower_annualized_turnover",
+    "lexicographically_smaller_candidate_id"
+  ],
+  "schema_version": "top40-v3-post-tournament-research-policy-v1",
+  "selection_floors": {
+    "maximum_annualized_turnover_inclusive": 30.0,
+    "maximum_base_cost_share_of_positive_gross_pnl_inclusive": 0.5,
+    "maximum_drawdown_inclusive": 0.3,
+    "minimum_annualized_return_exclusive": 0.0,
+    "minimum_double_cost_sharpe_inclusive": 0.35,
+    "minimum_gross_edge_per_turnover_bps_inclusive": 30.0,
+    "minimum_net_sharpe_inclusive": 0.75,
+    "minimum_positive_base_return_folds_inclusive": 3,
+    "minimum_positive_double_cost_return_folds_inclusive": 3,
+    "minimum_positive_quarter_fraction_inclusive": 0.5,
+    "minimum_positive_regimes_inclusive": 3,
+    "minimum_trade_count_inclusive": 1000,
+    "minimum_worst_fold_net_sharpe_inclusive": -0.5,
+    "minimum_worst_regime_sharpe_inclusive": -0.75
+  },
+  "study_id": "top40-v3-post-tournament-team04-team06-r1"
+}

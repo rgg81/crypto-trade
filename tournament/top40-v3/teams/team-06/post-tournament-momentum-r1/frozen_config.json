@@ -1,0 +1,31 @@
+{
+  "artifact": "post_tournament_research_candidate_config",
+  "candidate_id": "t06-mom-r1-baseline",
+  "candidate_status": "development_only_not_frozen",
+  "data_contract": {
+    "direction_source": "own_coin_history_only",
+    "external_data": false,
+    "funding_used_by_signal": false
+  },
+  "implementation": {
+    "build_factory": "build_strategy",
+    "entrypoint": "strategy_t06_baseline.py",
+    "stateful": true
+  },
+  "parameters": {
+    "entry_strength": 0.0,
+    "hold_mixed_signal": false,
+    "rebalance_days": 1
+  },
+  "risk_policy": {
+    "path": "risk_policy.json",
+    "policy_id": "team-06-v3-controlled"
+  },
+  "schema_version": 1,
+  "seed": 20260718,
+  "team_id": "team-06",
+  "v3_parent": {
+    "candidate_id": "t06-own-coin-momentum-consensus-v1",
+    "source_bundle_sha256": "9ead481e2282cf98e1ea6292080694e9d73a749a8db3741cd3a84136f355b2f2"
+  }
+}
