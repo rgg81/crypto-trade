@@ -263,7 +263,7 @@ def summarize_run(
         seed=int(statistics["bootstrap_seed"]),
     )
     packet: dict[str, Any] = {
-        "schema_version": "top40-v4-run-summary-v1",
+        "schema_version": "top40-v4-r1-run-summary-v1",
         "stage": result.stage,
         "team_id": result.team_id,
         "candidate_identity": {

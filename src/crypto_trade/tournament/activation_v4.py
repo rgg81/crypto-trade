@@ -16,14 +16,14 @@ from typing import Any
 from crypto_trade.tournament import pure_crypto_universe_v6, top40_v4
 from crypto_trade.tournament.layout_v4 import TOP40_V4_LAYOUT
 
-SCHEMA_VERSION = "top40-v4-activation-freeze-v1"
-TEST_OUTPUT_PATH = "tournament/top40-v4/activation-tests.out"
+SCHEMA_VERSION = "top40-v4-r1-activation-freeze-v1"
+TEST_OUTPUT_PATH = "tournament/top40-v4-r1/activation-tests.out"
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _GIT_OBJECT_ID = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})")
 
 FROZEN_SCOPE = (
     ".python-version",
-    "TOURNAMENT-CHARTER-TOP40-V4.md",
+    "TOURNAMENT-CHARTER-TOP40-V4-R1.md",
     "pyproject.toml",
     "scripts/top40_v4_tournament.py",
     "src/crypto_trade/tournament/_strategy_worker_v4.py",
@@ -45,11 +45,11 @@ FROZEN_SCOPE = (
     "tests/tournament/test_top40_v4.py",
     "tests/tournament/test_v4_team_bundles.py",
     "tournament/top40/data_manifest.json",
-    "tournament/top40-v4/README.md",
-    "tournament/top40-v4/ROBUSTNESS-POLICY.md",
-    "tournament/top40-v4/TEAM-MANDATES.md",
-    "tournament/top40-v4/TEAM-PLAYBOOK.md",
-    "tournament/top40-v4/config.toml",
+    "tournament/top40-v4-r1/README.md",
+    "tournament/top40-v4-r1/ROBUSTNESS-POLICY.md",
+    "tournament/top40-v4-r1/TEAM-MANDATES.md",
+    "tournament/top40-v4-r1/TEAM-PLAYBOOK.md",
+    "tournament/top40-v4-r1/config.toml",
     "uv.lock",
 )
 

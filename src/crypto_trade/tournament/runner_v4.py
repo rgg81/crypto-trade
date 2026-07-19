@@ -1418,7 +1418,7 @@ def _launch_strategy_worker(
 ) -> tuple[_StrategyWorkerClient, tempfile.TemporaryDirectory[str]]:
     repository_parent = _runner_repository_parent()
     site_packages = _current_venv_site_packages(repository_parent)
-    sandbox = tempfile.TemporaryDirectory(prefix=f"top40-v4-{team_id}-")
+    sandbox = tempfile.TemporaryDirectory(prefix=f"top40-v4-r1-{team_id}-")
     sandbox_root = Path(sandbox.name)
     bundle = sandbox_root / "bundle"
     runtime_site_packages = sandbox_root / "runtime-site-packages"
@@ -2192,12 +2192,12 @@ def _compute_metrics(
     config: Mapping[str, Any],
     authorized: AuthorizedWindow,
 ) -> dict[str, Any]:
-    scored = base_daily.loc[authorized.score_start : authorized.score_end_inclusive]
-    stressed_scored = stressed_daily.loc[authorized.score_start : authorized.score_end_inclusive]
-    triple_scored = triple_daily.loc[authorized.score_start : authorized.score_end_inclusive]
-    labels = classify_btc_regimes(btc_daily).loc[
-        authorized.score_start : authorized.score_end_inclusive
-    ]
+    score_start = _as_utc_timestamp(authorized.score_start)
+    score_end = _as_utc_timestamp(authorized.score_end_inclusive)
+    scored = base_daily.loc[score_start:score_end]
+    stressed_scored = stressed_daily.loc[score_start:score_end]
+    triple_scored = triple_daily.loc[score_start:score_end]
+    labels = classify_btc_regimes(btc_daily).loc[score_start:score_end]
     if not labels.index.equals(scored.index) or labels.notna().sum() == 0:
         raise ValueError(f"BTC regime labels do not cover the exact {authorized.stage} grid")
     statistics = config["statistics"]

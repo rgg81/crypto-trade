@@ -37,17 +37,17 @@ _TOP_LEVEL_KEYS = frozenset(
 )
 
 _EXPECTED_PATHS = {
-    "tournament_root": "tournament/top40-v4",
-    "reports_root": "reports-top40-v4",
-    "team_root": "tournament/top40-v4/teams",
-    "research_journal": "tournament/top40-v4/research-journal.jsonl",
-    "nomination_registry": "tournament/top40-v4/nomination-registry.json",
-    "selection_freeze": "tournament/top40-v4/selection-freeze.json",
-    "activation_freeze": "tournament/top40-v4/activation-freeze.json",
-    "source_archive_root": "reports-top40-v4/source-archives/sha256",
-    "is_reports_root": "reports-top40-v4/is",
-    "private_final_root": "tournament/top40-v4/private/historical-oos",
-    "final_release_root": "reports-top40-v4/historical-oos",
+    "tournament_root": "tournament/top40-v4-r1",
+    "reports_root": "reports-top40-v4-r1",
+    "team_root": "tournament/top40-v4-r1/teams",
+    "research_journal": "tournament/top40-v4-r1/research-journal.jsonl",
+    "nomination_registry": "tournament/top40-v4-r1/nomination-registry.json",
+    "selection_freeze": "tournament/top40-v4-r1/selection-freeze.json",
+    "activation_freeze": "tournament/top40-v4-r1/activation-freeze.json",
+    "source_archive_root": "reports-top40-v4-r1/source-archives/sha256",
+    "is_reports_root": "reports-top40-v4-r1/is",
+    "private_final_root": "tournament/top40-v4-r1/private/historical-oos",
+    "final_release_root": "reports-top40-v4-r1/historical-oos",
 }
 
 _EXPECTED_FOLDS = (
@@ -120,7 +120,7 @@ def validate_config(raw: Mapping[str, Any]) -> None:
     _expect(raw, ("schema_version",), 1)
     _expect(raw, ("name",), TOP40_V4_LAYOUT.name)
     _expect(raw, ("policy_status",), "active-pending-activation")
-    _expect(raw, ("charter_path",), "TOURNAMENT-CHARTER-TOP40-V4.md")
+    _expect(raw, ("charter_path",), "TOURNAMENT-CHARTER-TOP40-V4-R1.md")
     if tuple(_sequence(raw.get("teams"), "teams")) != TEAM_IDS:
         raise ValueError("V4 config must contain exactly team-01 through team-12")
     paths = _mapping(raw.get("paths"), "paths")

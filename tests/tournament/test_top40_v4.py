@@ -32,7 +32,7 @@ def _accepted(team_id: str, trial: int) -> dict[str, object]:
         "purpose": "bounded preregistered test",
         "metadata": {"tags": ["baseline"]},
         "authority": {"source_bundle_sha256": "1" * 64},
-        "output_path": f"reports-top40-v4/is/{team_id}/run-{trial:02d}",
+        "output_path": f"reports-top40-v4-r1/is/{team_id}/run-{trial:02d}",
     }
 
 
@@ -43,14 +43,14 @@ def _success(request: dict[str, object]) -> dict[str, object]:
         "run_id": payload["run_id"],
         "candidate_id": payload["candidate_id"],
         "request_sha256": request["record_sha256"],
-        "summary_path": f"reports-top40-v4/is/{payload['team_id']}/summary.json",
+        "summary_path": f"reports-top40-v4-r1/is/{payload['team_id']}/summary.json",
         "summary_sha256": "2" * 64,
     }
 
 
 def _candidate_authority(team_id: str) -> dict[str, str]:
     candidate_id = f"{team_id.replace('-', '')}-finalist-v1"
-    candidate_root = f"tournament/top40-v4/teams/{team_id}/candidates/{candidate_id}"
+    candidate_root = f"tournament/top40-v4-r1/teams/{team_id}/candidates/{candidate_id}"
     digest = hashlib.sha256(team_id.encode("ascii")).hexdigest()
     return {
         "team_id": team_id,
@@ -58,7 +58,9 @@ def _candidate_authority(team_id: str) -> dict[str, str]:
         "candidate_root": candidate_root,
         "entrypoint": f"{candidate_root}/strategy.py",
         "source_bundle_sha256": digest,
-        "source_archive_path": f"tournament/top40-v4/source-archives/{team_id}/{candidate_id}.json",
+        "source_archive_path": (
+            f"tournament/top40-v4-r1/source-archives/{team_id}/{candidate_id}.json"
+        ),
         "source_archive_sha256": "1" * 64,
         "strategy_sha256": "2" * 64,
         "risk_policy_sha256": "3" * 64,
@@ -103,7 +105,7 @@ def _historical_request(team_id: str, sequence: int) -> dict[str, object]:
             "run_id": run_id,
             "selection_record_sha256": "a" * 64,
             "output_path": (
-                f"tournament/top40-v4/private/historical-oos/{team_id}/{run_id}"
+                f"tournament/top40-v4-r1/private/historical-oos/{team_id}/{run_id}"
             ),
         },
     }
@@ -143,6 +145,34 @@ def test_v4_contract_has_twelve_teams_and_only_two_historical_stages() -> None:
     assert historical.end_exclusive == "2026-07-01T00:00:00Z"
     with pytest.raises(ValueError, match="is or historical_oos"):
         runner_v4._authorized_window(loaded.raw, "validation")
+
+
+def test_metric_window_normalizes_utc_start_and_date_only_end() -> None:
+    index = pd.date_range("2020-02-03T00:00:00Z", periods=180, freq="1D")
+    daily = pd.Series([0.001, -0.0005] * 90, index=index, name="net_return")
+    authorized = runner_v4.AuthorizedWindow(
+        stage="is",
+        replay_start="2020-02-03T00:00:00Z",
+        end_exclusive="2020-08-01T00:00:00Z",
+        score_start="2020-02-03T00:00:00Z",
+        score_end_inclusive="2020-07-31",
+    )
+    packet = runner_v4._compute_metrics(
+        daily,
+        daily,
+        daily,
+        daily,
+        {
+            "statistics": {
+                "bootstrap_samples": 100,
+                "bootstrap_block_days": 5,
+                "bootstrap_seed": 20260719,
+            }
+        },
+        authorized,
+    )
+    assert packet["scored_window"].start == authorized.score_start
+    assert packet["scored_window"].end == authorized.score_end_inclusive
 
 
 def test_config_rejects_a_softened_gate() -> None:
@@ -261,7 +291,7 @@ def test_journal_allows_an_empty_bracket_but_never_lowers_the_floors(
             {
                 "input_head_sha256": before.head_sha256,
                 "advancing": [],
-                "selection_freeze_path": "tournament/top40-v4/selection-freeze.json",
+                "selection_freeze_path": "tournament/top40-v4-r1/selection-freeze.json",
                 "selection_freeze_sha256": "5" * 64,
             },
         )
@@ -272,8 +302,8 @@ def test_journal_allows_an_empty_bracket_but_never_lowers_the_floors(
         {
             "selection_record_sha256": selection["record_sha256"],
             "terminal_record_sha256s": [],
-            "staging_path": "reports-top40-v4/.historical-oos-staging",
-            "release_path": "reports-top40-v4/historical-oos",
+            "staging_path": "reports-top40-v4-r1/.historical-oos-staging",
+            "release_path": "reports-top40-v4-r1/historical-oos",
             "manifest_sha256": "6" * 64,
             "bundle_sha256": "7" * 64,
         },
@@ -498,11 +528,11 @@ def test_nomination_retry_replaces_only_an_unjournaled_orphan(
     monkeypatch.setattr(journal_v4, "append", append)
     monkeypatch.setattr(journal_v4, "read", lambda _path: state)
 
-    certificate = "tournament/top40-v4/certificates/team-01/research.json"
+    certificate = "tournament/top40-v4-r1/certificates/team-01/research.json"
     with pytest.raises(OSError, match="simulated crash"):
         orchestrator_v4.nominate(tmp_path, team_id, candidate_id, certificate)
     nomination_path = (
-        tmp_path / f"tournament/top40-v4/nominations/{team_id}-{candidate_id}.json"
+        tmp_path / f"tournament/top40-v4-r1/nominations/{team_id}-{candidate_id}.json"
     )
     assert json.loads(nomination_path.read_text())["trial_count"] == 8
 
@@ -648,8 +678,8 @@ def test_authorized_release_rebuilds_missing_staging_before_promotion(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     release = {
-        "staging_path": "reports-top40-v4/.historical-oos-staging",
-        "release_path": "reports-top40-v4/historical-oos",
+        "staging_path": "reports-top40-v4-r1/.historical-oos-staging",
+        "release_path": "reports-top40-v4-r1/historical-oos",
         "manifest_sha256": "a" * 64,
         "bundle_sha256": "b" * 64,
     }
@@ -741,7 +771,7 @@ def test_source_archive_accepts_team_12_namespace(tmp_path: Path) -> None:
         tmp_path,
         team_id="team-12",
         candidate_id="team12-test-v1",
-        candidate_root="tournament/top40-v4/teams/team-12/candidates/team12-test-v1",
+        candidate_root="tournament/top40-v4-r1/teams/team-12/candidates/team12-test-v1",
         entrypoint="strategy.py",
         source_bundle_sha256=bundle,
         files=files,
@@ -794,7 +824,7 @@ def test_artifact_publisher_keeps_independent_base_double_and_triple_cost_runs(
         tmp_path,
         "team-12",
         stage="is",
-        output_relative="reports-top40-v4/is/team-12/triple-test",
+        output_relative="reports-top40-v4-r1/is/team-12/triple-test",
         targets=pd.DataFrame({"BTCUSDT": 0.0}, index=index),
         base=evaluation(0.001),
         stressed=evaluation(0.0005),

@@ -77,7 +77,7 @@ def main(argv: list[str] | None = None) -> int:
         else:  # pragma: no cover - argparse owns this invariant.
             raise AssertionError(arguments.command)
     except (OSError, TypeError, ValueError, RuntimeError) as exc:
-        sys.stderr.write(f"top40-v4: {exc}\n")
+        sys.stderr.write(f"top40-v4-r1: {exc}\n")
         return 2
     sys.stdout.write(json.dumps(result, allow_nan=False, indent=2, sort_keys=True) + "\n")
     return 0

@@ -20,8 +20,8 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-SCHEMA_VERSION = "top40-v4-candidate-source-archive-v1"
-ARCHIVE_NAMESPACE = "reports-top40-v4/source-archives/sha256"
+SCHEMA_VERSION = "top40-v4-r1-candidate-source-archive-v1"
+ARCHIVE_NAMESPACE = "reports-top40-v4-r1/source-archives/sha256"
 MAX_ARCHIVE_BYTES = 16 * 1024 * 1024
 
 _SHA256 = re.compile(r"[0-9a-f]{64}")
@@ -159,7 +159,7 @@ def _decode_archive(payload: bytes, *, relative_path: str, sha256: str) -> Sourc
         raise SourceArchiveError("source archive team_id is invalid")
     candidate_id = _require_identifier(value["candidate_id"], "candidate_id")
     candidate_root = _relative_path(value["candidate_root"], "candidate_root")
-    required_prefix = f"tournament/top40-v4/teams/{team_id}"
+    required_prefix = f"tournament/top40-v4-r1/teams/{team_id}"
     if candidate_root != required_prefix and not candidate_root.startswith(required_prefix + "/"):
         raise SourceArchiveError("candidate_root is outside its V4 team namespace")
     entrypoint = _relative_path(value["entrypoint"], "entrypoint")

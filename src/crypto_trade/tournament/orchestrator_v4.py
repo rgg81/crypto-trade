@@ -879,7 +879,7 @@ def _certificate(
 
 def _write_nomination_registry(root: Path, state: journal_v4.JournalState) -> None:
     registry = {
-        "schema_version": "top40-v4-nomination-registry-v1",
+        "schema_version": "top40-v4-r1-nomination-registry-v1",
         "journal_head_sha256": state.head_sha256,
         "teams": {
             team_id: dict(record["payload"])
@@ -950,7 +950,7 @@ def nominate(
             failed = sorted(key for key, passed in selection["gates"].items() if not passed)
             raise OrchestratorError(f"candidate fails frozen IS gates: {', '.join(failed)}")
         nomination = {
-            "schema_version": "top40-v4-nomination-v1",
+            "schema_version": "top40-v4-r1-nomination-v1",
             "team_id": team_id,
             "candidate_id": candidate_id,
             "trial_count": state.trials_by_team[team_id],
@@ -1139,7 +1139,7 @@ def close_is(root: str | Path) -> Mapping[str, Any]:
             float(loaded.raw["ensemble"]["maximum_constituent_weight"]),
         )
         freeze = {
-            "schema_version": "top40-v4-selection-freeze-v1",
+            "schema_version": "top40-v4-r1-selection-freeze-v1",
             "tournament": TOP40_V4_LAYOUT.name,
             "input_journal_head_sha256": state.head_sha256,
             "config_sha256": loaded.sha256,
@@ -1366,7 +1366,7 @@ def _ensemble_release(
         "triple_cost": "triple_cost_daily_returns",
     }
     packet: dict[str, Any] = {
-        "schema_version": "top40-v4-historical-oos-ensemble-v1",
+        "schema_version": "top40-v4-r1-historical-oos-ensemble-v1",
         "role": "additional-reporting-portfolio",
         "constituent_weights": weights,
         "cash_weight": selection["ensemble"]["cash_weight"],
@@ -1458,7 +1458,7 @@ def _release_bundle(
                     team_destination / "result.json",
                     _pretty(
                         {
-                            "schema_version": "top40-v4-historical-oos-dnf-v1",
+                            "schema_version": "top40-v4-r1-historical-oos-dnf-v1",
                             "team_id": team_id,
                             "candidate_id": finalist["candidate_id"],
                             "status": "DNF",
@@ -1488,7 +1488,7 @@ def _release_bundle(
                 )
         bundle_sha256 = _sha256(_canonical({"files": file_entries}))
         manifest = {
-            "schema_version": "top40-v4-historical-oos-release-v1",
+            "schema_version": "top40-v4-r1-historical-oos-release-v1",
             "evidence_label": "candidate-relative-historical-oos-not-globally-pristine",
             "window": {"start": "2024-07-01T00:00:00Z", "end_exclusive": "2026-07-01T00:00:00Z"},
             "selection_record_sha256": state.selection_record_sha256,

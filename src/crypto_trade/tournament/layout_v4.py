@@ -79,10 +79,10 @@ class TournamentLayoutV4:
 
 
 TOP40_V4_LAYOUT = TournamentLayoutV4(
-    name="quant-portfolio-blind-top40-v4",
-    branch="quant-portfolio-blind-top40-v4",
-    tournament_root="tournament/top40-v4",
-    reports_root="reports-top40-v4",
+    name="quant-portfolio-blind-top40-v4-r1",
+    branch="quant-portfolio-blind-top40-v4-r1",
+    tournament_root="tournament/top40-v4-r1",
+    reports_root="reports-top40-v4-r1",
     orchestrator_script="scripts/top40_v4_tournament.py",
     contract_source="src/crypto_trade/tournament/top40_v4.py",
     team_ids=tuple(f"team-{number:02d}" for number in range(1, 13)),

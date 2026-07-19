@@ -1,10 +1,14 @@
-# Top-40 V4
+# Top-40 V4-R1
 
-Top-40 V4 is the twelve-team successor to V3. It keeps V3 immutable and reuses only audited,
-generation-neutral execution components through a new V4 authority and write namespace.
+Top-40 V4-R1 is the clean restart of the twelve-team successor to V3. It preserves the first V4
+activation incident, starts from an empty journal, and reuses only audited, generation-neutral
+execution components through a separate authority and write namespace.
+
+The abandoned activation evidence is preserved in
+[`../top40-v4/incidents/2026-07-19-evaluator-utc-slice/INCIDENT.md`](../top40-v4/incidents/2026-07-19-evaluator-utc-slice/INCIDENT.md).
 
 The authoritative prose contract is
-[`../../TOURNAMENT-CHARTER-TOP40-V4.md`](../../TOURNAMENT-CHARTER-TOP40-V4.md). Numerical policy is
+[`../../TOURNAMENT-CHARTER-TOP40-V4-R1.md`](../../TOURNAMENT-CHARTER-TOP40-V4-R1.md). Numerical policy is
 in [`config.toml`](config.toml). Team mechanisms are defined in [`TEAM-MANDATES.md`](TEAM-MANDATES.md)
 and the operating workflow in [`TEAM-PLAYBOOK.md`](TEAM-PLAYBOOK.md).
 
@@ -53,18 +57,18 @@ An IS trial is accepted before the runner opens market data. Its entrypoint must
 
 ```bash
 uv run python scripts/top40_v4_tournament.py is-run team-01 \
-  tournament/top40-v4/teams/team-01/candidates/t01-slow-tsm-baseline-v1/strategy.py \
+  tournament/top40-v4-r1/teams/team-01/candidates/t01-slow-tsm-baseline-v1/strategy.py \
   --purpose "transparent slow-trend baseline"
 ```
 
 After at least eight accepted trials, a team either nominates one eligible candidate with a
 journal-backed certificate or retires. Certificate files live under
-`tournament/top40-v4/certificates/<team-id>/`; each required evidence cell lists the accepted
+`tournament/top40-v4-r1/certificates/<team-id>/`; each required evidence cell lists the accepted
 request-record hashes whose preregistered tags satisfy that cell.
 
 ```bash
 uv run python scripts/top40_v4_tournament.py nominate team-01 candidate-id \
-  tournament/top40-v4/certificates/team-01/candidate-id.json
+  tournament/top40-v4-r1/certificates/team-01/candidate-id.json
 uv run python scripts/top40_v4_tournament.py retire team-01 --reason "mechanism falsified"
 ```
 

@@ -1,18 +1,20 @@
-# Top-40 V4 tournament charter
+# Top-40 V4-R1 tournament charter
 
 Status: pre-activation authority
 
-Tournament: `quant-portfolio-blind-top40-v4`
+Tournament: `quant-portfolio-blind-top40-v4-r1`
 
 ## 1. Objective
 
-Top-40 V4 is a two-round, twelve-team, pure-crypto model-building tournament. Round 1 is a
+Top-40 V4-R1 is a two-round, twelve-team, pure-crypto model-building tournament. Round 1 is a
 transparent in-sample research league. Only the strongest robust IS finalists advance. Round 2 is
 a single frozen historical championship over 2024-07-01 through 2026-06-30. The exact strategies,
 risk policies, dependencies, data authority, evaluator and ensemble weights are frozen before any
 Round-2 observation.
 
-V4 does not rewrite any V1, V2 or V3 result. Earlier tournament namespaces are immutable evidence.
+V4-R1 does not rewrite any earlier result. The aborted first V4 activation and all V1–V3
+namespaces remain immutable evidence. V4-R1 starts with a new activation and empty journal and
+inherits no performance observation from that infrastructure-only failure.
 
 ## 2. Evidence labels
 
@@ -82,7 +84,7 @@ compute budget is exhausted.
 ## 6. IS qualification
 
 The five fixed chronological folds are 2020 (from February 3), 2021, 2022, 2023 and 2024H1. A
-nominee must pass every conjunctive floor frozen in `tournament/top40-v4/config.toml`, including:
+nominee must pass every conjunctive floor frozen in `tournament/top40-v4-r1/config.toml`, including:
 
 - full-period Sharpe, return, drawdown and 2x/3x cost resilience;
 - positive-quarter and chronological-fold breadth;

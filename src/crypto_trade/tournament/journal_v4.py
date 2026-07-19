@@ -17,7 +17,7 @@ from typing import Any
 
 from crypto_trade.tournament.layout_v4 import TOP40_V4_LAYOUT
 
-SCHEMA_VERSION = "top40-v4-lifecycle-journal-v1"
+SCHEMA_VERSION = "top40-v4-r1-lifecycle-journal-v1"
 GENESIS_SHA256 = "0" * 64
 MAX_RECORD_BYTES = 1_048_576
 

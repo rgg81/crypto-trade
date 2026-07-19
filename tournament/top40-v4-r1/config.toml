@@ -1,24 +1,24 @@
 schema_version = 1
-name = "quant-portfolio-blind-top40-v4"
+name = "quant-portfolio-blind-top40-v4-r1"
 policy_status = "active-pending-activation"
-charter_path = "TOURNAMENT-CHARTER-TOP40-V4.md"
+charter_path = "TOURNAMENT-CHARTER-TOP40-V4-R1.md"
 teams = [
   "team-01", "team-02", "team-03", "team-04", "team-05", "team-06",
   "team-07", "team-08", "team-09", "team-10", "team-11", "team-12",
 ]
 
 [paths]
-tournament_root = "tournament/top40-v4"
-reports_root = "reports-top40-v4"
-team_root = "tournament/top40-v4/teams"
-research_journal = "tournament/top40-v4/research-journal.jsonl"
-nomination_registry = "tournament/top40-v4/nomination-registry.json"
-selection_freeze = "tournament/top40-v4/selection-freeze.json"
-activation_freeze = "tournament/top40-v4/activation-freeze.json"
-source_archive_root = "reports-top40-v4/source-archives/sha256"
-is_reports_root = "reports-top40-v4/is"
-private_final_root = "tournament/top40-v4/private/historical-oos"
-final_release_root = "reports-top40-v4/historical-oos"
+tournament_root = "tournament/top40-v4-r1"
+reports_root = "reports-top40-v4-r1"
+team_root = "tournament/top40-v4-r1/teams"
+research_journal = "tournament/top40-v4-r1/research-journal.jsonl"
+nomination_registry = "tournament/top40-v4-r1/nomination-registry.json"
+selection_freeze = "tournament/top40-v4-r1/selection-freeze.json"
+activation_freeze = "tournament/top40-v4-r1/activation-freeze.json"
+source_archive_root = "reports-top40-v4-r1/source-archives/sha256"
+is_reports_root = "reports-top40-v4-r1/is"
+private_final_root = "tournament/top40-v4-r1/private/historical-oos"
+final_release_root = "reports-top40-v4-r1/historical-oos"
 
 [data]
 source = "binance-public-usdm"
