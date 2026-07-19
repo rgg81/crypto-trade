@@ -91,3 +91,4 @@
 {"apply_funding": true, "cost_mult": 1.0, "event": "holdout_run", "label": "canonical", "slip_mult": 1.0, "team_id": "team-05", "ts": "2026-07-18T20:23:33+00:00"}
 {"event": "holdout_result", "is_replay_identical": true, "label": "canonical", "maxdd": -0.35533132743132045, "sharpe": 1.5509506623995717, "team_id": "team-05", "ts": "2026-07-18T20:23:52+00:00"}
 {"event": "stage2_report", "ts": "2026-07-18T20:24:14+00:00", "winner": "team-02"}
+{"event": "data_backfill_complete", "result": "430/430 union symbols now have OI; +32136 8h rows", "scoring_impact": "NONE \u2014 completed AFTER Stage-2; no finalist consumes aux[oi] (01 funding, 02 close-only WINNER, 04 close-only, 05 taker-volumes), and team-08 (the only OI family) did not reach the holdout. Paper desk is price-only, unaffected.", "ts": "2026-07-19T04:47:28+00:00", "what": "open_interest top-up for the 27 union symbols missing OI"}
