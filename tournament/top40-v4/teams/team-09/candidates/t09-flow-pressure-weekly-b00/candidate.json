@@ -1,0 +1,49 @@
+{
+  "candidate_id": "t09-flow-pressure-weekly-b00",
+  "control_profile": "Own-history activity normalization, cross-sectional residualization, divergence damping, rank retention, and central risk controls.",
+  "falsifier": "The pressure spread is a liquidity-size proxy, loses both directional roles, or fails when flow and price disagree.",
+  "formation_horizon": "189 completed 8-hour bars with a 21-bar pressure window",
+  "hypothesis": "Persistent residual taker-buy imbalance confirmed by residual price pressure and own-history activity predicts a weekly cross-sectional spread.",
+  "material_parameters": {
+    "activity_weight": 0.2,
+    "decision_hour_utc": 0,
+    "decision_weekday_utc": 0,
+    "divergence_scale": 0.35,
+    "entry_fraction_per_side": 0.2,
+    "flow_weight": 0.5,
+    "interval_hours": 8,
+    "lookback_bars": 189,
+    "maximum_abs_net": 0.02,
+    "maximum_symbol_weight": 0.025,
+    "minimum_median_quote_volume": 1000000.0,
+    "minimum_positions_per_side": 8,
+    "minimum_positive_activity_fraction": 0.95,
+    "minimum_valid_symbols": 24,
+    "price_weight": 0.3,
+    "retention_fraction_per_side": 0.3,
+    "signal_bars": 21,
+    "total_gross": 0.28,
+    "total_gross_bps": 2800,
+    "winsor_z": 4.0
+  },
+  "mechanism": "taker-flow-price-volume-pressure",
+  "neighborhood_coordinates": {
+    "lookback_bars": 189,
+    "signal_bars": 21,
+    "total_gross_bps": 2800
+  },
+  "neighborhood_id": "t09-flow-pressure-weekly-n1",
+  "parent_candidate_id": null,
+  "rebalance_horizon": "weekly Monday 00:00 UTC",
+  "schema_version": 1,
+  "tags": [
+    "baseline",
+    "formation-grid",
+    "rebalance-grid",
+    "control-ablation",
+    "role-check",
+    "local-neighborhood",
+    "flow-normalized"
+  ],
+  "team_id": "team-09"
+}

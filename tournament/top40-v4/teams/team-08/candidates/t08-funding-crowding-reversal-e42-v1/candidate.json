@@ -1,0 +1,35 @@
+{
+  "candidate_id": "t08-funding-crowding-reversal-e42-v1",
+  "control_profile": "funding-extreme threshold, price-flow confirmation, downward volatility scaling, drawdown brakes, close-confirmed loss stop and one-way turnover cap",
+  "falsifier": "Extreme settled funding continues rather than unwinds, confirmation arrives too late for next-open execution, or base and stressed costs make both long and short roles nonpositive.",
+  "formation_horizon": "latest settled funding event standardized against forty-two prior events with three completed confirmation bars",
+  "hypothesis": "An extreme settled funding observation identifies crowded positioning, and an aligned market-residual price and taker-flow move confirms an unwind that persists beyond the next executable open.",
+  "material_parameters": {
+    "confirmation_bars": 3,
+    "funding_reference_events": 42,
+    "holding_days": 3,
+    "minimum_abs_funding_z": 1.25,
+    "total_gross": 0.24,
+    "turnover_cap": 0.1
+  },
+  "mechanism": "funding-crowding-mean-reversion",
+  "neighborhood_coordinates": {
+    "confirmation_bars": 3,
+    "funding_reference_events": 42,
+    "holding_days": 3
+  },
+  "neighborhood_id": "t08-funding-crowding-reversal-n1",
+  "parent_candidate_id": null,
+  "rebalance_horizon": "one daily event cohort with three equally weighted overlapping cohorts",
+  "schema_version": 1,
+  "tags": [
+    "baseline",
+    "formation-grid",
+    "rebalance-grid",
+    "role-check",
+    "local-neighborhood",
+    "funding-crowding",
+    "mean-reversion"
+  ],
+  "team_id": "team-08"
+}

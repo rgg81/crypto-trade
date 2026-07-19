@@ -1,0 +1,36 @@
+{
+  "candidate_id": "t06-downside-low-vol-b126-w1-v1",
+  "control_profile": "weekly turnover, downward volatility scaling, drawdown brakes, close-confirmed loss stop and one-way turnover cap",
+  "falsifier": "The beta-orthogonal low-risk ordering is nonpositive after doubled costs, lacks profitable fragile-name shorts, or fails when downside, drawdown and volatility components are ablated.",
+  "formation_horizon": "one hundred twenty-six completed bars of market-residual risk history",
+  "hypothesis": "Coins with persistently lower residual downside semivariance, volatility and drawdown are more resilient than high-risk peers, producing a broad long-low-risk and short-fragile spread.",
+  "material_parameters": {
+    "downside_weight": 0.45,
+    "drawdown_weight": 0.2,
+    "lookback_bars": 126,
+    "rebalance_days": 7,
+    "selected_fraction": 0.25,
+    "total_gross": 0.36,
+    "volatility_weight": 0.35
+  },
+  "mechanism": "downside-risk-low-volatility",
+  "neighborhood_coordinates": {
+    "lookback_bars": 126,
+    "rebalance_days": 7,
+    "selected_fraction": 0.25
+  },
+  "neighborhood_id": "t06-downside-low-vol-n1",
+  "parent_candidate_id": null,
+  "rebalance_horizon": "weekly at the first daily boundary of the week",
+  "schema_version": 1,
+  "tags": [
+    "baseline",
+    "formation-grid",
+    "rebalance-grid",
+    "role-check",
+    "local-neighborhood",
+    "downside-risk",
+    "low-volatility"
+  ],
+  "team_id": "team-06"
+}

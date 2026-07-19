@@ -1,0 +1,36 @@
+{
+  "candidate_id": "t02-breakout-buffer-baseline-v1",
+  "control_profile": "balanced broad sleeves with a reduced strategy gross, volatility target, fast position stop, time stop and turnover cap",
+  "falsifier": "Reject if persistence and short-horizon confirmation do not improve false-breakout behavior or if the faster schedule creates uneconomic turnover.",
+  "formation_horizon": "twenty-day high-low channel with seven-day return confirmation",
+  "hypothesis": "Fast channel location remains useful when unconfirmed moves are sharply attenuated and exposure is refreshed only twice per week.",
+  "material_parameters": {
+    "channel_days": 20,
+    "confirmation_days": 7,
+    "persistence_bars": 3,
+    "rebalance_boundaries_per_week": 2,
+    "rebalance_weekdays": [
+      0,
+      3
+    ],
+    "total_gross": 0.36,
+    "unconfirmed_scale": 0.2
+  },
+  "mechanism": "fast-breakout-time-series-momentum",
+  "neighborhood_coordinates": {
+    "channel_days": 20,
+    "confirmation_days": 7,
+    "rebalance_boundaries_per_week": 2
+  },
+  "neighborhood_id": "t02-breakout-window-neighborhood",
+  "parent_candidate_id": null,
+  "rebalance_horizon": "twice weekly at fixed UTC decision boundaries",
+  "schema_version": 1,
+  "tags": [
+    "baseline",
+    "formation-grid",
+    "rebalance-grid",
+    "role-check"
+  ],
+  "team_id": "team-02"
+}

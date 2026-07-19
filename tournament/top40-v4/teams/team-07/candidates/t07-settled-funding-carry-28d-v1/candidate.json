@@ -1,0 +1,36 @@
+{
+  "candidate_id": "t07-settled-funding-carry-28d-v1",
+  "control_profile": "continuous adverse-price discount, downward volatility scaling, drawdown brakes, close-confirmed loss stop and one-way turnover cap",
+  "falsifier": "Expected whole-book carry is not positive, adverse price movement consumes the carry, or the result is nonpositive under doubled or tripled costs and nearby funding windows.",
+  "formation_horizon": "robust seven-day and twenty-eight-day settled-funding estimates with a nine-bar residual price state",
+  "hypothesis": "The cross-sectional spread between persistently high and low settled funding rates compensates a broad short-high-rate and long-low-rate portfolio after continuously discounting adverse price paths.",
+  "material_parameters": {
+    "funding_window_days": 28,
+    "holding_days": 3,
+    "long_funding_window_days": 28,
+    "protection_strength": 0.4,
+    "short_funding_window_days": 7,
+    "side_gross": 0.14,
+    "turnover_cap": 0.12
+  },
+  "mechanism": "funding-carry-crowding-crash-protection",
+  "neighborhood_coordinates": {
+    "funding_window_days": 28,
+    "holding_days": 3,
+    "side_gross": 0.14
+  },
+  "neighborhood_id": "t07-settled-funding-carry-n1",
+  "parent_candidate_id": null,
+  "rebalance_horizon": "one daily cohort with three equally weighted overlapping cohorts",
+  "schema_version": 1,
+  "tags": [
+    "baseline",
+    "formation-grid",
+    "rebalance-grid",
+    "role-check",
+    "local-neighborhood",
+    "funding-carry",
+    "crash-protection"
+  ],
+  "team_id": "team-07"
+}

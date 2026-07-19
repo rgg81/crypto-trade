@@ -1,0 +1,33 @@
+{
+  "candidate_id": "t03-volume-trend-baseline-v1",
+  "control_profile": "balanced broad sleeves with lagged volume confirmation, volatility targeting, drawdown brakes and capped turnover",
+  "falsifier": "Reject if the volume-supported trend score does not improve the plain price-trend control or if volume concentration makes results fragile.",
+  "formation_horizon": "forty-two-day price trend with fourteen-day volume confirmation and a twenty-eight-day volume baseline",
+  "hypothesis": "Price trends supported by same-direction quote volume and stable participation are more durable than unconfirmed moves.",
+  "material_parameters": {
+    "confirmation_days": 14,
+    "formation_days": 42,
+    "minimum_positive_volume_fraction": 0.9,
+    "rebalance_days": 7,
+    "total_gross": 0.4,
+    "volume_baseline_days": 28,
+    "weak_confirmation_scale": 0.35
+  },
+  "mechanism": "volume-confirmed-time-series-momentum",
+  "neighborhood_coordinates": {
+    "confirmation_days": 14,
+    "formation_days": 42,
+    "rebalance_days": 7
+  },
+  "neighborhood_id": "t03-volume-confirmation-neighborhood",
+  "parent_candidate_id": null,
+  "rebalance_horizon": "weekly at the first UTC decision boundary",
+  "schema_version": 1,
+  "tags": [
+    "baseline",
+    "control-ablation",
+    "formation-grid",
+    "role-check"
+  ],
+  "team_id": "team-03"
+}

@@ -1,0 +1,35 @@
+{
+  "candidate_id": "t05-liquidity-shock-reversal-b063-h3-v1",
+  "control_profile": "downward volatility scaling, drawdown brakes, close-confirmed loss stop and one-way turnover cap",
+  "falsifier": "The fixed reversal sign is nonpositive after doubled costs, is concentrated in a few shocks, or loses its edge when the three-day cohorts replace daily whole-book turnover.",
+  "formation_horizon": "three completed bars measured against a sixty-three-bar causal reference window",
+  "hypothesis": "A large market-residual move accompanied by abnormal activity and aligned taker pressure reflects temporary liquidity demand and partially reverses after the next executable open.",
+  "material_parameters": {
+    "holding_days": 3,
+    "pretrend_bars": 21,
+    "reference_bars": 63,
+    "shock_bars": 3,
+    "total_gross": 0.3,
+    "turnover_cap": 0.12
+  },
+  "mechanism": "short-horizon-liquidity-shock-reversal",
+  "neighborhood_coordinates": {
+    "holding_days": 3,
+    "reference_bars": 63,
+    "shock_bars": 3
+  },
+  "neighborhood_id": "t05-liquidity-shock-reversal-n1",
+  "parent_candidate_id": null,
+  "rebalance_horizon": "one daily cohort with three equally weighted overlapping cohorts",
+  "schema_version": 1,
+  "tags": [
+    "baseline",
+    "formation-grid",
+    "rebalance-grid",
+    "role-check",
+    "local-neighborhood",
+    "liquidity-shock",
+    "cost-aware"
+  ],
+  "team_id": "team-05"
+}

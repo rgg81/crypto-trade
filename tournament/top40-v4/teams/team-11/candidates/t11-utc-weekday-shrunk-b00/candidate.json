@@ -1,0 +1,48 @@
+{
+  "candidate_id": "t11-utc-weekday-shrunk-b00",
+  "control_profile": "Common-market residualization, robust return clipping, hierarchical calendar-cell shrinkage, sign admission, rank retention, and short time stops.",
+  "falsifier": "The recurring UTC-weekday cell has unstable sign, disappears under adjacent weekday or slot priors, or cannot support profitable long and short sleeves.",
+  "formation_horizon": "546 completed 8-hour open-to-open returns",
+  "hypothesis": "A cross-sectionally residualized Monday 00:00 UTC return cell contains a persistent coin-level effect after shrinkage toward weekday, UTC-slot, and unconditional priors.",
+  "material_parameters": {
+    "cell_prior_observations": 26,
+    "decision_hour_utc": 0,
+    "decision_weekday_utc": 0,
+    "entry_fraction_per_side": 0.2,
+    "holding_bars": 1,
+    "interval_hours": 8,
+    "lookback_return_bars": 546,
+    "maximum_abs_net": 0.02,
+    "maximum_symbol_weight": 0.02,
+    "minimum_positions_per_side": 8,
+    "minimum_target_cell_observations": 20,
+    "minimum_valid_symbols": 24,
+    "retention_fraction_per_side": 0.3,
+    "total_gross": 0.24,
+    "total_gross_bps": 2400,
+    "unconditional_prior_weight": 0.2,
+    "utc_slot_prior_weight": 0.35,
+    "weekday_prior_weight": 0.45,
+    "winsor_mad_multiplier": 4.0
+  },
+  "mechanism": "utc-weekday-seasonality",
+  "neighborhood_coordinates": {
+    "cell_prior_observations": 26,
+    "lookback_return_bars": 546,
+    "total_gross_bps": 2400
+  },
+  "neighborhood_id": "t11-utc-weekday-shrunk-n1",
+  "parent_candidate_id": null,
+  "rebalance_horizon": "weekly Monday 00:00 UTC with an explicit next-boundary exit and 1-bar time stop",
+  "schema_version": 1,
+  "tags": [
+    "baseline",
+    "formation-grid",
+    "rebalance-grid",
+    "control-ablation",
+    "role-check",
+    "local-neighborhood",
+    "calendar-shrinkage"
+  ],
+  "team_id": "team-11"
+}

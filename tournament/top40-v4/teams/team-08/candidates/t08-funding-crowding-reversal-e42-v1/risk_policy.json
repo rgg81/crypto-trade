@@ -1,0 +1,44 @@
+{
+  "drawdown_brakes": [
+    {
+      "drawdown": 0.08,
+      "gross_scale": 0.7
+    },
+    {
+      "drawdown": 0.15,
+      "gross_scale": 0.35
+    },
+    {
+      "drawdown": 0.22,
+      "gross_scale": 0.0
+    }
+  ],
+  "policy_id": "t08-funding-reversal-baseline",
+  "position_stop": {
+    "cooldown_bars": 6,
+    "enabled": true,
+    "loss_fraction": 0.08
+  },
+  "same_boundary_reentry": false,
+  "schema_version": 1,
+  "side_scaling": {
+    "long_scale": 1.0,
+    "short_scale": 1.0
+  },
+  "time_stop": {
+    "cooldown_bars": 3,
+    "enabled": false,
+    "maximum_holding_bars": 9
+  },
+  "turnover_limit": {
+    "enabled": true,
+    "maximum_one_way_turnover": 0.1
+  },
+  "volatility_target": {
+    "annualized_target": 0.2,
+    "enabled": true,
+    "lookback_days": 30,
+    "maximum_scale": 1.0,
+    "minimum_scale": 0.2
+  }
+}

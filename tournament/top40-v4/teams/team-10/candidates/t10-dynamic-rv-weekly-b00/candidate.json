@@ -1,0 +1,51 @@
+{
+  "candidate_id": "t10-dynamic-rv-weekly-b00",
+  "control_profile": "Point-in-time neighbor graph, bounded hedge ratios, convergence half-life and crossing gates, robust spread scaling, and central risk controls.",
+  "falsifier": "The selected relationships fail stability gates, lack convergence on either spread side, or cannot clear weekly turnover and funding costs.",
+  "formation_horizon": "378 completed 8-hour bars with a 189-return pair-selection window",
+  "hypothesis": "Highly correlated crypto pairs with bounded rolling hedge fits and recurrent residual crossings converge after a robust spread dislocation.",
+  "material_parameters": {
+    "ar1_maximum": 0.977,
+    "ar1_minimum": 0.2,
+    "beta_maximum": 3.0,
+    "beta_minimum": 0.3,
+    "correlation_return_bars": 189,
+    "decision_hour_utc": 0,
+    "decision_weekday_utc": 0,
+    "entry_z": 1.75,
+    "formation_bars": 378,
+    "interval_hours": 8,
+    "maximum_abs_net": 0.025,
+    "maximum_half_life_bars": 30.0,
+    "maximum_sizing_z": 4.0,
+    "maximum_symbol_weight": 0.025,
+    "minimum_active_per_side": 3,
+    "minimum_correlation": 0.72,
+    "minimum_half_life_bars": 2.0,
+    "minimum_valid_symbols": 20,
+    "minimum_zero_crossings": 8,
+    "neighbors_per_symbol": 2,
+    "spread_scale_bars": 84,
+    "total_gross": 0.3
+  },
+  "mechanism": "dynamic-cointegration-relative-value",
+  "neighborhood_coordinates": {
+    "entry_z": 1.75,
+    "formation_bars": 378,
+    "minimum_correlation": 0.72
+  },
+  "neighborhood_id": "t10-dynamic-rv-weekly-n1",
+  "parent_candidate_id": null,
+  "rebalance_horizon": "weekly Monday 00:00 UTC",
+  "schema_version": 1,
+  "tags": [
+    "baseline",
+    "formation-grid",
+    "rebalance-grid",
+    "control-ablation",
+    "role-check",
+    "local-neighborhood",
+    "pair-stability"
+  ],
+  "team_id": "team-10"
+}

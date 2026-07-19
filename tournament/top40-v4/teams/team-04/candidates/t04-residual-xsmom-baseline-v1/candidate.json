@@ -1,0 +1,31 @@
+{
+  "candidate_id": "t04-residual-xsmom-baseline-v1",
+  "control_profile": "broad residual-ranked sleeves with bounded beta-aware side gross, volatility targeting, drawdown brakes and low turnover",
+  "falsifier": "Reject if residualization does not improve the matched raw-momentum control or if the result is explained by unstable market-beta estimates.",
+  "formation_horizon": "one-hundred-twenty-six-day beta estimate and eighty-four-day residual momentum with a seven-day skip",
+  "hypothesis": "Ranking coin-specific momentum after removing the contemporaneous crypto-market component isolates more persistent relative trends.",
+  "material_parameters": {
+    "beta_clip": 2.5,
+    "beta_lookback_days": 126,
+    "formation_days": 84,
+    "skip_days": 7,
+    "total_gross": 0.44
+  },
+  "mechanism": "market-residual-cross-sectional-momentum",
+  "neighborhood_coordinates": {
+    "beta_lookback_days": 126,
+    "formation_days": 84,
+    "skip_days": 7
+  },
+  "neighborhood_id": "t04-residual-horizon-neighborhood",
+  "parent_candidate_id": null,
+  "rebalance_horizon": "weekly at the first UTC decision boundary",
+  "schema_version": 1,
+  "tags": [
+    "baseline",
+    "control-ablation",
+    "formation-grid",
+    "role-check"
+  ],
+  "team_id": "team-04"
+}
