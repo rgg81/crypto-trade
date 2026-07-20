@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "team_id": "team-12",
+  "candidate_id": "t12-regime-ensemble-dual-confirm-center-e21-v3",
+  "evidence": {
+    "baseline": [
+      "8b49e607bd976580c2bcfdd58703a4542c9bb8c0d6d8ad7dfd713ae02f103e58"
+    ],
+    "sign-inversion": [
+      "d712746fe8d0f8cab8f3667646d0402af465167e6250af376fa9f2856dd8109a"
+    ],
+    "formation-grid": [
+      "8b49e607bd976580c2bcfdd58703a4542c9bb8c0d6d8ad7dfd713ae02f103e58",
+      "9d2fb5f9ec217d55d5a5cc733799d5650cbbe982c5609e963dd749068977712c",
+      "9634e2a3709f559ad1368925eb575e3b28bfbd59ba219cd245475f0205ce9c5a",
+      "1289af04cccd4d412897c86f05bc8dd7ecc1bdd96b49914115768cf312238224",
+      "f0f8798dbf8aadfab488cac802d0bf09712db4ecf9ad4b23b7b21ebdfce11d58"
+    ],
+    "rebalance-grid": [
+      "8b49e607bd976580c2bcfdd58703a4542c9bb8c0d6d8ad7dfd713ae02f103e58",
+      "9634e2a3709f559ad1368925eb575e3b28bfbd59ba219cd245475f0205ce9c5a"
+    ],
+    "control-ablation": [
+      "8b49e607bd976580c2bcfdd58703a4542c9bb8c0d6d8ad7dfd713ae02f103e58",
+      "0bad2edf94ddd95d83e2bda32283eceac9df2c6c85baec1c3c808c79ed4b8a87",
+      "6d4212935bc3afb569b634a15c884812abc3e6ebe16204b7048ea388fc623db3",
+      "ce6826881e1d9d88ad3188002bd87031d8a97100293b72acac1ea6c131034c3d"
+    ],
+    "role-check": [
+      "8b49e607bd976580c2bcfdd58703a4542c9bb8c0d6d8ad7dfd713ae02f103e58",
+      "0bad2edf94ddd95d83e2bda32283eceac9df2c6c85baec1c3c808c79ed4b8a87",
+      "9d2fb5f9ec217d55d5a5cc733799d5650cbbe982c5609e963dd749068977712c",
+      "9634e2a3709f559ad1368925eb575e3b28bfbd59ba219cd245475f0205ce9c5a",
+      "1289af04cccd4d412897c86f05bc8dd7ecc1bdd96b49914115768cf312238224",
+      "f0f8798dbf8aadfab488cac802d0bf09712db4ecf9ad4b23b7b21ebdfce11d58",
+      "d712746fe8d0f8cab8f3667646d0402af465167e6250af376fa9f2856dd8109a",
+      "6d4212935bc3afb569b634a15c884812abc3e6ebe16204b7048ea388fc623db3",
+      "ce6826881e1d9d88ad3188002bd87031d8a97100293b72acac1ea6c131034c3d"
+    ],
+    "local-neighborhood": [
+      "8b49e607bd976580c2bcfdd58703a4542c9bb8c0d6d8ad7dfd713ae02f103e58",
+      "9d2fb5f9ec217d55d5a5cc733799d5650cbbe982c5609e963dd749068977712c",
+      "9634e2a3709f559ad1368925eb575e3b28bfbd59ba219cd245475f0205ce9c5a",
+      "1289af04cccd4d412897c86f05bc8dd7ecc1bdd96b49914115768cf312238224",
+      "f0f8798dbf8aadfab488cac802d0bf09712db4ecf9ad4b23b7b21ebdfce11d58"
+    ]
+  }
+}

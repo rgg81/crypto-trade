@@ -1,0 +1,32 @@
+{
+  "candidate_id": "t06-downside-low-vol-voltarget-only-v1",
+  "control_profile": "volatility-target only: thirty-day downward scaling with no drawdown brake, position stop, time stop or turnover throttle",
+  "falsifier": "Volatility targeting alone fails to recover the parent's profitable short sleeve, fold breadth and edge density, showing that discrete controls rather than continuous normalization drive robustness.",
+  "formation_horizon": "one hundred twenty-six completed bars of market-residual risk history",
+  "hypothesis": "Continuous downward volatility targeting is the primary useful organizer control and should recover most of the parent's robustness without discrete stops, brakes or turnover throttling.",
+  "material_parameters": {
+    "active_optional_controls": 1,
+    "downside_weight": 0.45,
+    "drawdown_weight": 0.2,
+    "lookback_bars": 126,
+    "rebalance_days": 7,
+    "selected_fraction": 0.25,
+    "total_gross": 0.36,
+    "volatility_weight": 0.35
+  },
+  "mechanism": "downside-risk-low-volatility",
+  "neighborhood_coordinates": {},
+  "neighborhood_id": null,
+  "parent_candidate_id": "t06-downside-low-vol-b126-w1-v1",
+  "rebalance_horizon": "weekly at the first daily boundary of the week",
+  "schema_version": 1,
+  "tags": [
+    "control-ablation",
+    "role-check",
+    "individual-control",
+    "volatility-target-only",
+    "downside-risk",
+    "low-volatility"
+  ],
+  "team_id": "team-06"
+}

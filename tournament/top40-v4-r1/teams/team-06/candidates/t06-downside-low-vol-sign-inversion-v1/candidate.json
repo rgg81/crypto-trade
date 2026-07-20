@@ -1,0 +1,31 @@
+{
+  "candidate_id": "t06-downside-low-vol-sign-inversion-v1",
+  "control_profile": "weekly turnover, downward volatility scaling, drawdown brakes, close-confirmed loss stop and one-way turnover cap",
+  "falsifier": "The exact high-risk-minus-low-risk inversion matches or exceeds the parent after doubled costs, which would invalidate the claimed direction of the low-risk spread.",
+  "formation_horizon": "one hundred twenty-six completed bars of market-residual risk history",
+  "hypothesis": "As a diagnostic control, exactly reversing every parent target should destroy the low-risk premium if the original long-low-risk and short-fragile direction is genuine.",
+  "material_parameters": {
+    "downside_weight": 0.45,
+    "drawdown_weight": 0.2,
+    "lookback_bars": 126,
+    "rebalance_days": 7,
+    "selected_fraction": 0.25,
+    "sign_multiplier": -1,
+    "total_gross": 0.36,
+    "volatility_weight": 0.35
+  },
+  "mechanism": "downside-risk-low-volatility",
+  "neighborhood_coordinates": {},
+  "neighborhood_id": null,
+  "parent_candidate_id": "t06-downside-low-vol-b126-w1-v1",
+  "rebalance_horizon": "weekly at the first daily boundary of the week",
+  "schema_version": 1,
+  "tags": [
+    "sign-inversion",
+    "role-check",
+    "direction-diagnostic",
+    "downside-risk",
+    "low-volatility"
+  ],
+  "team_id": "team-06"
+}

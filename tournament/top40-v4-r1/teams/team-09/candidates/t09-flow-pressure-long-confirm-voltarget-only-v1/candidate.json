@@ -1,0 +1,50 @@
+{
+  "candidate_id": "t09-flow-pressure-long-confirm-voltarget-only-v1",
+  "control_profile": "Volatility-target only: a no-leverage twenty-two-percent annualized target with no drawdown brake, position stop, time stop, or turnover throttle.",
+  "falsifier": "The isolated volatility target makes either 2022 or 2024H1 negative after doubled costs, reduces the positive-fold count below four, or pushes gross edge below fifty basis points per turnover.",
+  "formation_horizon": "168 completed 8-hour bars with an 18-bar pressure window",
+  "hypothesis": "The no-leverage volatility target is the least intrusive overlay and should preserve the controls-off signal's five-fold breadth while reducing exposure only when trailing portfolio volatility exceeds twenty-two percent.",
+  "material_parameters": {
+    "active_optional_controls": 1,
+    "activity_weight": 0.2,
+    "decision_hour_utc": 0,
+    "decision_weekday_utc": 0,
+    "long_divergence_scale": 0.1,
+    "short_divergence_scale": 0.35,
+    "entry_fraction_per_side": 0.2,
+    "flow_weight": 0.5,
+    "interval_hours": 8,
+    "lookback_bars": 168,
+    "maximum_abs_net": 0.02,
+    "maximum_symbol_weight": 0.025,
+    "minimum_median_quote_volume": 1000000.0,
+    "minimum_positions_per_side": 8,
+    "minimum_positive_activity_fraction": 0.95,
+    "minimum_valid_symbols": 24,
+    "price_weight": 0.3,
+    "retention_fraction_per_side": 0.3,
+    "signal_bars": 18,
+    "total_gross": 0.26,
+    "total_gross_bps": 2600,
+    "winsor_z": 4.0
+  },
+  "mechanism": "taker-flow-price-volume-pressure",
+  "neighborhood_coordinates": {
+    "lookback_bars": 168,
+    "signal_bars": 18,
+    "total_gross_bps": 2600
+  },
+  "neighborhood_id": "t09-flow-pressure-weekly-n1",
+  "parent_candidate_id": "t09-flow-pressure-long-confirm-controls-off-v1",
+  "rebalance_horizon": "weekly Monday 00:00 UTC",
+  "schema_version": 1,
+  "tags": [
+    "control-ablation",
+    "role-check",
+    "individual-control",
+    "volatility-target-only",
+    "long-sleeve-defense",
+    "flow-normalized"
+  ],
+  "team_id": "team-09"
+}

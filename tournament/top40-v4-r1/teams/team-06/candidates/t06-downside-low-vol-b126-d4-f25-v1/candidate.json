@@ -1,0 +1,35 @@
+{
+  "candidate_id": "t06-downside-low-vol-b126-d4-f25-v1",
+  "control_profile": "four-day turnover, downward volatility scaling, drawdown brakes, close-confirmed loss stop and one-way turnover cap",
+  "falsifier": "Faster rank refresh pushes annual turnover above twenty, gross edge below fifty basis points per turnover, or causes any previously positive doubled-cost fold to become negative.",
+  "formation_horizon": "one hundred twenty-six completed bars of market-residual risk history",
+  "hypothesis": "Refreshing the same residual-risk ordering every four days should adapt faster in choppy transitions while retaining the persistent long-low-risk and short-fragile spread.",
+  "material_parameters": {
+    "downside_weight": 0.45,
+    "drawdown_weight": 0.2,
+    "lookback_bars": 126,
+    "rebalance_days": 4,
+    "selected_fraction": 0.25,
+    "total_gross": 0.36,
+    "volatility_weight": 0.35
+  },
+  "mechanism": "downside-risk-low-volatility",
+  "neighborhood_coordinates": {
+    "lookback_bars": 126,
+    "rebalance_days": 4,
+    "selected_fraction": 0.25
+  },
+  "neighborhood_id": "t06-downside-low-vol-n1",
+  "parent_candidate_id": "t06-downside-low-vol-b126-w1-v1",
+  "rebalance_horizon": "every four days at the first daily boundary, anchored to the Monday Unix epoch week",
+  "schema_version": 1,
+  "tags": [
+    "rebalance-grid",
+    "role-check",
+    "local-neighborhood",
+    "faster-rebalance",
+    "downside-risk",
+    "low-volatility"
+  ],
+  "team_id": "team-06"
+}

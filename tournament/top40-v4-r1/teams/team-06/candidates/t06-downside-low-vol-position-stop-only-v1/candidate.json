@@ -1,0 +1,36 @@
+{
+  "candidate_id": "t06-downside-low-vol-position-stop-only-v1",
+  "control_profile": "position-stop only: ten-percent close-confirmed loss exit with six-bar cooldown and no volatility target, drawdown brake, time stop or turnover throttle",
+  "falsifier": "The isolated position stop fails to recover positive long and short sleeves, at least four positive doubled-cost folds, positive chop Sharpe and gross edge above fifty basis points per turnover.",
+  "formation_horizon": "one hundred twenty-six completed bars of market-residual risk history",
+  "hypothesis": "The close-confirmed ten-percent position stop is the main useful overlay because it cuts violent fragile-coin squeezes and low-risk breakdowns before the next weekly rank refresh.",
+  "material_parameters": {
+    "active_optional_controls": 1,
+    "downside_weight": 0.45,
+    "drawdown_weight": 0.2,
+    "lookback_bars": 126,
+    "rebalance_days": 7,
+    "selected_fraction": 0.25,
+    "total_gross": 0.36,
+    "volatility_weight": 0.35
+  },
+  "mechanism": "downside-risk-low-volatility",
+  "neighborhood_coordinates": {
+    "lookback_bars": 126,
+    "rebalance_days": 7,
+    "selected_fraction": 0.25
+  },
+  "neighborhood_id": "t06-downside-low-vol-n1",
+  "parent_candidate_id": "t06-downside-low-vol-b126-w1-v1",
+  "rebalance_horizon": "weekly at the first daily boundary of the week",
+  "schema_version": 1,
+  "tags": [
+    "control-ablation",
+    "role-check",
+    "individual-control",
+    "position-stop-only",
+    "downside-risk",
+    "low-volatility"
+  ],
+  "team_id": "team-06"
+}

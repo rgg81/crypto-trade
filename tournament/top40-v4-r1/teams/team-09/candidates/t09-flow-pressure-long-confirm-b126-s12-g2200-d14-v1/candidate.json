@@ -1,0 +1,50 @@
+{
+  "candidate_id": "t09-flow-pressure-long-confirm-b126-s12-g2200-d14-v1",
+  "control_profile": "Fourteen-day refresh, own-history activity normalization, cross-sectional residualization, ten-percent damping of unconfirmed positive scores, thirty-five-percent damping of unconfirmed negative scores, rank retention, and central risk controls.",
+  "falsifier": "The low-coordinate and slow-refresh edge loses money after doubled costs or collapses below fifty basis points of gross edge per turnover, invalidating neighborhood breadth.",
+  "formation_horizon": "126 completed 8-hour bars with a 12-bar pressure window",
+  "hypothesis": "Shorter pressure measurement combined with a fourteen-day hold should retain persistent confirmed flow while avoiding weekly reaction to transient rank changes.",
+  "material_parameters": {
+    "activity_weight": 0.2,
+    "decision_hour_utc": 0,
+    "rebalance_days": 14,
+    "long_divergence_scale": 0.1,
+    "short_divergence_scale": 0.35,
+    "entry_fraction_per_side": 0.2,
+    "flow_weight": 0.5,
+    "interval_hours": 8,
+    "lookback_bars": 126,
+    "maximum_abs_net": 0.02,
+    "maximum_symbol_weight": 0.025,
+    "minimum_median_quote_volume": 1000000.0,
+    "minimum_positions_per_side": 8,
+    "minimum_positive_activity_fraction": 0.95,
+    "minimum_valid_symbols": 24,
+    "price_weight": 0.3,
+    "retention_fraction_per_side": 0.3,
+    "signal_bars": 12,
+    "total_gross": 0.22,
+    "total_gross_bps": 2200,
+    "winsor_z": 4.0
+  },
+  "mechanism": "taker-flow-price-volume-pressure",
+  "neighborhood_coordinates": {
+    "lookback_bars": 126,
+    "signal_bars": 12,
+    "total_gross_bps": 2200
+  },
+  "neighborhood_id": "t09-flow-pressure-weekly-n1",
+  "parent_candidate_id": "t09-flow-pressure-long-confirm-b168-s18-g2600-v1",
+  "rebalance_horizon": "every fourteen days at 00:00 UTC, anchored to the Monday Unix epoch week",
+  "schema_version": 1,
+  "tags": [
+    "formation-grid",
+    "rebalance-grid",
+    "role-check",
+    "local-neighborhood",
+    "long-sleeve-defense",
+    "low-extreme",
+    "flow-normalized"
+  ],
+  "team_id": "team-09"
+}

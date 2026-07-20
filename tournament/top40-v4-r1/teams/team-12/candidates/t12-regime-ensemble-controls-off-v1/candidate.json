@@ -1,0 +1,56 @@
+{
+  "candidate_id": "t12-regime-ensemble-controls-off-v1",
+  "control_profile": "Controls off: one-day-lagged BTC router, fixed regime weights, residual signals, rank retention, and router-level stress gross reduction without any optional central overlay.",
+  "falsifier": "Removing every optional central control fails to restore positive doubled-cost 2022 and 2024H1 folds, positive bear Sharpe, and positive gross PnL from both directional sleeves.",
+  "formation_horizon": "252 completed 8-hour returns with 63-bar momentum, 6-bar reversal, and 126-bar downside components",
+  "hypothesis": "The fixed regime ensemble has stronger raw breadth than the baseline because weekly ranking changes should complete their holding period without position-stop churn, cooldown blocks, drawdown de-risking, volatility scaling, or turnover throttling.",
+  "material_parameters": {
+    "active_optional_controls": 0,
+    "bear_return_threshold": -0.1,
+    "bear_total_gross": 0.22,
+    "btc_direction_bars": 180,
+    "btc_volatility_bars": 90,
+    "bull_return_threshold": 0.1,
+    "bull_total_gross": 0.3,
+    "chop_total_gross": 0.26,
+    "decision_hour_utc": 0,
+    "decision_weekday_utc": 0,
+    "downside_bars": 126,
+    "entry_fraction_per_side": 0.2,
+    "interval_hours": 8,
+    "lookback_return_bars": 252,
+    "maximum_abs_net": 0.02,
+    "maximum_symbol_weight": 0.025,
+    "minimum_positions_per_side": 8,
+    "minimum_valid_symbols": 24,
+    "momentum_bars": 63,
+    "regime_lag_bars": 3,
+    "regime_weights": {
+      "bear": [0.15, 0.3, 0.55],
+      "bull": [0.55, 0.1, 0.35],
+      "chop": [0.25, 0.4, 0.35],
+      "stress": [0.1, 0.25, 0.65]
+    },
+    "retention_fraction_per_side": 0.3,
+    "reversal_bars": 6,
+    "stress_annualized_volatility": 0.8,
+    "stress_total_gross": 0.16
+  },
+  "mechanism": "simple-preregistered-regime-ensemble",
+  "neighborhood_coordinates": {
+    "btc_direction_bars": 180,
+    "lookback_return_bars": 252,
+    "momentum_bars": 63
+  },
+  "neighborhood_id": "t12-regime-ensemble-weekly-n1",
+  "parent_candidate_id": "t12-regime-ensemble-weekly-b00",
+  "rebalance_horizon": "weekly Monday 00:00 UTC",
+  "schema_version": 1,
+  "tags": [
+    "control-ablation",
+    "role-check",
+    "controls-off",
+    "regime-router"
+  ],
+  "team_id": "team-12"
+}

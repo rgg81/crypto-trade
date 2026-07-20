@@ -1,0 +1,31 @@
+{
+  "candidate_id": "t06-downside-low-vol-controls-off-v1",
+  "control_profile": "controls off: raw weekly targets with no volatility scaling, drawdown brake, position stop, time stop or turnover throttle",
+  "falsifier": "Disabling all optional organizer controls improves net Sharpe, chop Sharpe, fold breadth and drawdown together, which would show the parent overlay suppresses rather than protects the signal.",
+  "formation_horizon": "one hundred twenty-six completed bars of market-residual risk history",
+  "hypothesis": "A controls-off ablation isolates the raw low-risk spread and measures whether the parent volatility target, drawdown brakes, position stop and turnover throttle add genuine robustness.",
+  "material_parameters": {
+    "active_optional_controls": 0,
+    "downside_weight": 0.45,
+    "drawdown_weight": 0.2,
+    "lookback_bars": 126,
+    "rebalance_days": 7,
+    "selected_fraction": 0.25,
+    "total_gross": 0.36,
+    "volatility_weight": 0.35
+  },
+  "mechanism": "downside-risk-low-volatility",
+  "neighborhood_coordinates": {},
+  "neighborhood_id": null,
+  "parent_candidate_id": "t06-downside-low-vol-b126-w1-v1",
+  "rebalance_horizon": "weekly at the first daily boundary of the week",
+  "schema_version": 1,
+  "tags": [
+    "control-ablation",
+    "role-check",
+    "controls-off",
+    "downside-risk",
+    "low-volatility"
+  ],
+  "team_id": "team-06"
+}

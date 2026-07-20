@@ -1,0 +1,49 @@
+{
+  "candidate_id": "t09-flow-pressure-long-confirm-b252-s30-g3200-v1",
+  "control_profile": "Own-history activity normalization, cross-sectional residualization, ten-percent damping of unconfirmed positive scores, thirty-five-percent damping of unconfirmed negative scores, rank retention, and central risk controls.",
+  "falsifier": "The high-coordinate edge loses money after doubled costs or collapses below fifty basis points of gross edge per turnover, invalidating neighborhood breadth.",
+  "formation_horizon": "252 completed 8-hour bars with a 30-bar pressure window",
+  "hypothesis": "The upper history, pressure and gross coordinates test whether the repaired flow mechanism remains positive when persistence is measured more slowly and exposure is modestly increased.",
+  "material_parameters": {
+    "activity_weight": 0.2,
+    "decision_hour_utc": 0,
+    "decision_weekday_utc": 0,
+    "long_divergence_scale": 0.1,
+    "short_divergence_scale": 0.35,
+    "entry_fraction_per_side": 0.2,
+    "flow_weight": 0.5,
+    "interval_hours": 8,
+    "lookback_bars": 252,
+    "maximum_abs_net": 0.02,
+    "maximum_symbol_weight": 0.025,
+    "minimum_median_quote_volume": 1000000.0,
+    "minimum_positions_per_side": 8,
+    "minimum_positive_activity_fraction": 0.95,
+    "minimum_valid_symbols": 24,
+    "price_weight": 0.3,
+    "retention_fraction_per_side": 0.3,
+    "signal_bars": 30,
+    "total_gross": 0.32,
+    "total_gross_bps": 3200,
+    "winsor_z": 4.0
+  },
+  "mechanism": "taker-flow-price-volume-pressure",
+  "neighborhood_coordinates": {
+    "lookback_bars": 252,
+    "signal_bars": 30,
+    "total_gross_bps": 3200
+  },
+  "neighborhood_id": "t09-flow-pressure-weekly-n1",
+  "parent_candidate_id": "t09-flow-pressure-long-confirm-b210-s24-g3000-v1",
+  "rebalance_horizon": "weekly Monday 00:00 UTC",
+  "schema_version": 1,
+  "tags": [
+    "formation-grid",
+    "role-check",
+    "local-neighborhood",
+    "long-sleeve-defense",
+    "high-extreme",
+    "flow-normalized"
+  ],
+  "team_id": "team-09"
+}
