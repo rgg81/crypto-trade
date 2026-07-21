@@ -1,0 +1,42 @@
+{
+  "candidate_id": "t02-dual-trend-breakout-c20-f7-r63-w1-v2",
+  "control_profile": "Weekly dual-horizon breakout with a 63-day directional trend gate and volatility-target-only organizer control.",
+  "falsifier": "Reject the repair if weekly slowing and the slow directional gate fail to produce positive long and short gross PnL, economical turnover, positive chop Sharpe, and improved doubled-cost Sharpe.",
+  "formation_horizon": "twenty-day channel, seven-day fast confirmation, and sixty-three-day directional trend gate",
+  "hypothesis": "A slow same-direction coin trend gate removes counter-regime false breakouts while weekly refresh reduces churn, preserving fast breakout continuation on both long and short sides.",
+  "material_parameters": {
+    "active_optional_controls": 1,
+    "channel_days": 20,
+    "confirmation_days": 7,
+    "persistence_bars": 3,
+    "rebalance_boundaries_per_week": 1,
+    "rebalance_weekdays": [
+      0
+    ],
+    "total_gross": 0.36,
+    "trend_days": 63,
+    "unconfirmed_scale": 0.2,
+    "volatility_target": 0.22
+  },
+  "mechanism": "fast-breakout-time-series-momentum",
+  "neighborhood_coordinates": {
+    "channel_days": 20,
+    "confirmation_days": 7,
+    "rebalance_boundaries_per_week": 1,
+    "trend_days": 63
+  },
+  "neighborhood_id": "t02-dual-trend-weekly-neighborhood",
+  "parent_candidate_id": "t02-breakout-buffer-controls-off-v1",
+  "rebalance_horizon": "weekly Monday 00:00 UTC",
+  "schema_version": 1,
+  "tags": [
+    "formation-grid",
+    "rebalance-grid",
+    "control-ablation",
+    "role-check",
+    "local-neighborhood",
+    "volatility-target-only",
+    "false-breakout-defense"
+  ],
+  "team_id": "team-02"
+}

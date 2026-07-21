@@ -1,0 +1,34 @@
+{
+  "candidate_id": "t02-breakout-buffer-sign-inversion-v1",
+  "control_profile": "Exact target-sign inversion of the controls-off buffered fast-breakout signal.",
+  "falsifier": "The exactly inverted targets match or exceed the controls-off parent after doubled costs, invalidating the claimed breakout direction.",
+  "formation_horizon": "twenty-day high-low channel with seven-day return confirmation",
+  "hypothesis": "Exactly reversing every raw target should destroy the fast-breakout premium if channel and return persistence have the proposed directional sign.",
+  "material_parameters": {
+    "active_optional_controls": 0,
+    "channel_days": 20,
+    "confirmation_days": 7,
+    "persistence_bars": 3,
+    "rebalance_boundaries_per_week": 2,
+    "rebalance_weekdays": [
+      0,
+      3
+    ],
+    "sign_multiplier": -1,
+    "total_gross": 0.36,
+    "unconfirmed_scale": 0.2
+  },
+  "mechanism": "fast-breakout-time-series-momentum",
+  "neighborhood_coordinates": {},
+  "neighborhood_id": null,
+  "parent_candidate_id": "t02-breakout-buffer-controls-off-v1",
+  "rebalance_horizon": "twice weekly at fixed UTC decision boundaries",
+  "schema_version": 1,
+  "tags": [
+    "sign-inversion",
+    "role-check",
+    "direction-diagnostic",
+    "controls-off"
+  ],
+  "team_id": "team-02"
+}

@@ -1,0 +1,45 @@
+{
+  "candidate_id": "t02-breadth-gated-breakout-c20-f7-r63-w1-v3",
+  "control_profile": "Weekly fast breakout gated by 63-day crypto breadth with volatility-target-only organizer control.",
+  "falsifier": "Reject the breadth repair if suppressing the aggregate counter-regime sleeve fails to lift base and doubled-cost Sharpe, positive-quarter breadth, and confidence while retaining positive long, short, and chop roles.",
+  "formation_horizon": "twenty-day channel, seven-day fast confirmation, and sixty-three-day crypto breadth regime",
+  "hypothesis": "Fast breakouts generalize when their side agrees with broad native-crypto trend breadth, while a neutral breadth band preserves balanced participation in chop.",
+  "material_parameters": {
+    "active_optional_controls": 1,
+    "breadth_bear_threshold": 0.45,
+    "breadth_bull_threshold": 0.55,
+    "breadth_days": 63,
+    "channel_days": 20,
+    "confirmation_days": 7,
+    "persistence_bars": 3,
+    "rebalance_boundaries_per_week": 1,
+    "rebalance_weekdays": [
+      0
+    ],
+    "total_gross": 0.36,
+    "unconfirmed_scale": 0.2,
+    "volatility_target": 0.22
+  },
+  "mechanism": "fast-breakout-time-series-momentum",
+  "neighborhood_coordinates": {
+    "breadth_days": 63,
+    "channel_days": 20,
+    "confirmation_days": 7,
+    "rebalance_boundaries_per_week": 1
+  },
+  "neighborhood_id": "t02-breadth-gated-weekly-neighborhood",
+  "parent_candidate_id": "t02-dual-trend-breakout-c20-f7-r63-w1-v2",
+  "rebalance_horizon": "weekly Monday 00:00 UTC",
+  "schema_version": 1,
+  "tags": [
+    "formation-grid",
+    "rebalance-grid",
+    "control-ablation",
+    "role-check",
+    "local-neighborhood",
+    "volatility-target-only",
+    "false-breakout-defense",
+    "crypto-breadth-regime"
+  ],
+  "team_id": "team-02"
+}

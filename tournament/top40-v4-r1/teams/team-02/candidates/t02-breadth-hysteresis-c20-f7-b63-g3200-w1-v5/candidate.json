@@ -1,0 +1,49 @@
+{
+  "candidate_id": "t02-breadth-hysteresis-c20-f7-b63-g3200-w1-v5",
+  "control_profile": "Weekly one-sided crypto-breadth hysteresis breakout at 0.32 gross with volatility-target-only organizer control.",
+  "falsifier": "Reject the hysteresis repair if holding the prior side inside the 45-55% breadth band fails to eliminate the weak fold and lift Sharpe and confidence, or if it breaks long, short, chop, cost, or drawdown gates.",
+  "formation_horizon": "twenty-day channel, seven-day fast confirmation, and sixty-three-day crypto breadth hysteresis",
+  "hypothesis": "A 45-55% causal breadth buffer suppresses weekly regime whipsaw by retaining the prior one-sided state until native-crypto participation decisively crosses the opposite boundary.",
+  "material_parameters": {
+    "active_optional_controls": 1,
+    "breadth_bear_threshold": 0.45,
+    "breadth_bull_threshold": 0.55,
+    "breadth_days": 63,
+    "channel_days": 20,
+    "confirmation_days": 7,
+    "persistence_bars": 3,
+    "rebalance_boundaries_per_week": 1,
+    "rebalance_weekdays": [
+      0
+    ],
+    "total_gross": 0.32,
+    "total_gross_bps": 3200,
+    "unconfirmed_scale": 0.2,
+    "volatility_target": 0.22
+  },
+  "mechanism": "fast-breakout-time-series-momentum",
+  "neighborhood_coordinates": {
+    "breadth_bear_threshold": 0.45,
+    "breadth_bull_threshold": 0.55,
+    "breadth_days": 63,
+    "channel_days": 20,
+    "confirmation_days": 7,
+    "rebalance_boundaries_per_week": 1,
+    "total_gross_bps": 3200
+  },
+  "neighborhood_id": "t02-breadth-hysteresis-weekly-neighborhood",
+  "parent_candidate_id": "t02-breadth-switch-breakout-c20-f7-b63-g3200-w1-v4",
+  "rebalance_horizon": "weekly Monday 00:00 UTC",
+  "schema_version": 1,
+  "tags": [
+    "formation-grid",
+    "rebalance-grid",
+    "control-ablation",
+    "role-check",
+    "local-neighborhood",
+    "volatility-target-only",
+    "false-breakout-defense",
+    "crypto-breadth-regime"
+  ],
+  "team_id": "team-02"
+}

@@ -1,0 +1,31 @@
+{
+  "drawdown_brakes": [],
+  "policy_id": "t02-breadth-switch-c24-f9-b63-v6",
+  "position_stop": {
+    "cooldown_bars": 12,
+    "enabled": false,
+    "loss_fraction": 0.06
+  },
+  "same_boundary_reentry": false,
+  "schema_version": 1,
+  "side_scaling": {
+    "long_scale": 1,
+    "short_scale": 1
+  },
+  "time_stop": {
+    "cooldown_bars": 6,
+    "enabled": false,
+    "maximum_holding_bars": 42
+  },
+  "turnover_limit": {
+    "enabled": false,
+    "maximum_one_way_turnover": 0.1
+  },
+  "volatility_target": {
+    "annualized_target": 0.22,
+    "enabled": true,
+    "lookback_days": 30,
+    "maximum_scale": 1,
+    "minimum_scale": 0.15
+  }
+}

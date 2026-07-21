@@ -1,0 +1,44 @@
+{
+  "candidate_id": "t02-breadth-switch-c20-f7-b63-v6",
+  "control_profile": "Weekly 50% crypto-breadth side-switching breakout at 0.32 gross with volatility-target-only organizer control.",
+  "falsifier": "Reject this local formation point if the binary breadth-switch edge does not remain positive after doubled costs or if slower or faster formation materially destabilizes folds, sleeves, regimes, turnover, or drawdown.",
+  "formation_horizon": "twenty-day channel, seven-day fast confirmation, and sixty-three-day binary crypto breadth side switch",
+  "hypothesis": "The causal binary breadth-switch breakout should occupy a performance plateau across the preregistered five-point channel and confirmation grid rather than depend on the original twenty-day and seven-day coordinate.",
+  "material_parameters": {
+    "active_optional_controls": 1,
+    "breadth_bear_threshold": 0.5,
+    "breadth_bull_threshold": 0.5,
+    "breadth_days": 63,
+    "channel_days": 20,
+    "confirmation_days": 7,
+    "persistence_bars": 3,
+    "rebalance_boundaries_per_week": 1,
+    "rebalance_weekdays": [
+      0
+    ],
+    "total_gross": 0.32,
+    "total_gross_bps": 3200,
+    "unconfirmed_scale": 0.2,
+    "volatility_target": 0.22
+  },
+  "mechanism": "fast-breakout-time-series-momentum",
+  "neighborhood_coordinates": {
+    "channel_days": 20,
+    "confirmation_days": 7
+  },
+  "neighborhood_id": "t02-breadth-switch-formation-neighborhood-v6",
+  "parent_candidate_id": "t02-breadth-switch-breakout-c20-f7-b63-g3200-w1-v4",
+  "rebalance_horizon": "weekly Monday 00:00 UTC",
+  "schema_version": 1,
+  "tags": [
+    "formation-grid",
+    "rebalance-grid",
+    "control-ablation",
+    "role-check",
+    "local-neighborhood",
+    "volatility-target-only",
+    "false-breakout-defense",
+    "crypto-breadth-regime"
+  ],
+  "team_id": "team-02"
+}

@@ -1,0 +1,32 @@
+{
+  "candidate_id": "t02-breakout-buffer-controls-off-v1",
+  "control_profile": "Controls off: unchanged buffered fast-breakout targets with no volatility scaling, drawdown brake, position stop, time stop, or turnover throttle.",
+  "falsifier": "Reject the control-harm hypothesis if removing the overlay fails to improve weak-fold breadth, short-sleeve economics, or doubled-cost Sharpe without creating an unacceptable drawdown.",
+  "formation_horizon": "twenty-day high-low channel with seven-day return confirmation",
+  "hypothesis": "Frequent stop, time-stop, drawdown, and throttle interventions are interrupting the twice-weekly breakout portfolio; the raw targets should preserve winners and improve fold breadth when optional controls are removed.",
+  "material_parameters": {
+    "active_optional_controls": 0,
+    "channel_days": 20,
+    "confirmation_days": 7,
+    "persistence_bars": 3,
+    "rebalance_boundaries_per_week": 2,
+    "rebalance_weekdays": [
+      0,
+      3
+    ],
+    "total_gross": 0.36,
+    "unconfirmed_scale": 0.2
+  },
+  "mechanism": "fast-breakout-time-series-momentum",
+  "neighborhood_coordinates": {},
+  "neighborhood_id": null,
+  "parent_candidate_id": "t02-breakout-buffer-baseline-v1",
+  "rebalance_horizon": "twice weekly at fixed UTC decision boundaries",
+  "schema_version": 1,
+  "tags": [
+    "control-ablation",
+    "role-check",
+    "controls-off"
+  ],
+  "team_id": "team-02"
+}
