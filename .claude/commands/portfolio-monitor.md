@@ -325,9 +325,16 @@ Runs the crypto-cup-01 winner **team-02 breakout-channel** for a 6-month forward
   (recent-half run-rate); chop is the declared weak regime — bleed there is EXPECTED, not an alert.
 - **Health check:** `scripts/tournament_paper_healthcheck.py` — STATUS OK|ALERT: proc alive, log
   freshness/tracebacks, frozen-submission SHA, DB-held vs recomputed-target drift (paper desks must
-  never drift; threshold 5e-3 absorbs the between-candle recompute gap). **PnL:**
+  never drift; threshold 5e-3 absorbs the between-candle recompute gap). **PnL digest:**
   `scripts/tournament_paper_pnl.py` — evaluator-exact recompute-from-data (taker + liquidity
-  slippage + native funding, the tournament cost model); no DB state trusted for scoring.
+  slippage + native funding, the tournament cost model); no DB state trusted for scoring. Prints
+  the ACCUM P&L headline (%, $, equity), trailing-24h delta, maxDD, funding/cost $, and the
+  DEPLOYED book (gross/net/L-S — `gross` = vol-target-scaled, matches the desk log's `target_gross`,
+  NOT the pre-scale gross≈1). **Run it EVERY tick** so accumulated P&L is always in the status —
+  the recompute is ~20-40s, fine at 4-hourly cadence; Sharpe stays `n/a` until ≥2 monthly buckets.
+  Every tick note must carry the one-line accum: `P&L <±x.xx>% ($<±N>, eq $<E>), 24h <±y.yy>%,
+  maxDD <z>%`. PnL/drawdown are NEVER alerts (HANDS-OFF) — this line is informational, the ALERT
+  set below is what gates a push.
 - **ALERT set (tournament-specific):** engine down · Traceback in log · SHA integrity failure ·
   held-vs-target drift > 5e-3 · log silent past a rebalance boundary (+25 min stagger + compute ≈
   expect activity by :40 past 00/08/16 UTC) · healthcheck itself crashing. BENIGN: drawdowns/PnL of
@@ -345,16 +352,17 @@ Runs the crypto-cup-01 winner **team-02 breakout-channel** for a 6-month forward
 
   VERBATIM TOURNAMENT TICK PROMPT (keep byte-stable across recreations):
   "TOURNAMENT-DESK MONITOR TICK (crypto-cup-01 paper desk ONLY — never touch v1/v2/metals from
-  this session). From /home/roberto/crypto-trade/.worktrees/quant-portfolio-tournament run:
-  `uv run python scripts/tournament_paper_healthcheck.py` and read the last ~40 lines of
-  logs/portfolio_tournament_paper.log. On the first tick after 00:00 UTC also run
-  `uv run python scripts/tournament_paper_pnl.py` and note the running Sharpe/return one-liner.
-  Interpret per the TOURNAMENT PAPER DESK section of .claude/commands/portfolio-monitor.md:
-  HANDS-OFF (observe+inform only; PnL/drawdown are never alerts), alert ONLY on engine down /
-  Traceback / SHA integrity failure / held-vs-target drift >5e-3 / missed rebalance. On ALERT:
-  investigate, apply the documented recovery if it is one of the known-safe recoveries (relaunch
-  keeping DB), and PushNotification the user with a one-line summary. On OK: no user ping; keep a
-  one-line note. Do NOT call ScheduleWakeup (the cron is the cadence)."
+  this session). From /home/roberto/crypto-trade/.worktrees/quant-portfolio-tournament run BOTH
+  `uv run python scripts/tournament_paper_healthcheck.py` AND
+  `uv run python scripts/tournament_paper_pnl.py`, and read the last ~40 lines of
+  logs/portfolio_tournament_paper.log. Interpret per the TOURNAMENT PAPER DESK section of
+  .claude/commands/portfolio-monitor.md: HANDS-OFF (observe+inform only; PnL/drawdown are never
+  alerts), alert ONLY on engine down / Traceback / SHA integrity failure / held-vs-target drift
+  >5e-3 / missed rebalance. Your tick note MUST include the accum-P&L one-liner from the digest
+  (P&L %, $, equity, 24h delta, maxDD). On ALERT: investigate, apply the documented recovery if
+  it is one of the known-safe recoveries (relaunch keeping DB), and PushNotification the user
+  with a one-line summary. On OK: no user ping; keep the one-line note. Do NOT call
+  ScheduleWakeup (the cron is the cadence)."
 
 ## Intelligence roadmap (the living backlog — build these into the skill over time)
 Prioritized; each becomes a committed helper script + a section here when built.
