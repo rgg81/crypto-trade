@@ -1,0 +1,42 @@
+{
+  "candidate_id": "t07-state-carry-p12-f21-b28-h7-g5500-v4",
+  "control_profile": "Causal 28-day BTC state budgets, exposure-reducing multi-day residual-trend protection, seven-day overlapping cohorts, volatility scaling, drawdown brakes, position stops and turnover throttling.",
+  "falsifier": "A 4-day residual-trend protection horizon fails to improve adverse long/short price selection while preserving carry, return, fold breadth, turnover and cost resilience across the preregistered neighborhood.",
+  "formation_horizon": "robust seven-day and twenty-eight-day settled funding with a twenty-eight-day BTC state, twenty-one-bar residual scale and 12-bar adverse-price protection",
+  "hypothesis": "Funding carry is more durable when live crowded selections are sized against a completed 4-day idiosyncratic trend instead of the baseline one-day move; the five-point grid tests whether that protection is a plateau rather than a fitted endpoint.",
+  "material_parameters": {
+    "active_optional_controls": 6,
+    "dominant_side_fraction": 0.72,
+    "holding_days": 7,
+    "long_funding_window_days": 28,
+    "market_days": 28,
+    "market_threshold": 0.05,
+    "protection_strength": 0.85,
+    "short_funding_window_days": 7,
+    "total_gross": 0.55,
+    "total_gross_bps": 5500,
+    "price_return_bars": 21,
+    "protection_return_bars": 12
+  },
+  "mechanism": "funding-carry-crowding-crash-protection",
+  "neighborhood_coordinates": {
+    "protection_return_bars": 12
+  },
+  "neighborhood_id": "t07-state-carry-protection-n3",
+  "parent_candidate_id": "t07-state-carry-p09-f21-b28-h7-g5500-v4",
+  "rebalance_horizon": "one daily cohort averaged across seven overlapping daily vintages",
+  "schema_version": 1,
+  "tags": [
+    "formation-grid",
+    "rebalance-grid",
+    "control-ablation",
+    "role-check",
+    "local-neighborhood",
+    "funding-carry",
+    "crash-protection",
+    "market-state",
+    "full-controls",
+    "price-weakness-ablation"
+  ],
+  "team_id": "team-07"
+}
