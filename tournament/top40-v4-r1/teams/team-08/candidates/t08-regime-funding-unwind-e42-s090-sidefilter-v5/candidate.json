@@ -1,0 +1,40 @@
+{
+  "candidate_id": "t08-regime-funding-unwind-e42-s090-sidefilter-v5",
+  "control_profile": "Causal bull-or-ninety-percent-BTC-volatility short suppression plus a symmetric twenty-percent volatility target; stops, cooldowns, drawdown brakes, time stops, and turnover clipping are disabled.",
+  "falsifier": "Reject the local state neighborhood if later short protection at ninety-percent BTC volatility loses positive doubled-cost breadth or restores the weak stress-role cell.",
+  "formation_horizon": "latest settled funding event standardized against forty-two prior events, with three completed price-confirmation bars and causal sixty-day direction plus ninety-percent thirty-day BTC volatility protection",
+  "hypothesis": "If the center is not threshold-fragile, delaying stress protection to ninety-percent annualized BTC volatility should preserve positive cost-stressed performance while admitting a narrower set of protected days.",
+  "material_parameters": {
+    "chop_holding_days": 7,
+    "chop_minimum_abs_funding_z": 1.25,
+    "confirmation_bars": 3,
+    "funding_reference_events": 42,
+    "market_days": 60,
+    "market_threshold": 0.1,
+    "protected_short_scale": 0.0,
+    "stress_volatility_days": 30,
+    "stress_volatility_threshold": 0.9,
+    "total_gross": 0.22,
+    "unwind_holding_days": 3,
+    "unwind_minimum_abs_funding_z": 0.5,
+    "volatility_target": 0.2
+  },
+  "mechanism": "funding-crowding-mean-reversion",
+  "neighborhood_coordinates": {
+    "funding_reference_events": 42,
+    "stress_volatility_threshold": 0.9
+  },
+  "neighborhood_id": "t08-regime-funding-unwind-n4",
+  "parent_candidate_id": "t08-regime-funding-unwind-e42-h3h7-voltarget-v2",
+  "rebalance_horizon": "daily cohorts with three-day confirmed-unwind and seven-day chop-extreme shadow portfolios",
+  "schema_version": 1,
+  "tags": [
+    "role-check",
+    "local-neighborhood",
+    "formation-grid",
+    "funding-crowding",
+    "mean-reversion",
+    "market-state"
+  ],
+  "team_id": "team-08"
+}
