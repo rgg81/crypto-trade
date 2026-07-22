@@ -1,0 +1,37 @@
+{
+  "candidate_id": "t08-regime-funding-unwind-e42-h3h7-voltarget-v2",
+  "control_profile": "Symmetric twenty-percent volatility target only; position stops, cooldowns, drawdown brakes, time stops, and turnover clipping are disabled.",
+  "falsifier": "Reject the control-ablation thesis if removing the stop, cooldown, brake, and turnover cap does not reduce annualized turnover and cost share while preserving both funding-unwind roles.",
+  "formation_horizon": "latest settled funding event standardized against forty-two prior events, with three completed price-confirmation bars outside chop",
+  "hypothesis": "The funding-unwind signal has positive gross price and funding PnL in both roles, but repeated position-stop exits and cooldown re-entry create avoidable turnover; a volatility-only overlay should retain the mechanism with less churn.",
+  "material_parameters": {
+    "chop_holding_days": 7,
+    "chop_minimum_abs_funding_z": 1.25,
+    "confirmation_bars": 3,
+    "funding_reference_events": 42,
+    "market_days": 60,
+    "market_threshold": 0.1,
+    "total_gross": 0.22,
+    "unwind_holding_days": 3,
+    "unwind_minimum_abs_funding_z": 0.5,
+    "volatility_target": 0.2
+  },
+  "mechanism": "funding-crowding-mean-reversion",
+  "neighborhood_coordinates": {
+    "funding_reference_events": 42,
+    "unwind_holding_days": 3
+  },
+  "neighborhood_id": "t08-regime-funding-unwind-n2",
+  "parent_candidate_id": "t08-regime-funding-unwind-e42-h3h7-v2",
+  "rebalance_horizon": "daily cohorts with three-day confirmed-unwind and seven-day chop-extreme shadow portfolios",
+  "schema_version": 1,
+  "tags": [
+    "control-ablation",
+    "role-check",
+    "local-neighborhood",
+    "funding-crowding",
+    "mean-reversion",
+    "market-state"
+  ],
+  "team_id": "team-08"
+}
