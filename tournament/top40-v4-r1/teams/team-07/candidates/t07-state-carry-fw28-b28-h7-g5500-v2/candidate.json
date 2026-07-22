@@ -1,0 +1,40 @@
+{
+  "candidate_id": "t07-state-carry-fw28-b28-h7-g5500-v2",
+  "control_profile": "Causal 28-day BTC state budgets, exposure-reducing adverse-price discounts, seven-day overlapping cohorts, volatility scaling, drawdown brakes, position stops and turnover throttling.",
+  "falsifier": "The repaired price discount and slower cohort book fail to lift net return, role breadth and cost efficiency, or a market-state allocation merely disguises negative carry economics.",
+  "formation_horizon": "robust seven-day and twenty-eight-day settled funding with a twenty-eight-day BTC state and nine-bar residual price protection",
+  "hypothesis": "Settled funding carry survives when crowded shorts are concentrated in falling or neutral names, actual exposure is reduced during adverse idiosyncratic moves, and the long/short budget follows a slow causal crypto market state.",
+  "material_parameters": {
+    "active_optional_controls": 6,
+    "dominant_side_fraction": 0.72,
+    "holding_days": 7,
+    "long_funding_window_days": 28,
+    "market_days": 28,
+    "market_threshold": 0.05,
+    "protection_strength": 0.85,
+    "short_funding_window_days": 7,
+    "total_gross": 0.55,
+    "total_gross_bps": 5500
+  },
+  "mechanism": "funding-carry-crowding-crash-protection",
+  "neighborhood_coordinates": {
+    "market_days": 28,
+    "market_threshold": 0.05
+  },
+  "neighborhood_id": "t07-state-carry-market-n2",
+  "parent_candidate_id": "t07-settled-funding-carry-28d-v1",
+  "rebalance_horizon": "one daily cohort averaged across seven overlapping daily vintages",
+  "schema_version": 1,
+  "tags": [
+    "formation-grid",
+    "rebalance-grid",
+    "control-ablation",
+    "role-check",
+    "local-neighborhood",
+    "funding-carry",
+    "crash-protection",
+    "market-state",
+    "full-controls"
+  ],
+  "team_id": "team-07"
+}
