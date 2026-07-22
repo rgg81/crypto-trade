@@ -1,0 +1,27 @@
+{
+  "candidate_id": "t04-residual-xsmom-controls-off-v1",
+  "control_profile": "Controls off: unchanged weekly residual cross-sectional momentum targets with no volatility scaling, drawdown brake, position stop, time stop, or turnover throttle.",
+  "falsifier": "Reject the control-harm hypothesis if removing the overlay fails to improve fold breadth and Sharpe without creating unacceptable drawdown, turnover, or cost sensitivity.",
+  "formation_horizon": "one-hundred-twenty-six-day beta estimate and eighty-four-day residual momentum with a seven-day skip",
+  "hypothesis": "Frequent stops and drawdown interventions suppress the weekly residual-momentum portfolio; the unchanged raw targets should preserve relative trends and reveal whether the weak folds are signal or overlay failures.",
+  "material_parameters": {
+    "active_optional_controls": 0,
+    "beta_clip": 2.5,
+    "beta_lookback_days": 126,
+    "formation_days": 84,
+    "skip_days": 7,
+    "total_gross": 0.44
+  },
+  "mechanism": "market-residual-cross-sectional-momentum",
+  "neighborhood_coordinates": {},
+  "neighborhood_id": null,
+  "parent_candidate_id": "t04-residual-xsmom-baseline-v1",
+  "rebalance_horizon": "weekly at the first UTC decision boundary",
+  "schema_version": 1,
+  "tags": [
+    "control-ablation",
+    "role-check",
+    "controls-off"
+  ],
+  "team_id": "team-04"
+}

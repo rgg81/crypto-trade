@@ -1,0 +1,31 @@
+{
+  "candidate_id": "t04-residual-xsmom-b126-f24-s1-v3",
+  "control_profile": "Balanced short-horizon residual-momentum sleeves with beta-aware gross and the original full protective organizer controls.",
+  "falsifier": "Reject this local formation point if the short-horizon residual effect is not positive after doubled costs or if formation variation destabilizes folds, sleeves, regimes, turnover, costs, or drawdown.",
+  "formation_horizon": "one-hundred-twenty-six-day beta estimate and twenty-four-day residual momentum with a one-day skip",
+  "hypothesis": "The crypto residual-momentum effect should form a stable two-to-four-week plateau across the frozen 14, 18, 21, 24, and 28 day grid rather than depend on a single formation coordinate.",
+  "material_parameters": {
+    "active_optional_controls": 5,
+    "beta_clip": 2.5,
+    "beta_lookback_days": 126,
+    "formation_days": 24,
+    "skip_days": 1,
+    "total_gross": 0.44
+  },
+  "mechanism": "market-residual-cross-sectional-momentum",
+  "neighborhood_coordinates": {
+    "formation_days": 24
+  },
+  "neighborhood_id": "t04-short-residual-formation-neighborhood",
+  "parent_candidate_id": "t04-residual-xsmom-b126-f21-s1-v3",
+  "rebalance_horizon": "weekly at the first UTC decision boundary",
+  "schema_version": 1,
+  "tags": [
+    "formation-grid",
+    "role-check",
+    "local-neighborhood",
+    "short-horizon-repair",
+    "full-controls"
+  ],
+  "team_id": "team-04"
+}

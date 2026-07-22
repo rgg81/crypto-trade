@@ -1,0 +1,27 @@
+{
+  "candidate_id": "t04-residual-xsmom-sign-inversion-v1",
+  "control_profile": "Exact target-sign inversion of the baseline residual cross-sectional momentum portfolio under the original full organizer controls.",
+  "falsifier": "The exactly inverted targets match or exceed the baseline after doubled costs, invalidating the claimed winner-minus-loser ordering of residual momentum.",
+  "formation_horizon": "one-hundred-twenty-six-day beta estimate and eighty-four-day residual momentum with a seven-day skip",
+  "hypothesis": "Exactly reversing every residual-momentum target should destroy performance if high residual-momentum coins genuinely outperform low residual-momentum coins.",
+  "material_parameters": {
+    "beta_clip": 2.5,
+    "beta_lookback_days": 126,
+    "formation_days": 84,
+    "sign_multiplier": -1,
+    "skip_days": 7,
+    "total_gross": 0.44
+  },
+  "mechanism": "market-residual-cross-sectional-momentum",
+  "neighborhood_coordinates": {},
+  "neighborhood_id": null,
+  "parent_candidate_id": "t04-residual-xsmom-baseline-v1",
+  "rebalance_horizon": "weekly at the first UTC decision boundary",
+  "schema_version": 1,
+  "tags": [
+    "sign-inversion",
+    "role-check",
+    "direction-diagnostic"
+  ],
+  "team_id": "team-04"
+}

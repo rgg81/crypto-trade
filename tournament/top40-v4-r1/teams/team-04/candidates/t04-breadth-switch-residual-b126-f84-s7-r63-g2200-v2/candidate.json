@@ -1,0 +1,35 @@
+{
+  "candidate_id": "t04-breadth-switch-residual-b126-f84-s7-r63-g2200-v2",
+  "control_profile": "One-sided crypto-breadth residual momentum at 0.22 gross with the original full protective organizer controls.",
+  "falsifier": "Reject the side-regime repair if breadth gating fails to produce positive long and short gross PnL, at least four positive folds, and materially stronger Sharpe without violating drawdown, turnover, cost, or regime floors.",
+  "formation_horizon": "one-hundred-twenty-six-day beta estimate, eighty-four-day residual momentum with seven-day skip, and sixty-three-day crypto breadth switch",
+  "hypothesis": "Residual winners should be held in broad native-crypto uptrends and residual losers shorted in broad downtrends, eliminating the structurally losing counter-regime sleeve while retaining relative selection.",
+  "material_parameters": {
+    "active_optional_controls": 5,
+    "active_side_gross": 0.22,
+    "beta_clip": 2.5,
+    "beta_lookback_days": 126,
+    "breadth_days": 63,
+    "breadth_threshold": 0.5,
+    "formation_days": 84,
+    "skip_days": 7,
+    "total_gross": 0.22
+  },
+  "mechanism": "market-residual-cross-sectional-momentum",
+  "neighborhood_coordinates": {
+    "formation_days": 84
+  },
+  "neighborhood_id": "t04-breadth-switch-formation-neighborhood",
+  "parent_candidate_id": "t04-residual-xsmom-baseline-v1",
+  "rebalance_horizon": "weekly at the first UTC decision boundary",
+  "schema_version": 1,
+  "tags": [
+    "formation-grid",
+    "role-check",
+    "local-neighborhood",
+    "crypto-breadth-regime",
+    "full-controls",
+    "side-regime-repair"
+  ],
+  "team_id": "team-04"
+}
