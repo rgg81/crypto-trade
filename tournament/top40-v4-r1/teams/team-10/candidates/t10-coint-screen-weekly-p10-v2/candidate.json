@@ -1,0 +1,36 @@
+{
+  "candidate_id": "t10-coint-screen-weekly-p10-v2",
+  "control_profile": "Weekly dynamic relative value with a causal Engle-Granger stationarity screen, bounded hedge and half-life gates, robust spread scaling, and the original full organizer controls.",
+  "falsifier": "A formal ten-percent cointegration screen fails to make bear performance and at least four base and doubled-cost folds positive, or weakens Sharpe, edge density, sleeve symmetry, activity, costs, or drawdown relative to the unscreened baseline.",
+  "formation_horizon": "378 completed 8-hour bars with a 189-return neighbor window and full-history causal Engle-Granger screen",
+  "hypothesis": "Correlation, crossings, and a single AR fit admit structurally unstable crypto pairs; requiring residual stationarity before sizing should remove false convergence trades concentrated in the 2020 and 2022 weak folds.",
+  "material_parameters": {
+    "active_optional_controls": 5,
+    "ar1_maximum": 0.977,
+    "ar1_minimum": 0.2,
+    "beta_maximum": 3,
+    "beta_minimum": 0.3,
+    "cointegration_maxlag": 1,
+    "correlation_return_bars": 189,
+    "entry_z": 1.75,
+    "formation_bars": 378,
+    "maximum_cointegration_pvalue": 0.1,
+    "minimum_correlation": 0.72,
+    "minimum_zero_crossings": 8,
+    "spread_scale_bars": 84,
+    "total_gross": 0.3
+  },
+  "mechanism": "dynamic-cointegration-relative-value",
+  "neighborhood_coordinates": {},
+  "neighborhood_id": null,
+  "parent_candidate_id": "t10-dynamic-rv-weekly-b00",
+  "rebalance_horizon": "weekly Monday 00:00 UTC",
+  "schema_version": 1,
+  "tags": [
+    "pair-stability",
+    "cointegration-screen",
+    "role-check",
+    "full-controls"
+  ],
+  "team_id": "team-10"
+}
