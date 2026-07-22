@@ -1,0 +1,29 @@
+{
+  "candidate_id": "t03-support-f21-m60-sign-inversion-v10",
+  "control_profile": "Exact final-target sign inversion of the full-control twenty-one-day volume-support and sixty-day state center.",
+  "falsifier": "The momentum interpretation is falsified if exact target-sign inversion is not decisively worse after identical execution, funding, costs, and risk controls.",
+  "formation_horizon": "exact sign inversion of the twenty-one-day trend, fourteen-day directional-volume support, and completed sixty-day BTC state center",
+  "hypothesis": "If Team 03 captures continuation rather than generic volatility or funding exposure, negating every requested target weight must destroy its performance.",
+  "material_parameters": {
+    "confirmation_days": 14,
+    "formation_days": 21,
+    "market_days": 60,
+    "market_threshold": 0.1,
+    "maximum_abs_net": 0.25,
+    "rebalance_days": 7,
+    "sign_multiplier": -1,
+    "total_gross": 0.25,
+    "weak_confirmation_scale": 0.35
+  },
+  "mechanism": "volume-confirmed-time-series-momentum",
+  "neighborhood_coordinates": {},
+  "neighborhood_id": null,
+  "parent_candidate_id": "t03-support-f21-m60-t1000-g2500-v3",
+  "rebalance_horizon": "weekly at the first UTC decision boundary",
+  "schema_version": 1,
+  "tags": [
+    "sign-inversion",
+    "role-check"
+  ],
+  "team_id": "team-03"
+}
