@@ -1,0 +1,34 @@
+{
+  "candidate_id": "t03-support-f28-m60-t1000-g2500-v6",
+  "control_profile": "Full controls with a twenty-eight-day directional-volume trend, strict sixty-day BTC state gating, volatility targeting, drawdown brakes, position and time stops, and capped turnover.",
+  "falsifier": "Reject if the slower formation point cannot preserve the stronger raw bear sleeve after next-open execution, funding, stops, costs, and fold tests.",
+  "formation_horizon": "twenty-eight-day per-coin trend confirmed by fourteen-day directional quote-volume share, conditioned on a completed sixty-day BTC state",
+  "hypothesis": "A four-week trend may sacrifice some bull responsiveness but improve short persistence and reduce false bearish selections while volume support filters weak moves.",
+  "material_parameters": {
+    "confirmation_days": 14,
+    "formation_days": 28,
+    "market_days": 60,
+    "market_threshold": 0.1,
+    "maximum_abs_net": 0.25,
+    "rebalance_days": 7,
+    "total_gross": 0.25,
+    "weak_confirmation_scale": 0.35
+  },
+  "mechanism": "volume-confirmed-time-series-momentum",
+  "neighborhood_coordinates": {
+    "formation_days": 28,
+    "market_days": 60
+  },
+  "neighborhood_id": "t03-support-state-n3",
+  "parent_candidate_id": "t03-support-f21-m60-t1000-g2500-v3",
+  "rebalance_horizon": "weekly at the first UTC decision boundary",
+  "schema_version": 1,
+  "tags": [
+    "formation-grid",
+    "role-check",
+    "local-neighborhood",
+    "full-controls",
+    "market-state"
+  ],
+  "team_id": "team-03"
+}
