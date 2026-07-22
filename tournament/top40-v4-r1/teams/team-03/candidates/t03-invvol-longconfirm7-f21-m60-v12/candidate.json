@@ -1,0 +1,38 @@
+{
+  "candidate_id": "t03-invvol-longconfirm7-f21-m60-v12",
+  "control_profile": "Full controls with a twenty-one-day directional-volume trend, seven-day long persistence, inverse-realized-volatility sleeve allocation, strict sixty-day BTC state gating, stops, volatility targeting, drawdown brakes, and capped turnover.",
+  "falsifier": "Reject if inverse-volatility sleeve allocation fails to lift net and double-cost Sharpe above the selection floors, preserve positive long and short gross PnL, and repair 2024H1, chop, fold breadth, and concentration.",
+  "formation_horizon": "twenty-one-day per-coin trend confirmed by fourteen-day directional quote-volume share, with seven-day price persistence for longs and a completed sixty-day BTC state",
+  "hypothesis": "Volatility-adjusted ranking followed by equal capital leaves the portfolio dominated by high-volatility outlier coins; inverse-realized-volatility sleeve weights should preserve the momentum edge while improving temporal and regime breadth.",
+  "material_parameters": {
+    "allocation_method": "inverse-realized-volatility",
+    "confirmation_days": 14,
+    "formation_days": 21,
+    "long_price_confirmation_days": 7,
+    "market_days": 60,
+    "market_threshold": 0.1,
+    "maximum_abs_net": 0.25,
+    "rebalance_days": 7,
+    "total_gross": 0.25,
+    "weak_confirmation_scale": 0.35
+  },
+  "mechanism": "volume-confirmed-time-series-momentum",
+  "neighborhood_coordinates": {
+    "formation_days": 21,
+    "market_days": 60
+  },
+  "neighborhood_id": "t03-support-state-n3",
+  "parent_candidate_id": "t03-longconfirm7-f21-m60-g2500-v9",
+  "rebalance_horizon": "weekly at the first UTC decision boundary",
+  "schema_version": 1,
+  "tags": [
+    "formation-grid",
+    "role-check",
+    "local-neighborhood",
+    "full-controls",
+    "market-state",
+    "price-persistence",
+    "inverse-volatility"
+  ],
+  "team_id": "team-03"
+}
