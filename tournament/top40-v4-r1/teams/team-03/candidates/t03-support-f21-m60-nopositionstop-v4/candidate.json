@@ -1,0 +1,30 @@
+{
+  "candidate_id": "t03-support-f21-m60-nopositionstop-v4",
+  "control_profile": "Position-stop ablation with the twenty-one-day directional-volume trend, strict sixty-day BTC state gating, volatility targeting, drawdown brakes, time stops, and capped turnover.",
+  "falsifier": "Reject the ablation if removing the eight-percent position stop fails to improve fold breadth and 2024H1 without breaching drawdown, turnover, concentration, or cost limits.",
+  "formation_horizon": "twenty-one-day per-coin trend confirmed by fourteen-day directional quote-volume share, conditioned on a completed sixty-day BTC state",
+  "hypothesis": "A fixed eight-percent coin stop cuts valid weekly crypto continuation and creates cooldown drag; the portfolio-level state gate and drawdown brake should provide safer protection.",
+  "material_parameters": {
+    "confirmation_days": 14,
+    "formation_days": 21,
+    "market_days": 60,
+    "market_threshold": 0.1,
+    "maximum_abs_net": 0.25,
+    "position_stop_enabled": 0,
+    "rebalance_days": 7,
+    "total_gross": 0.25,
+    "weak_confirmation_scale": 0.35
+  },
+  "mechanism": "volume-confirmed-time-series-momentum",
+  "neighborhood_coordinates": {},
+  "neighborhood_id": null,
+  "parent_candidate_id": "t03-support-f21-m60-t1000-g2500-v3",
+  "rebalance_horizon": "weekly at the first UTC decision boundary",
+  "schema_version": 1,
+  "tags": [
+    "control-ablation",
+    "role-check",
+    "position-stop-off"
+  ],
+  "team_id": "team-03"
+}
