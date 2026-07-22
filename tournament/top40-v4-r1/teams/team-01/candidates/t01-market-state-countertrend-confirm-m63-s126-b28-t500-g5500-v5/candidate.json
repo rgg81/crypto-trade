@@ -1,0 +1,45 @@
+{
+  "candidate_id": "t01-market-state-countertrend-confirm-m63-s126-b28-t500-g5500-v5",
+  "control_profile": "Weekly 28-day BTC state allocation with strict dual-horizon confirmation only on the countertrend sleeve and the full organizer controls.",
+  "falsifier": "Countertrend-only confirmation fails to turn aggregate short PnL positive, repair the 2024H1 and worst-fold miss, lift base Sharpe and confidence, or preserve the center's return, doubled-cost, regime, drawdown, cost, concentration, and neighborhood passes.",
+  "formation_horizon": "sixty-three-day and one-hundred-twenty-six-day per-coin trends with a twenty-eight-day BTC state and countertrend-only sign agreement",
+  "hypothesis": "Mixed-horizon signals are useful when aligned with the broad BTC state but fragile when opposing it; requiring both slow horizons to agree only for the countertrend sleeve should remove losing bull-state shorts and bear-state longs without discarding the dominant trend edge.",
+  "material_parameters": {
+    "active_optional_controls": 4,
+    "countertrend_confirmation": 1,
+    "disagreement_scale": 0.25,
+    "dominant_side_fraction": 0.72,
+    "market_days": 28,
+    "market_threshold": 0.05,
+    "maximum_abs_net": 0.242,
+    "maximum_symbol_weight": 0.05,
+    "medium_days": 63,
+    "minimum_positions_per_side": 8,
+    "rebalance_days": 7,
+    "rebalance_weekday": 0,
+    "selected_fraction_per_side": 0.25,
+    "slow_days": 126,
+    "total_gross": 0.55,
+    "total_gross_bps": 5500,
+    "volatility_days": 63
+  },
+  "mechanism": "slow-per-coin-time-series-momentum",
+  "neighborhood_coordinates": {
+    "market_days": 28,
+    "market_threshold": 0.05
+  },
+  "neighborhood_id": "t01-fast-market-state-n2",
+  "parent_candidate_id": "t01-market-state-m63-s126-b28-t500-g5500-v4",
+  "rebalance_horizon": "weekly Monday 00:00 UTC",
+  "schema_version": 1,
+  "tags": [
+    "local-neighborhood",
+    "role-check",
+    "market-state",
+    "asymmetric-risk",
+    "countertrend-confirmation",
+    "transition-defense",
+    "full-controls"
+  ],
+  "team_id": "team-01"
+}
