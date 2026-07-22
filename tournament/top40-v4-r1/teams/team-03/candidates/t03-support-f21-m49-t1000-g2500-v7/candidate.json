@@ -1,0 +1,34 @@
+{
+  "candidate_id": "t03-support-f21-m49-t1000-g2500-v7",
+  "control_profile": "Full controls with a twenty-one-day directional-volume trend, strict forty-nine-day BTC state gating, volatility targeting, drawdown brakes, position and time stops, and capped turnover.",
+  "falsifier": "Reject if the faster state horizon fails to convert its stronger gross chop and 2023 behavior into robust full-engine gains without weakening bear, short, cost, or fold gates.",
+  "formation_horizon": "twenty-one-day per-coin trend confirmed by fourteen-day directional quote-volume share, conditioned on a completed forty-nine-day BTC state",
+  "hypothesis": "A seven-week BTC state reacts sooner than the sixty-day center while remaining slow enough to preserve bear-side persistence and avoid false weekly state flips.",
+  "material_parameters": {
+    "confirmation_days": 14,
+    "formation_days": 21,
+    "market_days": 49,
+    "market_threshold": 0.1,
+    "maximum_abs_net": 0.25,
+    "rebalance_days": 7,
+    "total_gross": 0.25,
+    "weak_confirmation_scale": 0.35
+  },
+  "mechanism": "volume-confirmed-time-series-momentum",
+  "neighborhood_coordinates": {
+    "formation_days": 21,
+    "market_days": 49
+  },
+  "neighborhood_id": "t03-support-state-n3",
+  "parent_candidate_id": "t03-support-f21-m60-t1000-g2500-v3",
+  "rebalance_horizon": "weekly at the first UTC decision boundary",
+  "schema_version": 1,
+  "tags": [
+    "formation-grid",
+    "role-check",
+    "local-neighborhood",
+    "full-controls",
+    "market-state"
+  ],
+  "team_id": "team-03"
+}
