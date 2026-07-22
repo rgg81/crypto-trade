@@ -1,0 +1,38 @@
+{
+  "candidate_id": "t08-regime-funding-unwind-e42-h4h9-voltarget-v3",
+  "control_profile": "Symmetric twenty-percent volatility target only; position stops, cooldowns, drawdown brakes, time stops, and turnover clipping are disabled.",
+  "falsifier": "Reject the holding-extension thesis if four-day confirmed-unwind and nine-day chop cohorts fail to lower turnover below twenty, raise edge density above fifty basis points, or preserve both roles and all crypto regimes.",
+  "formation_horizon": "latest settled funding event standardized against forty-two prior events, with three completed price-confirmation bars outside chop",
+  "hypothesis": "Funding-crowding unwinds persist beyond the original three and seven-day averages; extending the two holding windows proportionally should retain gross PnL while reducing replacement turnover and stressed-cost drag.",
+  "material_parameters": {
+    "chop_holding_days": 9,
+    "chop_minimum_abs_funding_z": 1.25,
+    "confirmation_bars": 3,
+    "funding_reference_events": 42,
+    "market_days": 60,
+    "market_threshold": 0.1,
+    "total_gross": 0.22,
+    "unwind_holding_days": 4,
+    "unwind_minimum_abs_funding_z": 0.5,
+    "volatility_target": 0.2
+  },
+  "mechanism": "funding-crowding-mean-reversion",
+  "neighborhood_coordinates": {
+    "funding_reference_events": 42,
+    "unwind_holding_days": 4
+  },
+  "neighborhood_id": "t08-regime-funding-unwind-n2",
+  "parent_candidate_id": "t08-regime-funding-unwind-e42-h3h7-voltarget-v2",
+  "rebalance_horizon": "daily cohorts with four-day confirmed-unwind and nine-day chop-extreme shadow portfolios",
+  "schema_version": 1,
+  "tags": [
+    "rebalance-grid",
+    "role-check",
+    "local-neighborhood",
+    "cost-aware",
+    "funding-crowding",
+    "mean-reversion",
+    "market-state"
+  ],
+  "team_id": "team-08"
+}
