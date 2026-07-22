@@ -1,0 +1,34 @@
+{
+  "candidate_id": "t10-dynamic-rv-weekly-sign-inversion-v1",
+  "control_profile": "Exact target-sign inversion of the weekly dynamic relative-value baseline under the original full organizer controls.",
+  "falsifier": "The exact sign inversion is not materially worse than convergence after costs, or it improves the baseline's bear and weak-fold behavior enough to challenge the assumed mean-reversion direction.",
+  "formation_horizon": "378 completed 8-hour bars with a 189-return pair-selection window",
+  "hypothesis": "If residual dislocations genuinely converge, negating every non-flat target before the unchanged execution and risk stack should destroy performance and provide a clean sign check.",
+  "material_parameters": {
+    "active_optional_controls": 5,
+    "ar1_maximum": 0.977,
+    "ar1_minimum": 0.2,
+    "beta_maximum": 3,
+    "beta_minimum": 0.3,
+    "correlation_return_bars": 189,
+    "entry_z": 1.75,
+    "formation_bars": 378,
+    "minimum_correlation": 0.72,
+    "minimum_zero_crossings": 8,
+    "spread_scale_bars": 84,
+    "target_sign": -1,
+    "total_gross": 0.3
+  },
+  "mechanism": "dynamic-cointegration-relative-value",
+  "neighborhood_coordinates": {},
+  "neighborhood_id": null,
+  "parent_candidate_id": "t10-dynamic-rv-weekly-b00",
+  "rebalance_horizon": "weekly Monday 00:00 UTC",
+  "schema_version": 1,
+  "tags": [
+    "sign-inversion",
+    "role-check",
+    "pair-stability"
+  ],
+  "team_id": "team-10"
+}

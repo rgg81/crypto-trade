@@ -1,0 +1,34 @@
+{
+  "candidate_id": "t10-dynamic-rv-weekly-controls-off-v1",
+  "control_profile": "Controls off: unchanged weekly dynamic relative-value targets with no volatility scaling, drawdown brake, position stop, time stop, or turnover throttle.",
+  "falsifier": "Removing the organizer overlay fails to improve bear and chronological breadth, Sharpe, and gross edge, or creates unacceptable drawdown, turnover, cost sensitivity, or role imbalance.",
+  "formation_horizon": "378 completed 8-hour bars with a 189-return pair-selection window",
+  "hypothesis": "The baseline's sparse mean-reversion targets may already be self-limiting, so central stop and brake interactions could be truncating convergence and causing the negative 2020 and 2022 folds.",
+  "material_parameters": {
+    "active_optional_controls": 0,
+    "ar1_maximum": 0.977,
+    "ar1_minimum": 0.2,
+    "beta_maximum": 3,
+    "beta_minimum": 0.3,
+    "correlation_return_bars": 189,
+    "entry_z": 1.75,
+    "formation_bars": 378,
+    "minimum_correlation": 0.72,
+    "minimum_zero_crossings": 8,
+    "spread_scale_bars": 84,
+    "total_gross": 0.3
+  },
+  "mechanism": "dynamic-cointegration-relative-value",
+  "neighborhood_coordinates": {},
+  "neighborhood_id": null,
+  "parent_candidate_id": "t10-dynamic-rv-weekly-b00",
+  "rebalance_horizon": "weekly Monday 00:00 UTC",
+  "schema_version": 1,
+  "tags": [
+    "control-ablation",
+    "controls-off",
+    "role-check",
+    "pair-stability"
+  ],
+  "team_id": "team-10"
+}
