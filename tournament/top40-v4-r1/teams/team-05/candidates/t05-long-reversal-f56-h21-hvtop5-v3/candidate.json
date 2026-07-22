@@ -1,0 +1,27 @@
+{
+  "candidate_id": "t05-long-reversal-f56-h21-hvtop5-v3",
+  "control_profile": "Twenty-two percent volatility target only; no position stop, drawdown brake, time stop, or turnover clipping.",
+  "falsifier": "Reject the family if shortening the overlap to three weeks destroys doubled-cost edge or temporal breadth.",
+  "formation_horizon": "fifty-six completed days",
+  "hypothesis": "If the overreaction corrects somewhat faster than four weeks, three overlapping weekly cohorts should preserve signal strength while remaining below the turnover ceiling.",
+  "material_parameters": {
+    "excluded_liquidity_leaders": 5,
+    "formation_bars": 168,
+    "holding_weeks": 3,
+    "selected_fraction_per_side": 0.2,
+    "total_gross": 0.4,
+    "volatility_quantile": 0.5
+  },
+  "mechanism": "volatile-midsize-long-formation-reversal",
+  "neighborhood_coordinates": {
+    "formation_bars": 168,
+    "holding_weeks": 3,
+    "volatility_quantile": 0.5
+  },
+  "neighborhood_id": "t05-long-formation-reversal-n2",
+  "parent_candidate_id": "t05-long-reversal-f56-h28-hvtop5-v3",
+  "rebalance_horizon": "one weekly cohort with three equally weighted overlapping cohorts",
+  "schema_version": 1,
+  "tags": ["rebalance-grid", "role-check", "local-neighborhood", "cost-aware"],
+  "team_id": "team-05"
+}

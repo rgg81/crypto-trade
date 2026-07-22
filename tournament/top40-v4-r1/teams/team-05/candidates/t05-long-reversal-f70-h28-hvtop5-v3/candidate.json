@@ -1,0 +1,27 @@
+{
+  "candidate_id": "t05-long-reversal-f70-h28-hvtop5-v3",
+  "control_profile": "Twenty-two percent volatility target only; no position stop, drawdown brake, time stop, or turnover clipping.",
+  "falsifier": "Reject the family if the ten-week formation neighbor loses doubled-cost edge, role breadth, fold breadth, or regime breadth.",
+  "formation_horizon": "seventy completed days",
+  "hypothesis": "The documented crypto reversal window extends to ten weeks, so a ten-week formation should retain the same volatile non-mega-cap loser-minus-winner effect.",
+  "material_parameters": {
+    "excluded_liquidity_leaders": 5,
+    "formation_bars": 210,
+    "holding_weeks": 4,
+    "selected_fraction_per_side": 0.2,
+    "total_gross": 0.4,
+    "volatility_quantile": 0.5
+  },
+  "mechanism": "volatile-midsize-long-formation-reversal",
+  "neighborhood_coordinates": {
+    "formation_bars": 210,
+    "holding_weeks": 4,
+    "volatility_quantile": 0.5
+  },
+  "neighborhood_id": "t05-long-formation-reversal-n2",
+  "parent_candidate_id": "t05-long-reversal-f56-h28-hvtop5-v3",
+  "rebalance_horizon": "one weekly cohort with four equally weighted overlapping cohorts",
+  "schema_version": 1,
+  "tags": ["formation-grid", "role-check", "local-neighborhood", "cost-aware"],
+  "team_id": "team-05"
+}
