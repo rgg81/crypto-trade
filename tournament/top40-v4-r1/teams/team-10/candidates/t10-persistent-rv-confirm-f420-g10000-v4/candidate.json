@@ -1,0 +1,46 @@
+{
+  "candidate_id": "t10-persistent-rv-confirm-f420-g10000-v4",
+  "control_profile": "Weekly convergence-confirmed persistent-correlation relative value at 1.00 gross with the full organizer control stack.",
+  "falsifier": "One-bar convergence damping fails to preserve economic return while repairing the 2020 and 2022 folds, or the candidate fails any return, cost, role, regime, concentration, confidence, or existing formation-neighborhood gate.",
+  "formation_horizon": "420 completed 8-hour bars with adjacent 126-return stability windows and one-bar convergence confirmation",
+  "hypothesis": "A dislocated spread already contracting at the decision boundary is stronger convergence evidence than a still-widening spread; retaining widening signals at one-quarter conviction should reduce stale divergence losses without discarding the persistent pair family.",
+  "material_parameters": {
+    "active_optional_controls": 5,
+    "ar1_maximum": 0.977,
+    "ar1_minimum": 0.2,
+    "beta_maximum": 3,
+    "beta_minimum": 0.3,
+    "correlation_return_bars": 126,
+    "entry_z": 1.75,
+    "formation_bars": 420,
+    "maximum_abs_net": 0.08333333333333333,
+    "maximum_symbol_weight": 0.08333333333333333,
+    "minimum_correlation": 0.72,
+    "minimum_prior_correlation": 0.5,
+    "minimum_zero_crossings": 8,
+    "spread_scale_bars": 84,
+    "total_gross": 1.0,
+    "total_gross_bps": 10000,
+    "unconfirmed_scale": 0.25
+  },
+  "mechanism": "dynamic-cointegration-relative-value",
+  "neighborhood_coordinates": {
+    "formation_bars": 420
+  },
+  "neighborhood_id": "t10-persistent-rv-formation-n1",
+  "parent_candidate_id": "t10-persistent-rv-f420-c126-p50-g9000-v3",
+  "rebalance_horizon": "weekly Monday 00:00 UTC",
+  "schema_version": 1,
+  "tags": [
+    "formation-grid",
+    "local-neighborhood",
+    "control-ablation",
+    "role-check",
+    "pair-stability",
+    "convergence-confirmation",
+    "turnover-defense",
+    "risk-utilization",
+    "full-controls"
+  ],
+  "team_id": "team-10"
+}
