@@ -1,0 +1,30 @@
+{
+  "candidate_id": "t07-settled-funding-carry-28d-sign-inversion-v2",
+  "control_profile": "Exact target-sign inversion of the frozen baseline with identical volatility scaling, drawdown brakes, position stop and turnover cap.",
+  "falsifier": "If the exact inversion materially outperforms the baseline, the declared long-low-funding and short-high-funding carry sign is wrong; symmetric weakness instead confirms the sign while exposing price-risk defects.",
+  "formation_horizon": "robust seven-day and twenty-eight-day settled-funding estimates with a nine-bar residual price state",
+  "hypothesis": "Negating every scheduled baseline target provides a clean funding-direction diagnostic without changing selection, scale, holding schedule or controls.",
+  "material_parameters": {
+    "funding_window_days": 28,
+    "holding_days": 3,
+    "long_funding_window_days": 28,
+    "protection_strength": 0.4,
+    "short_funding_window_days": 7,
+    "side_gross": 0.14,
+    "turnover_cap": 0.12,
+    "sign_multiplier": -1
+  },
+  "mechanism": "funding-carry-crowding-crash-protection",
+  "neighborhood_coordinates": {},
+  "neighborhood_id": null,
+  "parent_candidate_id": "t07-settled-funding-carry-28d-v1",
+  "rebalance_horizon": "one daily cohort with three equally weighted overlapping cohorts",
+  "schema_version": 1,
+  "tags": [
+    "sign-inversion",
+    "role-check",
+    "direction-diagnostic",
+    "funding-carry"
+  ],
+  "team_id": "team-07"
+}
