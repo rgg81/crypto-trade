@@ -1,0 +1,44 @@
+{
+  "candidate_id": "t01-breadth-agree-m63-s126-b600-g5500-v3",
+  "control_profile": "Weekly dual-horizon agreement with breadth-adaptive 72/28 sleeve budgets and the full volatility, drawdown, stop, and turnover controls.",
+  "falsifier": "Strict sign agreement and causal breadth allocation fail to make both sleeves profitable across at least four folds, or the candidate fails any return, cost, drawdown, regime, concentration, confidence, or frozen neighborhood gate.",
+  "formation_horizon": "sixty-three-day and one-hundred-twenty-six-day confirmed close-return horizons",
+  "hypothesis": "Per-coin trends confirmed at both slow horizons should be more persistent, while shifting a bounded 72% of gross toward the sleeve supported by cross-coin sign breadth should avoid fighting broad bull and bear trends without becoming permanently directional.",
+  "material_parameters": {
+    "active_optional_controls": 4,
+    "breadth_threshold": 0.6,
+    "dominant_side_fraction": 0.72,
+    "maximum_abs_net": 0.242,
+    "maximum_symbol_weight": 0.08,
+    "medium_days": 63,
+    "minimum_positions_per_side": 4,
+    "rebalance_days": 7,
+    "rebalance_weekday": 0,
+    "selected_fraction_per_side": 0.25,
+    "slow_days": 126,
+    "total_gross": 0.55,
+    "total_gross_bps": 5500,
+    "volatility_days": 63
+  },
+  "mechanism": "slow-per-coin-time-series-momentum",
+  "neighborhood_coordinates": {
+    "breadth_threshold": 0.6,
+    "medium_days": 63,
+    "slow_days": 126
+  },
+  "neighborhood_id": "t01-breadth-agreement-n1",
+  "parent_candidate_id": "t01-slow-tsm-baseline-v1",
+  "rebalance_horizon": "weekly Monday 00:00 UTC",
+  "schema_version": 1,
+  "tags": [
+    "formation-grid",
+    "local-neighborhood",
+    "control-ablation",
+    "role-check",
+    "horizon-agreement",
+    "breadth-allocation",
+    "asymmetric-risk",
+    "full-controls"
+  ],
+  "team_id": "team-01"
+}

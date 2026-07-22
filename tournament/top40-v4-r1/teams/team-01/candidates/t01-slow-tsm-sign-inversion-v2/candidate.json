@@ -1,0 +1,30 @@
+{
+  "candidate_id": "t01-slow-tsm-sign-inversion-v2",
+  "control_profile": "Exact target-sign inversion of the baseline with the same volatility target, drawdown brakes, position stop, and turnover cap.",
+  "falsifier": "If the exact inversion materially outperforms the baseline, the declared trend direction is wrong; symmetric weakness instead supports the sign while exposing non-directional defects.",
+  "formation_horizon": "sixty-three-day and one-hundred-twenty-six-day close-return horizons",
+  "hypothesis": "Negating every scheduled baseline target provides a clean direction diagnostic without changing selection, scale, schedule, or controls.",
+  "material_parameters": {
+    "disagreement_scale": 0.25,
+    "medium_days": 63,
+    "rebalance_days": 7,
+    "rebalance_weekday": 0,
+    "selected_fraction_per_side": 0.25,
+    "sign_multiplier": -1,
+    "slow_days": 126,
+    "total_gross": 0.44,
+    "volatility_days": 63
+  },
+  "mechanism": "slow-per-coin-time-series-momentum",
+  "neighborhood_coordinates": {},
+  "neighborhood_id": null,
+  "parent_candidate_id": "t01-slow-tsm-baseline-v1",
+  "rebalance_horizon": "weekly at the first UTC decision boundary",
+  "schema_version": 1,
+  "tags": [
+    "sign-inversion",
+    "role-check",
+    "direction-diagnostic"
+  ],
+  "team_id": "team-01"
+}

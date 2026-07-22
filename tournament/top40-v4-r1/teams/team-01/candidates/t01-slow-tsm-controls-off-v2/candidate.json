@@ -1,0 +1,30 @@
+{
+  "candidate_id": "t01-slow-tsm-controls-off-v2",
+  "control_profile": "Controls off: unchanged baseline targets with no volatility scaling, drawdown brake, position stop, time stop, or turnover throttle.",
+  "falsifier": "If removing all optional controls improves robust edge after costs and across folds, the baseline control stack is suppressing signal rather than limiting its stated risks.",
+  "formation_horizon": "sixty-three-day and one-hundred-twenty-six-day close-return horizons",
+  "hypothesis": "A controls-off replay isolates raw slow-trend behavior and measures whether risk scaling and exit controls improve or merely cosmetically smooth the baseline.",
+  "material_parameters": {
+    "active_optional_controls": 0,
+    "disagreement_scale": 0.25,
+    "medium_days": 63,
+    "rebalance_days": 7,
+    "rebalance_weekday": 0,
+    "selected_fraction_per_side": 0.25,
+    "slow_days": 126,
+    "total_gross": 0.44,
+    "volatility_days": 63
+  },
+  "mechanism": "slow-per-coin-time-series-momentum",
+  "neighborhood_coordinates": {},
+  "neighborhood_id": null,
+  "parent_candidate_id": "t01-slow-tsm-baseline-v1",
+  "rebalance_horizon": "weekly at the first UTC decision boundary",
+  "schema_version": 1,
+  "tags": [
+    "control-ablation",
+    "controls-off",
+    "role-check"
+  ],
+  "team_id": "team-01"
+}

@@ -1,0 +1,44 @@
+{
+  "candidate_id": "t01-breadth-agree-m77-s154-b650-g5500-v3",
+  "control_profile": "Weekly dual-horizon agreement with breadth-adaptive 72/28 sleeve budgets and the full volatility, drawdown, stop, and turnover controls.",
+  "falsifier": "The frozen slower/higher-threshold endpoint loses economic edge, sleeve or regime breadth, fold robustness, or cost efficiency and therefore does not support a stable neighborhood around the center.",
+  "formation_horizon": "seventy-seven-day and one-hundred-fifty-four-day confirmed close-return horizons",
+  "hypothesis": "A modestly slower pair of horizons and 65% breadth trigger tests whether the repair survives more persistent confirmation and less frequent asymmetric allocation.",
+  "material_parameters": {
+    "active_optional_controls": 4,
+    "breadth_threshold": 0.65,
+    "dominant_side_fraction": 0.72,
+    "maximum_abs_net": 0.242,
+    "maximum_symbol_weight": 0.08,
+    "medium_days": 77,
+    "minimum_positions_per_side": 4,
+    "rebalance_days": 7,
+    "rebalance_weekday": 0,
+    "selected_fraction_per_side": 0.25,
+    "slow_days": 154,
+    "total_gross": 0.55,
+    "total_gross_bps": 5500,
+    "volatility_days": 63
+  },
+  "mechanism": "slow-per-coin-time-series-momentum",
+  "neighborhood_coordinates": {
+    "breadth_threshold": 0.65,
+    "medium_days": 77,
+    "slow_days": 154
+  },
+  "neighborhood_id": "t01-breadth-agreement-n1",
+  "parent_candidate_id": "t01-breadth-agree-m63-s126-b600-g5500-v3",
+  "rebalance_horizon": "weekly Monday 00:00 UTC",
+  "schema_version": 1,
+  "tags": [
+    "formation-grid",
+    "local-neighborhood",
+    "control-ablation",
+    "role-check",
+    "horizon-agreement",
+    "breadth-allocation",
+    "asymmetric-risk",
+    "full-controls"
+  ],
+  "team_id": "team-01"
+}

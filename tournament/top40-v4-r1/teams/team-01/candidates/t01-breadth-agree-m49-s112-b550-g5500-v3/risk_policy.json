@@ -1,0 +1,44 @@
+{
+  "drawdown_brakes": [
+    {
+      "drawdown": 0.08,
+      "gross_scale": 0.7
+    },
+    {
+      "drawdown": 0.15,
+      "gross_scale": 0.35
+    },
+    {
+      "drawdown": 0.22,
+      "gross_scale": 0.0
+    }
+  ],
+  "policy_id": "t01-breadth-agree-m49-s112-b550-g5500-v3",
+  "position_stop": {
+    "cooldown_bars": 9,
+    "enabled": true,
+    "loss_fraction": 0.1
+  },
+  "same_boundary_reentry": false,
+  "schema_version": 1,
+  "side_scaling": {
+    "long_scale": 1.0,
+    "short_scale": 1.0
+  },
+  "time_stop": {
+    "cooldown_bars": 0,
+    "enabled": false,
+    "maximum_holding_bars": 84
+  },
+  "turnover_limit": {
+    "enabled": true,
+    "maximum_one_way_turnover": 0.12
+  },
+  "volatility_target": {
+    "annualized_target": 0.25,
+    "enabled": true,
+    "lookback_days": 42,
+    "maximum_scale": 1.0,
+    "minimum_scale": 0.2
+  }
+}
