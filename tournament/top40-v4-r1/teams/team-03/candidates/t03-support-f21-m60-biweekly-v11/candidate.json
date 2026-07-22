@@ -1,0 +1,30 @@
+{
+  "candidate_id": "t03-support-f21-m60-biweekly-v11",
+  "control_profile": "Full controls with the twenty-one-day directional-volume trend and sixty-day state center, refreshed on deterministic alternate Mondays.",
+  "falsifier": "Reject if fortnightly refresh loses trend responsiveness, state-role timing, fold breadth, or gross edge despite lower expected turnover.",
+  "formation_horizon": "twenty-one-day per-coin trend confirmed by fourteen-day directional quote-volume share, conditioned on a completed sixty-day BTC state",
+  "hypothesis": "If the continuation edge is persistent rather than weekly selection noise, holding the same construction for two weeks should retain performance while reducing turnover.",
+  "material_parameters": {
+    "confirmation_days": 14,
+    "formation_days": 21,
+    "market_days": 60,
+    "market_threshold": 0.1,
+    "maximum_abs_net": 0.25,
+    "rebalance_days": 14,
+    "total_gross": 0.25,
+    "weak_confirmation_scale": 0.35
+  },
+  "mechanism": "volume-confirmed-time-series-momentum",
+  "neighborhood_coordinates": {},
+  "neighborhood_id": null,
+  "parent_candidate_id": "t03-support-f21-m60-t1000-g2500-v3",
+  "rebalance_horizon": "fortnightly on deterministic alternate Monday UTC boundaries",
+  "schema_version": 1,
+  "tags": [
+    "rebalance-grid",
+    "control-ablation",
+    "role-check",
+    "full-controls"
+  ],
+  "team_id": "team-03"
+}
