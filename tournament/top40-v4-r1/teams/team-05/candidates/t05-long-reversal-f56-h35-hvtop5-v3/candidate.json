@@ -22,6 +22,6 @@
   "parent_candidate_id": "t05-long-reversal-f56-h28-hvtop5-v3",
   "rebalance_horizon": "one weekly cohort with five equally weighted overlapping cohorts",
   "schema_version": 1,
-  "tags": ["rebalance-grid", "role-check", "local-neighborhood", "cost-aware"],
+  "tags": ["mechanism-pivot", "rebalance-grid", "role-check", "local-neighborhood", "cost-aware"],
   "team_id": "team-05"
 }
