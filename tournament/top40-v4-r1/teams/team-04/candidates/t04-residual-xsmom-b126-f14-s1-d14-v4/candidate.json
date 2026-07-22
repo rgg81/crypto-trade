@@ -1,0 +1,30 @@
+{
+  "candidate_id": "t04-residual-xsmom-b126-f14-s1-d14-v4",
+  "control_profile": "Fixed fourteen-day residual-momentum refresh with beta-aware balanced gross and the original full protective organizer controls.",
+  "falsifier": "Slowing the strongest frozen formation point fails to improve chop, short-sleeve, worst-fold, Sharpe, and edge-density behavior, or reduces the positive base and doubled-cost fold count below four.",
+  "formation_horizon": "one-hundred-twenty-six-day beta estimate and fourteen-day residual momentum with a one-day skip",
+  "hypothesis": "A fixed fourteen-day refresh may reduce noisy rank churn and allow relative continuation to mature, improving chop and cost robustness without losing the fourteen-day signal's four-fold breadth.",
+  "material_parameters": {
+    "active_optional_controls": 5,
+    "beta_clip": 2.5,
+    "beta_lookback_days": 126,
+    "formation_days": 14,
+    "rebalance_days": 14,
+    "skip_days": 1,
+    "total_gross": 0.44
+  },
+  "mechanism": "market-residual-cross-sectional-momentum",
+  "neighborhood_coordinates": {},
+  "neighborhood_id": null,
+  "parent_candidate_id": "t04-residual-xsmom-b126-f14-s1-v3",
+  "rebalance_horizon": "every fourteen days at 00:00 UTC, anchored to the Monday Unix epoch week",
+  "schema_version": 1,
+  "tags": [
+    "rebalance-grid",
+    "role-check",
+    "slower-rebalance",
+    "short-horizon-repair",
+    "full-controls"
+  ],
+  "team_id": "team-04"
+}

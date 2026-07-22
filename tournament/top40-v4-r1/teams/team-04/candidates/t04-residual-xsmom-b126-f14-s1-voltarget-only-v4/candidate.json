@@ -1,0 +1,29 @@
+{
+  "candidate_id": "t04-residual-xsmom-b126-f14-s1-voltarget-only-v4",
+  "control_profile": "Volatility-target only: the unchanged fourteen-day residual-momentum signal with no drawdown brake, position stop, time stop, or turnover throttle.",
+  "falsifier": "The isolated volatility target fails to improve full-sample Sharpe and the losing short and chop roles, or it sacrifices the four positive folds, doubled-cost resilience, drawdown, turnover, or edge density of the full-control parent.",
+  "formation_horizon": "one-hundred-twenty-six-day beta estimate and fourteen-day residual momentum with a one-day skip",
+  "hypothesis": "At the strongest frozen formation point, volatility scaling may retain useful risk normalization while removing stop, brake, time-stop, and throttle interactions that truncate cross-sectional winners and losers.",
+  "material_parameters": {
+    "active_optional_controls": 1,
+    "beta_clip": 2.5,
+    "beta_lookback_days": 126,
+    "formation_days": 14,
+    "skip_days": 1,
+    "total_gross": 0.44
+  },
+  "mechanism": "market-residual-cross-sectional-momentum",
+  "neighborhood_coordinates": {},
+  "neighborhood_id": null,
+  "parent_candidate_id": "t04-residual-xsmom-b126-f14-s1-v3",
+  "rebalance_horizon": "weekly at the first UTC decision boundary",
+  "schema_version": 1,
+  "tags": [
+    "control-ablation",
+    "individual-control",
+    "volatility-target-only",
+    "role-check",
+    "short-horizon-repair"
+  ],
+  "team_id": "team-04"
+}
