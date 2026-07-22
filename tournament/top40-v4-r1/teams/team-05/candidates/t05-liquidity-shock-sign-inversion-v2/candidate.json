@@ -1,0 +1,34 @@
+{
+  "candidate_id": "t05-liquidity-shock-sign-inversion-v2",
+  "control_profile": "Exact final-target sign inversion with the baseline downward volatility scaling, drawdown brakes, close-confirmed loss stop, and one-way turnover cap.",
+  "falsifier": "Reject continuation if exact final-target inversion remains nonpositive gross or net of base costs, or if it fails to improve the baseline across folds and regimes.",
+  "formation_horizon": "three completed bars measured against a sixty-three-bar causal reference window",
+  "hypothesis": "Aligned aggressive flow during an abnormal residual price and activity shock is informed at the eight-hour horizon, so the baseline reversal sign should be inverted exactly.",
+  "material_parameters": {
+    "holding_days": 3,
+    "pretrend_bars": 21,
+    "reference_bars": 63,
+    "shock_bars": 3,
+    "sign_multiplier": -1,
+    "total_gross": 0.3,
+    "turnover_cap": 0.12
+  },
+  "mechanism": "short-horizon-liquidity-shock-reversal",
+  "neighborhood_coordinates": {
+    "holding_days": 3,
+    "reference_bars": 63,
+    "shock_bars": 3
+  },
+  "neighborhood_id": "t05-liquidity-shock-reversal-n1",
+  "parent_candidate_id": "t05-liquidity-shock-reversal-b063-h3-v1",
+  "rebalance_horizon": "one daily cohort with three equally weighted overlapping cohorts",
+  "schema_version": 1,
+  "tags": [
+    "sign-inversion",
+    "role-check",
+    "local-neighborhood",
+    "full-controls",
+    "liquidity-shock"
+  ],
+  "team_id": "team-05"
+}

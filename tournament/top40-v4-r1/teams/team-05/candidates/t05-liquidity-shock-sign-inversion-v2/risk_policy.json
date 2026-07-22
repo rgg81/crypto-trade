@@ -1,0 +1,44 @@
+{
+  "drawdown_brakes": [
+    {
+      "drawdown": 0.1,
+      "gross_scale": 0.75
+    },
+    {
+      "drawdown": 0.18,
+      "gross_scale": 0.4
+    },
+    {
+      "drawdown": 0.25,
+      "gross_scale": 0.0
+    }
+  ],
+  "policy_id": "t05-liquidity-reversal-sign-inversion",
+  "position_stop": {
+    "cooldown_bars": 6,
+    "enabled": true,
+    "loss_fraction": 0.09
+  },
+  "same_boundary_reentry": false,
+  "schema_version": 1,
+  "side_scaling": {
+    "long_scale": 1.0,
+    "short_scale": 1.0
+  },
+  "time_stop": {
+    "cooldown_bars": 3,
+    "enabled": false,
+    "maximum_holding_bars": 9
+  },
+  "turnover_limit": {
+    "enabled": true,
+    "maximum_one_way_turnover": 0.12
+  },
+  "volatility_target": {
+    "annualized_target": 0.25,
+    "enabled": true,
+    "lookback_days": 30,
+    "maximum_scale": 1.0,
+    "minimum_scale": 0.25
+  }
+}
