@@ -1,0 +1,39 @@
+{
+  "candidate_id": "t08-regime-funding-unwind-e42-h3h7-v2",
+  "control_profile": "Independent long and short funding-unwind sleeves, causal market-state selection, downward volatility scaling, drawdown brakes, close-confirmed loss stop, and one-way turnover cap.",
+  "falsifier": "Reject if removing forced side symmetry does not create economically meaningful exposure before 2024, if net or double-cost Sharpe remains weak, or if any bull, bear, chop, long, or short role is nonpositive.",
+  "formation_horizon": "latest settled funding event standardized against forty-two prior events, with three completed price-confirmation bars outside chop",
+  "hypothesis": "Extreme funding is a crowded basis state whose unwind is tradable after price confirmation, while neutral market states require larger extremes and slower averaging; allowing each side to qualify independently prevents sparse opposite-side events from suppressing the edge.",
+  "material_parameters": {
+    "chop_holding_days": 7,
+    "chop_minimum_abs_funding_z": 1.25,
+    "confirmation_bars": 3,
+    "funding_reference_events": 42,
+    "market_days": 60,
+    "market_threshold": 0.1,
+    "total_gross": 0.22,
+    "turnover_cap": 0.1,
+    "unwind_holding_days": 3,
+    "unwind_minimum_abs_funding_z": 0.5
+  },
+  "mechanism": "funding-crowding-mean-reversion",
+  "neighborhood_coordinates": {
+    "funding_reference_events": 42,
+    "unwind_holding_days": 3
+  },
+  "neighborhood_id": "t08-regime-funding-unwind-n2",
+  "parent_candidate_id": "t08-funding-crowding-reversal-e42-v1",
+  "rebalance_horizon": "daily cohorts with three-day confirmed-unwind and seven-day chop-extreme shadow portfolios",
+  "schema_version": 1,
+  "tags": [
+    "mechanism-pivot",
+    "formation-grid",
+    "role-check",
+    "local-neighborhood",
+    "full-controls",
+    "funding-crowding",
+    "mean-reversion",
+    "market-state"
+  ],
+  "team_id": "team-08"
+}
