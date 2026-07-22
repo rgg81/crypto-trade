@@ -14,8 +14,8 @@
   },
   "mechanism": "volatile-midsize-long-formation-reversal",
   "neighborhood_coordinates": {
-    "formation_days": 56,
-    "holding_days": 28,
+    "formation_bars": 168,
+    "holding_weeks": 4,
     "volatility_quantile": 0.5
   },
   "neighborhood_id": "t05-long-formation-reversal-n2",
