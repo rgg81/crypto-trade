@@ -1,0 +1,45 @@
+{
+  "candidate_id": "t07-confirm-zm050-f21-b28-h7-g5500-v5",
+  "control_profile": "Three-day residual-price confirmation of broad settled-funding pools, causal 28-day BTC state budgets, seven-day overlapping cohorts, volatility scaling, drawdown brakes, position stops and turnover throttling.",
+  "falsifier": "A symmetric entry threshold of -0.50 fails to make both long-low-funding and short-high-funding roles positive, or apparent improvement is narrow, costly, regime-dependent or fold-concentrated.",
+  "formation_horizon": "robust seven-day and twenty-eight-day settled funding with a twenty-eight-day BTC state, twenty-one-bar residual scale and nine-bar price confirmation at z -0.50",
+  "hypothesis": "Funding carry is viable only after adverse price continuation has stopped: low-funding longs require supportive residual trend and high-funding shorts require nonpositive residual trend before entry, without changing the carry sign.",
+  "material_parameters": {
+    "active_optional_controls": 6,
+    "dominant_side_fraction": 0.72,
+    "holding_days": 7,
+    "long_funding_window_days": 28,
+    "market_days": 28,
+    "market_threshold": 0.05,
+    "short_funding_window_days": 7,
+    "total_gross": 0.55,
+    "total_gross_bps": 5500,
+    "price_return_bars": 21,
+    "confirmation_return_bars": 9,
+    "confirmation_z": -0.5,
+    "funding_pool_fraction_per_side": 0.5,
+    "minimum_positions_per_side": 4
+  },
+  "mechanism": "funding-carry-crowding-crash-protection",
+  "neighborhood_coordinates": {
+    "confirmation_z": -0.5
+  },
+  "neighborhood_id": "t07-state-carry-confirmation-n4",
+  "parent_candidate_id": "t07-confirm-z000-f21-b28-h7-g5500-v5",
+  "rebalance_horizon": "one daily cohort averaged across seven overlapping daily vintages",
+  "schema_version": 1,
+  "tags": [
+    "formation-grid",
+    "rebalance-grid",
+    "control-ablation",
+    "role-check",
+    "local-neighborhood",
+    "funding-carry",
+    "crash-protection",
+    "market-state",
+    "full-controls",
+    "price-weakness-ablation",
+    "price-confirmation"
+  ],
+  "team_id": "team-07"
+}
