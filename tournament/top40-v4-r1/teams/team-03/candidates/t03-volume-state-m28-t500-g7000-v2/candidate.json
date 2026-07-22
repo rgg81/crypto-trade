@@ -1,0 +1,35 @@
+{
+  "candidate_id": "t03-volume-state-m28-t500-g7000-v2",
+  "control_profile": "Weekly sign-respecting volume-confirmed momentum with a causal twenty-eight-day BTC state budget, volatility targeting, drawdown brakes, position and time stops, and capped turnover.",
+  "falsifier": "Reject if causal state-aware sleeve budgets do not convert profitable long trend selection and 2022 short selection into robust net returns across folds and bull, bear, and chop roles.",
+  "formation_horizon": "forty-two-day per-coin price trend with fourteen-day volume confirmation, a twenty-eight-day volume baseline, and a completed twenty-eight-day BTC market state",
+  "hypothesis": "Volume-confirmed per-coin trends are more persistent when long and short risk budgets align with a slow, causal crypto market state.",
+  "material_parameters": {
+    "confirmation_days": 14,
+    "dominant_side_fraction": 0.675,
+    "formation_days": 42,
+    "market_days": 28,
+    "market_threshold": 0.05,
+    "maximum_abs_net": 0.245,
+    "rebalance_days": 7,
+    "total_gross": 0.7,
+    "volume_baseline_days": 28,
+    "weak_confirmation_scale": 0.35
+  },
+  "mechanism": "volume-confirmed-time-series-momentum-market-state",
+  "neighborhood_coordinates": {
+    "market_days": 28,
+    "market_threshold": 0.05
+  },
+  "neighborhood_id": "t03-volume-state-market-n2",
+  "parent_candidate_id": "t03-volume-trend-baseline-v1",
+  "rebalance_horizon": "weekly at the first UTC decision boundary",
+  "schema_version": 1,
+  "tags": [
+    "local-neighborhood",
+    "role-check",
+    "market-state",
+    "full-controls"
+  ],
+  "team_id": "team-03"
+}
