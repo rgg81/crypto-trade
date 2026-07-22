@@ -1,0 +1,37 @@
+{
+  "candidate_id": "t08-regime-funding-unwind-e42-z075-voltarget-v4",
+  "control_profile": "Symmetric twenty-percent volatility target only; position stops, cooldowns, drawdown brakes, time stops, and turnover clipping are disabled.",
+  "falsifier": "Reject selective funding-event pruning if the 0.75/1.50 z thresholds do not reduce turnover and raise gross edge density relative to the 0.50/1.25 center while preserving annualized return, both sleeve roles, regimes, and stressed-cost robustness.",
+  "formation_horizon": "latest settled funding event standardized against forty-two prior events, requiring absolute z of 0.75 with three-bar unwind confirmation or 1.50 in chop",
+  "hypothesis": "The freshest three/seven-day funding-unwind construction contains positive gross PnL but admits marginal funding events; stronger 0.75/1.50 z thresholds should prune low-edge churn without diluting signal timing.",
+  "material_parameters": {
+    "chop_holding_days": 7,
+    "chop_minimum_abs_funding_z": 1.5,
+    "confirmation_bars": 3,
+    "funding_reference_events": 42,
+    "market_days": 60,
+    "market_threshold": 0.1,
+    "total_gross": 0.22,
+    "unwind_holding_days": 3,
+    "unwind_minimum_abs_funding_z": 0.75,
+    "volatility_target": 0.2
+  },
+  "mechanism": "funding-crowding-mean-reversion",
+  "neighborhood_coordinates": {
+    "funding_reference_events": 42,
+    "unwind_minimum_abs_funding_z": 0.75
+  },
+  "neighborhood_id": "t08-regime-funding-unwind-n3",
+  "parent_candidate_id": "t08-regime-funding-unwind-e42-h3h7-voltarget-v2",
+  "rebalance_horizon": "daily cohorts with three-day confirmed-unwind and seven-day chop-extreme shadow portfolios",
+  "schema_version": 1,
+  "tags": [
+    "formation-grid",
+    "role-check",
+    "local-neighborhood",
+    "funding-crowding",
+    "mean-reversion",
+    "market-state"
+  ],
+  "team_id": "team-08"
+}
