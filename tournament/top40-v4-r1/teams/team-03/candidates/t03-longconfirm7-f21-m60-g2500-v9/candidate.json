@@ -1,0 +1,36 @@
+{
+  "candidate_id": "t03-longconfirm7-f21-m60-g2500-v9",
+  "control_profile": "Full controls with a twenty-one-day directional-volume trend, seven-day price persistence required only for longs, strict sixty-day BTC state gating, stops, volatility targeting, drawdown brakes, and capped turnover.",
+  "falsifier": "Reject if long-only price persistence fails to repair 2023, 2024H1, chop, Sharpe, and fold breadth while preserving the unchanged bear short sleeve.",
+  "formation_horizon": "twenty-one-day per-coin trend confirmed by fourteen-day directional quote-volume share, with seven-day price persistence for longs and a completed sixty-day BTC state",
+  "hypothesis": "Positive crypto trends need recent price persistence to avoid momentum-crash longs, while imposing the same filter on shorts destroys the independently observed bear role.",
+  "material_parameters": {
+    "confirmation_days": 14,
+    "formation_days": 21,
+    "long_price_confirmation_days": 7,
+    "market_days": 60,
+    "market_threshold": 0.1,
+    "maximum_abs_net": 0.25,
+    "rebalance_days": 7,
+    "total_gross": 0.25,
+    "weak_confirmation_scale": 0.35
+  },
+  "mechanism": "volume-confirmed-time-series-momentum",
+  "neighborhood_coordinates": {
+    "formation_days": 21,
+    "market_days": 60
+  },
+  "neighborhood_id": "t03-support-state-n3",
+  "parent_candidate_id": "t03-support-f21-m60-t1000-g2500-v3",
+  "rebalance_horizon": "weekly at the first UTC decision boundary",
+  "schema_version": 1,
+  "tags": [
+    "formation-grid",
+    "role-check",
+    "local-neighborhood",
+    "full-controls",
+    "market-state",
+    "price-persistence"
+  ],
+  "team_id": "team-03"
+}
