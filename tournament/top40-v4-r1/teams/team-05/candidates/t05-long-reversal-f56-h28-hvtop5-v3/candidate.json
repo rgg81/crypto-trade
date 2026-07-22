@@ -1,0 +1,35 @@
+{
+  "candidate_id": "t05-long-reversal-f56-h28-hvtop5-v3",
+  "control_profile": "Twenty-two percent volatility target only; no position stop, drawdown brake, time stop, or turnover clipping.",
+  "falsifier": "Reject the pivot if the volatile non-leader loser-minus-winner spread fails doubled costs, has a nonpositive role, or remains unstable across calendar folds and frozen crypto regimes.",
+  "formation_horizon": "fifty-six completed days",
+  "hypothesis": "Relatively volatile non-mega-cap crypto assets overreact over eight-week windows, so recent losers outperform recent winners during a four-week overlapping holding period.",
+  "material_parameters": {
+    "excluded_liquidity_leaders": 5,
+    "formation_bars": 168,
+    "holding_weeks": 4,
+    "selected_fraction_per_side": 0.2,
+    "total_gross": 0.4,
+    "volatility_quantile": 0.5
+  },
+  "mechanism": "volatile-midsize-long-formation-reversal",
+  "neighborhood_coordinates": {
+    "formation_days": 56,
+    "holding_days": 28,
+    "volatility_quantile": 0.5
+  },
+  "neighborhood_id": "t05-long-formation-reversal-n2",
+  "parent_candidate_id": "t05-liquidity-shock-reversal-b063-h3-v1",
+  "rebalance_horizon": "one weekly cohort with four equally weighted overlapping cohorts",
+  "schema_version": 1,
+  "tags": [
+    "mechanism-pivot",
+    "formation-grid",
+    "rebalance-grid",
+    "role-check",
+    "local-neighborhood",
+    "cost-aware",
+    "long-formation-reversal"
+  ],
+  "team_id": "team-05"
+}
