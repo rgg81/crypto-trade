@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import csv
 import dataclasses
 import hashlib
+import io
 import json
 import os
 import time
+import zipfile
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
@@ -30,11 +33,12 @@ from crypto_trade.tournament.pure_crypto_universe_v6 import (
 )
 
 FAPI_BASE_URL = "https://fapi.binance.com"
+ARCHIVE_BASE_URL = "https://data.binance.vision"
 ARCHIVE_S3_URL = "https://s3-ap-northeast-1.amazonaws.com/data.binance.vision"
 ARCHIVE_DAILY_KLINE_PREFIX = "data/futures/um/daily/klines/"
 BRIDGE_START = HISTORICAL_END_EXCLUSIVE
 INTERVAL = pd.Timedelta(hours=INTERVAL_HOURS)
-CACHE_SCHEMA_VERSION = "team09-live-cache-v1"
+CACHE_SCHEMA_VERSION = "team09-live-cache-v2"
 _KLINE_COLUMNS = (
     "open_time",
     "open",
@@ -70,6 +74,7 @@ class LiveDataDiagnostics:
     completed_bridge_bar_rows: int
     bridge_funding_rows: int
     bridge_mark_rows: int
+    archive_fallback_file_count: int
 
     def to_dict(self) -> dict[str, object]:
         result = dataclasses.asdict(self)
@@ -83,6 +88,26 @@ class LiveMarketData:
     market_data: Team09MarketData
     diagnostics: LiveDataDiagnostics
     cache_dir: Path
+
+
+class BinancePublicDataError(RuntimeError):
+    """A non-retryable structured error returned by a Binance public endpoint."""
+
+    def __init__(
+        self,
+        *,
+        endpoint: str,
+        status_code: int,
+        error_code: int | None,
+        message: str,
+    ) -> None:
+        super().__init__(
+            f"Binance public-data error {status_code}/{error_code}: "
+            f"{endpoint}: {message}"
+        )
+        self.endpoint = endpoint
+        self.status_code = status_code
+        self.error_code = error_code
 
 
 class Team09PublicDataClient:
@@ -104,6 +129,7 @@ class Team09PublicDataClient:
             kwargs["transport"] = transport
         self._http = httpx.Client(**kwargs)
         self.pause_seconds = pause_seconds
+        self._archive_provenance: dict[str, dict[str, object]] = {}
 
     def close(self) -> None:
         self._http.close()
@@ -145,14 +171,116 @@ class Team09PublicDataClient:
         start: pd.Timestamp,
         end_inclusive: pd.Timestamp,
     ) -> pd.DataFrame:
-        rows = self._paged_klines(
-            "/fapi/v1/klines",
-            symbol,
-            start=start,
-            end_inclusive=end_inclusive,
-            limit=99,
-        )
+        try:
+            rows = self._paged_klines(
+                "/fapi/v1/klines",
+                symbol,
+                start=start,
+                end_inclusive=end_inclusive,
+                limit=99,
+            )
+        except BinancePublicDataError as exc:
+            if exc.error_code not in {-1121, -1122}:
+                raise
+            rows = self._archived_transaction_rows(
+                symbol,
+                start=start,
+                end_inclusive=end_inclusive,
+            )
         return _transaction_bar_frame(symbol, rows)
+
+    def archive_provenance(self) -> tuple[Mapping[str, object], ...]:
+        return tuple(
+            dict(self._archive_provenance[path])
+            for path in sorted(self._archive_provenance)
+        )
+
+    def _archived_transaction_rows(
+        self,
+        symbol: str,
+        *,
+        start: pd.Timestamp,
+        end_inclusive: pd.Timestamp,
+    ) -> list[list[object]]:
+        """Use checksum-verified official daily archives for REST-invalid symbols."""
+
+        prefix = (
+            f"{ARCHIVE_DAILY_KLINE_PREFIX}{symbol}/"
+            f"{INTERVAL_HOURS}h/"
+        )
+        keys, _prefixes = self._list_s3(
+            ARCHIVE_S3_URL,
+            prefix=prefix,
+            delimiter=None,
+        )
+        start_day = _utc(start).normalize()
+        end_day = _utc(end_inclusive).normalize()
+        selected: list[str] = []
+        filename_prefix = f"{symbol}-{INTERVAL_HOURS}h-"
+        for key in keys:
+            name = Path(key).name
+            if not name.startswith(filename_prefix) or not name.endswith(".zip"):
+                continue
+            raw_day = name.removeprefix(filename_prefix).removesuffix(".zip")
+            try:
+                day = pd.Timestamp(raw_day, tz="UTC")
+            except ValueError as exc:
+                raise RuntimeError(
+                    f"malformed Binance daily archive key: {key}"
+                ) from exc
+            if start_day <= day <= end_day:
+                selected.append(key)
+
+        rows: list[list[object]] = []
+        for key in sorted(selected):
+            archive_url = f"{ARCHIVE_BASE_URL}/{key}"
+            checksum_url = f"{archive_url}.CHECKSUM"
+            archive_response = self._request(archive_url)
+            checksum_response = self._request(checksum_url)
+            archive_bytes = archive_response.content
+            checksum_bytes = checksum_response.content
+            checksum_parts = checksum_bytes.decode("ascii").strip().split()
+            if (
+                len(checksum_parts) != 2
+                or len(checksum_parts[0]) != 64
+                or checksum_parts[1] != Path(key).name
+            ):
+                raise RuntimeError(
+                    f"malformed Binance archive checksum payload: {key}"
+                )
+            expected_sha256 = checksum_parts[0].lower()
+            actual_sha256 = hashlib.sha256(archive_bytes).hexdigest()
+            if actual_sha256 != expected_sha256:
+                raise RuntimeError(
+                    f"Binance daily archive checksum mismatch: {key}"
+                )
+            archive_rows = _read_archive_kline_rows(
+                archive_bytes,
+                expected_csv_name=Path(key).with_suffix(".csv").name,
+            )
+            rows.extend(archive_rows)
+            record = {
+                "archive_path": key,
+                "archive_sha256": actual_sha256,
+                "archive_size": len(archive_bytes),
+                "checksum_path": f"{key}.CHECKSUM",
+                "checksum_payload_sha256": hashlib.sha256(
+                    checksum_bytes
+                ).hexdigest(),
+            }
+            previous = self._archive_provenance.get(key)
+            if previous is not None and previous != record:
+                raise RuntimeError(
+                    f"APPEND-INVARIANCE ABORT: archive provenance changed for {key}"
+                )
+            self._archive_provenance[key] = record
+        start_ms = _milliseconds(start)
+        end_ms = _milliseconds(end_inclusive)
+        return [
+            row
+            for row in rows
+            if start_ms <= int(row[0]) <= end_ms
+        ]
 
     def mark_prices(
         self,
@@ -351,9 +479,30 @@ class Team09PublicDataClient:
             except httpx.HTTPStatusError as exc:
                 last_error = exc
                 retry_after = exc.response.headers.get("Retry-After")
-                if exc.response.status_code not in {418, 429} or attempt == 4:
-                    if attempt == 4:
-                        break
+                if exc.response.status_code not in {418, 429}:
+                    try:
+                        payload = exc.response.json()
+                    except ValueError:
+                        payload = {}
+                    error_code = (
+                        int(payload["code"])
+                        if isinstance(payload, Mapping)
+                        and isinstance(payload.get("code"), int)
+                        else None
+                    )
+                    message = (
+                        str(payload.get("msg"))
+                        if isinstance(payload, Mapping)
+                        else exc.response.text[:200]
+                    )
+                    raise BinancePublicDataError(
+                        endpoint=endpoint,
+                        status_code=exc.response.status_code,
+                        error_code=error_code,
+                        message=message,
+                    ) from exc
+                if attempt == 4:
+                    break
                 delay = _retry_delay(retry_after, attempt)
                 time.sleep(delay)
             except httpx.HTTPError as exc:
@@ -609,6 +758,10 @@ def build_live_market_data(
             boundary=live_boundary,
             client=client,
         )
+        archive_provenance = _merge_archive_provenance(
+            cache / "archive-kline-provenance.json",
+            client.archive_provenance(),
+        )
         forming = forming[forming["symbol"].isin(set(bridge_members))]
         _write_parquet_atomic(forming, cache / "forming-bars.parquet")
         _write_json_atomic(
@@ -618,6 +771,9 @@ def build_live_market_data(
     else:
         marks = _read_required_parquet(cache / "mark_prices.parquet")
         funding = _read_required_parquet(cache / "funding.parquet")
+        archive_provenance = _load_archive_provenance(
+            cache / "archive-kline-provenance.json"
+        )
 
     validate_live_cache_coverage(
         bars,
@@ -677,6 +833,7 @@ def build_live_market_data(
             completed_bridge_bar_rows=int(len(bars)),
             bridge_funding_rows=int(len(funding)),
             bridge_mark_rows=int(len(marks)),
+            archive_fallback_file_count=len(archive_provenance),
         )
         _write_json_atomic(diagnostics.to_dict(), cache / "diagnostics.json")
         write_live_cache_manifest(cache, boundary=live_boundary)
@@ -1214,6 +1371,7 @@ def verify_live_cache_manifest(
     manifest_path = cache / "cache-manifest.json"
     if not manifest_path.is_file():
         managed = (
+            "archive-kline-provenance.json",
             "bars.parquet",
             "forming-bars.parquet",
             "mark_prices.parquet",
@@ -1268,6 +1426,7 @@ def verify_live_cache_manifest(
         if _cache_file_rows(path) != entry.get("rows"):
             raise RuntimeError(f"Team 09 live cache row-count drift: {relative}")
     required_paths = {
+        "archive-kline-provenance.json",
         "archive-symbols.json",
         "bars.parquet",
         "candidate-symbols.json",
@@ -1308,6 +1467,7 @@ def write_live_cache_manifest(
 
     cache = Path(cache_dir).resolve()
     required_names = (
+        "archive-kline-provenance.json",
         "archive-symbols.json",
         "bars.parquet",
         "candidate-symbols.json",
@@ -1421,6 +1581,70 @@ def _membership_at(membership: pd.DataFrame, boundary: pd.Timestamp) -> tuple[st
         .sort_values("liquidity_rank")["symbol"]
         .astype(str)
     )
+
+
+def _read_archive_kline_rows(
+    archive_bytes: bytes,
+    *,
+    expected_csv_name: str,
+) -> list[list[object]]:
+    try:
+        with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
+            names = [
+                info.filename
+                for info in archive.infolist()
+                if not info.is_dir()
+            ]
+            if len(names) != 1 or Path(names[0]).name != expected_csv_name:
+                raise ValueError(
+                    "Binance daily kline archive has an unexpected member set"
+                )
+            raw_csv = archive.read(names[0])
+    except zipfile.BadZipFile as exc:
+        raise ValueError("Binance daily kline archive is not a valid ZIP") from exc
+    try:
+        parsed = list(csv.reader(io.StringIO(raw_csv.decode("utf-8-sig"))))
+    except UnicodeDecodeError as exc:
+        raise ValueError("Binance daily kline archive is not UTF-8") from exc
+    parsed = [row for row in parsed if row]
+    expected_header = [
+        "open_time",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "close_time",
+        "quote_volume",
+        "count",
+        "taker_buy_volume",
+        "taker_buy_quote_volume",
+        "ignore",
+    ]
+    if parsed and parsed[0][0] == "open_time":
+        if parsed[0] != expected_header:
+            raise ValueError("Binance daily kline archive header drift")
+        parsed = parsed[1:]
+    result: list[list[object]] = []
+    for row in parsed:
+        if len(row) != 12:
+            raise ValueError("Binance daily kline archive row width drift")
+        normalized: list[object] = list(row)
+        normalized[0] = _archive_timestamp_milliseconds(row[0])
+        normalized[6] = _archive_timestamp_milliseconds(row[6])
+        _validate_kline_row(
+            normalized,
+            interval_ms=INTERVAL_HOURS * 3_600_000,
+        )
+        result.append(normalized)
+    return result
+
+
+def _archive_timestamp_milliseconds(value: object) -> int:
+    timestamp = int(value)
+    if timestamp > 10_000_000_000_000:
+        timestamp //= 1000
+    return timestamp
 
 
 def _transaction_bar_frame(symbol: str, rows: list[list[object]]) -> pd.DataFrame:
@@ -1565,6 +1789,85 @@ def _write_immutable_json(payload: object, path: Path) -> None:
     os.replace(temporary, path)
 
 
+def _archive_provenance_record(value: object) -> dict[str, object]:
+    expected_fields = {
+        "archive_path",
+        "archive_sha256",
+        "archive_size",
+        "checksum_path",
+        "checksum_payload_sha256",
+    }
+    if not isinstance(value, Mapping) or set(value) != expected_fields:
+        raise ValueError("archive kline provenance record has an invalid schema")
+    archive_path = value["archive_path"]
+    archive_sha256 = value["archive_sha256"]
+    archive_size = value["archive_size"]
+    checksum_path = value["checksum_path"]
+    checksum_payload_sha256 = value["checksum_payload_sha256"]
+    if (
+        not isinstance(archive_path, str)
+        or not archive_path.startswith(ARCHIVE_DAILY_KLINE_PREFIX)
+        or not archive_path.endswith(".zip")
+        or Path(archive_path).is_absolute()
+        or ".." in Path(archive_path).parts
+        or checksum_path != f"{archive_path}.CHECKSUM"
+        or not isinstance(archive_size, int)
+        or isinstance(archive_size, bool)
+        or archive_size <= 0
+    ):
+        raise ValueError("archive kline provenance path/size is invalid")
+    for digest in (archive_sha256, checksum_payload_sha256):
+        if (
+            not isinstance(digest, str)
+            or len(digest) != 64
+            or any(character not in "0123456789abcdef" for character in digest)
+        ):
+            raise ValueError("archive kline provenance digest is invalid")
+    return {
+        "archive_path": archive_path,
+        "archive_sha256": archive_sha256,
+        "archive_size": archive_size,
+        "checksum_path": checksum_path,
+        "checksum_payload_sha256": checksum_payload_sha256,
+    }
+
+
+def _load_archive_provenance(path: Path) -> list[dict[str, object]]:
+    if not path.is_file():
+        raise FileNotFoundError(f"Team 09 live cache is missing: {path}")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, list):
+        raise ValueError("archive kline provenance must be a JSON array")
+    records = [_archive_provenance_record(value) for value in payload]
+    keys = [str(record["archive_path"]) for record in records]
+    if len(keys) != len(set(keys)) or keys != sorted(keys):
+        raise ValueError("archive kline provenance paths are duplicate or unordered")
+    return records
+
+
+def _merge_archive_provenance(
+    path: Path,
+    fresh: Iterable[Mapping[str, object]],
+) -> list[dict[str, object]]:
+    existing = _load_archive_provenance(path) if path.is_file() else []
+    records = {
+        str(record["archive_path"]): record
+        for record in existing
+    }
+    for raw in fresh:
+        record = _archive_provenance_record(raw)
+        key = str(record["archive_path"])
+        previous = records.get(key)
+        if previous is not None and previous != record:
+            raise RuntimeError(
+                f"APPEND-INVARIANCE ABORT: archive provenance revised {key}"
+            )
+        records[key] = record
+    result = [records[key] for key in sorted(records)]
+    _write_json_atomic(result, path)
+    return result
+
+
 def _load_json_exclusions(path: Path) -> dict[str, tuple[str, ...]]:
     if not path.is_file():
         return {}
@@ -1646,6 +1949,7 @@ def _diagnostics_from_mapping(payload: Mapping[str, Any]) -> LiveDataDiagnostics
         completed_bridge_bar_rows=int(payload["completed_bridge_bar_rows"]),
         bridge_funding_rows=int(payload["bridge_funding_rows"]),
         bridge_mark_rows=int(payload["bridge_mark_rows"]),
+        archive_fallback_file_count=int(payload["archive_fallback_file_count"]),
     )
     if diagnostics.pure_crypto_policy_id != POLICY_ID:
         raise RuntimeError("cached diagnostics pure-crypto policy drift")

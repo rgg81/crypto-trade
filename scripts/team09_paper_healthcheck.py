@@ -22,6 +22,7 @@ from crypto_trade.team09.backtest import LIVE_FORWARD_START
 from crypto_trade.team09.live import _gate_frame
 from crypto_trade.team09.live_data import (
     BRIDGE_START,
+    _load_archive_provenance,
     current_boundary,
     verify_live_cache_manifest,
 )
@@ -444,6 +445,17 @@ def main() -> int:
             alerts.append("CACHE DIAGNOSTIC BOUNDARY DRIFT")
         if diagnostics.get("unclassified_bridge_symbols"):
             alerts.append("UNCLASSIFIED BRIDGE CONTRACTS are present")
+        archive_provenance = _load_archive_provenance(
+            cache / "archive-kline-provenance.json"
+        )
+        if len(archive_provenance) != diagnostics.get(
+            "archive_fallback_file_count"
+        ):
+            alerts.append("ARCHIVE PROVENANCE count differs from diagnostics")
+        notes.append(
+            "checksum-verified transaction archive files: "
+            f"{len(archive_provenance)}"
+        )
         if not diagnostics.get("current_pure_crypto_symbols"):
             alerts.append("PURE-CRYPTO CLASSIFICATION is empty")
         members = tuple(str(value) for value in diagnostics["current_membership_symbols"])

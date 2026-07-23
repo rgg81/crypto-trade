@@ -59,6 +59,8 @@ Classify the failure:
   cached evidence. Never overwrite the old row.
 - `CACHE ... DRIFT`, missing mark, missing transaction open, unclassified bridge contract, or
   pure-crypto violation: keep the last sealed paper state and report the affected file/symbol.
+- REST-invalid historical contracts use Binance's official daily transaction archives only after
+  their published SHA-256 checksums pass. Treat archive-provenance drift as an integrity alert.
 - Funding follows actual published Binance events. A boundary with no funding event is valid;
   alert only on malformed, revised, duplicated, or future funding rows.
 - `ENGINE DOWN` or stale boundary with clean authority/data: a restart is experiment-preserving,

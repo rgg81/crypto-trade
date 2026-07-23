@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import hashlib
+import io
+import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 
+import httpx
 import numpy as np
 import pandas as pd
 import pytest
@@ -28,6 +32,7 @@ from crypto_trade.team09.live import (
     _position_frame,
 )
 from crypto_trade.team09.live_data import (
+    Team09PublicDataClient,
     _append_invariant_cache,
     classify_current_contracts,
     classify_known_contracts,
@@ -104,6 +109,69 @@ def test_inactive_pure_contract_remains_in_historical_registry() -> None:
     assert classification_exclusions == {}
 
 
+def test_rest_invalid_symbol_uses_checksum_verified_daily_archive() -> None:
+    key = (
+        "data/futures/um/daily/klines/BTCSTUSDT/8h/"
+        "BTCSTUSDT-8h-2026-07-22.zip"
+    )
+    member = "BTCSTUSDT-8h-2026-07-22.csv"
+    csv_payload = (
+        "open_time,open,high,low,close,volume,close_time,quote_volume,count,"
+        "taker_buy_volume,taker_buy_quote_volume,ignore\n"
+        "1784678400000,319.408,319.408,319.408,319.408,0,"
+        "1784707199999,0,0,0,0,0\n"
+    )
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(member, csv_payload)
+    archive_bytes = buffer.getvalue()
+    digest = hashlib.sha256(archive_bytes).hexdigest()
+    request_counts: dict[str, int] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        request_counts[path] = request_counts.get(path, 0) + 1
+        if path == "/fapi/v1/klines":
+            return httpx.Response(
+                400,
+                json={"code": -1122, "msg": "Invalid symbol status."},
+            )
+        if request.url.host == "s3-ap-northeast-1.amazonaws.com":
+            return httpx.Response(
+                200,
+                text=(
+                    "<ListBucketResult><IsTruncated>false</IsTruncated>"
+                    f"<Contents><Key>{key}</Key></Contents></ListBucketResult>"
+                ),
+            )
+        if path.endswith(".zip.CHECKSUM"):
+            return httpx.Response(
+                200,
+                text=f"{digest}  {Path(key).name}\n",
+            )
+        if path.endswith(".zip"):
+            return httpx.Response(200, content=archive_bytes)
+        raise AssertionError(f"unexpected request: {request.url}")
+
+    with Team09PublicDataClient(
+        transport=httpx.MockTransport(handler),
+        pause_seconds=0.0,
+    ) as client:
+        frame = client.transaction_bars(
+            "BTCSTUSDT",
+            start=pd.Timestamp("2026-07-22T00:00:00Z"),
+            end_inclusive=pd.Timestamp("2026-07-22T07:59:59.999Z"),
+        )
+        provenance = client.archive_provenance()
+    assert request_counts["/fapi/v1/klines"] == 1
+    assert frame["open_time"].tolist() == [
+        pd.Timestamp("2026-07-22T00:00:00Z")
+    ]
+    assert frame["open"].tolist() == [319.408]
+    assert provenance[0]["archive_path"] == key
+    assert provenance[0]["archive_sha256"] == digest
+
+
 def test_live_cache_aborts_if_a_sealed_value_changes(tmp_path: Path) -> None:
     path = tmp_path / "bars.parquet"
     original = pd.DataFrame(
@@ -148,6 +216,7 @@ def test_live_cache_manifest_detects_tampering(tmp_path: Path) -> None:
         cache / "contract_metadata.parquet", index=False
     )
     for name, payload in (
+        ("archive-kline-provenance.json", []),
         ("archive-symbols.json", []),
         ("candidate-symbols.json", []),
         ("classified-contracts.json", {}),
