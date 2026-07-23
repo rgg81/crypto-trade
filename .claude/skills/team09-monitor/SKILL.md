@@ -31,10 +31,11 @@ uv run python scripts/team09_paper_digest.py
 ```
 
 Interpret `STATUS OK` as operationally healthy. The healthcheck binds every paper artifact and
-load-bearing market-cache file by path, size, row count, and SHA-256. Report the digest as
-observational information. Before 90 official forward bars, label the result `INSUFFICIENT`; do
-not infer success or failure. The unscored continuity bridge begins 2026-07-01. Official forward
-observations begin 2026-08-01T00:00:00Z.
+load-bearing market-cache file by path, size, row count, and SHA-256. It also verifies that every
+Team 09 adapter and monitoring file matches the Git-anchored deployment manifest recorded in the
+paper tick. Report the digest as observational information. Before 90 official forward bars,
+label the result `INSUFFICIENT`; do not infer success or failure. The unscored continuity bridge
+begins 2026-07-01. Official forward observations begin 2026-08-01T00:00:00Z.
 
 ## Diagnose an alert
 
@@ -53,7 +54,7 @@ cat "paper-team09/market-cache/$GEN/diagnostics.json"
 Classify the failure:
 
 - `AUTHORITY DRIFT` or `PARITY RECORD DRIFT`: stop. Do not regenerate evidence or launch the
-  engine. Report the exact mismatched hash/file.
+  engine. Report the exact mismatched hash/file or deployment commit.
 - `APPEND-INVARIANCE ABORT`: stop. Identify the revised key/column and preserve both source and
   cached evidence. Never overwrite the old row.
 - `CACHE ... DRIFT`, missing mark, missing transaction open, unclassified bridge contract, or
@@ -77,7 +78,9 @@ PYTHONUNBUFFERED=1 nohup uv run python run_team09_paper.py \
 The replay starts from 2020-02-03 on every tick. A restart therefore reconstructs all state rather
 than trusting a mutable live strategy state. It catches up missed 8-hour boundaries in order.
 The installed five-minute `scripts/team09_paper_watchdog.sh` cron is the reboot/restart mechanism;
-it uses the same engine lock and never launches a second desk.
+it uses the same engine lock and never launches a second desk. A running process pins its startup
+deployment identity and exits if a new committed Team 09 deployment appears, allowing this
+watchdog to restart it on one internally consistent release.
 
 ## Run deep parity only on demand
 

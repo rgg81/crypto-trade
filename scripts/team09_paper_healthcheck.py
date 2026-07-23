@@ -15,7 +15,6 @@ import numpy as np
 import pandas as pd
 
 from crypto_trade.team09.authority import (
-    deployment_bundle_sha256,
     sha256_file,
     verify_frozen_authority,
 )
@@ -256,7 +255,9 @@ def main() -> int:
             "data_manifest_sha256": authority.data_manifest_sha256,
             "evaluator_authority_sha256": authority.evaluator_authority_sha256,
             "pure_crypto_policy_sha256": authority.pure_crypto_policy_sha256,
-            "deployment_bundle_sha256": deployment_bundle_sha256(),
+            "deployment_bundle_sha256": authority.deployment_bundle_sha256,
+            "deployment_manifest_sha256": authority.deployment_manifest_sha256,
+            "deployment_git_commit": authority.deployment_git_commit,
         }
         for field, expected_value in authority_fields.items():
             if integrity.get(field) != expected_value:

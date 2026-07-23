@@ -39,6 +39,7 @@ data/
 # Live trading logs
 logs/
 paper-team09/
+paper-team09-backups/
 
 # Iteration artifacts — regenerable, large, binary
 reports/

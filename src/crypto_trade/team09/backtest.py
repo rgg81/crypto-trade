@@ -412,6 +412,12 @@ def verify_historical_parity(
     expected_returns["timestamp"] = pd.to_datetime(
         expected_returns["timestamp"], utc=True, errors="raise"
     )
+    # The evaluator emits an empty string when no risk-policy reason applies.
+    # CSV has no distinct representation for that value, so restore the
+    # evaluator's exact string semantics after parsing the golden artifact.
+    expected_returns["risk_policy_reasons"] = expected_returns[
+        "risk_policy_reasons"
+    ].fillna("")
     expected_returns = expected_returns.set_index("timestamp")
     expected_returns.index = expected_returns.index.as_unit("ns")
     result = replay.evaluation()

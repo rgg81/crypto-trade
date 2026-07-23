@@ -16,7 +16,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from crypto_trade.team09.authority import sha256_file
+from crypto_trade.team09.authority import (
+    DeploymentAuthority,
+    sha256_file,
+    verify_deployment_authority,
+)
 from crypto_trade.team09.backtest import load_frozen_snapshot
 from crypto_trade.team09.live import persist_paper_tick, run_live_replay
 from crypto_trade.team09.live_data import (
@@ -30,6 +34,18 @@ from crypto_trade.team09.live_data import (
 
 DEFAULT_PAPER_DIR = Path("paper-team09")
 DEFAULT_LAG_SECONDS = 25 * 60
+
+
+class DeploymentChangedError(RuntimeError):
+    """Signal that a running process must restart onto a new committed release."""
+
+
+def _assert_process_deployment(expected: DeploymentAuthority) -> None:
+    current = verify_deployment_authority()
+    if current != expected:
+        raise DeploymentChangedError(
+            "Team 09 deployment changed while this process was running; restart required"
+        )
 
 
 def parse_args() -> argparse.Namespace:
@@ -199,7 +215,11 @@ def single_engine_lock(paper_dir: Path):
         yield
 
 
-def _run_one(args: argparse.Namespace, boundary: pd.Timestamp) -> None:
+def _run_one(
+    args: argparse.Namespace,
+    boundary: pd.Timestamp,
+    process_deployment: DeploymentAuthority,
+) -> None:
     started = pd.Timestamp.now(tz="UTC")
     _write_attempt(
         args.paper_dir.resolve(),
@@ -213,11 +233,13 @@ def _run_one(args: argparse.Namespace, boundary: pd.Timestamp) -> None:
         flush=True,
     )
     try:
+        _assert_process_deployment(process_deployment)
         paths = paper_tick(
             boundary=boundary,
             paper_dir=args.paper_dir.resolve(),
             refresh=not args.no_refresh,
         )
+        _assert_process_deployment(process_deployment)
     except Exception as exc:
         _write_attempt(
             args.paper_dir.resolve(),
@@ -337,9 +359,10 @@ def main() -> int:
     requested = exact_boundary(args.boundary) if args.boundary else None
     if requested is not None and requested > current_boundary():
         raise SystemExit("cannot paper-trade a future boundary")
+    process_deployment = verify_deployment_authority()
     with single_engine_lock(args.paper_dir.resolve()):
         if args.once or requested is not None:
-            _run_one(args, requested or current_boundary())
+            _run_one(args, requested or current_boundary(), process_deployment)
             return 0
         last_boundary = _last_successful_boundary(args.paper_dir.resolve())
         next_retry_at: pd.Timestamp | None = None
@@ -360,9 +383,11 @@ def main() -> int:
             )
             if can_run:
                 try:
-                    _run_one(args, boundary)
+                    _run_one(args, boundary, process_deployment)
                     last_boundary = boundary
                     next_retry_at = None
+                except DeploymentChangedError:
+                    raise
                 except Exception:
                     traceback.print_exc()
                     next_retry_at = pd.Timestamp.now(tz="UTC") + pd.Timedelta(

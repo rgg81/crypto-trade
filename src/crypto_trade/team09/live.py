@@ -13,7 +13,6 @@ import pandas as pd
 
 from crypto_trade.team09.authority import (
     CANDIDATE_ID,
-    deployment_bundle_sha256,
     sha256_file,
     verify_frozen_authority,
 )
@@ -170,7 +169,7 @@ def persist_paper_tick(
     _write_csv_atomic(gate_frame, gates_path)
     authority = verify_frozen_authority()
     integrity = {
-        "schema_version": "team09-paper-integrity-v1",
+        "schema_version": "team09-paper-integrity-v2",
         "status": "PASS",
         "candidate_id": CANDIDATE_ID,
         "paper_only": True,
@@ -186,7 +185,9 @@ def persist_paper_tick(
         "data_manifest_sha256": authority.data_manifest_sha256,
         "evaluator_authority_sha256": authority.evaluator_authority_sha256,
         "pure_crypto_policy_sha256": authority.pure_crypto_policy_sha256,
-        "deployment_bundle_sha256": deployment_bundle_sha256(),
+        "deployment_bundle_sha256": authority.deployment_bundle_sha256,
+        "deployment_manifest_sha256": authority.deployment_manifest_sha256,
+        "deployment_git_commit": authority.deployment_git_commit,
         "stable_bridge_rows": int(len(canonical_bridge)),
         "forward_rows": int(len(forward)),
         "latest_sealed_return": (

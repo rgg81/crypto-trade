@@ -13,6 +13,7 @@ from crypto_trade.team09.authority import (
     EVALUATOR_AUTHORITY_SHA256,
     STRATEGY_SHA256,
     release_team_root,
+    verify_deployment_authority,
     verify_frozen_authority,
 )
 from crypto_trade.team09.backtest import (
@@ -63,6 +64,10 @@ def test_frozen_team09_authority_is_exact() -> None:
     assert authority.candidate_id == CANDIDATE_ID
     assert authority.strategy_sha256 == STRATEGY_SHA256
     assert authority.evaluator_authority_sha256 == EVALUATOR_AUTHORITY_SHA256
+    deployment = verify_deployment_authority()
+    assert authority.deployment_bundle_sha256 == deployment.bundle_sha256
+    assert authority.deployment_manifest_sha256 == deployment.manifest_sha256
+    assert authority.deployment_git_commit == deployment.git_commit
 
 
 def test_pure_crypto_live_policy_excludes_stable_and_tradfi() -> None:

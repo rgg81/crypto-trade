@@ -11,6 +11,7 @@ import dataclasses
 import hashlib
 import importlib.util
 import json
+import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -83,6 +84,9 @@ _DEPLOYMENT_BUNDLE_PATHS = (
     "src/crypto_trade/team09/live_data.py",
     "src/crypto_trade/team09/report.py",
 )
+DEPLOYMENT_MANIFEST_RELATIVE_PATH = (
+    "tournament/top40-v4-r1/team09-deployment-manifest.json"
+)
 
 
 def repository_root() -> Path:
@@ -122,14 +126,7 @@ def sha256_file(path: str | Path) -> str:
     return digest.hexdigest()
 
 
-def deployment_bundle_sha256(root: str | Path | None = None) -> str:
-    """Hash every Team 09 adapter/report/monitor byte used by the deployed desk."""
-
-    base = Path(root).resolve() if root is not None else repository_root()
-    entries = {
-        relative: sha256_file(base / relative)
-        for relative in _DEPLOYMENT_BUNDLE_PATHS
-    }
+def _bundle_digest(entries: dict[str, str]) -> str:
     return hashlib.sha256(
         json.dumps(
             entries,
@@ -139,6 +136,129 @@ def deployment_bundle_sha256(root: str | Path | None = None) -> str:
             sort_keys=True,
         ).encode("utf-8")
     ).hexdigest()
+
+
+@dataclasses.dataclass(frozen=True)
+class DeploymentAuthority:
+    bundle_sha256: str
+    manifest_sha256: str
+    git_commit: str
+
+
+def _git_output(base: Path, *arguments: str) -> bytes:
+    completed = subprocess.run(
+        ("git", "-C", str(base), *arguments),
+        check=False,
+        capture_output=True,
+    )
+    if completed.returncode:
+        detail = completed.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"Team 09 Git authority check failed: {detail}")
+    return completed.stdout
+
+
+def verify_deployment_authority(
+    root: str | Path | None = None,
+) -> DeploymentAuthority:
+    """Bind every deployment adapter and monitor byte to a committed manifest."""
+
+    base = Path(root).resolve() if root is not None else repository_root()
+    manifest_path = base / DEPLOYMENT_MANIFEST_RELATIVE_PATH
+    if not manifest_path.is_file():
+        raise FileNotFoundError(
+            f"Team 09 deployment manifest is missing: {manifest_path}"
+        )
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("Team 09 deployment manifest is malformed") from exc
+    expected_top_level = {"schema_version", "candidate_id", "files"}
+    if not isinstance(payload, dict) or set(payload) != expected_top_level:
+        raise RuntimeError("Team 09 deployment manifest has an invalid schema")
+    if payload["schema_version"] != "team09-deployment-authority-v1":
+        raise RuntimeError("Team 09 deployment manifest has an unknown version")
+    if payload["candidate_id"] != CANDIDATE_ID:
+        raise RuntimeError("Team 09 deployment manifest names the wrong candidate")
+    file_entries = payload["files"]
+    if not isinstance(file_entries, list):
+        raise RuntimeError("Team 09 deployment manifest files must be a list")
+
+    expected_paths = set(_DEPLOYMENT_BUNDLE_PATHS)
+    observed_paths: set[str] = set()
+    hashes: dict[str, str] = {}
+    mismatches: list[str] = []
+    for entry in file_entries:
+        if not isinstance(entry, dict) or set(entry) != {"path", "sha256", "size"}:
+            raise RuntimeError("Team 09 deployment manifest has an invalid file entry")
+        relative = entry["path"]
+        expected_hash = entry["sha256"]
+        expected_size = entry["size"]
+        if (
+            not isinstance(relative, str)
+            or not isinstance(expected_hash, str)
+            or len(expected_hash) != 64
+            or not isinstance(expected_size, int)
+            or isinstance(expected_size, bool)
+            or expected_size < 0
+        ):
+            raise RuntimeError("Team 09 deployment manifest file metadata is invalid")
+        if relative in observed_paths:
+            raise RuntimeError(f"duplicate Team 09 deployment path: {relative}")
+        observed_paths.add(relative)
+        if relative not in expected_paths:
+            mismatches.append(f"unexpected path {relative}")
+            continue
+        path = base / relative
+        if not path.is_file():
+            mismatches.append(f"missing path {relative}")
+            continue
+        actual_size = path.stat().st_size
+        actual_hash = sha256_file(path)
+        hashes[relative] = actual_hash
+        if actual_size != expected_size:
+            mismatches.append(f"{relative} size {actual_size} != {expected_size}")
+        if actual_hash != expected_hash:
+            mismatches.append(f"{relative} sha256 {actual_hash} != {expected_hash}")
+    for missing in sorted(expected_paths - observed_paths):
+        mismatches.append(f"manifest omits {missing}")
+    if mismatches:
+        raise RuntimeError("Team 09 deployment-authority drift: " + "; ".join(mismatches))
+
+    committed_manifest = _git_output(
+        base,
+        "show",
+        f"HEAD:{DEPLOYMENT_MANIFEST_RELATIVE_PATH}",
+    )
+    working_manifest = manifest_path.read_bytes()
+    if committed_manifest != working_manifest:
+        raise RuntimeError(
+            "Team 09 deployment manifest differs from the committed HEAD version"
+        )
+    manifest_commit = (
+        _git_output(
+            base,
+            "log",
+            "-1",
+            "--format=%H",
+            "--",
+            DEPLOYMENT_MANIFEST_RELATIVE_PATH,
+        )
+        .decode("ascii")
+        .strip()
+    )
+    if len(manifest_commit) != 40:
+        raise RuntimeError("Team 09 deployment manifest has no Git commit anchor")
+    return DeploymentAuthority(
+        bundle_sha256=_bundle_digest(hashes),
+        manifest_sha256=hashlib.sha256(working_manifest).hexdigest(),
+        git_commit=manifest_commit,
+    )
+
+
+def deployment_bundle_sha256(root: str | Path | None = None) -> str:
+    """Return the verified, Git-anchored deployment bundle identity."""
+
+    return verify_deployment_authority(root).bundle_sha256
 
 
 @dataclasses.dataclass(frozen=True)
@@ -156,12 +276,16 @@ class FrozenAuthority:
     data_manifest_sha256: str
     evaluator_authority_sha256: str
     pure_crypto_policy_sha256: str
+    deployment_bundle_sha256: str
+    deployment_manifest_sha256: str
+    deployment_git_commit: str
 
 
 def verify_frozen_authority(root: str | Path | None = None) -> FrozenAuthority:
     """Fail closed unless every locally load-bearing frozen identity is intact."""
 
     base = Path(root).resolve() if root is not None else repository_root()
+    deployment = verify_deployment_authority(base)
     candidate = candidate_root(base)
     strategy = candidate / "strategy.py"
     risk_policy = candidate / "risk_policy.json"
@@ -279,6 +403,9 @@ def verify_frozen_authority(root: str | Path | None = None) -> FrozenAuthority:
         data_manifest_sha256=DATA_MANIFEST_SHA256,
         evaluator_authority_sha256=evaluator_sha256,
         pure_crypto_policy_sha256=PURE_CRYPTO_POLICY_SHA256,
+        deployment_bundle_sha256=deployment.bundle_sha256,
+        deployment_manifest_sha256=deployment.manifest_sha256,
+        deployment_git_commit=deployment.git_commit,
     )
 
 

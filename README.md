@@ -150,6 +150,8 @@ unscored continuity bridge. The live universe applies the frozen native-crypto-o
 fails closed on stablecoins, TradFi, metals, commodities, indexes, leveraged tokens, and unknown
 classifications. Each market-cache refresh is built and verified in a new generation before an
 atomic `CURRENT` pointer switch, so a crash or reboot leaves the prior sealed generation usable.
+Every adapter, report, watchdog, and monitor file is SHA-256 bound by the committed Team 09
+deployment manifest; a running engine exits for a clean watchdog restart if that release changes.
 `scripts/team09_paper_watchdog.sh` provides singleton restart/catch-up when installed in cron.
 
 ## Configuration

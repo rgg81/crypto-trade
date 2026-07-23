@@ -3,7 +3,13 @@
 from crypto_trade.team09.authority import (
     CANDIDATE_ID,
     TEAM_ID,
+    verify_deployment_authority,
     verify_frozen_authority,
 )
 
-__all__ = ["CANDIDATE_ID", "TEAM_ID", "verify_frozen_authority"]
+__all__ = [
+    "CANDIDATE_ID",
+    "TEAM_ID",
+    "verify_deployment_authority",
+    "verify_frozen_authority",
+]

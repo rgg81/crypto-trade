@@ -14,7 +14,6 @@ from crypto_trade.backtest_report import generate_html_report
 from crypto_trade.team09.authority import (
     CANDIDATE_ID,
     GOLDEN_DAILY_RETURNS_SHA256,
-    deployment_bundle_sha256,
     release_team_root,
     sha256_file,
     verify_frozen_authority,
@@ -160,7 +159,9 @@ def generate_all_period_report(
         "data_manifest_sha256": authority.data_manifest_sha256,
         "evaluator_authority_sha256": authority.evaluator_authority_sha256,
         "pure_crypto_policy_sha256": authority.pure_crypto_policy_sha256,
-        "deployment_bundle_sha256": deployment_bundle_sha256(),
+        "deployment_bundle_sha256": authority.deployment_bundle_sha256,
+        "deployment_manifest_sha256": authority.deployment_manifest_sha256,
+        "deployment_git_commit": authority.deployment_git_commit,
         "input_daily_returns_sha256": hashlib.sha256(input_payload).hexdigest(),
         "report_daily_csv_sha256": sha256_file(daily_path),
         "statistics": period_statistics(returns),

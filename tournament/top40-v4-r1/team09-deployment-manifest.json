@@ -1,0 +1,91 @@
+{
+  "candidate_id": "t09-flow-pressure-long-confirm-voltarget-only-v1",
+  "files": [
+    {
+      "path": ".agents/skills/team09-monitor/SKILL.md",
+      "sha256": "41c6b2478a53c003751822fe76443b596f56f1df7bf809dc55db1a7edf4a95be",
+      "size": 5552
+    },
+    {
+      "path": ".agents/skills/team09-monitor/agents/openai.yaml",
+      "sha256": "321a0e9294ecb0d8cb011bad5341d5c35d15caccb080154224333bf088984599",
+      "size": 201
+    },
+    {
+      "path": ".claude/commands/team09-monitor.md",
+      "sha256": "dda295b31132a3dc085a2719aaeadedfa8b5dfeb6f43872b9c8f64b9d45fdd6d",
+      "size": 552
+    },
+    {
+      "path": ".claude/skills/team09-monitor/SKILL.md",
+      "sha256": "41c6b2478a53c003751822fe76443b596f56f1df7bf809dc55db1a7edf4a95be",
+      "size": 5552
+    },
+    {
+      "path": ".claude/skills/team09-monitor/agents/openai.yaml",
+      "sha256": "321a0e9294ecb0d8cb011bad5341d5c35d15caccb080154224333bf088984599",
+      "size": 201
+    },
+    {
+      "path": "run_team09_paper.py",
+      "sha256": "251919026d375804223b06291274c74e6407ea665d74890c5da56094360f4907",
+      "size": 12703
+    },
+    {
+      "path": "scripts/team09_backtest.py",
+      "sha256": "06c06294f729a1199869f36c3b649d9dd5cd844836a0b762ce3d0b3413544079",
+      "size": 2812
+    },
+    {
+      "path": "scripts/team09_paper_digest.py",
+      "sha256": "e872ddf08c19997456d56a4c601389a6189717a6e04d50a13e7325a0d8912d55",
+      "size": 2203
+    },
+    {
+      "path": "scripts/team09_paper_healthcheck.py",
+      "sha256": "399430234fda65b4f2b3193aa2517a1293d2853ec0a2eed3a77b2ef9ec1da60a",
+      "size": 21232
+    },
+    {
+      "path": "scripts/team09_paper_watchdog.sh",
+      "sha256": "8dc34ecd53e5dc28480471f48cfeab0231207613aedad2f1b51e41b6b04d8b7d",
+      "size": 508
+    },
+    {
+      "path": "src/crypto_trade/backtest_report.py",
+      "sha256": "fb8f40fe93678e9832e9bbb452bd7895a7104eea9b632d98a3df1a68d19613b3",
+      "size": 9194
+    },
+    {
+      "path": "src/crypto_trade/team09/__init__.py",
+      "sha256": "b314dada74e85891a38e2c13504a977455ee1c4b3317ca5384f02d6539c94256",
+      "size": 344
+    },
+    {
+      "path": "src/crypto_trade/team09/authority.py",
+      "sha256": "7169a83182bf01d5491d0677d22854aa7aea29d1f1614a86b5024070eff25dfe",
+      "size": 17126
+    },
+    {
+      "path": "src/crypto_trade/team09/backtest.py",
+      "sha256": "b8b4748ff302780600c4f2e783345f3a6114b86a88c6293f339663373d62c716",
+      "size": 19659
+    },
+    {
+      "path": "src/crypto_trade/team09/live.py",
+      "sha256": "15f9e219c0cdcac708e113bc58415721e75022869e5603c9d83faa031d514996",
+      "size": 22724
+    },
+    {
+      "path": "src/crypto_trade/team09/live_data.py",
+      "sha256": "633e25f508efbe63277324c577dd7ea822b05cfe3d25d6df1891ef03f9257beb",
+      "size": 62074
+    },
+    {
+      "path": "src/crypto_trade/team09/report.py",
+      "sha256": "911e2087650ce2d7b8a95a81b1f1d2219f5186bb9ff2f8892987c229f3963e07",
+      "size": 6949
+    }
+  ],
+  "schema_version": "team09-deployment-authority-v1"
+}
