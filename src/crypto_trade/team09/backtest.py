@@ -184,6 +184,33 @@ def load_frozen_snapshot(root: str | Path | None = None) -> Team09MarketData:
     )
 
 
+def historical_terminal_held_symbols(
+    root: str | Path | None = None,
+) -> tuple[str, ...]:
+    """Return the exact held book entering the first live bridge boundary."""
+
+    verify_frozen_authority(root)
+    path = release_team_root(root) / "positions.parquet"
+    if not path.is_file():
+        raise FileNotFoundError(f"missing Team 09 golden positions: {path}")
+    actual_sha256 = sha256_file(path)
+    if actual_sha256 != GOLDEN_POSITIONS_SHA256:
+        raise RuntimeError(
+            "Team 09 golden position drift: "
+            f"{actual_sha256} != {GOLDEN_POSITIONS_SHA256}"
+        )
+    positions = _parquet_time_index(path)
+    expected_terminal = HISTORICAL_END_EXCLUSIVE - pd.Timedelta(
+        hours=INTERVAL_HOURS
+    )
+    if positions.index.max() != expected_terminal:
+        raise RuntimeError("Team 09 golden positions end at the wrong boundary")
+    terminal = positions.loc[expected_terminal].astype(float)
+    if terminal.isna().any() or not terminal.map(math.isfinite).all():
+        raise ValueError("Team 09 terminal golden positions are non-finite")
+    return tuple(sorted(terminal.index[terminal.abs() > 1e-12].astype(str)))
+
+
 def validate_market_data(
     data: Team09MarketData,
     *,

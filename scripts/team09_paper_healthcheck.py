@@ -461,6 +461,14 @@ def main() -> int:
         members = tuple(str(value) for value in diagnostics["current_membership_symbols"])
         if len(members) != 40 or len(set(members)) != 40:
             alerts.append("MEMBERSHIP BAD: current universe is not exactly 40 names")
+        accounting_symbols = tuple(
+            str(value) for value in diagnostics["accounting_symbols"]
+        )
+        if len(accounting_symbols) != len(set(accounting_symbols)):
+            alerts.append("ACCOUNTING SYMBOL REGISTRY contains duplicates")
+        if set(positions["symbol"].astype(str)) - set(accounting_symbols):
+            alerts.append("HELD BOOK is outside the accounting symbol registry")
+        notes.append(f"mark/funding accounting symbols: {len(accounting_symbols)}")
         member_violations = {
             symbol: symbol_policy_violations(symbol)
             for symbol in members

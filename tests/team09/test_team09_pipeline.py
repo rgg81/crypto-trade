@@ -21,6 +21,7 @@ from crypto_trade.team09.authority import (
     verify_frozen_authority,
 )
 from crypto_trade.team09.backtest import (
+    historical_terminal_held_symbols,
     load_frozen_snapshot,
     run_replay,
     verify_historical_parity,
@@ -73,6 +74,7 @@ def test_frozen_team09_authority_is_exact() -> None:
     assert authority.deployment_bundle_sha256 == deployment.bundle_sha256
     assert authority.deployment_manifest_sha256 == deployment.manifest_sha256
     assert authority.deployment_git_commit == deployment.git_commit
+    assert "BNXUSDT" in historical_terminal_held_symbols()
 
 
 def test_pure_crypto_live_policy_excludes_stable_and_tradfi() -> None:

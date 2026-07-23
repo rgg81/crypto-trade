@@ -23,6 +23,7 @@ from crypto_trade.team09.backtest import (
     HISTORICAL_END_EXCLUSIVE,
     INTERVAL_HOURS,
     Team09MarketData,
+    historical_terminal_held_symbols,
 )
 from crypto_trade.tournament.data import point_in_time_top40
 from crypto_trade.tournament.pure_crypto_universe_v6 import (
@@ -70,6 +71,7 @@ class LiveDataDiagnostics:
     unclassified_bridge_symbols: tuple[str, ...]
     excluded_current_contracts: Mapping[str, tuple[str, ...]]
     bridge_membership_symbols: tuple[str, ...]
+    accounting_symbols: tuple[str, ...]
     current_membership_symbols: tuple[str, ...]
     completed_bridge_bar_rows: int
     bridge_funding_rows: int
@@ -743,18 +745,22 @@ def build_live_market_data(
             )
         )
     )
+    historical_carried_symbols = historical_terminal_held_symbols()
+    accounting_symbols = tuple(
+        sorted(set(bridge_members) | set(historical_carried_symbols))
+    )
     current_members = _membership_at(membership, live_boundary)
 
     if client is not None:
         marks = refresh_mark_cache(
             cache / "mark_prices.parquet",
-            bridge_members,
+            accounting_symbols,
             boundary=live_boundary,
             client=client,
         )
         funding = refresh_funding_cache(
             cache / "funding.parquet",
-            bridge_members,
+            accounting_symbols,
             boundary=live_boundary,
             client=client,
         )
@@ -762,7 +768,7 @@ def build_live_market_data(
             cache / "archive-kline-provenance.json",
             client.archive_provenance(),
         )
-        forming = forming[forming["symbol"].isin(set(bridge_members))]
+        forming = forming[forming["symbol"].isin(set(accounting_symbols))]
         _write_parquet_atomic(forming, cache / "forming-bars.parquet")
         _write_json_atomic(
             {symbol: list(reasons) for symbol, reasons in sorted(exclusions.items())},
@@ -781,6 +787,7 @@ def build_live_market_data(
         funding,
         marks,
         membership,
+        required_accounting_symbols=historical_carried_symbols,
         boundary=live_boundary,
     )
     replay_bars = pd.concat([combined_bars, forming], ignore_index=True)
@@ -812,6 +819,7 @@ def build_live_market_data(
         if (
             diagnostics.current_membership_symbols != current_members
             or diagnostics.bridge_membership_symbols != bridge_members
+            or diagnostics.accounting_symbols != accounting_symbols
         ):
             raise RuntimeError("sealed cache diagnostics disagree with recomputed membership")
         if cache_manifest is None:
@@ -829,6 +837,7 @@ def build_live_market_data(
             unclassified_bridge_symbols=(),
             excluded_current_contracts=exclusions,
             bridge_membership_symbols=bridge_members,
+            accounting_symbols=accounting_symbols,
             current_membership_symbols=current_members,
             completed_bridge_bar_rows=int(len(bars)),
             bridge_funding_rows=int(len(funding)),
@@ -1323,26 +1332,32 @@ def validate_live_cache_coverage(
     marks: pd.DataFrame,
     membership: pd.DataFrame,
     *,
+    required_accounting_symbols: Iterable[str],
     boundary: pd.Timestamp,
 ) -> None:
     current_members = set(_membership_at(membership, boundary))
+    required_symbols = current_members | set(
+        str(symbol) for symbol in required_accounting_symbols
+    )
     forming_symbols = set(
         forming.loc[
             pd.to_datetime(forming["open_time"], utc=True) == boundary, "symbol"
         ].astype(str)
     )
-    missing_opens = current_members - forming_symbols
+    missing_opens = required_symbols - forming_symbols
     if missing_opens:
         raise RuntimeError(
-            f"Team 09 current members lack exact transaction opens: {sorted(missing_opens)}"
+            "Team 09 current members/carried symbols lack exact transaction "
+            f"opens: {sorted(missing_opens)}"
         )
     current_marks = set(
         marks.loc[pd.to_datetime(marks["mark_time"], utc=True) == boundary, "symbol"].astype(str)
     )
-    missing_marks = current_members - current_marks
+    missing_marks = required_symbols - current_marks
     if missing_marks:
         raise RuntimeError(
-            f"Team 09 current members lack exact boundary marks: {sorted(missing_marks)}"
+            "Team 09 current members/carried symbols lack exact boundary "
+            f"marks: {sorted(missing_marks)}"
         )
     funding_times = pd.to_datetime(funding["funding_time"], utc=True)
     if (funding_times > boundary + pd.Timedelta(seconds=1)).any():
@@ -1352,10 +1367,10 @@ def validate_live_cache_coverage(
     complete_symbols = set(
         bars.loc[bar_times == latest_complete, "symbol"].astype(str)
     )
-    missing_complete = current_members - complete_symbols
+    missing_complete = required_symbols - complete_symbols
     if missing_complete:
         raise RuntimeError(
-            "Team 09 current members lack the latest completed bar: "
+            "Team 09 current members/carried symbols lack the latest completed bar: "
             f"{sorted(missing_complete)}"
         )
 
@@ -1942,6 +1957,9 @@ def _diagnostics_from_mapping(payload: Mapping[str, Any]) -> LiveDataDiagnostics
         },
         bridge_membership_symbols=tuple(
             str(value) for value in payload["bridge_membership_symbols"]
+        ),
+        accounting_symbols=tuple(
+            str(value) for value in payload["accounting_symbols"]
         ),
         current_membership_symbols=tuple(
             str(value) for value in payload["current_membership_symbols"]
