@@ -1,0 +1,33 @@
+{
+  "candidate_id": "t08-regime-funding-unwind-e42-s080-sidefilter-v5",
+  "evidence": {
+    "baseline": [
+      "3b9f829c846cffb284672e5b9d314095c6ee5008290bd871d4689167e0469451"
+    ],
+    "control-ablation": [
+      "bb6fa6472b7c2088687482b987294e10fb07e1eaa104bb2d884bc8c7713e01e3"
+    ],
+    "formation-grid": [
+      "daf1938dd85375c759bc1b85fc2375b03599be702539ef3e776d7491f04ebc90",
+      "d473418ff345c551a5a0143a55d3e24bb09045daf31c809debbc418c46eeefd7"
+    ],
+    "local-neighborhood": [
+      "347eca979f6ccc3945692d1959c34cea8e600d844d934e7a83b57dc61c2f622a",
+      "fc2b621f77d0b54d5d1ddb2178423c5043f2954ec4991acff5ddef5830ec6fcb",
+      "3530d99c230704acc5cdb4f402540b43a66c818673a1d72b56309cc2fad7db85",
+      "feaf27721f7d0e26834f8db15388a7cbe26a08c45434ef91b29e8409eb0c3efe",
+      "bcd4b1c21ebf7ad207e4be894e742413a5fe0864ca921bcdbac61d4f4c1b597a"
+    ],
+    "rebalance-grid": [
+      "18cf83667ddf475b8384d20c7458d769fa04191c372b42b13564419549e0ba97"
+    ],
+    "role-check": [
+      "daf1938dd85375c759bc1b85fc2375b03599be702539ef3e776d7491f04ebc90"
+    ],
+    "sign-inversion": [
+      "d8aa78c8da332cc68097d9a9a8d6b8ef578c20096ecc0b7abc38e2634588f68a"
+    ]
+  },
+  "schema_version": 1,
+  "team_id": "team-08"
+}
