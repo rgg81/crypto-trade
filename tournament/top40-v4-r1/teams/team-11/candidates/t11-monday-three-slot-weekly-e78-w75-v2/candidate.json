@@ -1,0 +1,48 @@
+{
+  "candidate_id": "t11-monday-three-slot-weekly-e78-w75-v2",
+  "control_profile": "Deterministic fifty-eight-percent gross exposure with common-market residualization, robust clipping, sign admission, and symmetric long/short sizing; organizer stops, cooldowns, drawdown brakes, time stops, turnover clipping, and volatility targeting are disabled.",
+  "falsifier": "Reject the effect if it is absent from adjacent Monday anchors, unstable across eras, dependent on only one sleeve, or unable to survive stressed costs with an economical full-week holding period.",
+  "formation_horizon": "seventy-eight completed weekly open-to-open observations at each of Monday 00:00, 08:00, and 16:00 UTC, with a thirty-nine-week minimum",
+  "hypothesis": "Coin-specific weekly seasonality remains after removing the contemporaneous crypto-market move: a Monday 08:00 UTC estimate shrunk twenty-five percent toward its adjacent Monday anchors should forecast relative performance over the next full week.",
+  "material_parameters": {
+    "adjacent_cell_weight": 0.25,
+    "adjacent_hours_utc": [
+      0,
+      16
+    ],
+    "center_cell_weight": 0.75,
+    "decision_hour_utc": 8,
+    "decision_weekday_utc": 0,
+    "holding_bars": 21,
+    "interval_hours": 8,
+    "lookback_weeks": 78,
+    "maximum_abs_net": 0.02,
+    "maximum_symbol_weight": 0.04,
+    "minimum_lookback_weeks": 39,
+    "minimum_positions_per_side": 8,
+    "minimum_valid_symbols": 20,
+    "selected_fraction_per_side": 0.2,
+    "total_gross": 0.58,
+    "total_gross_bps": 5800,
+    "winsor_mad_multiplier": 4.0
+  },
+  "mechanism": "utc-weekday-seasonality",
+  "neighborhood_coordinates": {
+    "center_cell_weight": 0.75,
+    "lookback_weeks": 78
+  },
+  "neighborhood_id": "t11-monday-three-slot-weekly-n2",
+  "parent_candidate_id": "t11-utc-weekday-shrunk-b00",
+  "rebalance_horizon": "weekly Monday 08:00 UTC direct rebalance with continuous twenty-one-bar holding between decisions",
+  "schema_version": 1,
+  "tags": [
+    "formation-grid",
+    "rebalance-grid",
+    "control-ablation",
+    "role-check",
+    "local-neighborhood",
+    "calendar-shrinkage",
+    "adjacent-cell"
+  ],
+  "team_id": "team-11"
+}
