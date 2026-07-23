@@ -120,6 +120,38 @@ uv run crypto-trade backtest --strategy momentum --symbols BTCUSDT \
 | `--fee` | Round-trip fee % | `0.1` |
 | `--params` | Strategy params (`key=val,key=val`) | — |
 
+### Team 09 tournament winner
+
+Team 09 has one shared, hash-pinned strategy/evaluator path for research and paper trading.
+The replay is continuous across IS and historical OOS; it never resets state at 2024-07-01.
+
+```bash
+# Fast: regenerate the all-period report from the hash-verified golden stream
+uv run python scripts/team09_backtest.py
+
+# Full: recompute 7,020 decisions from the frozen snapshot and prove golden parity
+uv run python scripts/team09_backtest.py --recompute
+
+# One exact paper boundary (public market data, no signed client or exchange orders)
+uv run python run_team09_paper.py --once
+
+# Continuous 8h paper desk
+mkdir -p logs
+PYTHONUNBUFFERED=1 uv run python run_team09_paper.py
+
+# Read-only monitoring
+uv run python scripts/team09_paper_healthcheck.py
+uv run python scripts/team09_paper_digest.py
+```
+
+Generated research reports live under `reports/team09/`; paper evidence lives under
+`paper-team09/`. The official forward window starts at `2026-08-01T00:00:00Z`; July is an
+unscored continuity bridge. The live universe applies the frozen native-crypto-only policy and
+fails closed on stablecoins, TradFi, metals, commodities, indexes, leveraged tokens, and unknown
+classifications. Each market-cache refresh is built and verified in a new generation before an
+atomic `CURRENT` pointer switch, so a crash or reboot leaves the prior sealed generation usable.
+`scripts/team09_paper_watchdog.sh` provides singleton restart/catch-up when installed in cron.
+
 ## Configuration
 
 Settings are loaded from environment variables (see `.env.example`):

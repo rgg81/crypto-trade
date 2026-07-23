@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team 09 Monitor"
+  short_description: "Monitor Team 09 exact-replay paper trading"
+  default_prompt: "Use $team09-monitor to check Team 09 paper-trading health and parity."

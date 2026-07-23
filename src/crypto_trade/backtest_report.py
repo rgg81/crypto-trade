@@ -257,16 +257,20 @@ def generate_html_report(
     returns: pd.Series,
     output_path: str | Path,
     title: str = "Backtest Report",
+    *,
+    compounded: bool = False,
 ) -> str:
     """Generate a quantstats HTML tearsheet.
 
-    Uses ``compounded=False`` because each trade allocates a fixed dollar
-    amount — daily returns are additive sums, not portfolio growth rates.
+    The legacy fixed-notional backtests use ``compounded=False``. Portfolio
+    evaluator returns, such as Team 09, must explicitly pass
+    ``compounded=True`` because each bar return is relative to current equity.
 
     Args:
         returns: Daily returns Series (decimal, DatetimeIndex).
         output_path: Where to write the HTML file.
         title: Report title.
+        compounded: Whether QuantStats should compound the daily returns.
 
     Returns:
         Absolute path of the generated file.
@@ -282,6 +286,6 @@ def generate_html_report(
         title=title,
         periods_per_year=365,
         benchmark=None,
-        compounded=False,
+        compounded=compounded,
     )
     return str(output_path.resolve())
