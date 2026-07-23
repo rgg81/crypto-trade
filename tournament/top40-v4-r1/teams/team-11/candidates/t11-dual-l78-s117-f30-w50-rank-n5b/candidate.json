@@ -1,0 +1,51 @@
+{
+  "candidate_id": "t11-dual-l78-s117-f30-w50-rank-n5b",
+  "control_profile": "Deterministic fifty-eight-percent gross exposure with common-market residualization, robust clipping, relative-rank admission, and symmetric long/short sizing; organizer stops, cooldowns, drawdown brakes, time stops, turnover clipping, and volatility targeting are disabled.",
+  "falsifier": "Reject broader role-specific persistence if either sleeve is non-positive, diversification dilutes edge below fifty basis points, any post-warmup era is structurally weak, or the combined portfolio cannot survive stressed costs.",
+  "formation_horizon": "longs use seventy-eight completed weekly observations with a thirty-nine-week minimum; shorts use one hundred seventeen completed weekly observations with a fifty-eight-week minimum; both use Monday 00:00, 08:00, and 16:00 UTC anchors",
+  "hypothesis": "The role-specific Monday ranking has excess edge but insufficient temporal breadth at eight names per sleeve; selecting thirty percent of each valid cross-section should diversify idiosyncratic calendar failures while preserving positive long and short edge.",
+  "material_parameters": {
+    "adjacent_cell_weight": 0.5,
+    "adjacent_hours_utc": [
+      0,
+      16
+    ],
+    "center_cell_weight": 0.5,
+    "decision_hour_utc": 8,
+    "decision_weekday_utc": 0,
+    "holding_bars": 21,
+    "interval_hours": 8,
+    "long_lookback_weeks": 78,
+    "long_minimum_weeks": 39,
+    "maximum_abs_net": 0.02,
+    "maximum_symbol_weight": 0.04,
+    "minimum_positions_per_side": 8,
+    "minimum_valid_symbols": 20,
+    "relative_rank_admission": true,
+    "selected_fraction_per_side": 0.3,
+    "short_lookback_weeks": 117,
+    "short_minimum_weeks": 58,
+    "total_gross": 0.58,
+    "total_gross_bps": 5800,
+    "winsor_mad_multiplier": 4.0
+  },
+  "mechanism": "utc-weekday-seasonality",
+  "neighborhood_coordinates": {
+    "selected_fraction_per_side": 0.3,
+    "short_lookback_weeks": 117
+  },
+  "neighborhood_id": "t11-monday-dual-breadth-n5",
+  "parent_candidate_id": "t11-dual-l78-s104-f30-w50-rank-n5c",
+  "rebalance_horizon": "weekly Monday 08:00 UTC direct rebalance with continuous twenty-one-bar holding between decisions",
+  "schema_version": 1,
+  "tags": [
+    "formation-grid",
+    "rebalance-grid",
+    "control-ablation",
+    "role-check",
+    "local-neighborhood",
+    "calendar-shrinkage",
+    "adjacent-cell"
+  ],
+  "team_id": "team-11"
+}
