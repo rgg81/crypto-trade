@@ -64,17 +64,25 @@ def main() -> None:
     eq_now = args.equity * (1 + cum)
     d1 = _window_return(net, last - pd.Timedelta(hours=24)) if len(s) else 0.0
     days = (last - lo).total_seconds() / 86400 if len(s) else 0.0
-    fund_dollars = m.total_funding_pnl * args.equity if np.isfinite(m.total_funding_pnl) else 0.0
-    cost_dollars = m.total_cost * args.equity if np.isfinite(m.total_cost) else 0.0
     sharpe = f"{m.sharpe:+.2f}" if np.isfinite(m.sharpe) else "n/a (<2mo)"
+
+    # Decompose net on the DEPLOYED (vol-target-scaled) basis so price + funding − cost ties to
+    # ACCUM P&L. parts["pnl"/"fpnl"/"cost"] are PRE-scale (gross≈1); the deployed book is
+    # gross≈0.64, so each must be × scale before summing — otherwise funding/cost read on a
+    # different basis than the headline and look ~1.6× too large.
+    win = (net.index >= lo) & (net.index < hi)
+    sc = parts["scale"].reindex(net.index)
+    price_d = float((parts["pnl"].reindex(net.index) * sc)[win].sum()) * args.equity
+    fund_d = float((parts["fpnl"].reindex(net.index) * sc)[win].sum()) * args.equity
+    cost_d = float((parts["cost"].reindex(net.index) * sc)[win].sum()) * args.equity
 
     print("=== crypto-cup-01 paper desk (team-02 breakout) — PnL digest ===")
     print(f"window {lo.date()} → {last}  ({days:.1f}d, {len(s)} candles)")
     print(f"  ACCUM P&L   {cum * 100:+.2f}%   ${args.equity * cum:+,.0f}   equity ${eq_now:,.0f}")
     print(f"  last 24h    {d1 * 100:+.2f}%")
     print(f"  maxDD       {m.maxdd * 100:.1f}%    sharpe {sharpe}")
-    turn = f"turnover {m.ann_turnover:.0f}x/yr"
-    print(f"  funding     ${fund_dollars:+,.0f}   cost ${cost_dollars:-,.0f}   {turn}")
+    print(f"  decomp $    price {price_d:+,.0f}  funding {fund_d:+,.0f}  cost {cost_d:-,.0f}")
+    print(f"  turnover    {m.ann_turnover:.0f}x/yr")
     # DEPLOYED book = w × vol-target scale (matches the desk log's target_gross), not the
     # pre-scale normalized w (which is gross≈1).
     deployed = w.mul(parts["scale"], axis=0).iloc[-1]
