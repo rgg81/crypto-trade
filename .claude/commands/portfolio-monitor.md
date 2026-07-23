@@ -383,6 +383,29 @@ ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regi
 auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
+- **2026-07-23 — INCIDENT (tournament desk engine-death, recovered).** Healthcheck flagged
+  `proc=DOWN` at the 19:25 UTC tick; the tournament paper engine had vanished ~08:30 UTC (last
+  log line a normal 08:00 rebalance leg — NO traceback, NO OOM). Diagnosis: NOT a WSL reboot
+  (host up 10d) and the v1/v2 desks were both still alive → a desk-LOCAL death, not a host event.
+  Root cause: the desk was launched via `nohup … & disown` from a Bash-tool shell in the monitor
+  session; its parent shell got reaped after ~5 days and took the child with it. Consequence: the
+  16:00 UTC rebalance was MISSED and the live DB book lagged (drift climbed >5e-3 — a SECOND
+  alert, but a downstream one). PnL was UNAFFECTED (the digest recomputes the intended book from
+  data regardless of the live engine). Recovery = the documented keep-DB relaunch (`>>`-append to
+  preserve the log + an inline `[monitor]` incident line): engine came back, `run_once` on startup
+  detected the missed 16:00 candle and fired a catch-up rebalance (34 legs), drift snapped back to
+  0.0005, STATUS OK. Pushed the user. **Lesson for durability:** a desk launched from a session
+  shell dies with that shell's lifecycle — for a 6-month run this WILL recur. Options to harden
+  (backlog): (a) launch under `setsid`/`systemd-run --user` so it's not parented to the tool shell;
+  (b) a CronCreate liveness-relaunch guard that runs the keep-DB relaunch whenever the healthcheck
+  reports proc=DOWN. For now the 4-hourly monitor cron catches a death within ≤4h and the recovery
+  is one keep-DB relaunch.
+- **2026-07-21 v25** — tournament desk tick surfaces ACCUM P&L every cycle: `tournament_paper_pnl.py`
+  rewritten as an at-a-glance digest (ACCUM P&L %/$/equity, 24h delta, maxDD, price/funding/cost $
+  decomposition on the DEPLOYED scaled basis, deployed book gross/net/L-S). Skill: run the digest
+  EVERY tick (not just after 00:00 UTC) and require the accum-P&L one-liner in every tick note; cron
+  prompt updated + recreated. Fixed a basis bug where funding/cost were summed pre-vol-target-scale
+  (gross≈1) while ACCUM P&L is the deployed book (gross≈0.64) → funding/cost read ~1.6× too large.
 - **2026-07-19 v24** — TOURNAMENT PAPER DESK track added (crypto-cup-01 winner team-02
   breakout-channel, 6-month forward test from 2026-07-18). Third desk, PAPER-ONLY dry-run engine
   (no creds/orders), own runner/log/DB in the quant-portfolio-tournament worktree, +25-min stagger.
