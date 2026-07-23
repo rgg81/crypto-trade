@@ -1,0 +1,31 @@
+{
+  "drawdown_brakes": [],
+  "policy_id": "t11-stop06-l78-s104-f35-w50-n6e",
+  "position_stop": {
+    "cooldown_bars": 3,
+    "enabled": true,
+    "loss_fraction": 0.06
+  },
+  "same_boundary_reentry": false,
+  "schema_version": 1,
+  "side_scaling": {
+    "long_scale": 1.0,
+    "short_scale": 1.0
+  },
+  "time_stop": {
+    "cooldown_bars": 0,
+    "enabled": false,
+    "maximum_holding_bars": 21
+  },
+  "turnover_limit": {
+    "enabled": false,
+    "maximum_one_way_turnover": 0.12
+  },
+  "volatility_target": {
+    "annualized_target": 0.25,
+    "enabled": false,
+    "lookback_days": 30,
+    "maximum_scale": 1.0,
+    "minimum_scale": 0.2
+  }
+}

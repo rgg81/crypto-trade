@@ -1,0 +1,53 @@
+{
+  "candidate_id": "t11-stop06-l78-s104-f30-w50-n6c",
+  "control_profile": "Deterministic fifty-eight-percent gross exposure with common-market residualization, robust clipping, relative-rank admission, symmetric sizing, and a close-confirmed six-percent position stop with three-bar cooldown; drawdown brakes, time stops, turnover clipping, and volatility targeting are disabled.",
+  "falsifier": "Reject the stop if it fails to improve adverse symbol-week tails and temporal consistency, pushes turnover above policy, dilutes edge below fifty basis points, or destroys either sleeve under stressed costs.",
+  "formation_horizon": "longs use seventy-eight completed weekly observations with a thirty-nine-week minimum; shorts use one hundred four completed weekly observations with a fifty-two-week minimum; both use Monday 00:00, 08:00, and 16:00 UTC anchors",
+  "hypothesis": "The broader dual-horizon Monday ranking is profitable but a few persistent adverse symbol-weeks dominate its late-era loss; a symmetric six-percent close-confirmed position stop with three-bar cooldown should cut those tails without changing signal formation or weekly selection.",
+  "material_parameters": {
+    "adjacent_cell_weight": 0.5,
+    "adjacent_hours_utc": [
+      0,
+      16
+    ],
+    "center_cell_weight": 0.5,
+    "decision_hour_utc": 8,
+    "decision_weekday_utc": 0,
+    "holding_bars": 21,
+    "interval_hours": 8,
+    "long_lookback_weeks": 78,
+    "long_minimum_weeks": 39,
+    "maximum_abs_net": 0.02,
+    "maximum_symbol_weight": 0.04,
+    "minimum_positions_per_side": 8,
+    "minimum_valid_symbols": 20,
+    "position_stop_cooldown_bars": 3,
+    "position_stop_loss_fraction": 0.06,
+    "relative_rank_admission": true,
+    "selected_fraction_per_side": 0.3,
+    "short_lookback_weeks": 104,
+    "short_minimum_weeks": 52,
+    "total_gross": 0.58,
+    "total_gross_bps": 5800,
+    "winsor_mad_multiplier": 4.0
+  },
+  "mechanism": "utc-weekday-seasonality",
+  "neighborhood_coordinates": {
+    "selected_fraction_per_side": 0.3,
+    "short_lookback_weeks": 104
+  },
+  "neighborhood_id": "t11-monday-dual-breadth-stop06-n6",
+  "parent_candidate_id": "t11-dual-l78-s104-f30-w50-rank-n5c",
+  "rebalance_horizon": "weekly Monday 08:00 UTC direct rebalance with continuous twenty-one-bar holding between decisions",
+  "schema_version": 1,
+  "tags": [
+    "formation-grid",
+    "rebalance-grid",
+    "control-ablation",
+    "role-check",
+    "local-neighborhood",
+    "calendar-shrinkage",
+    "adjacent-cell"
+  ],
+  "team_id": "team-11"
+}
