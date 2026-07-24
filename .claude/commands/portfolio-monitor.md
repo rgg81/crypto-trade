@@ -323,9 +323,17 @@ Runs the crypto-cup-01 winner **team-02 breakout-channel** for a 6-month forward
   integrity failure means the frozen bundle was edited: that is a hard ALERT, halt-and-tell-user,
   NEVER "fix" the bundle. Holdout reference: +2.113; honest paper expectation nearer +1.1
   (recent-half run-rate); chop is the declared weak regime — bleed there is EXPECTED, not an alert.
-- **Health check:** `scripts/tournament_paper_healthcheck.py` — STATUS OK|ALERT: proc alive, log
-  freshness/tracebacks, frozen-submission SHA, DB-held vs recomputed-target drift (paper desks must
-  never drift; threshold 5e-3 absorbs the between-candle recompute gap). **PnL digest:**
+- **Health check:** `scripts/tournament_paper_healthcheck.py` — STATUS OK|ALERT: (1) the actual
+  PYTHON ENGINE CHILD alive (not just the `uv run` wrapper — the wrapper sits at ~0 CPU in
+  futex_do_wait waiting on its child, so "wrapper alive" is NOT engine-alive; a wrapper-only match
+  is itself an alert); (2) log freshness/tracebacks; (3) **REBALANCE RECENCY — the load-bearing
+  liveness signal**: parses the newest `rebalance plan as_of=` stamp and ALERTS if it is >10h old
+  (8h cadence + 25-min stagger + 90-min margin), which catches a silent stop regardless of PID
+  state (child hang, stuck poll, dead); (4) frozen-submission SHA; (5) DB-held vs recomputed-target
+  drift (threshold 5e-3 absorbs the between-candle recompute gap — note it climbs to ~0.003-0.005
+  LATE in an 8h candle and resets at the next rebalance; that is benign, not a leak). Added the
+  child-PID + rebalance-recency checks 2026-07-24 after a false-liveness read (pgrep matched the
+  wrapper; the engine child was in fact healthy at 51s CPU / hrtimer_nanosleep). **PnL digest:**
   `scripts/tournament_paper_pnl.py` — evaluator-exact recompute-from-data (taker + liquidity
   slippage + native funding, the tournament cost model); no DB state trusted for scoring. Prints
   the ACCUM P&L headline (%, $, equity), trailing-24h delta, maxDD, funding/cost $, and the
