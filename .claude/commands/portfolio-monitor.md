@@ -357,6 +357,19 @@ Runs the crypto-cup-01 winner **team-02 breakout-channel** for a 6-month forward
   `cron: "55 */4 * * *"`, recurring, prompt = the verbatim tournament-only tick instruction below.
   The cron IS the cadence (no ScheduleWakeup from the fired prompt). Session-only/in-memory: if
   `CronList` shows no job, the loop stopped — recreate it with the same recipe.
+- **WATCHDOG (auto-recovery, added 2026-07-25 after two failures in 2 days — a session-shell
+  reap on 07-23 and a socket HANG during a 418 storm on 07-25).** `scripts/tournament_paper_watchdog.py`
+  + a SEPARATE cron `"7,27,47 * * * *"` (every 20 min). It relaunches a DEAD engine (no python
+  child) or a HUNG one (python child alive but log stale ≥20 min AND newest rebalance >10h old —
+  the 07-25 signature), keep-DB and **detached via `start_new_session=True`/setsid** so the
+  relaunched engine is NOT parented to a session shell (closes the reap hole). ANTI-THRASH: an
+  engine that is merely retrying through a 418 ban keeps its log advancing (tick errors every
+  60s), so `log_age < 20 min` → the watchdog leaves it ALONE (never kills a healthy retrier and
+  never adds relaunch load to an active ban). `--force-relaunch` for a manual kill+relaunch.
+  **CAVEAT — session-bound:** both the monitor cron and this watchdog live only in the current
+  Claude session and expire in 7 days; they self-heal the desk WHILE the session runs, but for
+  true unattended 6-month operation the desk should be a **systemd --user service** (survives
+  session end AND host reboot) — recommended to the user, not yet set up.
 
   VERBATIM TOURNAMENT TICK PROMPT (keep byte-stable across recreations):
   "TOURNAMENT-DESK MONITOR TICK (crypto-cup-01 paper desk ONLY — never touch v1/v2/metals from
