@@ -291,8 +291,18 @@ A SECOND book runs ALONGSIDE v1, fully isolated, on a SEPARATE testnet account. 
   `curl -s -o /dev/null -w '%{http_code}' 'https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=8h&limit=2'`
   — a `200` means the IP is clear and the freeze is a genuine process hang — then (2) PGID-kill + relaunch
   (KEEP the DB). A restart of a stuck engine is PRO-test recovery (it reconciles to its own target), not
-  interference. Backlog: add a lightweight engine heartbeat / poll-tick timestamp so a hang is detectable
-  without the log-activity heuristic.
+  interference.
+  **CRITICAL false-hang caveat (learned 2026-07-25, nearly mis-fired a relaunch):** `log frozen + IP 200`
+  is NOT sufficient to call a hang. A **full 540-symbol refresh in progress freezes the log for MINUTES**
+  legitimately (it logs nothing until the refresh completes), and a *throttled* refresh grinding through
+  partial-418s can freeze it ~8–10 min. Before concluding hung + killing, grep the last few
+  `klines refreshed: N ok` lines: **if N is CLIMBING across attempts (e.g. 125 → 305 → 538) the engine is
+  actively RECOVERING, not hung — do NOT kill** (killing interrupts recovery + triggers a fresh cold
+  refresh into the ban). Only conclude a genuine hang if the log is frozen AND the refresh ok-count is
+  NOT progressing across a real ≥5-min window AND IP=200. When in doubt, watch the log mtime for ~3 min:
+  a healthy-but-slow engine's mtime advances (even if minutes apart); a truly hung one never moves.
+  Backlog: add a lightweight engine heartbeat / poll-tick timestamp so a hang is detectable without the
+  log-activity heuristic (would have removed all ambiguity here).
 - The HANDS-OFF mandate applies to v2 identically: observe + inform, never intervene on performance.
 - **Network resilience (2026-06-23):** the engine poll loop (`engine.py:run()`) now wraps each tick in
   try/except → a transient `ConnectError`/network/API failure logs a ONE-LINER `tick error #N (...);
@@ -323,6 +333,21 @@ ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regi
 auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
+- **2026-07-25 v24** — FALSE-HANG CAVEAT (a slow refresh ≠ a hang). INCIDENT: WSL host was **suspended
+  ~35h** (machine asleep; `uptime` showed NO reboot + proc etime continuous — a suspend freezes the
+  process, so it logged nothing and missed 4 boundaries). On resume the cold 540-symbol refresh tripped a
+  **418 IP ban**; the `min_refresh_fraction=0.80` guard correctly REFUSED to rebalance on the partial
+  panels (125/542, then 305/542) — book never traded on ragged data. The log then went quiet ~9 min and,
+  with `IP=200`, I nearly called it a HANG and PGID-killed it — but a re-check showed the refresh ok-count
+  was **CLIMBING (125 → 305 → 538)**, i.e. the engine was inside a slow/throttled full refresh, actively
+  RECOVERING, not hung. Held off; it completed the 538-ok refresh, rebalanced to the **current** 16:00 Jul
+  25 target (one shot, NOT replaying the 4 slept-through cycles), `errors=0`, STATUS→OK. LESSON added to the
+  HUNG-engine bullet: `log-frozen + IP-200` is NOT sufficient to call a hang — a full refresh freezes the
+  log for MINUTES legitimately; **grep the last few `klines refreshed: N ok` lines and if N is climbing, the
+  engine is recovering — do NOT kill** (a kill interrupts recovery + fires a fresh cold refresh into the
+  ban). Only conclude hung if the ok-count is NOT progressing across a real ≥5-min window. Reinforces the
+  suspend/resume + cold-refresh-418 failure mode (2nd occurrence) → backlog: stagger engines' cold-start
+  refreshes / shared kline cache / post-resume backoff, and an engine heartbeat to kill the ambiguity.
 - **2026-07-18 v23** — V2-TRACK MONITOR now driven by a **CronCreate session cron** + WSL-reboot recovery
   documented (user directive: "this must be tracked by the skill"). Two additions. (1) **Session-cron
   loop** (see "Session-cron alternative" under Self-paced loop): the v2 monitor runs every 2h at :13
