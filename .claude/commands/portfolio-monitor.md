@@ -385,6 +385,20 @@ Runs the crypto-cup-01 winner **team-02 breakout-channel** for a 6-month forward
   with a one-line summary. On OK: no user ping; keep the one-line note. Do NOT call
   ScheduleWakeup (the cron is the cadence)."
 
+## Known behavior — tournament desk funding concentration (verified 2026-07-25)
+The winner (team-02 breakout) is **price-only — zero funding awareness**. When a held coin enters
+a real funding DISLOCATION, its funding cost can dominate short-window P&L. Verified case: in the
+first paper week, funding was −$151, of which **DEXEUSDT alone was −$127 (84%)** — DEXE was
+repeatedly hitting the **−2.0% Binance cap on a 1h funding schedule** (up to ~8 settlements per 8h
+candle, correctly summed — not a bug: dedup clean, sign/lag correct), and the price-only signal was
+short it (a normal ~4% weight) so it paid ~−2%/hr. This is the realistic cost model working AS
+DESIGNED (honest), surfacing a strategy blind spot (walks into funding traps). It is concentrated +
+event-driven, NOT a structural run-rate; DEXE was never in the IS universe. **Monitor implication:**
+a large single-week funding drag is NOT an alert and NOT a bug — before worrying, decompose by
+symbol (`tournament_paper_pnl.py` shows the price/funding/cost split; per-symbol funding contribution
+is a one-liner over `scoring["fund_win"] × held weights`). Expect the biggest funding hits to be one
+dislocated alt the book happens to be short/long, not a broad book-wide cost.
+
 ## Intelligence roadmap (the living backlog — build these into the skill over time)
 Prioritized; each becomes a committed helper script + a section here when built.
 1. **Parity / drift check (HIGH).** ✅ DONE 2026-06-21 — `scripts/portfolio_parity_check.py`.
