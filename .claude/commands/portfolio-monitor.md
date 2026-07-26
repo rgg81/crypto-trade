@@ -280,6 +280,19 @@ A SECOND book runs ALONGSIDE v1, fully isolated, on a SEPARATE testnet account. 
   to get the pgid of the `uv run` leader, then `kill -TERM -- -<pgid>` (TERMs the `uv` wrapper AND its python
   child together), escalate to `-KILL` if it survives ~4s. Verify dead with `ps -eo cmd | grep run_portfolio_v2`
   (NOT pgrep). NEVER touch the v1 quant-research worktree/proc.
+- **STAGGER THE RELAUNCH after a host reboot/resume — do NOT launch into the other engine's cold refresh
+  (2026-07-26).** A WSL reboot kills BOTH engines, so recovery tends to restart them near-simultaneously —
+  and two concurrent cold 540-symbol production-kline refreshes off the SAME IP are exactly what trips the
+  `418` ban (root cause of the v11/v12/v16/v24 incidents; the `rebalance_lag_seconds` stagger only covers
+  steady-state 8h boundaries, NOT restart time). Before relaunching v2, check whether v1 is mid-cold-start
+  (`tail` its log for `loaded NNN TRADING symbols` with no `klines refreshed` yet). If it is, WAIT — then
+  gate the launch on a clean IP: poll ~3 different symbols' klines every ~45s until you get **3/3 HTTP 200
+  in one round** (a single 200 is not enough — a recovering IP FLAPS: expect runs like `418 418 418` /
+  `200 418 200` before it settles). Launch in that window. Payoff is large and measured: this recovery got
+  a clean **538/542-ok refresh on the FIRST successful tick**, versus the un-staggered restart the night
+  before which ground through `125 → 305 → 538` across 4 failed ticks and ~6 min of 418 storm. There is
+  almost always slack to spend on this — the book sits safely flat-held between 8h boundaries and the
+  engine catch-up rebalances to the CURRENT target regardless of how many boundaries were missed.
 - **HUNG engine (proc up, but frozen) — a distinct failure mode from a crash (2026-07-05).** A crash removes
   the proc (`STATUS: ENGINE DOWN`); a HANG leaves `proc=up` but the poll loop stops advancing. The tell: the
   engine was in an **actively-logging** state (a `tick error #N … retrying in 60s` storm writes a line every
@@ -333,6 +346,29 @@ ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regi
 auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
+- **2026-07-26 v25** — STAGGERED-RELAUNCH recovery (the standing "stagger cold-start refreshes" backlog
+  item, finally exercised as an operational procedure). INCIDENT: WSL host **rebooted** ~12:10 UTC
+  (`uptime` = `up 7 min`), killing BOTH engines; v2's log ended cleanly on the 2026-07-25 16:00 rebalance
+  with `errors=0` and no traceback → host kill, not a crash (v23 signature). v2 missed the 00:00 + 08:00
+  Jul 26 boundaries; the book sat untouched on the venue (32 pos, gross $1508, uPnL +$42.9, avail $3299 —
+  no liquidation risk). KEY DIFFERENCE FROM PRIOR RECOVERIES: v1 had already been relaunched ~12:15 and was
+  mid-cold-start, so I did **not** immediately relaunch v2 — launching into a concurrent 540-symbol refresh
+  is the documented cause of the 418 storm. Confirmed the hazard was real: v1's cold refresh tripped a 418
+  and parked it in a 900s backoff, and a probe showed the IP **flapping** (`200`, then `418 418`) rather
+  than hard-banned. Polled 3 symbols every 45s until one round came back **3/3 200** (12:38:25Z, after ~9
+  min and 13 rounds of flapping), launched v2 in that window KEEPING the DB + APPENDING the log. Result:
+  **538/542-ok refresh on the FIRST tick**, one-shot rebalance to the CURRENT `as_of=2026-07-26 08:00`
+  target (correctly did NOT replay the missed 00:00 cycle), `orders placed=9 skipped=1 errors=0 retrying=0
+  papered=1`, STATUS→OK. Compare the un-staggered restart the previous night: `125 → 305 → 538` across 4
+  failed ticks. LESSONS added to the Relaunch-v2 bullet: (a) after a host reboot, CHECK the other engine's
+  state before relaunching and wait out its cold refresh; (b) gate the launch on **3/3 clean 200s in one
+  round**, since a single 200 is meaningless on a flapping IP; (c) there is nearly always slack to spend —
+  the catch-up rebalances to the current target no matter how many boundaries were missed. ALSO: `CronList`
+  returned "No scheduled jobs" (the session cron dies with the host, per v23) → recreated as `13 */2 * * *`.
+  Reconcile dust drifted +$0.29 over ~18d (−$2.93 → −$3.22), well inside the $5 tolerance and NOT growing
+  materially — benign testnet wallet drift exactly as diagnosed in v21. All-in P/L (prod-funding basis)
+  **+$113.54 / +2.27%** vs the $5,000 seed. Still-open backlog: an engine heartbeat, and a shared/staggered
+  cold-start kline cache so this stays a procedure rather than a manual wait.
 - **2026-07-25 v24** — FALSE-HANG CAVEAT (a slow refresh ≠ a hang). INCIDENT: WSL host was **suspended
   ~35h** (machine asleep; `uptime` showed NO reboot + proc etime continuous — a suspend freezes the
   process, so it logged nothing and missed 4 boundaries). On resume the cold 540-symbol refresh tripped a
