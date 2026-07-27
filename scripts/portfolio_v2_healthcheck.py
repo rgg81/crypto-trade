@@ -33,9 +33,8 @@ CANDLE_MS = 8 * 60 * 60 * 1000
 # -4141 "Symbol is closed" = a prod-listed name absent from testnet (e.g. TLM: TRADING on prod,
 # NOT LISTED on testnet) — same family as -1121 invalid-symbol / -4140. Trades fine on production.
 TESTNET_ERR = {"-1121", "-4131", "-4411", "-4061", "-4046", "-4140", "-4141"}
-# Binance hard-rejects a timestamp >1000ms AHEAD of server time (-1021); alert below that so we
-# catch the drift while signed calls still intermittently succeed, rather than after they all fail.
-CLOCK_SKEW_ALERT_MS = 700
+# Binance hard-rejects a timestamp >1000ms AHEAD of server time (-1021). The client compensates
+# (see the skew block in main), so this is reported as INFO well below the 1000ms cliff.
 CLOCK_SKEW_WARN_MS = 300
 
 
@@ -177,18 +176,18 @@ def main() -> None:
         except Exception:
             pass
 
-    # clock skew vs the exchange — a fast host clock blocks ALL signed calls (-1021)
+    # Clock skew vs the exchange. Since 4874fba2 AuthenticatedBinanceClient re-syncs its own
+    # offset from /fapi/v1/time on a -1021 and retries, so skew no longer blocks trading — it is
+    # HOST HYGIENE, reported as INFO. (Proven live 2026-07-27: 17 orders placed, errors=0, with
+    # the host still +1.32s off.) It stays worth surfacing because the compensation is a fallback,
+    # not a licence to let the host drift, and because v1 has its own un-patched src/ copy.
     auth_base = os.environ.get("BINANCE_AUTH_BASE_URL", "https://testnet.binancefuture.com")
     skew = _clock_skew_ms(auth_base)
-    if skew is not None and skew > CLOCK_SKEW_ALERT_MS:
-        flags.append(
-            f"CLOCK SKEW {skew:+.0f}ms (local AHEAD of exchange; >1000ms => -1021 on every "
-            f"signed call, engine CANNOT place orders). "
-            f"Fix: sudo systemctl restart systemd-timesyncd"
-        )
-    elif skew is not None and abs(skew) > CLOCK_SKEW_WARN_MS:
+    if skew is not None and abs(skew) > CLOCK_SKEW_WARN_MS:
         info.append(
-            f"clock skew {skew:+.0f}ms vs exchange (watch; -1021 blocks trading at >1000ms)"
+            f"host clock {skew:+.0f}ms vs exchange (engine self-corrects via /fapi/v1/time on "
+            f"-1021; host fix needs an ELEVATED Windows prompt: "
+            f"sc config w32time start= auto; net start w32time; w32tm /resync /force)"
         )
 
     # live account (v2 creds from env)
