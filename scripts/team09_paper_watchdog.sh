@@ -19,4 +19,4 @@ fi
 cd "$ROOT"
 PYTHONUNBUFFERED=1 nohup "$UV" run python run_team09_paper.py \
     </dev/null \
-    >>"$LOG_DIR/team09_paper.log" 2>&1 &
+    >>"$LOG_DIR/team09_paper.log" 2>&1 9>&- &

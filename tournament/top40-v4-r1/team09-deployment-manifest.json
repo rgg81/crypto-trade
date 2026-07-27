@@ -48,8 +48,8 @@
     },
     {
       "path": "scripts/team09_paper_watchdog.sh",
-      "sha256": "955ca6313425df70395b3f3b3e7e86e3217232ec70d1a28275fff9d03cab6838",
-      "size": 573
+      "sha256": "5fe8de9f008df06df16eded94339a91dcbadcf35f7947996c7a5f4f8b192a44d",
+      "size": 578
     },
     {
       "path": "src/crypto_trade/backtest_report.py",
