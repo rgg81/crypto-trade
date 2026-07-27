@@ -293,6 +293,24 @@ A SECOND book runs ALONGSIDE v1, fully isolated, on a SEPARATE testnet account. 
   before which ground through `125 → 305 → 538` across 4 failed ticks and ~6 min of 418 storm. There is
   almost always slack to spend on this — the book sits safely flat-held between 8h boundaries and the
   engine catch-up rebalances to the CURRENT target regardless of how many boundaries were missed.
+- **CLOCK SKEW after a reboot/resume — a SILENT hard trading blocker (2026-07-27).** Binance rejects any
+  signed request whose timestamp is **>1000ms AHEAD** of server time (`-1021`), and `recvWindow` does NOT
+  relax that side (it only widens the behind-tolerance). WSL drifts ahead across a reboot/suspend when
+  `timedatectl` shows `NTP service: inactive`. The failure is nasty because it is **invisible in the log**:
+  public kline fetches are unsigned and keep succeeding, so refreshes look fine, while EVERY signed call
+  (`get_positions`, `set_leverage`, `place_order`) fails — the engine computes a correct plan and places
+  NOTHING. Skew near the 1s cliff is INTERMITTENT (some calls squeak through), so "the API worked once"
+  proves nothing. `portfolio_v2_healthcheck.py` now measures it directly and ALERTs above 700ms.
+  **FIX (no password needed — this is the important part):** the host has a NOPASSWD sudoers entry for
+  ntpdate, so a monitor session can fix this itself in seconds:
+  `sudo -n /usr/sbin/ntpdate pool.ntp.org` — verify with a skew re-probe (`/fapi/v1/time` vs local, sampled
+  either side of the request so latency isn't misread as skew). Do NOT conclude "needs the user" on a
+  password prompt: run `sudo -n -l` FIRST to list NOPASSWD rights (currently `service cron start|stop`,
+  `/usr/sbin/hwclock`, `/usr/sbin/ntpdate pool.ntp.org`). `sudo systemctl restart systemd-timesyncd` and
+  `timedatectl set-ntp true` both DO require a password, and `hwclock` fails under WSL ("Cannot access the
+  Hardware Clock") — ntpdate is the one that works. Fixing the clock needs NO engine restart: each request
+  is signed with a fresh timestamp, so trading resumes on the next tick by itself. Landing slightly BEHIND
+  (negative skew, e.g. −50ms) is the safe side. Host-wide, so it fixes v1 too.
 - **HUNG engine (proc up, but frozen) — a distinct failure mode from a crash (2026-07-05).** A crash removes
   the proc (`STATUS: ENGINE DOWN`); a HANG leaves `proc=up` but the poll loop stops advancing. The tell: the
   engine was in an **actively-logging** state (a `tick error #N … retrying in 60s` storm writes a line every
@@ -346,6 +364,28 @@ ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regi
 auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
+- **2026-07-27 v26** — CLOCK-SKEW blocker found, fixed, and made self-detecting (+ a process lesson about
+  giving up too early on sudo). INCIDENT: host rebooted ~07:14 UTC; both engines were relaunched
+  concurrently ~07:18/07:41 (un-staggered — the v25 hazard, nobody was watching), a ~3h DNS outage
+  (`Temporary failure in name resolution`, 366 ticks) then delayed them into cold-refreshing together →
+  418 ban. That much was self-healing. The REAL blocker was hiding underneath: the host clock had drifted
+  **+1.36s AHEAD**, so every SIGNED call returned `-1021` while unsigned kline fetches kept working — the
+  log looked like an ordinary 418 recovery, and the engine would have computed a correct plan at 16:15 and
+  placed NOTHING. The healthcheck's only clue was `account query failed: HTTPStatusError`, which cost real
+  diagnosis time (hand-signing probe requests to see the code). THREE fixes: (1) `_clock_skew_ms()` in
+  `portfolio_v2_healthcheck.py` — measured mid-flight so latency isn't misread as skew, ALERT >700ms (below
+  the 1000ms cliff, while calls still intermittently succeed), INFO >300ms; (2) account-query failures now
+  print the Binance code+msg, so `-1021` (clock) is distinguishable at a glance from `-2015` (bad key) /
+  `-1003` (rate limit); (3) the skew playbook bullet above. **PROCESS LESSON (the one that cost the most):**
+  I checked `sudo -n true`, saw a password was required, and told the user it was theirs to fix — but
+  `sudo -n -l` reveals a **NOPASSWD entry for `/usr/sbin/ntpdate pool.ntp.org`**, which fixed it instantly
+  (`step time server … offset -1.385914 sec`; skew +1364ms → −50ms; signed calls restored, book readable
+  again at 32 pos / uPnL +$44.8). ALWAYS run `sudo -n -l` to enumerate NOPASSWD rights before declaring a
+  privileged action blocked. Note `systemctl restart systemd-timesyncd` and `timedatectl set-ntp true` DO
+  need a password and `hwclock` doesn't work under WSL — ntpdate is the one that works. No engine restart
+  was needed (fresh timestamp per request). All-in P/L (prod-funding basis) +$118.91 / +2.38% vs seed.
+  Backlog: have the auth client cache a `/fapi/v1/time` offset (what most Binance SDKs do) so clock drift
+  becomes impossible rather than merely visible — untouched here since it's the live order path.
 - **2026-07-26 v25** — STAGGERED-RELAUNCH recovery (the standing "stagger cold-start refreshes" backlog
   item, finally exercised as an operational procedure). INCIDENT: WSL host **rebooted** ~12:10 UTC
   (`uptime` = `up 7 min`), killing BOTH engines; v2's log ended cleanly on the 2026-07-25 16:00 rebalance
