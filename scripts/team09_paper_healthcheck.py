@@ -466,6 +466,25 @@ def main() -> int:
         )
         if len(accounting_symbols) != len(set(accounting_symbols)):
             alerts.append("ACCOUNTING SYMBOL REGISTRY contains duplicates")
+        raw_admissions = diagnostics.get("accounting_admission_boundaries")
+        if not isinstance(raw_admissions, Mapping):
+            alerts.append("ACCOUNTING ADMISSION REGISTRY is missing or malformed")
+        else:
+            if set(raw_admissions) != set(accounting_symbols):
+                alerts.append(
+                    "ACCOUNTING ADMISSION REGISTRY differs from accounting symbols"
+                )
+            for symbol, value in raw_admissions.items():
+                admission = _utc(value)
+                if (
+                    admission < BRIDGE_START
+                    or admission > boundary
+                    or admission != admission.floor("8h")
+                ):
+                    alerts.append(
+                        "ACCOUNTING ADMISSION BOUNDARY BAD: "
+                        f"{symbol}={admission.isoformat()}"
+                    )
         if set(positions["symbol"].astype(str)) - set(accounting_symbols):
             alerts.append("HELD BOOK is outside the accounting symbol registry")
         notes.append(f"mark/funding accounting symbols: {len(accounting_symbols)}")

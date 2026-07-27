@@ -33,8 +33,11 @@ from crypto_trade.team09.live import (
     _position_frame,
 )
 from crypto_trade.team09.live_data import (
+    BRIDGE_START,
     Team09PublicDataClient,
     _append_invariant_cache,
+    _causal_accounting_rows,
+    _resolve_accounting_admissions,
     classify_current_contracts,
     classify_known_contracts,
     resolve_contract_lifecycle,
@@ -196,6 +199,68 @@ def test_live_cache_aborts_if_a_sealed_value_changes(tmp_path: Path) -> None:
             revised,
             keys=("open_time", "symbol"),
             values=("close",),
+        )
+
+
+def test_new_accounting_symbols_are_causally_admitted() -> None:
+    boundary = pd.Timestamp("2026-07-27T00:00:00Z")
+    prior = {"OLDUSDT": BRIDGE_START.isoformat()}
+    admissions = _resolve_accounting_admissions(
+        {
+            "accounting_symbols": ["OLDUSDT", "NEWUSDT"],
+        },
+        prior=prior,
+        accounting_symbols=("OLDUSDT", "NEWUSDT"),
+        boundary=boundary,
+    )
+    assert admissions == {
+        "NEWUSDT": boundary.isoformat(),
+        "OLDUSDT": BRIDGE_START.isoformat(),
+    }
+
+    frame = pd.DataFrame(
+        {
+            "funding_time": [
+                BRIDGE_START,
+                BRIDGE_START,
+                boundary,
+            ],
+            "symbol": ["OLDUSDT", "NEWUSDT", "NEWUSDT"],
+            "funding_rate": [0.001, 0.002, 0.003],
+            "mark_price": [100.0, 200.0, 201.0],
+        }
+    )
+    causal = _causal_accounting_rows(
+        frame,
+        time_column="funding_time",
+        admissions=admissions,
+    )
+    assert causal[["funding_time", "symbol"]].to_dict("records") == [
+        {"funding_time": BRIDGE_START, "symbol": "OLDUSDT"},
+        {"funding_time": boundary, "symbol": "NEWUSDT"},
+    ]
+
+
+def test_accounting_admission_revision_aborts() -> None:
+    boundary = pd.Timestamp("2026-07-27T08:00:00Z")
+    with pytest.raises(
+        RuntimeError,
+        match="APPEND-INVARIANCE ABORT: accounting admission revised",
+    ):
+        _resolve_accounting_admissions(
+            {
+                "accounting_symbols": ["BTCUSDT"],
+                "accounting_admission_boundaries": {
+                    "BTCUSDT": BRIDGE_START.isoformat(),
+                },
+            },
+            prior={
+                "BTCUSDT": pd.Timestamp(
+                    "2026-07-27T00:00:00Z"
+                ).isoformat(),
+            },
+            accounting_symbols=("BTCUSDT",),
+            boundary=boundary,
         )
 
 

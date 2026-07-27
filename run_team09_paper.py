@@ -24,6 +24,7 @@ from crypto_trade.team09.authority import (
 from crypto_trade.team09.backtest import load_frozen_snapshot
 from crypto_trade.team09.live import persist_paper_tick, run_live_replay
 from crypto_trade.team09.live_data import (
+    BRIDGE_START,
     LiveMarketData,
     Team09PublicDataClient,
     build_live_market_data,
@@ -96,29 +97,29 @@ def paper_tick(
     refresh: bool,
 ) -> dict[str, Path]:
     frozen = load_frozen_snapshot()
+    cache_root = paper_dir / "market-cache"
+    prior_accounting_admissions = _paper_accounting_admissions(paper_dir)
     if refresh:
         with Team09PublicDataClient() as client:
             live_data = _refresh_cache_generation(
                 frozen,
                 boundary=boundary,
-                cache_root=paper_dir / "market-cache",
+                cache_root=cache_root,
                 client=client,
+                prior_accounting_admissions=prior_accounting_admissions,
             )
     else:
-        cache_dir = _current_cache_generation(
-            paper_dir / "market-cache",
-            required=True,
-        )
-        if cache_dir is None:
-            raise RuntimeError("Team 09 current cache generation is unavailable")
-        live_data = build_live_market_data(
+        live_data = _refresh_cache_generation(
             frozen,
             boundary=boundary,
-            cache_dir=cache_dir,
+            cache_root=cache_root,
             client=None,
+            prior_accounting_admissions=prior_accounting_admissions,
         )
     tick = run_live_replay(live_data, boundary=boundary)
-    return persist_paper_tick(tick, paper_dir)
+    paths = persist_paper_tick(tick, paper_dir)
+    _publish_committed_cache(paper_dir, live_data.cache_dir)
+    return paths
 
 
 def _refresh_cache_generation(
@@ -126,7 +127,8 @@ def _refresh_cache_generation(
     *,
     boundary: pd.Timestamp,
     cache_root: Path,
-    client: Team09PublicDataClient,
+    client: Team09PublicDataClient | None,
+    prior_accounting_admissions: dict[str, object] | None,
 ) -> LiveMarketData:
     cache_root.mkdir(parents=True, exist_ok=True)
     generations = cache_root / "generations"
@@ -146,6 +148,8 @@ def _refresh_cache_generation(
             boundary=boundary,
             cache_dir=staging,
             client=client,
+            prior_accounting_admissions=prior_accounting_admissions,
+            persist_accounting_admissions=client is None,
         )
     except Exception:
         failed_root = cache_root / "failed"
@@ -162,18 +166,151 @@ def _refresh_cache_generation(
     )
     generation = generations / generation_name
     if generation.exists():
-        raise RuntimeError(f"Team 09 cache generation already exists: {generation}")
-    os.replace(staging, generation)
-    _write_text_atomic(
-        generation.relative_to(cache_root).as_posix() + "\n",
-        cache_root / "CURRENT",
-    )
-    _prune_directories(generations, keep=9, preserve={generation})
+        verify_live_cache_manifest(generation)
+        if sha256_file(generation / "cache-manifest.json") != sha256_file(
+            manifest_path
+        ):
+            raise RuntimeError(
+                f"Team 09 cache generation collision: {generation}"
+            )
+        shutil.rmtree(staging)
+    else:
+        os.replace(staging, generation)
     return LiveMarketData(
         market_data=live_data.market_data,
         diagnostics=live_data.diagnostics,
         cache_dir=generation,
     )
+
+
+def _paper_accounting_admissions(
+    paper_dir: Path,
+) -> dict[str, object] | None:
+    integrity_path = paper_dir / "integrity.json"
+    if not integrity_path.is_file():
+        return None
+    payload = json.loads(integrity_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or payload.get("status") != "PASS":
+        raise RuntimeError("Team 09 prior paper integrity is not a PASS record")
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        raise RuntimeError("Team 09 prior paper diagnostics are missing")
+    admissions = data.get("accounting_admission_boundaries")
+    if admissions is not None:
+        if not isinstance(admissions, dict):
+            raise RuntimeError(
+                "Team 09 prior accounting admissions are malformed"
+            )
+        return dict(admissions)
+    legacy_symbols = data.get("accounting_symbols")
+    if not isinstance(legacy_symbols, list) or not all(
+        isinstance(symbol, str) and symbol
+        for symbol in legacy_symbols
+    ):
+        raise RuntimeError(
+            "Team 09 legacy accounting-symbol evidence is malformed"
+        )
+    return {
+        symbol: BRIDGE_START.isoformat()
+        for symbol in legacy_symbols
+    }
+
+
+def _integrity_bound_cache_generation(
+    paper_dir: Path,
+    *,
+    required: bool,
+) -> Path | None:
+    paper = paper_dir.resolve()
+    integrity_path = paper / "integrity.json"
+    if not integrity_path.is_file():
+        if required:
+            raise FileNotFoundError(
+                f"Team 09 paper integrity is missing: {integrity_path}"
+            )
+        return None
+    payload = json.loads(integrity_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or payload.get("status") != "PASS":
+        raise RuntimeError("Team 09 paper integrity is not a PASS record")
+    artifacts = payload.get("artifacts")
+    binding = artifacts.get("cache_manifest") if isinstance(artifacts, dict) else None
+    if not isinstance(binding, dict):
+        raise RuntimeError("Team 09 integrity cache binding is malformed")
+    relative = binding.get("path")
+    if (
+        not isinstance(relative, str)
+        or Path(relative).is_absolute()
+        or ".." in Path(relative).parts
+    ):
+        raise RuntimeError("Team 09 integrity cache binding is unsafe")
+    manifest = (paper / relative).resolve()
+    generations = (paper / "market-cache" / "generations").resolve()
+    if (
+        manifest.name != "cache-manifest.json"
+        or not manifest.parent.is_relative_to(generations)
+    ):
+        raise RuntimeError(
+            "Team 09 integrity does not bind a cache generation manifest"
+        )
+    if not manifest.is_file():
+        if required:
+            raise FileNotFoundError(
+                f"Team 09 integrity-bound cache is missing: {relative}"
+            )
+        return None
+    if (
+        manifest.stat().st_size != binding.get("size")
+        or sha256_file(manifest) != binding.get("sha256")
+        or binding.get("rows") != 1
+    ):
+        raise RuntimeError("Team 09 integrity-bound cache manifest drift")
+    verify_live_cache_manifest(manifest.parent)
+    return manifest.parent
+
+
+def _publish_committed_cache(paper_dir: Path, generation: Path) -> None:
+    paper = paper_dir.resolve()
+    cache_root = paper / "market-cache"
+    bound = _integrity_bound_cache_generation(paper, required=True)
+    if bound is None or bound != generation.resolve():
+        raise RuntimeError(
+            "Team 09 paper integrity does not bind the prepared cache generation"
+        )
+    _write_text_atomic(
+        bound.relative_to(cache_root).as_posix() + "\n",
+        cache_root / "CURRENT",
+    )
+    current = _current_cache_generation(cache_root, required=True)
+    if current != bound:
+        raise RuntimeError(
+            "Team 09 cache CURRENT does not match committed paper integrity"
+        )
+    _prune_directories(
+        cache_root / "generations",
+        keep=9,
+        preserve={bound, current},
+    )
+
+
+def _reconcile_current_from_integrity(paper_dir: Path) -> None:
+    paper = paper_dir.resolve()
+    bound = _integrity_bound_cache_generation(paper, required=False)
+    if bound is None:
+        return
+    cache_root = paper / "market-cache"
+    try:
+        current = _current_cache_generation(cache_root, required=False)
+    except (FileNotFoundError, RuntimeError):
+        current = None
+    if current != bound:
+        _write_text_atomic(
+            bound.relative_to(cache_root).as_posix() + "\n",
+            cache_root / "CURRENT",
+        )
+    if _current_cache_generation(cache_root, required=True) != bound:
+        raise RuntimeError(
+            "Team 09 could not reconcile CURRENT from paper integrity"
+        )
 
 
 def _current_cache_generation(
@@ -361,6 +498,7 @@ def main() -> int:
         raise SystemExit("cannot paper-trade a future boundary")
     process_deployment = verify_deployment_authority()
     with single_engine_lock(args.paper_dir.resolve()):
+        _reconcile_current_from_integrity(args.paper_dir.resolve())
         if args.once or requested is not None:
             _run_one(args, requested or current_boundary(), process_deployment)
             return 0

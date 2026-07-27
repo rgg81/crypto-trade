@@ -72,6 +72,7 @@ class LiveDataDiagnostics:
     excluded_current_contracts: Mapping[str, tuple[str, ...]]
     bridge_membership_symbols: tuple[str, ...]
     accounting_symbols: tuple[str, ...]
+    accounting_admission_boundaries: Mapping[str, str]
     current_membership_symbols: tuple[str, ...]
     completed_bridge_bar_rows: int
     bridge_funding_rows: int
@@ -537,6 +538,8 @@ def build_live_market_data(
     boundary: object,
     cache_dir: str | Path,
     client: Team09PublicDataClient | None,
+    prior_accounting_admissions: Mapping[str, object] | None = None,
+    persist_accounting_admissions: bool = False,
 ) -> LiveMarketData:
     """Extend frozen data through ``boundary`` and add a forming execution row.
 
@@ -550,6 +553,11 @@ def build_live_market_data(
     cache_manifest = verify_live_cache_manifest(
         cache,
         required=client is None,
+    )
+    cached_diagnostics = (
+        _load_json_mapping(cache / "diagnostics.json")
+        if (cache / "diagnostics.json").is_file()
+        else {}
     )
     if client is not None:
         info = client.exchange_info()
@@ -746,8 +754,22 @@ def build_live_market_data(
         )
     )
     historical_carried_symbols = historical_terminal_held_symbols()
+    prior_admission_symbols = _accounting_admission_symbols(
+        cached_diagnostics,
+        prior_accounting_admissions,
+    )
     accounting_symbols = tuple(
-        sorted(set(bridge_members) | set(historical_carried_symbols))
+        sorted(
+            set(bridge_members)
+            | set(historical_carried_symbols)
+            | prior_admission_symbols
+        )
+    )
+    accounting_admissions = _resolve_accounting_admissions(
+        cached_diagnostics,
+        prior=prior_accounting_admissions,
+        accounting_symbols=accounting_symbols,
+        boundary=live_boundary,
     )
     current_members = _membership_at(membership, live_boundary)
 
@@ -796,15 +818,25 @@ def build_live_market_data(
         .sort_values(["open_time", "symbol"])
         .reset_index(drop=True)
     )
+    causal_funding = _causal_accounting_rows(
+        funding,
+        time_column="funding_time",
+        admissions=accounting_admissions,
+    )
+    causal_marks = _causal_accounting_rows(
+        marks,
+        time_column="mark_time",
+        admissions=accounting_admissions,
+    )
     combined_funding = _combine_historical(
         frozen.funding,
-        funding,
+        causal_funding,
         time_column="funding_time",
         bridge_start=BRIDGE_START,
     )
     combined_marks = _combine_historical(
         frozen.mark_prices,
-        marks,
+        causal_marks,
         time_column="mark_time",
         bridge_start=BRIDGE_START,
     )
@@ -822,6 +854,28 @@ def build_live_market_data(
             or diagnostics.accounting_symbols != accounting_symbols
         ):
             raise RuntimeError("sealed cache diagnostics disagree with recomputed membership")
+        cached_admissions = cached_diagnostics.get(
+            "accounting_admission_boundaries"
+        )
+        if (
+            cached_admissions is not None
+            and diagnostics.accounting_admission_boundaries
+            != accounting_admissions
+        ):
+            raise RuntimeError(
+                "sealed cache diagnostics disagree with accounting admissions"
+            )
+        diagnostics = dataclasses.replace(
+            diagnostics,
+            accounting_admission_boundaries=accounting_admissions,
+        )
+        if persist_accounting_admissions:
+            _write_json_atomic(
+                diagnostics.to_dict(),
+                cache / "diagnostics.json",
+            )
+            write_live_cache_manifest(cache, boundary=live_boundary)
+            cache_manifest = verify_live_cache_manifest(cache)
         if cache_manifest is None:
             raise RuntimeError("cache-only replay has no verified cache manifest")
     else:
@@ -838,6 +892,7 @@ def build_live_market_data(
             excluded_current_contracts=exclusions,
             bridge_membership_symbols=bridge_members,
             accounting_symbols=accounting_symbols,
+            accounting_admission_boundaries=accounting_admissions,
             current_membership_symbols=current_members,
             completed_bridge_bar_rows=int(len(bars)),
             bridge_funding_rows=int(len(funding)),
@@ -1585,6 +1640,131 @@ def _combine_historical(
     return result.sort_values(keys).reset_index(drop=True)
 
 
+def _accounting_admission_symbols(
+    cached_diagnostics: Mapping[str, Any],
+    prior: Mapping[str, object] | None,
+) -> set[str]:
+    symbols: set[str] = set()
+    legacy = cached_diagnostics.get("accounting_symbols", ())
+    if not isinstance(legacy, (list, tuple)):
+        raise ValueError("cached accounting symbols are malformed")
+    for symbol in legacy:
+        if not isinstance(symbol, str) or not symbol:
+            raise ValueError("cached accounting symbols are malformed")
+        symbols.add(symbol)
+    for raw in (
+        cached_diagnostics.get("accounting_admission_boundaries"),
+        prior,
+    ):
+        if raw is None:
+            continue
+        if not isinstance(raw, Mapping):
+            raise ValueError("accounting admission boundaries must be an object")
+        for symbol in raw:
+            if not isinstance(symbol, str) or not symbol:
+                raise ValueError("accounting admission symbol is malformed")
+            symbols.add(symbol)
+    return symbols
+
+
+def _normalise_accounting_admissions(
+    raw: Mapping[str, object],
+    *,
+    boundary: pd.Timestamp,
+) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for symbol, value in raw.items():
+        if not isinstance(symbol, str) or not symbol:
+            raise ValueError("accounting admission symbol is malformed")
+        admission = exact_boundary(value)
+        if admission > boundary:
+            raise RuntimeError(
+                "accounting admission boundary is later than the replay boundary: "
+                f"{symbol}={admission.isoformat()}"
+            )
+        result[symbol] = admission.isoformat()
+    return dict(sorted(result.items()))
+
+
+def _resolve_accounting_admissions(
+    cached_diagnostics: Mapping[str, Any],
+    *,
+    prior: Mapping[str, object] | None,
+    accounting_symbols: Iterable[str],
+    boundary: pd.Timestamp,
+) -> dict[str, str]:
+    current = tuple(sorted(set(str(symbol) for symbol in accounting_symbols)))
+    cached_raw = cached_diagnostics.get("accounting_admission_boundaries")
+    if cached_raw is not None and not isinstance(cached_raw, Mapping):
+        raise ValueError("cached accounting admission boundaries are malformed")
+    cached = (
+        _normalise_accounting_admissions(cached_raw, boundary=boundary)
+        if isinstance(cached_raw, Mapping)
+        else {}
+    )
+    if prior is not None:
+        if not isinstance(prior, Mapping):
+            raise ValueError("prior accounting admission boundaries are malformed")
+        resolved = _normalise_accounting_admissions(prior, boundary=boundary)
+    elif cached:
+        resolved = dict(cached)
+    elif cached_diagnostics:
+        legacy = cached_diagnostics.get("accounting_symbols")
+        if not isinstance(legacy, (list, tuple)):
+            raise ValueError("legacy cached accounting symbols are malformed")
+        resolved = {
+            str(symbol): BRIDGE_START.isoformat()
+            for symbol in legacy
+        }
+    else:
+        resolved = {
+            symbol: BRIDGE_START.isoformat()
+            for symbol in current
+        }
+
+    unknown = set(resolved) - set(current)
+    if unknown:
+        raise RuntimeError(
+            "accounting admissions contain symbols outside the replay registry: "
+            f"{sorted(unknown)}"
+        )
+    for symbol in current:
+        if symbol not in resolved:
+            resolved[symbol] = boundary.isoformat()
+    for symbol, cached_boundary in cached.items():
+        expected = resolved.get(symbol)
+        if expected is not None and cached_boundary != expected:
+            raise RuntimeError(
+                "APPEND-INVARIANCE ABORT: accounting admission revised for "
+                f"{symbol}: {cached_boundary} != {expected}"
+            )
+    return dict(sorted(resolved.items()))
+
+
+def _causal_accounting_rows(
+    frame: pd.DataFrame,
+    *,
+    time_column: str,
+    admissions: Mapping[str, str],
+) -> pd.DataFrame:
+    if frame.empty:
+        return frame.copy()
+    required = {time_column, "symbol"}
+    missing = required - set(frame.columns)
+    if missing:
+        raise ValueError(f"accounting frame missing columns: {sorted(missing)}")
+    symbols = frame["symbol"].astype(str)
+    unknown = set(symbols) - set(admissions)
+    if unknown:
+        raise RuntimeError(
+            "accounting cache contains symbols without admission evidence: "
+            f"{sorted(unknown)}"
+        )
+    times = pd.to_datetime(frame[time_column], utc=True, errors="raise")
+    admitted = pd.to_datetime(symbols.map(admissions), utc=True, errors="raise")
+    return frame.loc[times >= admitted].copy()
+
+
 def _membership_at(membership: pd.DataFrame, boundary: pd.Timestamp) -> tuple[str, ...]:
     times = pd.to_datetime(membership["reconstitution_time"], utc=True)
     valid = times[times <= boundary]
@@ -1933,8 +2113,25 @@ def _diagnostics_from_mapping(payload: Mapping[str, Any]) -> LiveDataDiagnostics
     exclusions = payload.get("excluded_current_contracts")
     if not isinstance(exclusions, Mapping):
         raise ValueError("cached diagnostics exclusions are malformed")
+    boundary = exact_boundary(payload["boundary"])
+    accounting_symbols = tuple(
+        str(value) for value in payload["accounting_symbols"]
+    )
+    raw_admissions = payload.get("accounting_admission_boundaries")
+    if raw_admissions is None:
+        accounting_admissions = {
+            symbol: BRIDGE_START.isoformat()
+            for symbol in accounting_symbols
+        }
+    elif isinstance(raw_admissions, Mapping):
+        accounting_admissions = _normalise_accounting_admissions(
+            raw_admissions,
+            boundary=boundary,
+        )
+    else:
+        raise ValueError("cached accounting admission boundaries are malformed")
     diagnostics = LiveDataDiagnostics(
-        boundary=exact_boundary(payload["boundary"]),
+        boundary=boundary,
         fetched_at=_utc(payload["fetched_at"]),
         pure_crypto_policy_id=str(payload["pure_crypto_policy_id"]),
         current_pure_crypto_symbols=tuple(
@@ -1958,9 +2155,8 @@ def _diagnostics_from_mapping(payload: Mapping[str, Any]) -> LiveDataDiagnostics
         bridge_membership_symbols=tuple(
             str(value) for value in payload["bridge_membership_symbols"]
         ),
-        accounting_symbols=tuple(
-            str(value) for value in payload["accounting_symbols"]
-        ),
+        accounting_symbols=accounting_symbols,
+        accounting_admission_boundaries=accounting_admissions,
         current_membership_symbols=tuple(
             str(value) for value in payload["current_membership_symbols"]
         ),
