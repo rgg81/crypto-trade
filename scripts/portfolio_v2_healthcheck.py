@@ -33,11 +33,41 @@ CANDLE_MS = 8 * 60 * 60 * 1000
 # -4141 "Symbol is closed" = a prod-listed name absent from testnet (e.g. TLM: TRADING on prod,
 # NOT LISTED on testnet) — same family as -1121 invalid-symbol / -4140. Trades fine on production.
 TESTNET_ERR = {"-1121", "-4131", "-4411", "-4061", "-4046", "-4140", "-4141"}
+# Binance hard-rejects a timestamp >1000ms AHEAD of server time (-1021); alert below that so we
+# catch the drift while signed calls still intermittently succeed, rather than after they all fail.
+CLOCK_SKEW_ALERT_MS = 700
+CLOCK_SKEW_WARN_MS = 300
 
 
 def _proc_alive() -> bool:
     out = subprocess.run(["ps", "-eo", "cmd"], capture_output=True, text=True).stdout
     return PROC in out
+
+
+def _clock_skew_ms(base: str) -> float | None:
+    """Local clock offset vs Binance server time, in ms (positive = local AHEAD).
+
+    Binance REJECTS any signed request whose timestamp is >1000ms AHEAD of server time
+    (error -1021), and `recvWindow` does NOT relax that side — it only widens the
+    behind-tolerance. So a host clock running fast is a HARD trading blocker: every signed
+    call (get_positions, place_order, set_leverage) fails and the engine places NO orders,
+    while public kline fetches keep working and the log looks healthy. WSL hosts drift
+    ahead across a reboot/suspend when NTP is inactive, which is exactly how this bites.
+    Measured mid-flight (local clock sampled either side of the request) so network latency
+    doesn't masquerade as skew.
+    """
+    import json
+    import time as _t
+    import urllib.request
+
+    try:
+        t0 = _t.time() * 1000
+        with urllib.request.urlopen(f"{base}/fapi/v1/time", timeout=10) as r:
+            server = float(json.load(r)["serverTime"])
+        t1 = _t.time() * 1000
+        return (t0 + t1) / 2 - server
+    except Exception:
+        return None
 
 
 def _log_scan():
@@ -147,6 +177,20 @@ def main() -> None:
         except Exception:
             pass
 
+    # clock skew vs the exchange — a fast host clock blocks ALL signed calls (-1021)
+    auth_base = os.environ.get("BINANCE_AUTH_BASE_URL", "https://testnet.binancefuture.com")
+    skew = _clock_skew_ms(auth_base)
+    if skew is not None and skew > CLOCK_SKEW_ALERT_MS:
+        flags.append(
+            f"CLOCK SKEW {skew:+.0f}ms (local AHEAD of exchange; >1000ms => -1021 on every "
+            f"signed call, engine CANNOT place orders). "
+            f"Fix: sudo systemctl restart systemd-timesyncd"
+        )
+    elif skew is not None and abs(skew) > CLOCK_SKEW_WARN_MS:
+        info.append(
+            f"clock skew {skew:+.0f}ms vs exchange (watch; -1021 blocks trading at >1000ms)"
+        )
+
     # live account (v2 creds from env)
     pos_line = "positions: n/a (no creds / API error)"
     try:
@@ -188,7 +232,17 @@ def main() -> None:
             if conc > MAX_CONC:
                 info.append(f"concentration {conc:.0%} > {MAX_CONC:.0%} (info)")
     except Exception as e:
-        info.append(f"account query failed: {type(e).__name__}")
+        # surface the Binance error code — a bare exception name hides WHY (e.g. -1021 clock
+        # skew vs -2015 bad key vs -1003 rate limit), which cost real diagnosis time on 2026-07-27
+        detail = ""
+        resp = getattr(e, "response", None)
+        if resp is not None:
+            try:
+                body = resp.json()
+                detail = f" [{body.get('code')}: {body.get('msg')}]"
+            except Exception:
+                detail = f" [HTTP {resp.status_code}]"
+        info.append(f"account query failed: {type(e).__name__}{detail}")
 
     status = "ALERT" if flags else "OK"
     proc_s = "up" if alive else "DOWN"
