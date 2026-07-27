@@ -311,6 +311,23 @@ A SECOND book runs ALONGSIDE v1, fully isolated, on a SEPARATE testnet account. 
   Hardware Clock") — ntpdate is the one that works. Fixing the clock needs NO engine restart: each request
   is signed with a fresh timestamp, so trading resumes on the next tick by itself. Landing slightly BEHIND
   (negative skew, e.g. −50ms) is the safe side. Host-wide, so it fixes v1 too.
+  ⚠️ **BUT ntpdate does NOT HOLD on this host — measured, don't re-litigate (2026-07-27).** After a step to
+  −48ms the clock returns to +1.34s within ~40s and plateaus there (`t+0s −48ms, t+20s +867ms, t+40s
+  +1440ms, t+60..180s ≈ +1338ms`). WSL re-syncs the guest clock from the WINDOWS host, and the Windows
+  clock is the one that's wrong: `w32tm /query /status` showed `Leap Indicator: 3(not synchronized)`,
+  `Source: Local CMOS Clock`, `Last Successful Sync Time: unspecified`, with `w32time` at
+  `START_TYPE: 3 DEMAND_START` (so it never starts at boot). The peer (`time.windows.com,0x9`) IS
+  configured but wouldn't poll for ~9h. `w32tm /resync` and `sc start w32time` are BOTH refused from WSL
+  (`Access is denied`) — they need an ELEVATED Windows prompt:
+  `sc config w32time start= auto; net start w32time; w32tm /resync /force`.
+  **So a periodic ntpdate is NOT a viable stopgap** (drift returns faster than any sane cron), and
+  **`AuthenticatedBinanceClient` now self-corrects** (commit `4874fba2`) — it re-syncs its own offset from
+  `/fapi/v1/time` on a `-1021` and retries once, so host drift no longer blocks trading at all. Treat the
+  Windows fix as hygiene, not as the thing standing between the book and a rebalance.
+  📌 **Verifying a clock claim:** a ~1.3s error is INVISIBLE on any clock display — the taskbar will look
+  perfectly correct. Never accept "the clock is fine" (from a human OR from one good reading) without a
+  programmatic probe against `/fapi/v1/time`, AND a re-probe past 60s, since the host re-sync interval is
+  what silently undoes an in-WSL fix. The decisive test is a real signed call: `-1021` or not.
 - **HUNG engine (proc up, but frozen) — a distinct failure mode from a crash (2026-07-05).** A crash removes
   the proc (`STATUS: ENGINE DOWN`); a HANG leaves `proc=up` but the poll loop stops advancing. The tell: the
   engine was in an **actively-logging** state (a `tick error #N … retrying in 60s` storm writes a line every
@@ -364,6 +381,33 @@ ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regi
 auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
+- **2026-07-27 v27** — CLOCK DRIFT MADE HARMLESS IN CODE (`4874fba2`), after the host-side fix proved
+  unreachable. Continues the v26 incident. The Windows fix could NOT be landed: `w32time` was stopped,
+  `DEMAND_START`, never synced (`Source: Local CMOS Clock`), and every corrective command (`sc start`,
+  `w32tm /resync`) is refused from WSL with `Access is denied`; three attempts from the Windows side did
+  not change a single field. Measurement also killed the ntpdate stopgap: after stepping to −48ms the
+  clock returns to +1.34s **within ~40 seconds** and plateaus (WSL re-syncs from the bad Windows clock),
+  so no cron cadence can cover a rebalance. FIX: `AuthenticatedBinanceClient` now self-corrects — signs
+  with a cached offset (0 until proven otherwise) and, on a `-1021`, re-syncs from `/fapi/v1/time` and
+  retries ONCE. Chose REACTIVE over the usual proactive SDK sync deliberately: no extra round-trip on the
+  happy path, and it doesn't perturb the 14 existing auth tests that index `captured[0]` (a proactive
+  probe broke 8 of them — the failure that redirected the design). Retry is safe for orders because
+  `-1021` is rejected at the gateway before matching; capped at one retry so a persistently-bad clock
+  errors rather than loops. VERIFIED against the live API with the host still +1.32s off: first call
+  re-syncs to −1364ms, then 8/8 signed calls succeed; previously 0/1. Added
+  `tests/test_auth_client_time_offset.py` (6 tests — first coverage of the signing path): incident-exact
+  skew, no-extra-request when healthy, offset reuse, single-placement on order retry, bounded retry,
+  probe-failure not masking the original error. Full live+portfolio+auth scope 273 passed / 0 failed
+  (4 pre-existing collection errors in v1-iteration test files are unrelated — verified by stashing).
+  Engine restarted to load it (PGID-kill, DB KEPT, log appended). **Two process lessons.** (1) The
+  self-match trap is WIDER than documented: `ps -eo cmd | grep run_portfolio_v2` also false-positives when
+  YOUR OWN shell command contains the pattern — it reported "STILL ALIVE" against my own bash process.
+  Verify by PID (`kill -0 <pid>`) or match the venv python (`/venv\/bin\/python3 run_portfolio_v2/`),
+  never a bare cmd-grep. (2) A user (or a single green reading) asserting "the clock is fixed" is not
+  evidence — 1.3s is invisible on a display, and one signed call succeeded by luck mid-incident while the
+  skew was unchanged. Always probe programmatically, re-probe past 60s, and treat a real signed call as
+  the arbiter. NOTE this fixes the v2 worktree's `src/` only; v1 (quant-research) has its own copy and is
+  still exposed — port `4874fba2` before v1 real money.
 - **2026-07-27 v26** — CLOCK-SKEW blocker found, fixed, and made self-detecting (+ a process lesson about
   giving up too early on sudo). INCIDENT: host rebooted ~07:14 UTC; both engines were relaunched
   concurrently ~07:18/07:41 (un-staggered — the v25 hazard, nobody was watching), a ~3h DNS outage
