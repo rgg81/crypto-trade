@@ -58,10 +58,22 @@ def _get_json(url: str):
 
 
 def _fetch_funding_rates(sym: str, start_ms: int, end_ms: int, base: str):
-    """Historical funding rates for one symbol on one venue → [(fundingTime_ms, rate), ...]."""
-    data = _get_json(
+    """Historical funding rates for one symbol on one venue → [(fundingTime_ms, rate), ...].
+
+    Returns None if the FETCH ITSELF failed (network/timeout/418), as distinct from [] meaning
+    the venue answered and genuinely has no history for this symbol. Callers must not conflate
+    the two: on 2026-07-28 a transient fetch failure on BCHUSDT was reported as "not on prod →
+    assumed 0" for a symbol that is plainly TRADING on production, silently dropping ~103
+    settlements from the repricing.
+    """
+    url = (
         f"{base}/fapi/v1/fundingRate?symbol={sym}&startTime={start_ms}&endTime={end_ms}&limit=1000"
     )
+    data = _get_json(url)
+    if data is None:  # one cheap retry — these failures are overwhelmingly transient
+        data = _get_json(url)
+    if data is None:
+        return None
     rows = []
     if isinstance(data, list):
         for r in data:
@@ -89,9 +101,11 @@ def _prod_repriced_funding(funding_events: list):
     funding_events: [(symbol, time_ms, testnet_income), ...] (one row per FUNDING_FEE settlement).
     Per event:  prod_income = testnet_income × (prod_rate / testnet_rate)  — notional cancels.
     Returns dict with prod_total, testnet_matched (raw testnet $ that WAS repriced),
-    n_matched, n_unmatched, missing_syms (symbols with no prod funding history — e.g. testnet-only
-    listings; their events are assumed 0 prod funding since we couldn't hold them on production),
-    and per-symbol (testnet, prod) contributions for the top-payer display.
+    n_matched, n_unmatched, missing_syms (symbols the venue confirms have no prod funding history —
+    e.g. testnet-only listings; their events are assumed 0 prod funding since we couldn't hold them
+    on production), failed_syms (symbols whose prod fetch ERRORED — an unknown, NOT a delisting;
+    reported separately so a network blip is never read as "not on prod"), and per-symbol
+    (testnet, prod) contributions for the top-payer display.
     """
     out = {
         "prod_total": 0.0,
@@ -99,6 +113,7 @@ def _prod_repriced_funding(funding_events: list):
         "n_matched": 0,
         "n_unmatched": 0,
         "missing_syms": [],
+        "failed_syms": [],
         "by_sym": {},
     }
     if not funding_events:
@@ -110,7 +125,11 @@ def _prod_repriced_funding(funding_events: list):
     hi = max(t for _, t, _ in funding_events) + EIGHT_H_MS
     for sym, evs in by_sym.items():
         prod_rows = _fetch_funding_rates(sym, lo, hi, PROD_BASE)
-        if not prod_rows:  # symbol not listed on production → no prod-funding concept
+        if prod_rows is None:  # fetch ERRORED — unknown, not evidence of a delisting
+            out["failed_syms"].append(sym)
+            out["n_unmatched"] += len(evs)
+            continue
+        if not prod_rows:  # venue answered: symbol genuinely has no prod funding history
             out["missing_syms"].append(sym)
             out["n_unmatched"] += len(evs)
             continue
@@ -256,12 +275,19 @@ def main() -> None:
     # funding repricing detail
     miss = rp["missing_syms"]
     missnote = f"; {len(miss)} sym(s) not on prod → assumed 0: {','.join(miss[:4])}" if miss else ""
+    failed = rp["failed_syms"]
+    failnote = (
+        f"; ⚠ {len(failed)} sym(s) prod-funding FETCH FAILED (transient, NOT a delisting; "
+        f"their funding is excluded → rerun): {','.join(failed[:4])}"
+        if failed
+        else ""
+    )
     unm = f", {rp['n_unmatched']} unmatched" if rp["n_unmatched"] else ""
     annp = (funding_prod / days * 365) if days > 0 else 0.0
     print(
         f"  FUNDING repriced testnet→prod: ledger {funding_tn:+.2f} → prod-equivalent "
         f"{funding_prod:+.2f} over {days:.1f}d (~{annp:+,.0f}/yr) "
-        f"[{rp['n_matched']} settlements{unm}{missnote}]"
+        f"[{rp['n_matched']} settlements{unm}{missnote}{failnote}]"
     )
     # biggest movers (by absolute testnet contribution — where the artifact bit hardest)
     tops = sorted(rp["by_sym"].items(), key=lambda kv: abs(kv[1][0]), reverse=True)[:3]
