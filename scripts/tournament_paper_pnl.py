@@ -38,12 +38,13 @@ def _window_return(net: pd.Series, lo: pd.Timestamp) -> float:
     return float((1 + s).cumprod().iloc[-1] - 1) if len(s) else 0.0
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--start", default=DESK_T0)
-    ap.add_argument("--equity", type=float, default=DESK_EQUITY)
-    args = ap.parse_args()
+def compute_stats(start: str = DESK_T0, equity: float = DESK_EQUITY) -> dict:
+    """Recompute the paper book from data and return the digest stats as a dict.
 
+    Single source of truth for both the full digest (this script) and the compact one-liner
+    the watchdog prints. SHA-checks the frozen submission first (raises on mutation — an
+    integrity failure the caller surfaces). ~20-40s (loads the full-history universe).
+    """
     tp.check_submission_shas(st.TEAM_DIR)
     coins = st.load_universe()
     pn, scoring, elig = st._panels(coins)
@@ -54,17 +55,13 @@ def main() -> None:
     tp.purge_team_modules()
     net, w, parts = te.net_series(raw, pn, scoring)
 
-    lo = pd.Timestamp(args.start)
+    lo = pd.Timestamp(start)
     last = net.index.max()
     hi = last + pd.Timedelta(hours=8)
     m = te.evaluate(net, w, parts, lo=lo, hi=hi)
     s = net[net.index >= lo]
-
     cum = _window_return(net, lo)
-    eq_now = args.equity * (1 + cum)
     d1 = _window_return(net, last - pd.Timedelta(hours=24)) if len(s) else 0.0
-    days = (last - lo).total_seconds() / 86400 if len(s) else 0.0
-    sharpe = f"{m.sharpe:+.2f}" if np.isfinite(m.sharpe) else "n/a (<2mo)"
 
     # Decompose net on the DEPLOYED (vol-target-scaled) basis so price + funding − cost ties to
     # ACCUM P&L. parts["pnl"/"fpnl"/"cost"] are PRE-scale (gross≈1); the deployed book is
@@ -72,26 +69,58 @@ def main() -> None:
     # different basis than the headline and look ~1.6× too large.
     win = (net.index >= lo) & (net.index < hi)
     sc = parts["scale"].reindex(net.index)
-    price_d = float((parts["pnl"].reindex(net.index) * sc)[win].sum()) * args.equity
-    fund_d = float((parts["fpnl"].reindex(net.index) * sc)[win].sum()) * args.equity
-    cost_d = float((parts["cost"].reindex(net.index) * sc)[win].sum()) * args.equity
-
-    print("=== crypto-cup-01 paper desk (team-02 breakout) — PnL digest ===")
-    print(f"window {lo.date()} → {last}  ({days:.1f}d, {len(s)} candles)")
-    print(f"  ACCUM P&L   {cum * 100:+.2f}%   ${args.equity * cum:+,.0f}   equity ${eq_now:,.0f}")
-    print(f"  last 24h    {d1 * 100:+.2f}%")
-    print(f"  maxDD       {m.maxdd * 100:.1f}%    sharpe {sharpe}")
-    print(f"  decomp $    price {price_d:+,.0f}  funding {fund_d:+,.0f}  cost {cost_d:-,.0f}")
-    print(f"  turnover    {m.ann_turnover:.0f}x/yr")
-    # DEPLOYED book = w × vol-target scale (matches the desk log's target_gross), not the
-    # pre-scale normalized w (which is gross≈1).
     deployed = w.mul(parts["scale"], axis=0).iloc[-1]
-    n_long = int((deployed > 1e-9).sum())
-    n_short = int((deployed < -1e-9).sum())
-    print(
-        f"  book        gross {deployed.abs().sum():.3f}  net {deployed.sum():+.3f}  "
-        f"{n_long}L/{n_short}S"
+    return {
+        "start": lo.date(),
+        "last": last,
+        "days": (last - lo).total_seconds() / 86400 if len(s) else 0.0,
+        "n_candles": len(s),
+        "accum_pct": cum * 100,
+        "accum_usd": equity * cum,
+        "equity": equity * (1 + cum),
+        "d1_pct": d1 * 100,
+        "maxdd_pct": m.maxdd * 100,
+        "sharpe": f"{m.sharpe:+.2f}" if np.isfinite(m.sharpe) else "n/a (<2mo)",
+        "price_usd": float((parts["pnl"].reindex(net.index) * sc)[win].sum()) * equity,
+        "funding_usd": float((parts["fpnl"].reindex(net.index) * sc)[win].sum()) * equity,
+        "cost_usd": float((parts["cost"].reindex(net.index) * sc)[win].sum()) * equity,
+        "turnover": m.ann_turnover,
+        "gross": float(deployed.abs().sum()),
+        "net": float(deployed.sum()),
+        "n_long": int((deployed > 1e-9).sum()),
+        "n_short": int((deployed < -1e-9).sum()),
+    }
+
+
+def oneline(d: dict) -> str:
+    """Compact single-line P&L pulse (used by the watchdog)."""
+    return (
+        f"P&L {d['accum_pct']:+.2f}% (${d['accum_usd']:+,.0f}, eq ${d['equity']:,.0f}) "
+        f"24h {d['d1_pct']:+.2f}% maxDD {d['maxdd_pct']:.1f}% | "
+        f"price {d['price_usd']:+,.0f} fund {d['funding_usd']:+,.0f} cost {d['cost_usd']:-,.0f} | "
+        f"book g{d['gross']:.2f} n{d['net']:+.2f} {d['n_long']}L/{d['n_short']}S"
     )
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--start", default=DESK_T0)
+    ap.add_argument("--equity", type=float, default=DESK_EQUITY)
+    args = ap.parse_args()
+    d = compute_stats(args.start, args.equity)
+
+    p, f, c = d["price_usd"], d["funding_usd"], d["cost_usd"]
+    accum = f"{d['accum_pct']:+.2f}%   ${d['accum_usd']:+,.0f}   equity ${d['equity']:,.0f}"
+    decomp = f"price {p:+,.0f}  funding {f:+,.0f}  cost {c:-,.0f}"
+    book = f"gross {d['gross']:.3f}  net {d['net']:+.3f}  {d['n_long']}L/{d['n_short']}S"
+    print("=== crypto-cup-01 paper desk (team-02 breakout) — PnL digest ===")
+    print(f"window {d['start']} → {d['last']}  ({d['days']:.1f}d, {d['n_candles']} candles)")
+    print(f"  ACCUM P&L   {accum}")
+    print(f"  last 24h    {d['d1_pct']:+.2f}%")
+    print(f"  maxDD       {d['maxdd_pct']:.1f}%    sharpe {d['sharpe']}")
+    print(f"  decomp $    {decomp}")
+    print(f"  turnover    {d['turnover']:.0f}x/yr")
+    print(f"  book        {book}")
 
 
 if __name__ == "__main__":

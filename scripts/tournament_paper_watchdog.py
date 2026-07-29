@@ -134,7 +134,19 @@ def main() -> int:
     print(
         f"[watchdog] OK — child={child}, log {log_age:.0f}m, last rebalance {rb_age:.1f}h ({state})"
     )
+    _print_stats()  # basic P&L pulse — best-effort, AFTER the liveness verdict
     return 0
+
+
+def _print_stats() -> None:
+    """Compact P&L pulse. Best-effort and lazily imported so a slow/failing recompute can NEVER
+    block or break the watchdog's liveness+recovery job (which already ran above)."""
+    try:
+        import tournament_paper_pnl as pnl  # scripts/ is on sys.path[0]; import runs the SHA check
+
+        print(f"[watchdog] stats — {pnl.oneline(pnl.compute_stats())}")
+    except Exception as e:  # noqa: BLE001 — stats are informational; never fail the watchdog
+        print(f"[watchdog] stats — n/a ({type(e).__name__}: {e})")
 
 
 if __name__ == "__main__":

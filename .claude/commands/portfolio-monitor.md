@@ -366,6 +366,14 @@ Runs the crypto-cup-01 winner **team-02 breakout-channel** for a 6-month forward
   engine that is merely retrying through a 418 ban keeps its log advancing (tick errors every
   60s), so `log_age < 20 min` → the watchdog leaves it ALONE (never kills a healthy retrier and
   never adds relaunch load to an active ban). `--force-relaunch` for a manual kill+relaunch.
+  **P&L PULSE (added 2026-07-27):** on the healthy/no-op path the watchdog ALSO prints a compact
+  accum-P&L line — `[watchdog] stats — P&L <±x.xx>% ($<±N>, eq $<E>) 24h <±y.yy>% maxDD <z>% |
+  price/fund/cost | book g/n/L/S`. It's `tournament_paper_pnl.oneline(compute_stats())` (the exact
+  same recompute the digest uses — single source of truth), lazily imported inside a try/except AFTER
+  the liveness verdict so a slow/failing ~20-40s recompute can NEVER block or break recovery (stats
+  degrade to `n/a (...)`, the watchdog's real job already ran). So even the 20-min watchdog tick now
+  carries a P&L heartbeat; it does NOT replace the 4-hourly monitor digest (which also runs the
+  healthcheck + reads the log tail). PnL in this line is informational only — HANDS-OFF, never an alert.
   **CAVEAT — session-bound:** both the monitor cron and this watchdog live only in the current
   Claude session and expire in 7 days; they self-heal the desk WHILE the session runs, but for
   true unattended 6-month operation the desk should be a **systemd --user service** (survives
