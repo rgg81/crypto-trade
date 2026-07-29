@@ -36,13 +36,24 @@ def _build(monkeypatch, *, local_skew_ms: float):
         if request.url.path == "/fapi/v1/time":
             return httpx.Response(200, json={"serverTime": SERVER_NOW_MS})
         ts = int(parse_qs(urlparse(str(request.url)).query)["timestamp"][0])
-        # Mirror Binance's actual rule so the test fails the way production would.
+        recv = int(parse_qs(urlparse(str(request.url)).query)["recvWindow"][0])
+        # Mirror BOTH of Binance's timestamp rules so the test fails the way production would.
+        # Note both rejections carry code -1021 — the ahead-cliff is a fixed 1000ms and is NOT
+        # widened by recvWindow, whereas the behind-tolerance IS recvWindow.
         if ts > SERVER_NOW_MS + 1000:
             return httpx.Response(
                 400,
                 json={
                     "code": -1021,
                     "msg": "Timestamp for this request was 1000ms ahead of the server's time.",
+                },
+            )
+        if ts < SERVER_NOW_MS - recv:
+            return httpx.Response(
+                400,
+                json={
+                    "code": -1021,
+                    "msg": "Timestamp for this request is outside of the recvWindow.",
                 },
             )
         return httpx.Response(200, content=json.dumps({"ok": True}))
@@ -62,6 +73,24 @@ def test_signed_call_recovers_from_host_clock_running_fast(monkeypatch):
     assert c.get_positions() == {"ok": True}
     assert c._time_offset_ms == pytest.approx(-1340, abs=5)
     # rejected attempt -> time probe -> successful retry
+    assert [r.url.path for r in seen][-3:] == [
+        "/fapi/v3/positionRisk",
+        "/fapi/v1/time",
+        "/fapi/v3/positionRisk",
+    ]
+
+
+def test_signed_call_recovers_from_host_clock_running_slow(monkeypatch):
+    """Drift the OTHER way must also recover.
+
+    Binance reports a too-old timestamp as -1021 as well ("outside of the recvWindow"), so the
+    same re-sync path covers it. Live on 2026-07-29 the host was free-running and had drifted
+    from +1.3s AHEAD to -0.4s BEHIND in ~2 days, heading for the -5000ms recvWindow floor — so
+    this direction is a real trajectory, not a hypothetical.
+    """
+    c, seen = _build(monkeypatch, local_skew_ms=-9000)
+    assert c.get_positions() == {"ok": True}
+    assert c._time_offset_ms == pytest.approx(9000, abs=5)
     assert [r.url.path for r in seen][-3:] == [
         "/fapi/v3/positionRisk",
         "/fapi/v1/time",
