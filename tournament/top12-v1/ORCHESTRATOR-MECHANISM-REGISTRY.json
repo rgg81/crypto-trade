@@ -1,0 +1,72 @@
+{
+  "collision_policy": {
+    "alpha_payoff_must_be_distinct": true,
+    "feature_family_alone_is_not_sufficient": true,
+    "pivot_requires_organizer_registration_before_market_access": true,
+    "shared_risk_controls_do_not_create_a_collision": true
+  },
+  "schema_version": 1,
+  "teams": {
+    "team-01": {
+      "economic_payoff": "delayed response after another eligible coin's completed information shock",
+      "mandate": "causal-cross-coin-response-delay",
+      "primary_structure": "directed lag graph"
+    },
+    "team-02": {
+      "economic_payoff": "directional asymmetry following a transition out of sustained range compression",
+      "mandate": "range-compression-expansion-asymmetry",
+      "primary_structure": "own-coin volatility-state transition"
+    },
+    "team-03": {
+      "economic_payoff": "persistence or rejection encoded by completed-bar auction geometry",
+      "mandate": "auction-path-shape-persistence",
+      "primary_structure": "own-coin wick-body-close-location state"
+    },
+    "team-04": {
+      "economic_payoff": "reversion of price moves that are large relative to contemporaneous causal liquidity capacity",
+      "mandate": "liquidity-impact-elasticity-reversion",
+      "primary_structure": "return-to-volume impact elasticity"
+    },
+    "team-05": {
+      "economic_payoff": "recoupling after cross-sectional return dispersion and breadth diverge",
+      "mandate": "dispersion-breadth-recoupling",
+      "primary_structure": "market-level dispersion state with coin residual allocation"
+    },
+    "team-06": {
+      "economic_payoff": "state-dependent decay path after discontinuous completed-price jumps",
+      "mandate": "jump-aftershock-decay-state",
+      "primary_structure": "event-time hazard state machine"
+    },
+    "team-07": {
+      "economic_payoff": "price response to changes in the slope and acceleration of settled funding",
+      "mandate": "funding-curve-acceleration",
+      "primary_structure": "settled-funding derivative curve"
+    },
+    "team-08": {
+      "economic_payoff": "rotation between central and peripheral coins as the causal correlation network fragments",
+      "mandate": "correlation-network-centrality-rotation",
+      "primary_structure": "rolling correlation graph topology"
+    },
+    "team-09": {
+      "economic_payoff": "continuation or reversal when trading-intensity time accelerates relative to wall-clock time",
+      "mandate": "volume-clock-intensity-transition",
+      "primary_structure": "business-time versus clock-time state"
+    },
+    "team-10": {
+      "economic_payoff": "systematic change in behavior as contracts season after their first full six-month eligibility",
+      "mandate": "contract-maturation-seasoning",
+      "primary_structure": "causal contract-age cohort"
+    },
+    "team-11": {
+      "economic_payoff": "directional allocation when recent return-sign sequences move between ordered and high-entropy states",
+      "mandate": "return-sign-entropy-predictability",
+      "primary_structure": "own-coin symbolic-sequence entropy"
+    },
+    "team-12": {
+      "economic_payoff": "relative resilience and fragility when downside co-movement enters a tail-contagion state",
+      "mandate": "downside-tail-dependence-contagion",
+      "primary_structure": "conditional downside-dependence network"
+    }
+  },
+  "tournament": "quant-portfolio-blind-top12-v1"
+}

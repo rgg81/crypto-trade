@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "team_id": "team-09",
+  "candidate_id": "team09-vcit-baseline-v1",
+  "parent_candidate_id": null,
+  "mechanism": "volume-clock-intensity-transition",
+  "hypothesis": "Returns aligned with an acceleration of a coin's own normalized trading-intensity clock persist, while returns observed during deceleration fade.",
+  "falsifier": "Falsify if the signal reduces to a static raw-volume rank, vanishes after within-coin activity normalization, lacks positive contribution from either side, or is unstable across the declared formation and rebalance grids.",
+  "formation_horizon": "60d normalization; 21d slow state; 3d fast state; 5d return",
+  "rebalance_horizon": "1d",
+  "control_profile": "controls-off",
+  "neighborhood_id": null,
+  "neighborhood_coordinates": {},
+  "tags": [
+    "baseline",
+    "formation-grid",
+    "rebalance-grid",
+    "role-check"
+  ],
+  "material_parameters": {
+    "bar_hours": 8,
+    "normalization_bars": 180,
+    "normalization_minimum_bars": 90,
+    "fast_intensity_bars": 9,
+    "slow_intensity_bars": 63,
+    "transition_lag_bars": 3,
+    "return_bars": 15,
+    "return_volatility_bars": 63,
+    "activity_clip": 4.0,
+    "transition_clip": 4.0,
+    "return_clip": 4.0,
+    "maximum_gross": 0.8,
+    "maximum_absolute_net": 0.2,
+    "maximum_symbol_weight": 0.08,
+    "rebalance_utc_hour": 0
+  }
+}

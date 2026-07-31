@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "policy_id": "t11-rsep-baseline-v1-risk",
+  "same_boundary_reentry": false,
+  "volatility_target": {
+    "enabled": false,
+    "lookback_days": 20,
+    "annualized_target": 0.15,
+    "minimum_scale": 0.5,
+    "maximum_scale": 1.0
+  },
+  "drawdown_brakes": [
+    {
+      "drawdown": 0.1,
+      "gross_scale": 0.75
+    },
+    {
+      "drawdown": 0.2,
+      "gross_scale": 0.5
+    },
+    {
+      "drawdown": 0.3,
+      "gross_scale": 0.0
+    }
+  ],
+  "position_stop": {
+    "enabled": false,
+    "loss_fraction": 0.1,
+    "cooldown_bars": 3
+  },
+  "time_stop": {
+    "enabled": false,
+    "maximum_holding_bars": 30,
+    "cooldown_bars": 1
+  },
+  "turnover_limit": {
+    "enabled": true,
+    "maximum_one_way_turnover": 0.8
+  },
+  "side_scaling": {
+    "long_scale": 1.0,
+    "short_scale": 1.0
+  }
+}

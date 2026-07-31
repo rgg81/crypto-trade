@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "team_id": "team-02",
+  "candidate_id": "t02-rcea-baseline-v1",
+  "parent_candidate_id": null,
+  "mechanism": "range-compression-expansion-asymmetry",
+  "hypothesis": "A transition from sustained own-coin range compression into a directionally efficient completed expansion bar carries asymmetric next-open information: moderate upside releases persist longer, while downside releases require a larger and cleaner displacement and decay faster.",
+  "falsifier": "Falsify if direction-conditioned compression releases are symmetric, if the stricter short and longer-lived long response is unstable across the declared formation and rebalance grid or market roles, or if next-open trading costs consume the edge.",
+  "formation_horizon": "42d (126 completed 8h bars; 36-bar compression state)",
+  "rebalance_horizon": "2d (6 completed 8h bars)",
+  "control_profile": "declarative-volatility-drawdown-stop-turnover-controls-v1",
+  "neighborhood_id": null,
+  "neighborhood_coordinates": {},
+  "tags": [
+    "baseline",
+    "formation-grid",
+    "rebalance-grid",
+    "role-check"
+  ],
+  "material_parameters": {
+    "bar_hours": 8,
+    "formation_bars": 126,
+    "compression_bars": 36,
+    "compression_median_ratio_maximum": 0.68,
+    "compression_upper_quartile_ratio_maximum": 0.82,
+    "up_expansion_multiple": 1.75,
+    "up_close_location_minimum": 0.72,
+    "up_body_efficiency_minimum": 0.42,
+    "down_expansion_multiple": 2.1,
+    "down_close_location_maximum": 0.18,
+    "down_body_efficiency_minimum": 0.55,
+    "long_holding_bars": 12,
+    "short_holding_bars": 6,
+    "rebalance_bars": 6,
+    "two_sided_budget_per_side": 0.36,
+    "one_sided_budget": 0.2,
+    "maximum_symbol_weight": 0.08,
+    "maximum_gross_target": 0.8,
+    "maximum_absolute_net_target": 0.2
+  }
+}

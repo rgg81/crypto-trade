@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "team_id": "team-03",
+  "candidate_id": "team03-auction-shape-baseline-v1",
+  "parent_candidate_id": null,
+  "mechanism": "auction-path-shape-persistence",
+  "hypothesis": "Persistent same-direction acceptance and rejection geometry in completed 8h auctions predicts continuation of directional pressure over the next daily holding interval after removing cross-sectional exposure to raw intrabar return magnitude.",
+  "falsifier": "Reject the mechanism if it lacks both long- and short-role contribution, sign inversion is not worse, magnitude-neutralized performance disappears, or adjacent formation, rebalance, and shape-threshold coordinates reveal an isolated optimum.",
+  "formation_horizon": "12 completed 8h bars",
+  "rebalance_horizon": "24h",
+  "control_profile": "baseline-controls-off",
+  "neighborhood_id": null,
+  "neighborhood_coordinates": {},
+  "tags": [
+    "baseline",
+    "formation-grid",
+    "rebalance-grid",
+    "role-check",
+    "raw-magnitude-neutralized"
+  ],
+  "material_parameters": {
+    "formation_bars": 12,
+    "minimum_active_states": 3,
+    "acceptance_body_fraction_minimum": 0.18,
+    "acceptance_close_location_minimum": 0.3,
+    "rejection_wick_asymmetry_minimum": 0.18,
+    "rejection_body_fraction_maximum": 0.45,
+    "acceptance_weight": 0.6,
+    "rejection_weight": 0.4,
+    "raw_magnitude_neutralization": "cross-sectional-linear-residual",
+    "rebalance_time_utc": "00:00",
+    "positions_per_side": 3,
+    "position_weight": 0.08
+  }
+}

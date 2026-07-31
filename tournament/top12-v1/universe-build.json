@@ -1,0 +1,16 @@
+{
+  "builder_path": "scripts/build_top12_universe.py",
+  "builder_sha256": "2ea5708599627822dab2ae13ca22795fe3bcec3de96c95ab90659f1c54a44825",
+  "data_manifest_path": "tournament/top12/data_manifest.json",
+  "data_manifest_sha256": "0ced737d1ee62f5a45470c7e363510d4e30aa5a9eb98f82cd17df94caac31198",
+  "first_reconstitution": "2020-08-03T00:00:00+00:00",
+  "last_reconstitution": "2026-06-29T00:00:00+00:00",
+  "membership_rows": 3708,
+  "membership_sha256": "084e4f19b40053fcb2188d35821bedc70ff680ba4af17e7ad032c1253f31fb87",
+  "membership_symbols": 61,
+  "schema_version": 1,
+  "source_manifest_sha256": "077eb036d262befec80f7013084fe6906859f7c3bbe2f8c193c9d9ec68e367c3",
+  "trailing_complete_days": 180,
+  "universe_size": 12,
+  "weekly_reconstitutions": 309
+}

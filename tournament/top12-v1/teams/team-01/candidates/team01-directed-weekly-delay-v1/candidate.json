@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "team_id": "team-01",
+  "candidate_id": "team01-directed-weekly-delay-v1",
+  "parent_candidate_id": null,
+  "mechanism": "causal-cross-coin-response-delay",
+  "hypothesis": "A point-in-time directed leader shock predicts a delayed same-sign weekly response in an under-reacting eligible follower, while a follower that has already overshot the leader should partially reverse.",
+  "falsifier": "Falsify if lead-over-reverse direction is unstable across eras, either long or short shock roles fail, chop filtering adds no value, sign inversion is competitive, or the effect does not survive mandatory 2x and 3x costs.",
+  "formation_horizon": "20 completed 7d returns",
+  "rebalance_horizon": "7d",
+  "control_profile": "weekly-low-gross-declarative-controls",
+  "neighborhood_id": "team01-weekly-delay-local-v1",
+  "neighborhood_coordinates": {
+    "calibration_weeks": 20,
+    "minimum_lag_correlation": 0.15,
+    "minimum_directional_edge": 0.05,
+    "shock_z_threshold": 0.75,
+    "underresponse_ratio": 0.5,
+    "overshoot_ratio": 1.25,
+    "maximum_pairs": 4,
+    "rebalance_days": 7
+  },
+  "tags": [
+    "baseline",
+    "formation-grid",
+    "rebalance-grid",
+    "role-check",
+    "directed-lead-lag",
+    "weekly-cost-control"
+  ],
+  "material_parameters": {
+    "bar_hours": 8,
+    "calibration_weeks": 20,
+    "minimum_pair_observations": 12,
+    "minimum_lag_correlation": 0.15,
+    "minimum_directional_edge": 0.05,
+    "shock_z_threshold": 0.75,
+    "underresponse_ratio": 0.5,
+    "overshoot_ratio": 1.25,
+    "overshoot_scale": 0.5,
+    "maximum_pairs": 4,
+    "maximum_snapshot_staleness_hours": 12,
+    "rebalance_days": 7,
+    "target_gross": 0.48,
+    "maximum_symbol_weight": 0.08
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "team_id": "team-12",
+  "candidate_id": "t12-tail-contagion-baseline-v1",
+  "parent_candidate_id": null,
+  "mechanism": "downside-tail-dependence-contagion",
+  "hypothesis": "When the cross-sectional crypto market proxy enters its downside tail, contracts with low excess co-crash frequency and low tail-loss amplification will outperform contracts with high conditional fragility over the next weekly holding interval.",
+  "falsifier": "Falsify if tail conditioning adds no value across the required formation and rebalance matrix, sign inversion is not materially worse, chronological or regime breadth fails, or the short sleeve is primarily generic market beta.",
+  "formation_horizon": "84d",
+  "rebalance_horizon": "7d",
+  "control_profile": "controls-off-baseline",
+  "neighborhood_id": null,
+  "neighborhood_coordinates": {},
+  "tags": [
+    "baseline",
+    "formation-grid",
+    "rebalance-grid",
+    "role-check"
+  ],
+  "material_parameters": {
+    "bar_hours": 8,
+    "formation_bars": 252,
+    "minimum_symbol_bars": 120,
+    "minimum_usable_symbols": 6,
+    "tail_quantile": 0.15,
+    "co_crash_weight": 0.65,
+    "tail_amplification_weight": 0.35,
+    "maximum_names_per_side": 5,
+    "absolute_weight_per_name": 0.08,
+    "minimum_tail_observations": 12
+  }
+}

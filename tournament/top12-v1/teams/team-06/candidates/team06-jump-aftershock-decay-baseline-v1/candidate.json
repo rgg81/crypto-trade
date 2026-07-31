@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "team_id": "team-06",
+  "candidate_id": "team06-jump-aftershock-decay-baseline-v1",
+  "parent_candidate_id": null,
+  "mechanism": "jump-aftershock-decay-state",
+  "hypothesis": "A completed discontinuous 8-hour price jump followed by a smaller same-sign completed aftershock identifies a short-lived continuation state whose conditional payoff decays with event age.",
+  "falsifier": "Falsify if the aftershock hazard is not directionally and economically stable across jump-size buckets, jump signs, and chronological eras, or if the edge disappears when explicit decay confirmation and invalidation are enforced.",
+  "formation_horizon": "30d",
+  "rebalance_horizon": "24h",
+  "control_profile": "volatility-target-drawdown-stops-turnover-side-scaling",
+  "neighborhood_id": null,
+  "neighborhood_coordinates": {},
+  "tags": [
+    "baseline",
+    "formation-grid",
+    "rebalance-grid",
+    "role-check"
+  ],
+  "material_parameters": {
+    "bar_hours": 8,
+    "formation_bars": 90,
+    "minimum_calibration_returns": 30,
+    "robust_jump_multiple": 5.0,
+    "minimum_absolute_jump_return": 0.03,
+    "maximum_event_age_bars": 6,
+    "minimum_first_aftershock_fraction": 0.03,
+    "maximum_first_aftershock_fraction": 0.65,
+    "maximum_opposing_aftershock_fraction": 0.35,
+    "maximum_renewed_impulse_fraction": 0.8,
+    "maximum_aftershock_growth_multiple": 1.25,
+    "aftershock_half_life_bars": 2.0,
+    "rebalance_hours": 24,
+    "maximum_gross_weight": 0.8,
+    "maximum_absolute_net_weight": 0.2,
+    "maximum_symbol_weight": 0.08
+  }
+}

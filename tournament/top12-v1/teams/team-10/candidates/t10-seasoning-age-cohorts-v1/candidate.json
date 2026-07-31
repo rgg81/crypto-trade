@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "team_id": "team-10",
+  "candidate_id": "t10-seasoning-age-cohorts-v1",
+  "parent_candidate_id": null,
+  "mechanism": "contract-maturation-seasoning",
+  "hypothesis": "Contracts that have only recently completed their first 180 days retain more speculative attention and less settled ownership than older contracts, so an equal-weight long-oldest/short-youngest age-cohort spread should earn a positive return as that premium decays.",
+  "falsifier": "Reject if the old-minus-young spread is not repeatable across independent listing vintages and chronological folds, if either side has persistently non-positive gross contribution, or if the result depends on a single bull, bear, or chop regime.",
+  "formation_horizon": "all completed 8h bars, minimum 180 days",
+  "rebalance_horizon": "weekly, first Monday UTC decision",
+  "control_profile": "controls-off",
+  "neighborhood_id": null,
+  "neighborhood_coordinates": {},
+  "tags": [
+    "baseline",
+    "formation-grid",
+    "rebalance-grid",
+    "role-check"
+  ],
+  "material_parameters": {
+    "bar_hours": 8,
+    "minimum_history_days": 180,
+    "cohort_size": 4,
+    "weight_per_symbol": 0.08,
+    "long_cohort": "oldest_contract_ages",
+    "short_cohort": "youngest_contract_ages",
+    "rebalance_weekday_utc": 0
+  }
+}

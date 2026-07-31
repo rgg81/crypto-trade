@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "team_id": "team-11",
+  "candidate_id": "t11-rsep-baseline-v1",
+  "parent_candidate_id": null,
+  "mechanism": "return-sign-entropy-predictability",
+  "hypothesis": "Transitions between locally ordered and high-entropy completed return-sign sequences contain next-sign information conditional on the current two-sign state, beyond matched recent cumulative direction and volatility.",
+  "falsifier": "Falsify if the entropy-transition residual adds no stable direction, return, or gross-edge value after the recent-direction and volatility control across the mandatory horizon matrix, role checks, sign inversion, and local neighborhood.",
+  "formation_horizon": "180 completed 8h returns",
+  "rebalance_horizon": "24h",
+  "control_profile": "matched cumulative-direction and realized-volatility state residual",
+  "neighborhood_id": null,
+  "neighborhood_coordinates": {},
+  "tags": [
+    "baseline",
+    "formation-grid",
+    "rebalance-grid",
+    "role-check"
+  ],
+  "material_parameters": {
+    "return_definition": "close-to-close log return",
+    "sign_alphabet": "negative=-1; nonnegative=+1",
+    "formation_bars": 180,
+    "entropy_estimator": "first-order conditional Shannon entropy normalized by log(2)",
+    "entropy_window_bars": 18,
+    "entropy_change_lag_bars": 6,
+    "entropy_transition_threshold": 0.08,
+    "sequence_state_bars": 2,
+    "control_window_bars": 12,
+    "volatility_control_split": "formation-sample median",
+    "laplace_alpha": 1.0,
+    "minimum_state_observations": 5,
+    "maximum_symbols_per_side": 5,
+    "symbol_weight": 0.08,
+    "decision_hour_utc": 0
+  }
+}

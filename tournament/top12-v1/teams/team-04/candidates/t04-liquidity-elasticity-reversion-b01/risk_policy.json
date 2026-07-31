@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "policy_id": "t04-lie-controls-off-b01",
+  "same_boundary_reentry": true,
+  "volatility_target": {
+    "enabled": false,
+    "lookback_days": 30,
+    "annualized_target": 0.12,
+    "minimum_scale": 0.25,
+    "maximum_scale": 1.0
+  },
+  "drawdown_brakes": [],
+  "position_stop": {
+    "enabled": false,
+    "loss_fraction": 0.1,
+    "cooldown_bars": 0
+  },
+  "time_stop": {
+    "enabled": false,
+    "maximum_holding_bars": 63,
+    "cooldown_bars": 0
+  },
+  "turnover_limit": {
+    "enabled": false,
+    "maximum_one_way_turnover": 0.8
+  },
+  "side_scaling": {
+    "long_scale": 1.0,
+    "short_scale": 1.0
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "team_id": "team-04",
+  "candidate_id": "t04-liquidity-elasticity-reversion-b01",
+  "parent_candidate_id": null,
+  "mechanism": "liquidity-impact-elasticity-reversion",
+  "hypothesis": "Moves that are extreme relative to causally normalized quote-volume capacity represent unusually expensive liquidity impact and tend to revert; combining own-history and point-in-time cross-sectional normalization should isolate this effect better than raw return or volume ranks.",
+  "falsifier": "Falsify if capacity normalization adds no value over identically normalized completed returns, if results depend on crash observations, or if either the long or short role lacks positive gross contribution.",
+  "formation_horizon": "63 completed 8h bars (21 days)",
+  "rebalance_horizon": "24 hours minimum between target submissions",
+  "control_profile": "controls-off-transparent-baseline",
+  "neighborhood_id": null,
+  "neighborhood_coordinates": {},
+  "tags": [
+    "baseline",
+    "formation-grid",
+    "rebalance-grid",
+    "role-check"
+  ],
+  "material_parameters": {
+    "bars_per_day": 3,
+    "formation_bars": 63,
+    "own_history_bars": 270,
+    "minimum_history_observations": 90,
+    "capacity_anchor_minimum_bars": 126,
+    "capacity_ratio_clip": [
+      0.05,
+      20.0
+    ],
+    "robust_z_clip": 4.0,
+    "own_history_weight": 0.5,
+    "cross_section_weight": 0.5,
+    "rebalance_hours": 24,
+    "side_gross_budget": 0.39,
+    "symbol_weight_cap": 0.079
+  }
+}

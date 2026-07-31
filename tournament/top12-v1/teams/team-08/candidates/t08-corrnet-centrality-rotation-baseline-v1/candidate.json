@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "team_id": "team-08",
+  "candidate_id": "t08-corrnet-centrality-rotation-baseline-v1",
+  "parent_candidate_id": null,
+  "mechanism": "correlation-network-centrality-rotation",
+  "hypothesis": "A causal change in the topology of the crypto correlation network identifies rotation in shock transmission: central coins should lead peripheral coins while the network fragments, while peripheral coins should catch up as the network reconnects.",
+  "falsifier": "Falsify if topology conditioning adds no value over marginal volatility, if centrality ranks are unstable under nearby formation windows or edge thresholds, or if either side of the central-peripheral rotation lacks positive gross contribution in its intended role.",
+  "formation_horizon": "84 completed UTC days (252 completed 8-hour returns)",
+  "rebalance_horizon": "7 days at Monday 00:00 UTC",
+  "control_profile": "combined",
+  "neighborhood_id": null,
+  "neighborhood_coordinates": {},
+  "tags": [
+    "baseline",
+    "formation-grid",
+    "rebalance-grid",
+    "role-check"
+  ],
+  "material_parameters": {
+    "bar_interval_hours": 8,
+    "formation_bars": 252,
+    "graph_half_bars": 126,
+    "edge_correlation_threshold": 0.55,
+    "topology_metric_edge_density_weight": 0.5,
+    "topology_metric_largest_component_weight": 0.5,
+    "topology_change_threshold": 0.05,
+    "centrality": "thresholded weighted degree",
+    "maximum_coins_per_side": 5,
+    "maximum_symbol_weight": 0.08,
+    "maximum_strategy_gross": 0.8,
+    "maximum_absolute_strategy_net": 0.2,
+    "rebalance_weekday_utc": 0,
+    "rebalance_hour_utc": 0
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "policy_id": "t08-corrnet-centrality-rotation-baseline-v1-risk",
+  "same_boundary_reentry": false,
+  "volatility_target": {
+    "enabled": true,
+    "lookback_days": 30,
+    "annualized_target": 0.2,
+    "minimum_scale": 0.25,
+    "maximum_scale": 1.0
+  },
+  "drawdown_brakes": [
+    {
+      "drawdown": 0.1,
+      "gross_scale": 0.75
+    },
+    {
+      "drawdown": 0.2,
+      "gross_scale": 0.5
+    },
+    {
+      "drawdown": 0.3,
+      "gross_scale": 0.0
+    }
+  ],
+  "position_stop": {
+    "enabled": true,
+    "loss_fraction": 0.12,
+    "cooldown_bars": 3
+  },
+  "time_stop": {
+    "enabled": true,
+    "maximum_holding_bars": 63,
+    "cooldown_bars": 3
+  },
+  "turnover_limit": {
+    "enabled": true,
+    "maximum_one_way_turnover": 0.4
+  },
+  "side_scaling": {
+    "long_scale": 1.0,
+    "short_scale": 1.0
+  }
+}

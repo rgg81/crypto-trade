@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "team_id": "team-05",
+  "candidate_id": "t05-dbr-baseline-v1",
+  "parent_candidate_id": null,
+  "mechanism": "dispersion-breadth-recoupling",
+  "hypothesis": "When cross-sectional return dispersion becomes unusually high without commensurate directional breadth and that gap begins to contract, the coins contributing most to the dislocation recouple toward the cross-sectional center.",
+  "falsifier": "Falsify if returns are attributable to common-beta exposure, either long or short gross contribution is non-positive, behavior depends on one directional era, or the effect fails the preregistered formation and rebalance grids.",
+  "formation_horizon": "21d",
+  "rebalance_horizon": "2d",
+  "control_profile": "standard-conservative",
+  "neighborhood_id": null,
+  "neighborhood_coordinates": {},
+  "tags": [
+    "baseline",
+    "formation-grid",
+    "rebalance-grid",
+    "role-check"
+  ],
+  "material_parameters": {
+    "bar_hours": 8,
+    "formation_bars": 63,
+    "state_reference_bars": 126,
+    "state_minimum_observations": 63,
+    "minimum_assets": 8,
+    "prior_gap_threshold": 0.75,
+    "minimum_gap_contraction": 0.2,
+    "contribution_power": 2.0,
+    "rebalance_hours": 48,
+    "side_gross_budget": 0.32,
+    "symbol_cap": 0.08
+  }
+}

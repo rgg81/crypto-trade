@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "team_id": "team-07",
+  "candidate_id": "t07-fca-baseline-v1",
+  "parent_candidate_id": null,
+  "mechanism": "funding-curve-acceleration",
+  "hypothesis": "Cross-sectionally level-neutral increases in the slope and acceleration of strictly settled funding predict continuation of changing leveraged-positioning demand over the next daily holding interval.",
+  "falsifier": "Reject the mechanism if funding derivatives fail the mandatory fold, cost, role, formation, and rebalance checks; if funding level or sign inversion explains the effect; or if next-open execution consumes it.",
+  "formation_horizon": "21 settled funding observations",
+  "rebalance_horizon": "24 hours",
+  "control_profile": "symmetric-organizer-controls-v1",
+  "neighborhood_id": null,
+  "neighborhood_coordinates": {},
+  "tags": [
+    "baseline",
+    "formation-grid",
+    "rebalance-grid",
+    "role-check"
+  ],
+  "material_parameters": {
+    "minimum_settlements": 12,
+    "formation_observations": 21,
+    "slope_weight": 0.5,
+    "acceleration_weight": 0.5,
+    "selection_per_side": 5,
+    "target_gross": 0.8,
+    "maximum_symbol_weight": 0.08,
+    "decision_hour_utc": 0
+  }
+}
