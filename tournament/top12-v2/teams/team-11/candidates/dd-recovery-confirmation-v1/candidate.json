@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "team_id": "team-11",
+  "candidate_id": "dd-recovery-confirmation-v1",
+  "parent_candidate_id": null,
+  "mechanism": "drawdown-recovery-asymmetry",
+  "hypothesis": "Among assets already in material drawdowns, confirmed upward recovery geometry predicts relative continuation while renewed downward drawdown geometry predicts relative underperformance.",
+  "falsifier": "The thesis is falsified if the recovery-confirmed long sleeve does not beat the renewed-drawdown short sleeve after costs across development folds or if returns are explained by drawdown depth without recovery-state confirmation.",
+  "formation_horizon": "84 calendar days of completed 8h closes, including 12-day recovery and 4-day confirmation regressions",
+  "rebalance_horizon": "weekly at Monday 00:00 UTC",
+  "control_profile": "dollar-neutral 1.0 gross targets, two-to-three names per side, volatility scaling, drawdown brakes, and a 0.20 one-way turnover cap",
+  "neighborhood_id": null,
+  "neighborhood_coordinates": {},
+  "tags": [
+    "baseline",
+    "recovery-geometry",
+    "moderately-low-turnover"
+  ],
+  "material_parameters": {
+    "bar_hours": 8,
+    "peak_lookback_bars": 252,
+    "recovery_window_bars": 36,
+    "confirmation_window_bars": 12,
+    "minimum_history_bars": 252,
+    "depth_floor": 0.03,
+    "long_recovery_min": 0.012,
+    "long_confirmation_min": 0.004,
+    "long_trough_lift_min": 0.015,
+    "short_recovery_max": -0.008,
+    "short_confirmation_max": -0.003,
+    "short_trough_gap_max": 0.012,
+    "long_score_weights": {
+      "recovery_slope_rank": 0.55,
+      "trough_lift_rank": 0.2,
+      "drawdown_depth_rank": 0.15,
+      "drawdown_duration_rank": 0.1
+    },
+    "short_score_weights": {
+      "negative_recovery_slope_rank": 0.55,
+      "trough_proximity_rank": 0.15,
+      "drawdown_depth_rank": 0.2,
+      "drawdown_duration_rank": 0.1
+    },
+    "maximum_names_per_side": 3,
+    "minimum_names_per_side": 2,
+    "target_gross": 1.0,
+    "rebalance_weekday": 0,
+    "rebalance_hour_utc": 0
+  }
+}

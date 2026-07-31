@@ -1,0 +1,94 @@
+{
+  "schema_version": "top12-v2-organizer-mechanism-registry-v1",
+  "visibility": "organizer-only-forbidden-to-teams",
+  "collision_policy": "economic-payoff-and-primary-signal-equivalence-fail-closed",
+  "prior_oos_policy": "families-previously-observed-on-2024-07-01-through-2026-07-01-are-ineligible-without-team-disclosure",
+  "forbidden_prior_oos_families": [
+    {
+      "fingerprint": "prior-oos-family-01",
+      "family": "idiosyncratic-volatility-lottery-premium"
+    },
+    {
+      "fingerprint": "prior-oos-family-02",
+      "family": "contract-maturation-seasoning"
+    },
+    {
+      "fingerprint": "prior-oos-family-03",
+      "family": "market-exhaustion-reversal"
+    }
+  ],
+  "teams": {
+    "team-01": {
+      "mandate": "residual-trend-quality-consensus",
+      "economic_payoff": "Rank assets by residual trend shared across several causal horizons after removing the lagged market component; require horizon agreement and trend quality.",
+      "primary_structure": "cross-sectional residualization plus multi-horizon directional consensus",
+      "collision_status": "reserved"
+    },
+    "team-02": {
+      "mandate": "funding-price-dislocation-repair",
+      "economic_payoff": "Test whether lagged funding pressure that disagrees with price displacement predicts a bounded repair while agreement acts only as a veto.",
+      "primary_structure": "lagged funding/price disagreement state and conditional repair",
+      "collision_status": "reserved"
+    },
+    "team-03": {
+      "mandate": "volume-participation-breadth-thrust",
+      "economic_payoff": "Test whether a broad cross-section of unusual quote-volume participation confirms directional continuation more reliably than price magnitude alone.",
+      "primary_structure": "cross-sectional participation breadth and directional thrust",
+      "collision_status": "reserved"
+    },
+    "team-04": {
+      "mandate": "realized-volatility-term-structure-breakout",
+      "economic_payoff": "Compare causal short- and long-horizon realized volatility states and test breakouts only when the volatility curve changes regime.",
+      "primary_structure": "realized-volatility horizon ratio with price breakout",
+      "collision_status": "reserved"
+    },
+    "team-05": {
+      "mandate": "funding-dispersion-carry-quality",
+      "economic_payoff": "Test whether wide cross-sectional settled-funding dispersion supports a market-neutral carry allocation when funding persistence and price neutrality agree.",
+      "primary_structure": "cross-sectional funding carry with dispersion and persistence quality",
+      "collision_status": "reserved"
+    },
+    "team-06": {
+      "mandate": "liquidity-shock-impact-persistence",
+      "economic_payoff": "Measure causal quote-volume shocks and test whether price impact persists when participation remains broad and liquidity does not normalize.",
+      "primary_structure": "lagged liquidity shock with impact-persistence state",
+      "collision_status": "reserved"
+    },
+    "team-07": {
+      "mandate": "correlation-dispersion-regime-allocation",
+      "economic_payoff": "Use lagged market correlation and cross-sectional dispersion to choose when relative-value signals should be active, reduced, or directionally tilted.",
+      "primary_structure": "correlation-dispersion regime allocator",
+      "collision_status": "reserved"
+    },
+    "team-08": {
+      "mandate": "intrabar-close-location-persistence",
+      "economic_payoff": "Test whether persistent closing location within completed 8-hour ranges reveals directional auction pressure beyond close-to-close returns.",
+      "primary_structure": "range-normalized close location and auction-pressure persistence",
+      "collision_status": "reserved"
+    },
+    "team-09": {
+      "mandate": "signed-volume-pressure-persistence",
+      "economic_payoff": "Estimate causal taker-buy versus taker-sell pressure and test whether persistent aggressor imbalance predicts continuation under strict cost controls.",
+      "primary_structure": "taker aggressor imbalance persistence, not volume-surprise breadth",
+      "collision_status": "reserved"
+    },
+    "team-10": {
+      "mandate": "calendar-boundary-flow-reversal",
+      "economic_payoff": "Test recurring UTC calendar-boundary flow dislocations with causal state confirmation, without hard-coded timestamp-to-position tables.",
+      "primary_structure": "calendar phase conditioned flow reversal",
+      "collision_status": "reserved"
+    },
+    "team-11": {
+      "mandate": "drawdown-recovery-asymmetry",
+      "economic_payoff": "Compare each asset's causal drawdown depth, duration, and recovery slope to the cross-section; trade asymmetric recovery states.",
+      "primary_structure": "relative drawdown geometry and recovery asymmetry",
+      "collision_status": "reserved"
+    },
+    "team-12": {
+      "mandate": "tail-concentration-defensive-rotation",
+      "economic_payoff": "Use lagged cross-sectional tail concentration to rotate toward assets with resilient downside beta and away from fragile tail exposure.",
+      "primary_structure": "cross-sectional tail concentration and defensive downside-beta rotation",
+      "collision_status": "reserved"
+    }
+  }
+}

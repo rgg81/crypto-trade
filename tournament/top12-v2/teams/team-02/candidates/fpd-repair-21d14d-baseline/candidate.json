@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "team_id": "team-02",
+  "candidate_id": "fpd-repair-21d14d-baseline",
+  "parent_candidate_id": null,
+  "mechanism": "funding-price-dislocation-repair",
+  "hypothesis": "When 14-day settled funding pressure opposes a material 21-day price displacement, the displacement partially repairs over the next week; funding-price agreement has no forecast role.",
+  "falsifier": "Reject the thesis if the disagreement-conditioned repair is not positive after base costs, is not directionally symmetric, or is no better than the agreement-state veto control across development folds.",
+  "formation_horizon": "21 complete UTC days of 8h closes and 14 trailing UTC days of funding settlements strictly before each boundary.",
+  "rebalance_horizon": "Weekly at Monday 00:00 UTC, with execution delegated to the next executable open.",
+  "control_profile": "Agreement is a strict veto; require material displacement, funding strength, two names per side, dollar neutrality, and organizer-enforced volatility, drawdown, and turnover controls.",
+  "neighborhood_id": null,
+  "neighborhood_coordinates": {},
+  "tags": [
+    "baseline"
+  ],
+  "material_parameters": {
+    "formation_days": 21,
+    "funding_lookback_days": 14,
+    "minimum_funding_observations": 21,
+    "minimum_absolute_log_return": 0.03,
+    "return_saturation_scale": 0.12,
+    "minimum_funding_scale": 0.000001,
+    "minimum_funding_strength": 0.5,
+    "minimum_names_per_side": 2,
+    "maximum_names_per_side": 3,
+    "target_gross_exposure": 1.0,
+    "rebalance_weekday_utc": 0,
+    "rebalance_hour_utc": 0,
+    "side_weighting": "equal",
+    "agreement_action": "veto",
+    "repair_direction": "opposite_price_displacement"
+  }
+}

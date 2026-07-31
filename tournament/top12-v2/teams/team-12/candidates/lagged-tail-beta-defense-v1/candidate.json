@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "team_id": "team-12",
+  "candidate_id": "lagged-tail-beta-defense-v1",
+  "parent_candidate_id": null,
+  "mechanism": "tail-concentration-defensive-rotation",
+  "hypothesis": "A lagged rise in cross-sectional loss concentration identifies a persistent fragile downside-beta structure, so a broad resilient-minus-fragile rotation should earn a cost-resistant defensive spread.",
+  "falsifier": "Falsify if the resilient-minus-fragile spread lacks consistent sign across development folds, loses its gross edge under doubled costs, or the exact sign inversion is not materially worse.",
+  "formation_horizon": "84 completed UTC daily returns, with a one-day concentration lag, a 21-day concentration smoother, and a 42-observation state rank.",
+  "rebalance_horizon": "Weekly at the Monday 00:00 UTC decision boundary for execution at the next executable open.",
+  "control_profile": "Dollar-neutral broad sleeves, robust cross-sectional return clipping, state-scaled gross exposure, a 15 percent name cap, central volatility scaling, drawdown brakes, and a 20 percent one-way turnover limit.",
+  "neighborhood_id": null,
+  "neighborhood_coordinates": {},
+  "tags": [
+    "baseline"
+  ],
+  "material_parameters": {
+    "formation_days": 84,
+    "minimum_history_days": 56,
+    "minimum_cross_section": 8,
+    "minimum_downside_observations": 12,
+    "concentration_smoothing_days": 21,
+    "concentration_minimum_observations": 5,
+    "regime_rank_days": 42,
+    "signal_lag_days": 1,
+    "concentration_weight_floor": 0.25,
+    "return_clip_mad_multiple": 4.0,
+    "tail_quantile": 0.25,
+    "downside_beta_weight": 0.7,
+    "tail_loading_weight": 0.3,
+    "observation_weight_quantile_cap": 0.9,
+    "minimum_gross": 0.55,
+    "maximum_gross": 0.8,
+    "sleeve_size": 5,
+    "rank_tilt_strength": 0.15,
+    "maximum_absolute_weight": 0.15,
+    "rebalance_weekday_utc": 0,
+    "rebalance_hour_utc": 0
+  }
+}

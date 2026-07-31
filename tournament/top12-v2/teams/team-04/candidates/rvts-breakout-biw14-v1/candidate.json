@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "team_id": "team-04",
+  "candidate_id": "rvts-breakout-biw14-v1",
+  "parent_candidate_id": null,
+  "mechanism": "realized-volatility-term-structure-breakout",
+  "hypothesis": "A fresh directional price breakout is more persistent when 7-day realized volatility has risen above and steepened against its 42-day state.",
+  "falsifier": "Reject the thesis if the baseline lacks cost-resistant edge, fold breadth, or sign specificity, or if removing the volatility-curve transition does not weaken it.",
+  "formation_horizon": "56 calendar days, including 7-day and 42-day realized volatility, a 7-day curve lag, a 14-day closing-price channel, and a 7-day event window",
+  "rebalance_horizon": "Monday 00:00 UTC in every even-numbered ISO week",
+  "control_profile": "Market-neutral matched long/short selection, fixed 0.15 name weights, at most three names per side, 15% volatility target, drawdown brakes, and 0.20 one-way turnover limit",
+  "neighborhood_id": null,
+  "neighborhood_coordinates": {},
+  "tags": [
+    "baseline"
+  ],
+  "material_parameters": {
+    "bar_hours": 8,
+    "short_volatility_days": 7,
+    "long_volatility_days": 42,
+    "curve_lag_days": 7,
+    "minimum_curve_ratio": 1.15,
+    "minimum_curve_steepening_multiple": 1.08,
+    "realized_volatility_estimator": "root-mean-square log close return",
+    "channel_bars": 42,
+    "breakout_event_bars": 21,
+    "breakout_price_field": "close",
+    "minimum_short_observations": 17,
+    "minimum_long_observations": 100,
+    "maximum_names_per_side": 3,
+    "weight_per_name": 0.15,
+    "require_both_sides": true,
+    "rebalance_iso_week_parity": "even",
+    "rebalance_days_nominal": 14
+  }
+}

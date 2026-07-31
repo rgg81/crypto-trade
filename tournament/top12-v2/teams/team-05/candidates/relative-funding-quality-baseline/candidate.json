@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "team_id": "team-05",
+  "candidate_id": "relative-funding-quality-baseline",
+  "parent_candidate_id": null,
+  "mechanism": "funding-dispersion-carry-quality",
+  "hypothesis": "When settled-funding dispersion is wide and relative funding is persistent, a price-neutral long-low-relative-funding and short-high-relative-funding book earns the cross-sectional funding spread after costs.",
+  "falsifier": "Falsify if persistent relative settled-funding dispersion does not support stable positive net performance across development folds and cost checks, or if the exact carry-sign inversion is comparably or more robust.",
+  "formation_horizon": "126 strictly prior settled-funding rows (nominally 42 days) plus 84 completed 8h price bars used only for quality and beta-neutrality vetoes.",
+  "rebalance_horizon": "Every Monday at 00:00 UTC, with no target update between scheduled boundaries.",
+  "control_profile": "Equal-dollar long and short funding tails; dispersion controls gross activation; funding persistence qualifies direction; absolute price movement, asset beta, and side-beta gap can only veto positions.",
+  "neighborhood_id": null,
+  "neighborhood_coordinates": {},
+  "tags": [
+    "baseline",
+    "funding-carry",
+    "market-neutral"
+  ],
+  "material_parameters": {
+    "funding_formation_rows": 126,
+    "minimum_funding_rows": 72,
+    "slow_funding_half_life_rows": 63,
+    "fast_funding_half_life_rows": 21,
+    "minimum_relative_sign_persistence": 0.6,
+    "minimum_cross_section_fraction": 0.6,
+    "current_dispersion_rows": 9,
+    "minimum_dispersion_ratio": 0.75,
+    "full_dispersion_ratio": 1.5,
+    "price_quality_bars": 84,
+    "minimum_price_bars": 60,
+    "maximum_absolute_price_log_move": 0.5,
+    "maximum_absolute_market_beta": 2.0,
+    "maximum_side_beta_gap": 0.35,
+    "funding_pool_names_per_side": 4,
+    "held_names_per_side": 3,
+    "long_funding_tail": "lowest_persistent_relative_funding",
+    "short_funding_tail": "highest_persistent_relative_funding",
+    "minimum_gross_exposure": 0.5,
+    "maximum_gross_exposure": 1.0
+  }
+}

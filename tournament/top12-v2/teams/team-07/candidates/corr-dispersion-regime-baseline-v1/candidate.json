@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "team_id": "team-07",
+  "candidate_id": "corr-dispersion-regime-baseline-v1",
+  "parent_candidate_id": null,
+  "mechanism": "correlation-dispersion-regime-allocation",
+  "hypothesis": "High lagged market correlation makes unusually wide cross-sectional residual dispersion more likely to mean-revert, while compressed dispersion in the same common-mode regime supports only a small market-trend tilt.",
+  "falsifier": "Reject the mechanism if the residual-reversal sleeve does not improve net risk-adjusted performance in high-correlation high-dispersion observations, or if gains vanish under doubled costs and across development folds.",
+  "formation_horizon": "Rolling completed 8h bars: 42 days for correlation and beta, 7 versus prior 42 days for dispersion, 14 days for residual dislocation, and 21 days for market trend.",
+  "rebalance_horizon": "Weekly at Monday 00:00 UTC, with orders left to the next executable open.",
+  "control_profile": "Unlevered gross budget at most 0.90, absolute symbol target capped at 0.16, organizer volatility and drawdown scaling, and 0.20 maximum one-way turnover per rebalance.",
+  "neighborhood_id": null,
+  "neighborhood_coordinates": {},
+  "tags": [
+    "baseline",
+    "causal",
+    "moderately-low-turnover",
+    "relative-value",
+    "regime-allocation"
+  ],
+  "material_parameters": {
+    "bar_hours": 8,
+    "rebalance_weekday": 0,
+    "rebalance_hour_utc": 0,
+    "minimum_symbols": 6,
+    "minimum_common_returns": 168,
+    "correlation_lookback_bars": 126,
+    "dispersion_fast_bars": 21,
+    "dispersion_slow_bars": 126,
+    "regime_lag_bars": 1,
+    "signal_lookback_bars": 42,
+    "signal_skip_bars": 2,
+    "trend_lookback_bars": 63,
+    "correlation_gate": {
+      "low": 0.25,
+      "high": 0.6
+    },
+    "dispersion_ratio_gate": {
+      "low": 0.9,
+      "high": 1.5
+    },
+    "compression_ratio_gate": {
+      "low": 0.7,
+      "high": 1.05
+    },
+    "maximum_relative_value_gross": 0.72,
+    "maximum_directional_net": 0.18,
+    "trend_tanh_scale": 1.5,
+    "beta_clip": {
+      "minimum": 0.25,
+      "maximum": 2.0
+    },
+    "maximum_absolute_weight": 0.16
+  }
+}

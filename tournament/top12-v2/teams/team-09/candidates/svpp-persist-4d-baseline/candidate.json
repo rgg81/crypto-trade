@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "team_id": "team-09",
+  "candidate_id": "svpp-persist-4d-baseline",
+  "parent_candidate_id": null,
+  "mechanism": "signed-volume-pressure-persistence",
+  "hypothesis": "Cross-sectional contracts with persistently positive actual taker-buy minus taker-sell pressure continue to outperform contracts with persistently negative pressure over the next moderately spaced holding interval.",
+  "falsifier": "Falsify if exact sign inversion is not materially worse, pressure-tail returns fail to order monotonically, or the base effect does not survive the fixed cost, turnover, fold, and breadth gates.",
+  "formation_horizon": "30 completed UTC days, capped at 90 eight-hour bars and requiring at least 72 valid aggressor-imbalance observations; persistence uses the latest 63 valid bars.",
+  "rebalance_horizon": "First call in each fixed 96-hour UTC timestamp bucket, with unchanged buckets returning no rebalance request.",
+  "control_profile": "Completed bars only; actual paired total and taker-buy volume only; long and short pressure thresholds; equal 0.50 gross side budgets; deterministic symbol tie-breaks; organizer-enforced volatility, drawdown, and turnover controls.",
+  "neighborhood_id": null,
+  "neighborhood_coordinates": {},
+  "tags": [
+    "baseline",
+    "aggressor-imbalance",
+    "pressure-persistence",
+    "market-neutral",
+    "moderately-low-turnover"
+  ],
+  "material_parameters": {
+    "bar_hours": 8,
+    "formation_days": 30,
+    "formation_bar_cap": 90,
+    "minimum_valid_bars": 72,
+    "persistence_blocks": 3,
+    "persistence_block_bars": 21,
+    "ewm_halflife_bars": 12,
+    "block_pressure_weight": 0.6,
+    "ewm_pressure_weight": 0.4,
+    "minimum_absolute_pressure": 0.02,
+    "positions_per_side": 3,
+    "side_gross": 0.5,
+    "rebalance_hours": 96,
+    "rebalance_alignment": "integer UTC timestamp nanoseconds divided by the 96-hour interval",
+    "volume_pair_priority": [
+      ["base_volume", "taker_buy_base_volume"],
+      ["volume", "taker_buy_base_volume"],
+      ["base_volume", "taker_buy_volume"],
+      ["volume", "taker_buy_volume"],
+      ["quote_volume", "taker_buy_quote_volume"]
+    ],
+    "invalid_aggressor_rows": "exclude nonfinite rows, nonpositive totals, negative taker buys, and taker buys above paired totals",
+    "portfolio_requirement": "at least one qualifying positive-pressure contract and one qualifying negative-pressure contract"
+  }
+}

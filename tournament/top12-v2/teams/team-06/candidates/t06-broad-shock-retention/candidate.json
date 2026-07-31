@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "team_id": "team-06",
+  "candidate_id": "t06-broad-shock-retention",
+  "parent_candidate_id": null,
+  "mechanism": "liquidity-shock-impact-persistence",
+  "hypothesis": "Directionally large two-bar price impact persists after quote-volume shocks when elevated trade counts indicate broad participation and both quote volume and participation remain above their causal baselines for the next three completed bars.",
+  "falsifier": "The thesis is falsified if the exact sign inversion is not worse, persistence-conditioned events do not improve on the shock-only ablation, or net performance is unstable across fixed folds and nearby causal horizons after stated costs.",
+  "formation_horizon": "A 14-day 42-bar causal liquidity baseline plus two event bars, three post-event confirmation bars, and an 18-bar event scan; volatility normalization uses up to 60 completed 8h returns.",
+  "rebalance_horizon": "Every nine completed 8h bars (72 hours), anchored deterministically to Monday 1970-01-05 00:00 UTC; non-rebalance decisions retain quantities.",
+  "control_profile": "Dollar-neutral matched long/short event selection, three symbols maximum per side, 15% absolute weight per symbol, cash when fewer than two symbols qualify per side, per-bar volatility normalization for ranking, and symbol-ascending deterministic tie-breaks.",
+  "neighborhood_id": null,
+  "neighborhood_coordinates": {},
+  "tags": [
+    "baseline",
+    "causal-event-study",
+    "moderately-low-turnover"
+  ],
+  "material_parameters": {
+    "bar_hours": 8,
+    "rebalance_bars": 9,
+    "baseline_bars": 42,
+    "event_bars": 2,
+    "post_confirmation_bars": 3,
+    "event_scan_bars": 18,
+    "minimum_quote_volume_shock_ratio": 1.5,
+    "minimum_event_trade_count_ratio": 1.25,
+    "minimum_post_quote_volume_ratio": 1.1,
+    "minimum_post_trade_count_ratio": 1.05,
+    "maximum_event_average_ticket_ratio": 1.75,
+    "minimum_absolute_log_impact": 0.005,
+    "minimum_retained_impact_fraction": 0.35,
+    "retention_strength_cap": 1.5,
+    "recency_half_life_bars": 6.0,
+    "volatility_lookback_bars": 60,
+    "volatility_floor_per_bar": 0.005,
+    "maximum_assets_per_side": 3,
+    "minimum_assets_per_side": 2,
+    "absolute_weight_per_asset": 0.15
+  }
+}

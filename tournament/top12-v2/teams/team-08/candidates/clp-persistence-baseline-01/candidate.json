@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "team_id": "team-08",
+  "candidate_id": "clp-persistence-baseline-01",
+  "parent_candidate_id": null,
+  "mechanism": "intrabar-close-location-persistence",
+  "hypothesis": "Persistent closes near the same side of completed 8-hour ranges reveal directional auction pressure that forecasts returns after controlling for formation-period close-to-close return.",
+  "falsifier": "Reject the mechanism if the baseline lacks stable positive net edge across development folds and cost stresses, or if exact sign inversion performs comparably or better.",
+  "formation_horizon": "126 completed 8-hour bars (42 days), with 42-bar exponential half-life and at least 100 valid nonzero-range bars.",
+  "rebalance_horizon": "Weekly at Monday 00:00 UTC; all other decision boundaries preserve current quantities.",
+  "control_profile": "Cross-sectionally residualize persistence pressure against average-ranked same-horizon close return, then form a rank-weighted dollar-neutral 1.0 gross book.",
+  "neighborhood_id": null,
+  "neighborhood_coordinates": {},
+  "tags": [
+    "baseline",
+    "auction-pressure",
+    "return-neutralized",
+    "weekly-rebalance"
+  ],
+  "material_parameters": {
+    "bar_hours": 8,
+    "lookback_bars": 126,
+    "minimum_valid_range_bars": 100,
+    "decay_halflife_bars": 42.0,
+    "relative_range_floor": 1e-12,
+    "close_location_clip": 1.0,
+    "persistence_formula": "decayed_mean_close_location_times_absolute_decayed_sign_balance",
+    "return_control": "cross_sectional_average_rank_of_lookback_log_close_return",
+    "minimum_cross_section": 6,
+    "signal_ranking": "cross_sectional_average_rank",
+    "target_gross": 1.0,
+    "target_long_gross": 0.5,
+    "target_short_gross": 0.5,
+    "rebalance_weekday_utc": 0,
+    "rebalance_hour_utc": 0
+  }
+}

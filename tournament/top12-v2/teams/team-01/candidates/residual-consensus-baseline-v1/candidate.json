@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "team_id": "team-01",
+  "candidate_id": "residual-consensus-baseline-v1",
+  "parent_candidate_id": null,
+  "mechanism": "residual-trend-quality-consensus",
+  "hypothesis": "Assets whose lagged-market-residual returns share one direction across 28, 84, and 168 days and trace orderly cumulative paths will continue to outperform opposite-consensus assets over the next week.",
+  "falsifier": "Reject the thesis if the exact sign inversion is not materially worse or if performance depends on one horizon, weak-consensus names, excessive turnover, or a narrow market regime.",
+  "formation_horizon": "Causal completed 8h returns over 28, 84, and 168 days, with beta estimated over 168 days against the equal-weight market return lagged by one 8h bar.",
+  "rebalance_horizon": "Weekly at Monday 00:00 UTC for next-open execution.",
+  "control_profile": "Dollar-neutral equal-weight long and short consensus tails; 0.80 requested gross, two or three names per side, weekly gating, and organizer volatility, drawdown, turnover, membership, and execution controls.",
+  "neighborhood_id": null,
+  "neighborhood_coordinates": {},
+  "tags": [
+    "baseline"
+  ],
+  "material_parameters": {
+    "bar_hours": 8,
+    "rebalance_weekday_utc": 0,
+    "rebalance_hour_utc": 0,
+    "horizon_days": [
+      28,
+      84,
+      168
+    ],
+    "beta_lookback_days": 168,
+    "market_lag_bars": 1,
+    "minimum_market_breadth": 6,
+    "minimum_observation_fraction": 0.85,
+    "return_clip_absolute_log": 0.35,
+    "beta_clip_absolute": 3.0,
+    "minimum_absolute_horizon_t": 0.15,
+    "quality_measure": "cumulative-residual-path-linear-r-squared",
+    "quality_multiplier_floor": 0.5,
+    "minimum_positions_per_side": 2,
+    "maximum_positions_per_side": 3,
+    "target_gross": 0.8,
+    "portfolio_weighting": "equal-within-side"
+  }
+}

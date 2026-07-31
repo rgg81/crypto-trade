@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "policy_id": "clp-persistence-baseline-risk-01",
+  "same_boundary_reentry": false,
+  "volatility_target": {
+    "enabled": true,
+    "lookback_days": 30,
+    "annualized_target": 0.18,
+    "minimum_scale": 0.25,
+    "maximum_scale": 1.0
+  },
+  "drawdown_brakes": [
+    {
+      "drawdown": 0.10,
+      "gross_scale": 0.75
+    },
+    {
+      "drawdown": 0.15,
+      "gross_scale": 0.50
+    }
+  ],
+  "position_stop": {
+    "enabled": false,
+    "loss_fraction": 0.10,
+    "cooldown_bars": 0
+  },
+  "time_stop": {
+    "enabled": false,
+    "maximum_holding_bars": 30,
+    "cooldown_bars": 0
+  },
+  "turnover_limit": {
+    "enabled": true,
+    "maximum_one_way_turnover": 0.20
+  },
+  "side_scaling": {
+    "long_scale": 1.0,
+    "short_scale": 1.0
+  }
+}

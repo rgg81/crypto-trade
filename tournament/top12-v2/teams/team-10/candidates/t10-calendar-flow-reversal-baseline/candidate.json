@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "team_id": "team-10",
+  "candidate_id": "t10-calendar-flow-reversal-baseline",
+  "parent_candidate_id": null,
+  "mechanism": "calendar-boundary-flow-reversal",
+  "hypothesis": "Recurring UTC month-change inventory and benchmark flows create temporary price displacements that reverse when contemporaneous taker imbalance confirms the crowded direction.",
+  "falsifier": "The thesis is falsified if the calendar-gated confirmed reversal does not improve directionally over its exact sign inversion or cannot retain positive gross edge after the prescribed costs across folds.",
+  "formation_horizon": "Nine completed 8-hour bars for displacement and flow surprise, normalized by the preceding 81 completed bars.",
+  "rebalance_horizon": "Eight-hour decision checks, active only from 24 hours before through 48 hours after each UTC month change.",
+  "control_profile": "Dollar-neutral equal-weight long and short sleeves, minimum two confirmed names per side, 0.80 target gross, volatility scaling, drawdown brakes, and a 0.20 one-way turnover cap.",
+  "neighborhood_id": null,
+  "neighborhood_coordinates": {},
+  "tags": ["baseline", "calendar-phase", "flow-confirmed", "cross-sectional-reversal"],
+  "material_parameters": {
+    "formation_bars_8h": 9,
+    "reference_bars_8h": 81,
+    "pre_boundary_hours": 24,
+    "post_boundary_hours": 48,
+    "confirmation_z": 0.75,
+    "names_per_side": 3,
+    "minimum_names_per_side": 2,
+    "target_gross": 0.8,
+    "signal": "equal_mean_price_and_taker_flow_z_then_reverse",
+    "weighting": "equal_weight_per_side"
+  }
+}

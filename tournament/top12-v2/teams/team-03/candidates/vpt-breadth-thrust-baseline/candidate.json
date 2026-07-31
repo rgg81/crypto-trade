@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "team_id": "team-03",
+  "candidate_id": "vpt-breadth-thrust-baseline",
+  "parent_candidate_id": null,
+  "mechanism": "volume-participation-breadth-thrust",
+  "hypothesis": "Fortnightly continuation is more reliable when lagged quote-volume surprises carry a consistent directional sign across a broad share of the eligible crypto universe.",
+  "falsifier": "Reject if the baseline cannot sustain cost-resistant fold performance or if removing the cross-sectional breadth gate does not materially weaken the development evidence.",
+  "formation_horizon": "28 complete UTC days for direction, with a 12-day thrust window and a lagged 28-day quote-volume median baseline.",
+  "rebalance_horizon": "Every second ISO Monday at 00:00 UTC; otherwise preserve current quantities subject to organizer controls.",
+  "control_profile": "Dollar-balanced long/short, three names per side maximum, broad-participation gate, volatility scaling, drawdown brakes, and a 20% one-way turnover limit.",
+  "neighborhood_id": null,
+  "neighborhood_coordinates": {},
+  "tags": ["baseline"],
+  "material_parameters": {
+    "bar_hours": 8,
+    "history_days": 90,
+    "volume_baseline_days": 28,
+    "thrust_days": 12,
+    "trend_days": 28,
+    "volume_ratio_threshold": 1.35,
+    "minimum_active_days": 2,
+    "minimum_analyzed_symbols": 8,
+    "minimum_participation_breadth": 0.5,
+    "minimum_directional_impulse": 0.25,
+    "maximum_names_per_side": 3,
+    "gross_target": 1.0,
+    "rebalance_iso_week_modulus": 2,
+    "rebalance_iso_week_remainder": 0
+  }
+}
