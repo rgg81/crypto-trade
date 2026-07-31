@@ -1,0 +1,396 @@
+{
+  "activated_at_utc": "2026-07-31T00:10:06Z",
+  "branch": "quant-portfolio-blind-top12",
+  "config_sha256": "aca1a936ef1d5d6c8c4476a7cb51f3bdddee5ad589fa3a7be1486286830324bc",
+  "implementation_commit": "fb84da0d5ceb472d377c2efb2409d4836ac1dad9",
+  "pure_crypto_report_sha256": "c5e802373a2dbdc3a6fdee6dce841645a469124f69b3e9226cebe24d51609d2c",
+  "record_sha256": "cb5c07fe4ef0f4e201321cf325910a5ebaf0ba2f8311ecba1ef833caffd3208f",
+  "schema_version": "top12-v1-activation-freeze-v1",
+  "scope_entries": [
+    {
+      "entry_sha256": "b7def3562e9ccd8d70750490a9bf112d6614366eb06e12e90711f0f49571d3a0",
+      "path": ".python-version",
+      "previous_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "sequence": 1,
+      "sha256": "02e735b3dfe1c32833eb550b7ff8ffa17f5f2bc3fa1e7bae61a8f5a3883ce398",
+      "size": 5
+    },
+    {
+      "entry_sha256": "c5b427a3b8c474a778055e369ba1f96613c01606a00bf807b7bbb4b32cead532",
+      "path": "TOURNAMENT-CHARTER-TOP12-V1.md",
+      "previous_sha256": "b7def3562e9ccd8d70750490a9bf112d6614366eb06e12e90711f0f49571d3a0",
+      "sequence": 2,
+      "sha256": "be2367ab8069bed5000d19260e6ebef446909e119ea52cf5d11251a674129afc",
+      "size": 9662
+    },
+    {
+      "entry_sha256": "bae3cc27dd05e4ffca06e84f2aeb87c666b9a5977fdf5bec2075d70958fc9d29",
+      "path": "pyproject.toml",
+      "previous_sha256": "c5b427a3b8c474a778055e369ba1f96613c01606a00bf807b7bbb4b32cead532",
+      "sequence": 3,
+      "sha256": "bc83dcb03d03e5f068a81eb6d583f5690d9da2df4b7695428a75e81786dd89a5",
+      "size": 1810
+    },
+    {
+      "entry_sha256": "1732889296495568ab32a5fcc9d793319881907893e8dfd0303dd04b9cfb1fb5",
+      "path": "scripts/build_top12_universe.py",
+      "previous_sha256": "bae3cc27dd05e4ffca06e84f2aeb87c666b9a5977fdf5bec2075d70958fc9d29",
+      "sequence": 4,
+      "sha256": "2ea5708599627822dab2ae13ca22795fe3bcec3de96c95ab90659f1c54a44825",
+      "size": 17302
+    },
+    {
+      "entry_sha256": "82c27963d5b234c63804d5ee2b6b40e2c4f0199821e4c5fb7da7d041992c9a04",
+      "path": "scripts/top12_v1_tournament.py",
+      "previous_sha256": "1732889296495568ab32a5fcc9d793319881907893e8dfd0303dd04b9cfb1fb5",
+      "sequence": 5,
+      "sha256": "fe4a5eca5f54973174b64181c925f736f84b84083052de28438c22b243b80f27",
+      "size": 3582
+    },
+    {
+      "entry_sha256": "472511ec886e412dd8244cd589aa130f3924ca3b877d184fdb58525c5194e9f1",
+      "path": "src/crypto_trade/tournament/_strategy_worker_v4.py",
+      "previous_sha256": "82c27963d5b234c63804d5ee2b6b40e2c4f0199821e4c5fb7da7d041992c9a04",
+      "sequence": 6,
+      "sha256": "2deaf071eb1a0c49dc0567506df383c7a129860af8c98f839eef005051e29e86",
+      "size": 46444
+    },
+    {
+      "entry_sha256": "7b0a05fafb485a01a4635b83a45c40b9cdcfefe19a451adcb92acf7e9fe84dd3",
+      "path": "src/crypto_trade/tournament/activation_top12_v1.py",
+      "previous_sha256": "472511ec886e412dd8244cd589aa130f3924ca3b877d184fdb58525c5194e9f1",
+      "sequence": 7,
+      "sha256": "2946a5b338199dbd5e5d27ac0f4342d35f4130b303b22869cb2979eb594fa2f1",
+      "size": 15288
+    },
+    {
+      "entry_sha256": "8b1715ef112dca6d9c4fb66124c329c39d0bca50083ea83c4578f46bb16db968",
+      "path": "src/crypto_trade/tournament/amendment_integrity_v2.py",
+      "previous_sha256": "7b0a05fafb485a01a4635b83a45c40b9cdcfefe19a451adcb92acf7e9fe84dd3",
+      "sequence": 8,
+      "sha256": "e3a4f60aa955ebcf461026527da5b6b28b87e9e7ec057dd2e10a1e884612a8ab",
+      "size": 34451
+    },
+    {
+      "entry_sha256": "fd45740fd6dccb18671adf75937d433eb12c03a5a36a10f7f52aaa569bca3685",
+      "path": "src/crypto_trade/tournament/data.py",
+      "previous_sha256": "8b1715ef112dca6d9c4fb66124c329c39d0bca50083ea83c4578f46bb16db968",
+      "sequence": 9,
+      "sha256": "de41fbcb6e007bff3059e266a2ec022d4e3ac9830bf480c28e0627d46c15c1ae",
+      "size": 8918
+    },
+    {
+      "entry_sha256": "684b999636ad4c935d503e22d5c2841c6ae34e34242e0645c03db4a4c8729db1",
+      "path": "src/crypto_trade/tournament/engine_v2.py",
+      "previous_sha256": "fd45740fd6dccb18671adf75937d433eb12c03a5a36a10f7f52aaa569bca3685",
+      "sequence": 10,
+      "sha256": "ea0f4659ded846978c9e5e4727594727c04a00b894365d4caccf46bc08ce950f",
+      "size": 58103
+    },
+    {
+      "entry_sha256": "31ec006dc7e51ce892034fffe98818033845922a30e38ff0205f7481e9cb0194",
+      "path": "src/crypto_trade/tournament/journal_top12_v1.py",
+      "previous_sha256": "684b999636ad4c935d503e22d5c2841c6ae34e34242e0645c03db4a4c8729db1",
+      "sequence": 11,
+      "sha256": "e1bc471331f45d5ef8cf99a07840e5501e166356d34ce0fa0ef135df8bbb388e",
+      "size": 24597
+    },
+    {
+      "entry_sha256": "f5def6ddc0068ce3a6e2de4cab177d72f09936de33311eacb33db41a596e2e2c",
+      "path": "src/crypto_trade/tournament/layout_top12_v1.py",
+      "previous_sha256": "31ec006dc7e51ce892034fffe98818033845922a30e38ff0205f7481e9cb0194",
+      "sequence": 12,
+      "sha256": "4bf8b1d2a50feab6ba1e3919c49fa63689b95353e171acfa9ffa1692589f92e3",
+      "size": 3178
+    },
+    {
+      "entry_sha256": "c6683eadbf17e1566bfb87255c65dd6d9316fc0d10fd03b3e08bd568dff0739a",
+      "path": "src/crypto_trade/tournament/metrics_v3.py",
+      "previous_sha256": "f5def6ddc0068ce3a6e2de4cab177d72f09936de33311eacb33db41a596e2e2c",
+      "sequence": 13,
+      "sha256": "22940ee652c4b59fa18fb99df8fb7d19cf5bafb2515602de9c7cfb9f087f3576",
+      "size": 6343
+    },
+    {
+      "entry_sha256": "a70c1507afdd0dd581adc2ea623bbc27c4a2ef91008d29043c006b1663c8d4c4",
+      "path": "src/crypto_trade/tournament/orchestrator_top12_v1.py",
+      "previous_sha256": "c6683eadbf17e1566bfb87255c65dd6d9316fc0d10fd03b3e08bd568dff0739a",
+      "sequence": 14,
+      "sha256": "a89bcc180bffe31e8925a1a3bd8964511bcf3b838744d9218abeffad19a5d728",
+      "size": 77496
+    },
+    {
+      "entry_sha256": "28876c0ff19529854de9fe85c77834b609e30e3f004483958c43a79464e80950",
+      "path": "src/crypto_trade/tournament/protocol.py",
+      "previous_sha256": "a70c1507afdd0dd581adc2ea623bbc27c4a2ef91008d29043c006b1663c8d4c4",
+      "sequence": 15,
+      "sha256": "1a740d839cf8cdbef2322da0db17634384e9a8bb7b5e8fbb5a071e34c4ef2f7a",
+      "size": 1960
+    },
+    {
+      "entry_sha256": "81ec1fe1336af67848ccbc1785db17bf0808af6327535ce9e0c06df09a9f6d0f",
+      "path": "src/crypto_trade/tournament/pure_crypto_universe_v6.py",
+      "previous_sha256": "28876c0ff19529854de9fe85c77834b609e30e3f004483958c43a79464e80950",
+      "sequence": 16,
+      "sha256": "fc93c0f26dcbf6304abe028736693ab2bee7430a56c14a8547defff472008192",
+      "size": 34031
+    },
+    {
+      "entry_sha256": "ed46f053da59f412ee7392a6ad95d1fe78406a6b9675b27149be32d43df2b7a3",
+      "path": "src/crypto_trade/tournament/risk_policy.py",
+      "previous_sha256": "81ec1fe1336af67848ccbc1785db17bf0808af6327535ce9e0c06df09a9f6d0f",
+      "sequence": 17,
+      "sha256": "94ea2c377c80890df299217a487eae0ac9e0365635f67d387e8b23eb68119b8e",
+      "size": 12840
+    },
+    {
+      "entry_sha256": "f23117c7ec84c4bbaf02cb54363736dd4d898bbffb98541b205d08569c30e892",
+      "path": "src/crypto_trade/tournament/runner_top12_v1.py",
+      "previous_sha256": "ed46f053da59f412ee7392a6ad95d1fe78406a6b9675b27149be32d43df2b7a3",
+      "sequence": 18,
+      "sha256": "eabd8b6d6930a6fcbac57d0cf3f4f7fd6f0dd3640390137f2d6613ce85c347f9",
+      "size": 103758
+    },
+    {
+      "entry_sha256": "2a9ab9c37bc94759ef4bd9c54f0c567e036542d5b01a12e61884b46541acc268",
+      "path": "src/crypto_trade/tournament/scoring_top12_v1.py",
+      "previous_sha256": "f23117c7ec84c4bbaf02cb54363736dd4d898bbffb98541b205d08569c30e892",
+      "sequence": 19,
+      "sha256": "ad80e129b578033542fbbcf97b86082ae2264608b214ffb7efc8a0c278afb767",
+      "size": 19829
+    },
+    {
+      "entry_sha256": "8162c4bb86488b4e6174afca7bec4990857120885f9c5ee42d4ca89beab07b41",
+      "path": "src/crypto_trade/tournament/source_archive_top12_v1.py",
+      "previous_sha256": "2a9ab9c37bc94759ef4bd9c54f0c567e036542d5b01a12e61884b46541acc268",
+      "sequence": 20,
+      "sha256": "ee1f6a09334fa6732abb391ae566637c5c9ca24f3c238f5c17c4e835b50add89",
+      "size": 17781
+    },
+    {
+      "entry_sha256": "1b28416a3ecba81ed985c9f004c69d1d06ca320e9c1c2a34629c0183ae85e954",
+      "path": "src/crypto_trade/tournament/top12_v1.py",
+      "previous_sha256": "8162c4bb86488b4e6174afca7bec4990857120885f9c5ee42d4ca89beab07b41",
+      "sequence": 21,
+      "sha256": "26b54486a4fd26b0b0e80278514f3476ac3a2bb4a622375a0113536959979ff8",
+      "size": 19316
+    },
+    {
+      "entry_sha256": "0cea7022d694746200e00a4d8f15d1f3cbaefb722004c1b70ca7fefee74a878e",
+      "path": "src/crypto_trade/tournament/top12_universe_v1.py",
+      "previous_sha256": "1b28416a3ecba81ed985c9f004c69d1d06ca320e9c1c2a34629c0183ae85e954",
+      "sequence": 22,
+      "sha256": "c64de55fc314d56fb2d832276405c176170ea0ce4da8db5c2802857db0f05dac",
+      "size": 18828
+    },
+    {
+      "entry_sha256": "b051b60b65fe2923da8be1985c2a52888bb0f13d833479a62a965217bd263611",
+      "path": "tests/tournament/test_top12_v1.py",
+      "previous_sha256": "0cea7022d694746200e00a4d8f15d1f3cbaefb722004c1b70ca7fefee74a878e",
+      "sequence": 23,
+      "sha256": "497e18393ed7ce81adc9df22b1d2de8085ad9b7493960f483c25ec5425efe431",
+      "size": 34924
+    },
+    {
+      "entry_sha256": "4ff60aa137e98711b5a06dffa715b2dffe9a5a88a2d0729aa6fea7888803473d",
+      "path": "tests/tournament/test_top12_v1_team_bundles.py",
+      "previous_sha256": "b051b60b65fe2923da8be1985c2a52888bb0f13d833479a62a965217bd263611",
+      "sequence": 24,
+      "sha256": "69333d54e9c8747997e6f09096819b88782df920513292a8cfa89883b601d84c",
+      "size": 4192
+    },
+    {
+      "entry_sha256": "2b9c19f68cb1aae44f37a56fad679ba1ee1bb1a5a49fc26d7cf0663638fa56b4",
+      "path": "tournament/top12/data_manifest.json",
+      "previous_sha256": "4ff60aa137e98711b5a06dffa715b2dffe9a5a88a2d0729aa6fea7888803473d",
+      "sequence": 25,
+      "sha256": "0ced737d1ee62f5a45470c7e363510d4e30aa5a9eb98f82cd17df94caac31198",
+      "size": 7090
+    },
+    {
+      "entry_sha256": "59a0029873a51bf339fe943cee601bebfaf29cb39d62273ff80ace20b5f0a1ac",
+      "path": "tournament/top12-v1/ORCHESTRATOR-MECHANISM-REGISTRY.json",
+      "previous_sha256": "2b9c19f68cb1aae44f37a56fad679ba1ee1bb1a5a49fc26d7cf0663638fa56b4",
+      "sequence": 26,
+      "sha256": "595c34ea6c8758d14f36281b0c563b21a7028a09ffbdb3942fd9c10b40c8142d",
+      "size": 3391
+    },
+    {
+      "entry_sha256": "5481b9132e043a131a9408ca349712363cb8df9b69c958dd5f246704ce1f3c65",
+      "path": "tournament/top12-v1/README.md",
+      "previous_sha256": "59a0029873a51bf339fe943cee601bebfaf29cb39d62273ff80ace20b5f0a1ac",
+      "sequence": 27,
+      "sha256": "3e90ad43c1fb3c2a5e6318b7e4f659658da03c1c2065b826ddd02f01778c38f8",
+      "size": 3667
+    },
+    {
+      "entry_sha256": "7a6cc2b81d31fe88f96b3d902f09b312ed0b3faf7b85410c755e5cb72d4cecd7",
+      "path": "tournament/top12-v1/ROBUSTNESS-POLICY.md",
+      "previous_sha256": "5481b9132e043a131a9408ca349712363cb8df9b69c958dd5f246704ce1f3c65",
+      "sequence": 28,
+      "sha256": "7f9bc17ad1e2cb5a8e4c10b0ea365fe41e328ec1c44bf2c1faa4885649dcafb0",
+      "size": 1686
+    },
+    {
+      "entry_sha256": "06a0aa20ad506301b8071a5a4f287e892cb439e0b1fab028a341d102de309e0f",
+      "path": "tournament/top12-v1/TEAM-API.md",
+      "previous_sha256": "7a6cc2b81d31fe88f96b3d902f09b312ed0b3faf7b85410c755e5cb72d4cecd7",
+      "sequence": 29,
+      "sha256": "bff3d56fe98aa9cbab214c2777831d8fc0e408a9d3fcedf6413c2997111eaadb",
+      "size": 2237
+    },
+    {
+      "entry_sha256": "bbad5aee204716275efaeff140d8b227db110fba437db278d3504b924c09e4fd",
+      "path": "tournament/top12-v1/TEAM-ISOLATION.md",
+      "previous_sha256": "06a0aa20ad506301b8071a5a4f287e892cb439e0b1fab028a341d102de309e0f",
+      "sequence": 30,
+      "sha256": "650ab1c52a1d4ae7e30833ddd6162d259a8b2e07e34a3d0d2f22bda06382677f",
+      "size": 2050
+    },
+    {
+      "entry_sha256": "52fb583eeb37ffe78a38e25cf72cc62d59677f1f9f26670b1bd2cd889125ce0e",
+      "path": "tournament/top12-v1/TEAM-PLAYBOOK.md",
+      "previous_sha256": "bbad5aee204716275efaeff140d8b227db110fba437db278d3504b924c09e4fd",
+      "sequence": 31,
+      "sha256": "763f475f2a06774ef27149fffb3ac041ad092547287f37194fd26c958ada1568",
+      "size": 2191
+    },
+    {
+      "entry_sha256": "52ce5ec9a1047b06e85d63166a9213fa38529e0a489cf40a5fa9ca5b100a262c",
+      "path": "tournament/top12-v1/config.toml",
+      "previous_sha256": "52fb583eeb37ffe78a38e25cf72cc62d59677f1f9f26670b1bd2cd889125ce0e",
+      "sequence": 32,
+      "sha256": "aca1a936ef1d5d6c8c4476a7cb51f3bdddee5ad589fa3a7be1486286830324bc",
+      "size": 9904
+    },
+    {
+      "entry_sha256": "01f0ee68edb8dbacc7d1ee3b55c4671662d0f7cac835a2215f411c099be1883b",
+      "path": "tournament/top12-v1/universe-build.json",
+      "previous_sha256": "52ce5ec9a1047b06e85d63166a9213fa38529e0a489cf40a5fa9ca5b100a262c",
+      "sequence": 33,
+      "sha256": "baa28a2ed0a726bb97f44b6793a0bee6b75d5edd183b8909446c0c9e916e8245",
+      "size": 764
+    },
+    {
+      "entry_sha256": "73e5e43d0155317f71adf5e317c47bebac167aaebfb64ff85387c39302b25a55",
+      "path": "tournament/top12-v1/teams/team-01/BRIEF.md",
+      "previous_sha256": "01f0ee68edb8dbacc7d1ee3b55c4671662d0f7cac835a2215f411c099be1883b",
+      "sequence": 34,
+      "sha256": "de6de9ebe15868942a33803a5b96386ce1a5c3f8667732253e738eff4b76d0dc",
+      "size": 703
+    },
+    {
+      "entry_sha256": "29cfe5a91ade6ec6a719ef625e1a50026467cf308bb5c3452fab528ac0edfb3a",
+      "path": "tournament/top12-v1/teams/team-02/BRIEF.md",
+      "previous_sha256": "73e5e43d0155317f71adf5e317c47bebac167aaebfb64ff85387c39302b25a55",
+      "sequence": 35,
+      "sha256": "05f03b11f96dbb11ed04aab896a93799b0951d0fd97a06be11526fda03f7bb7d",
+      "size": 642
+    },
+    {
+      "entry_sha256": "7104cdf79ed2e486abf1dafba37ed6bf8b53218ebec455a140f87ef450e25fa3",
+      "path": "tournament/top12-v1/teams/team-03/BRIEF.md",
+      "previous_sha256": "29cfe5a91ade6ec6a719ef625e1a50026467cf308bb5c3452fab528ac0edfb3a",
+      "sequence": 36,
+      "sha256": "d1412275e644811dc9890b44cf3c99215825e90715ccd260434d2456aa08b2f8",
+      "size": 603
+    },
+    {
+      "entry_sha256": "59c62b24dc851973daebc7d9f66e094d442159aaf471d3e162ff608f85376060",
+      "path": "tournament/top12-v1/teams/team-04/BRIEF.md",
+      "previous_sha256": "7104cdf79ed2e486abf1dafba37ed6bf8b53218ebec455a140f87ef450e25fa3",
+      "sequence": 37,
+      "sha256": "e74da70f7c43ef8dc8a46db1c0a74c8f870dfe9a48dfc8e8f9293ab93c215893",
+      "size": 668
+    },
+    {
+      "entry_sha256": "f82a66613afaf9802ed4823750f636d3f4fdd1f54c4499f51e2bbfaa698fefcb",
+      "path": "tournament/top12-v1/teams/team-05/BRIEF.md",
+      "previous_sha256": "59c62b24dc851973daebc7d9f66e094d442159aaf471d3e162ff608f85376060",
+      "sequence": 38,
+      "sha256": "32f7e2f5c1ca0fc0c25bc125ab62d126682aba1f700583e5d7a623943d247086",
+      "size": 623
+    },
+    {
+      "entry_sha256": "cdfff02ec73f6a53a4a4cd40ed4c1baa44b058ffd8a6b8fe12e6bef73219a6fe",
+      "path": "tournament/top12-v1/teams/team-06/BRIEF.md",
+      "previous_sha256": "f82a66613afaf9802ed4823750f636d3f4fdd1f54c4499f51e2bbfaa698fefcb",
+      "sequence": 39,
+      "sha256": "9f77c5440e928aa556498b771b15635c5d2cb9e57e61c115b43fc54c6d4d1db1",
+      "size": 596
+    },
+    {
+      "entry_sha256": "b0ff1da23b24e0f71f42a72c5bf857cde77da6402bca73c972cba693e939fecb",
+      "path": "tournament/top12-v1/teams/team-07/BRIEF.md",
+      "previous_sha256": "cdfff02ec73f6a53a4a4cd40ed4c1baa44b058ffd8a6b8fe12e6bef73219a6fe",
+      "sequence": 40,
+      "sha256": "3d4fae78fa547a26a0efa28c03ba8f47dccc2c90c34f08f492ccbe1d85eba718",
+      "size": 635
+    },
+    {
+      "entry_sha256": "9e8e10153e2ddd6ff315852c9023e473cb1705d5f083715e13e28d9b5038a704",
+      "path": "tournament/top12-v1/teams/team-08/BRIEF.md",
+      "previous_sha256": "b0ff1da23b24e0f71f42a72c5bf857cde77da6402bca73c972cba693e939fecb",
+      "sequence": 41,
+      "sha256": "b1be2758b92c3d44011a6c27dd79fa3b88fe40e32fef272134b5c9fdffb350e0",
+      "size": 657
+    },
+    {
+      "entry_sha256": "bf470b47e3e6a40998e007eee4c14626d7dfffdc216bbd770734c4b373211591",
+      "path": "tournament/top12-v1/teams/team-09/BRIEF.md",
+      "previous_sha256": "9e8e10153e2ddd6ff315852c9023e473cb1705d5f083715e13e28d9b5038a704",
+      "sequence": 42,
+      "sha256": "5c9a6a30f0aac764df04f7c3d65f6b6b9e3487da0e39aeae920447c5815b72c2",
+      "size": 607
+    },
+    {
+      "entry_sha256": "503f4237ac65445888a10324ea888ba611ec49f6e352ea1bb3f382e4a18b9ec4",
+      "path": "tournament/top12-v1/teams/team-10/BRIEF.md",
+      "previous_sha256": "bf470b47e3e6a40998e007eee4c14626d7dfffdc216bbd770734c4b373211591",
+      "sequence": 43,
+      "sha256": "616557aa76055405a2708b64d698f0d8f25d98f2aa0117c938472966276396d8",
+      "size": 637
+    },
+    {
+      "entry_sha256": "f7dd85e5acda7ea6da266eaf78fb3d69f7d44542b64277c07e88f4d55c3f7ffa",
+      "path": "tournament/top12-v1/teams/team-11/BRIEF.md",
+      "previous_sha256": "503f4237ac65445888a10324ea888ba611ec49f6e352ea1bb3f382e4a18b9ec4",
+      "sequence": 44,
+      "sha256": "4b939cae959c35958ade4e73f52e39cd2fb93873fa44e499dad63d3c7dc05142",
+      "size": 594
+    },
+    {
+      "entry_sha256": "30cbe68c67b9356eb454284e031c6a8ca289c48b281b28328fbd91f90ceafb8f",
+      "path": "tournament/top12-v1/teams/team-12/BRIEF.md",
+      "previous_sha256": "f7dd85e5acda7ea6da266eaf78fb3d69f7d44542b64277c07e88f4d55c3f7ffa",
+      "sequence": 45,
+      "sha256": "05e3f2133f67e3f7b135e90ef59ee12783bd4eaf1300d497efe6d08c590c3dff",
+      "size": 664
+    },
+    {
+      "entry_sha256": "026b8a20f0fe2a997be63ccaadd2885eb9cad51465674511729b77aae652d80c",
+      "path": "uv.lock",
+      "previous_sha256": "30cbe68c67b9356eb454284e031c6a8ca289c48b281b28328fbd91f90ceafb8f",
+      "sequence": 46,
+      "sha256": "869cd3380346a9c9a219fc762868e23cd494a18e22dd9b314ba18621d991faa5",
+      "size": 374244
+    }
+  ],
+  "scope_head_sha256": "026b8a20f0fe2a997be63ccaadd2885eb9cad51465674511729b77aae652d80c",
+  "tests": {
+    "command": [
+      "uv",
+      "run",
+      "--frozen",
+      "pytest",
+      "-q",
+      "tests/tournament/test_top12_v1.py",
+      "tests/tournament/test_top12_v1_team_bundles.py"
+    ],
+    "exit_code": 0,
+    "output_path": "tournament/top12-v1/activation-tests.out",
+    "output_sha256": "44a9553d0ba94e4b8cd22f62d76582f73f14bccf6d9deda54bef4a788ba72176",
+    "output_size": 99
+  },
+  "tournament_id": "quant-portfolio-blind-top12-v1"
+}
