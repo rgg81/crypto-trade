@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -91,6 +92,192 @@ def test_no_policy_preserves_v1_evaluator_behavior() -> None:
     pd.testing.assert_frame_equal(actual.returns, expected.returns)
     pd.testing.assert_frame_equal(actual.positions, expected.positions)
     pd.testing.assert_frame_equal(actual.events, expected.events)
+
+
+def test_causal_symbol_admission_preserves_the_established_arithmetic_axis() -> None:
+    symbol_count = 667
+    times = pd.date_range("2024-01-01", periods=4, freq="8h", tz="UTC")
+    symbols = [f"S{index:03d}USDT" for index in range(symbol_count)]
+    rng = np.random.default_rng(4)
+    active_indices = np.sort(rng.choice(symbol_count, 17, replace=False))
+    active = {
+        symbols[index]: (weight, move)
+        for index, weight, move in zip(
+            active_indices,
+            rng.uniform(0.002, 0.01, 17),
+            rng.normal(0.0, 1.0, 17),
+            strict=True,
+        )
+    }
+    rows: list[dict[str, object]] = []
+    for symbol in symbols:
+        move = active.get(symbol, (0.0, 0.0))[1]
+        for timestamp, price in zip(
+            times,
+            [100.0, 100.0, 100.0 + move, 100.0 + move],
+            strict=True,
+        ):
+            rows.append(
+                {
+                    "open_time": timestamp,
+                    "symbol": symbol,
+                    "open": price,
+                    "high": price,
+                    "low": price,
+                    "close": price,
+                    "quote_volume": 1_000_000_000.0,
+                }
+            )
+    bars = pd.DataFrame(rows)
+    funding = pd.DataFrame(
+        columns=["funding_time", "symbol", "funding_rate", "mark_price"]
+    )
+    membership = pd.DataFrame(
+        {
+            "reconstitution_time": [times[0]] * symbol_count,
+            "symbol": symbols,
+            "liquidity_rank": range(1, symbol_count + 1),
+            "trailing_quote_volume": range(symbol_count, 0, -1),
+        }
+    )
+    target = {symbol: active.get(symbol, (0.0, 0.0))[0] for symbol in symbols}
+    targets = pd.DataFrame([target, target], index=times[1:3])
+    config = EvaluatorConfig(
+        taker_fee_bps_per_side=0.0,
+        slippage_bps_per_side=0.0,
+        max_bar_participation=1.0,
+        max_symbol_exposure=0.20,
+    )
+    baseline = evaluate_targets(
+        bars,
+        funding,
+        membership,
+        targets,
+        mark_prices=_marks(bars),
+        config=config,
+    )
+
+    added_symbol = "A_NEWUSDT"
+    for added_time in (times[0], times[2]):
+        added_bar = pd.DataFrame(
+            [
+                {
+                    "open_time": added_time,
+                    "symbol": added_symbol,
+                    "open": 100.0,
+                    "high": 100.0,
+                    "low": 100.0,
+                    "close": 100.0,
+                    "quote_volume": 1_000_000_000.0,
+                }
+            ]
+        )
+        augmented_bars = pd.concat([bars, added_bar], ignore_index=True)
+        augmented_targets = targets.assign(**{added_symbol: 0.0})
+        augmented = evaluate_targets(
+            augmented_bars,
+            funding,
+            membership,
+            augmented_targets,
+            mark_prices=_marks(augmented_bars),
+            config=config,
+            initial_symbols=symbols,
+        )
+
+        pd.testing.assert_frame_equal(augmented.returns, baseline.returns, check_exact=True)
+        pd.testing.assert_frame_equal(augmented.events, baseline.events, check_exact=True)
+        pd.testing.assert_frame_equal(
+            augmented.positions.drop(columns=added_symbol),
+            baseline.positions,
+            check_exact=True,
+        )
+        assert augmented.positions[added_symbol].eq(0.0).all()
+        assert not augmented.events["symbol"].eq(added_symbol).any()
+
+
+def test_causal_symbol_is_tradable_at_its_first_eligible_boundary() -> None:
+    bars, funding, _, times = _market({"AAAUSDT": [100.0] * 4})
+    new_bars = pd.DataFrame(
+        {
+            "open_time": times[1:4],
+            "symbol": ["NEWUSDT"] * 3,
+            "open": [100.0] * 3,
+            "high": [100.0] * 3,
+            "low": [100.0] * 3,
+            "close": [100.0] * 3,
+            "quote_volume": [1_000_000_000.0] * 3,
+        }
+    )
+    bars = pd.concat([bars, new_bars], ignore_index=True)
+    membership = pd.DataFrame(
+        {
+            "reconstitution_time": [times[0], times[2], times[2]],
+            "symbol": ["AAAUSDT", "AAAUSDT", "NEWUSDT"],
+            "liquidity_rank": [1, 1, 2],
+            "trailing_quote_volume": [2.0, 2.0, 1.0],
+        }
+    )
+    targets = pd.DataFrame(
+        [
+            {"AAAUSDT": 0.1, "NEWUSDT": 0.0},
+            {"AAAUSDT": 0.0, "NEWUSDT": 0.1},
+        ],
+        index=times[1:3],
+    )
+
+    result = evaluate_targets(
+        bars,
+        funding,
+        membership,
+        targets,
+        mark_prices=_marks(bars),
+        config=_config(),
+        initial_symbols=("AAAUSDT",),
+    )
+
+    assert result.positions.loc[times[1], "NEWUSDT"] == 0.0
+    assert result.positions.loc[times[2], "NEWUSDT"] > 0.0
+    new_trades = result.events[
+        result.events["symbol"].eq("NEWUSDT")
+        & result.events["event_type"].eq("trade")
+    ]
+    assert new_trades["timestamp"].tolist() == [times[2]]
+
+
+def test_causal_symbol_nonzero_ineligible_target_still_fails_closed() -> None:
+    bars, funding, membership, times = _market({"AAAUSDT": [100.0] * 4})
+    new_bar = pd.DataFrame(
+        [
+            {
+                "open_time": times[2],
+                "symbol": "NEWUSDT",
+                "open": 100.0,
+                "high": 100.0,
+                "low": 100.0,
+                "close": 100.0,
+                "quote_volume": 1_000_000_000.0,
+            }
+        ]
+    )
+    bars = pd.concat([bars, new_bar], ignore_index=True)
+    targets = pd.DataFrame(
+        [
+            {"AAAUSDT": 0.0, "NEWUSDT": 0.0},
+            {"AAAUSDT": 0.0, "NEWUSDT": 0.1},
+        ],
+        index=times[1:3],
+    )
+
+    with pytest.raises(ValueError, match="ineligible target symbols.*NEWUSDT"):
+        evaluate_targets(
+            bars,
+            funding,
+            membership,
+            targets,
+            mark_prices=_marks(bars),
+            config=_config(),
+            initial_symbols=("AAAUSDT",),
+        )
 
 
 def test_position_stop_ignores_intrabar_low_and_exits_at_next_open_without_reentry() -> None:

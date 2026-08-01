@@ -162,6 +162,7 @@ def evaluate_targets(
     config: EvaluatorConfig | None = None,
     cost_multiplier: float = 1.0,
     risk_policy: RiskPolicy | None = None,
+    initial_symbols: Sequence[str] | None = None,
 ) -> EvaluationResult:
     """Convert target weights to fills, costs, funding cashflows, and open-to-open returns.
 
@@ -176,7 +177,9 @@ def evaluate_targets(
     and before the team rebalance. Position and time stops are close-confirmed: only the current
     boundary mark is inspected, and every resulting order uses the current executable open with
     ordinary costs and the same participation allowance as team orders. No intrabar high or low
-    participates in a policy decision.
+    participates in a policy decision. ``initial_symbols`` optionally freezes an established
+    arithmetic axis; other contracts are appended, without reordering, at their first executable
+    eligible boundary.
     """
     cfg = config or EvaluatorConfig()
     cfg.validate()
@@ -210,7 +213,24 @@ def evaluate_targets(
         raise ValueError("target frame contains non-finite target weights")
     if frame["symbol"].astype(str).eq(REBALANCE_INSTRUCTION_COLUMN).any():
         raise ValueError("market data contains the reserved rebalance instruction symbol")
-    symbols = sorted(set(frame["symbol"]) | set(target_frame.columns))
+    all_symbols = sorted(set(frame["symbol"]) | set(target_frame.columns))
+    if initial_symbols is None:
+        symbols = list(all_symbols)
+        deferred_symbols: set[str] = set()
+    else:
+        symbols = list(initial_symbols)
+        if any(not isinstance(symbol, str) or not symbol for symbol in symbols):
+            raise ValueError("initial symbols must be non-empty strings")
+        if len(symbols) != len(set(symbols)):
+            raise ValueError("initial symbols contain duplicates")
+        if REBALANCE_INSTRUCTION_COLUMN in symbols:
+            raise ValueError("initial symbols contain the reserved instruction column")
+        unknown_initial = set(symbols) - set(all_symbols)
+        if unknown_initial:
+            raise ValueError(
+                f"initial symbols are absent from bars and targets: {sorted(unknown_initial)}"
+            )
+        deferred_symbols = set(all_symbols) - set(symbols)
     opens = frame.pivot(index="open_time", columns="symbol", values="open").sort_index()
     closes = frame.pivot(index="open_time", columns="symbol", values="close").sort_index()
     quote_volume = frame.pivot(
@@ -239,6 +259,34 @@ def evaluate_targets(
     position_rows: list[pd.Series] = []
     event_rows: list[dict[str, object]] = []
     for index, fill_time in enumerate(evaluation_times):
+        if deferred_symbols:
+            # A compatibility-seeded evaluator keeps its established arithmetic axis intact.
+            # Later contracts enter only when they first become executable members (or when a
+            # direct caller supplies a nonzero target that must still be validated and rejected
+            # if ineligible). Once admitted, a symbol retains its slot for the rest of the replay.
+            full_current_open = opens.loc[fill_time]
+            fillable_all = set(full_current_open[full_current_open.notna()].index)
+            activation_candidates = set(eligible_at(membership, fill_time)) & fillable_all
+            if fill_time in target_frame.index and bool(
+                rebalance_instructions.loc[fill_time]
+            ):
+                target_row = target_frame.loc[fill_time]
+                activation_candidates.update(
+                    target_row.index[target_row.abs() > 1e-12]
+                )
+            newly_admitted = sorted(deferred_symbols & activation_candidates)
+            if newly_admitted:
+                symbols.extend(newly_admitted)
+                deferred_symbols.difference_update(newly_admitted)
+                quantities = quantities.reindex(symbols, fill_value=0.0)
+                policy_reference_weights = policy_reference_weights.reindex(
+                    symbols, fill_value=0.0
+                )
+                entry_prices = entry_prices.reindex(symbols)
+                holding_bars = holding_bars.reindex(symbols, fill_value=0).astype(int)
+                cooldown_bars_remaining = cooldown_bars_remaining.reindex(
+                    symbols, fill_value=0
+                ).astype(int)
         terminal_bar = index == len(evaluation_times) - 1
         next_time = (
             fill_time + pd.Timedelta(hours=cfg.interval_hours)
@@ -888,7 +936,7 @@ def evaluate_targets(
             )
         return_rows.append(return_row)
     returns = pd.DataFrame(return_rows).set_index("timestamp")
-    positions = pd.DataFrame(position_rows).fillna(0.0)
+    positions = pd.DataFrame(position_rows).reindex(columns=all_symbols).fillna(0.0)
     events = pd.DataFrame(event_rows)
     return EvaluationResult(returns=returns, positions=positions, events=events)
 

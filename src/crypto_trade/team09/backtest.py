@@ -42,6 +42,10 @@ IS_END_EXCLUSIVE = pd.Timestamp("2024-07-01T00:00:00Z")
 LIVE_FORWARD_START = pd.Timestamp("2026-08-01T00:00:00Z")
 INTERVAL_HOURS = 8
 STRATEGY_SEED = 20_260_719
+# The frozen snapshot plus these already-sealed bridge additions define the desk's immutable
+# legacy arithmetic axis. Later discoveries must not redefine that axis, even if an archive
+# backfill contains older bars; they enter causally at an executable eligible boundary instead.
+EVALUATOR_SEALED_BRIDGE_SYMBOLS = ("DATAIPUSDT", "GRAMUSDT")
 
 EVALUATOR_CONFIG = EvaluatorConfig(
     interval_hours=INTERVAL_HOURS,
@@ -344,6 +348,21 @@ def run_replay(
     ):
         raise ValueError("cost multipliers must be finite and positive")
     evaluations: dict[float, EvaluationResult] = {}
+    bar_times = pd.to_datetime(data.bars["open_time"], utc=True, errors="raise")
+    frozen_symbols = set(
+        data.bars.loc[
+            bar_times < HISTORICAL_END_EXCLUSIVE,
+            "symbol",
+        ].astype(str)
+    )
+    initial_symbols = tuple(
+        sorted(
+            frozen_symbols
+            | (set(EVALUATOR_SEALED_BRIDGE_SYMBOLS) & set(target_symbols))
+        )
+    )
+    if not initial_symbols:
+        raise ValueError("Team 09 evaluator compatibility symbol cohort is empty")
     for multiplier in unique_multipliers:
         evaluation = evaluate_targets(
             data.bars,
@@ -354,6 +373,7 @@ def run_replay(
             config=EVALUATOR_CONFIG,
             cost_multiplier=multiplier,
             risk_policy=policy,
+            initial_symbols=initial_symbols,
         )
         evaluation.returns.index.name = "timestamp"
         evaluation.returns.index = pd.DatetimeIndex(
