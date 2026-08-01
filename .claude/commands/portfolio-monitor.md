@@ -351,6 +351,21 @@ A SECOND book runs ALONGSIDE v1, fully isolated, on a SEPARATE testnet account. 
   a healthy-but-slow engine's mtime advances (even if minutes apart); a truly hung one never moves.
   Backlog: add a lightweight engine heartbeat / poll-tick timestamp so a hang is detectable without the
   log-activity heuristic (would have removed all ambiguity here).
+  **DIRECT hang proof — skip the log-heuristic ambiguity entirely (2026-08-01).** A stuck-socket hang
+  produces NO retry storm at all: exactly ONE `tick error #1 (...)` line, then total silence for HOURS
+  (not the minutes a real refresh takes) — never even reaching the `>25min past boundary` MISSED-rebalance
+  threshold before the alert fires on its own. In that shape, check the engine's actual socket state
+  instead of inferring from log timing: `ss -tnp | grep <pid>` (or match the venv-python cmd if the pid is
+  unknown). A connection sitting in **`CLOSE-WAIT`** to the exchange host (the remote closed its end, our
+  side never did — a blocking read now waits on a connection that will never respond) plus
+  `ps -o stat,pcpu -p <pid>` showing `S`/sleeping at ~0% CPU is DIRECT proof of a genuine hang — no need to
+  wait out a 5-min observation window or worry about the false-hang caveat above, since a real in-progress
+  refresh would show active CPU/successive requests, not one idle blocked socket. Diagnosed and recovered
+  live 2026-08-01: proc alive continuously since 2026-07-27 (`uptime` showed no reboot, no traceback), log
+  silent 2026-07-31 22:00→2026-08-01 11:07 (~13h, spanning a missed 08:00 UTC boundary) after a single
+  unretried `ConnectError`; `ss` showed the engine's fd stuck `CLOSE-WAIT` to a Binance edge IP. PGID-killed
+  + relaunched (DB KEPT, log appended); cleared the pre-existing 418 in ~1h (refresh climbed 233→539/542,
+  correctly guard-refused the partial), caught up to the current boundary in one shot, `errors=0`.
 - The HANDS-OFF mandate applies to v2 identically: observe + inform, never intervene on performance.
 - **Network resilience (2026-06-23):** the engine poll loop (`engine.py:run()`) now wraps each tick in
   try/except → a transient `ConnectError`/network/API failure logs a ONE-LINER `tick error #N (...);
@@ -381,6 +396,26 @@ ROADMAP #1–#7 COMPLETE. Future ideas: per-name funding-carry attribution, regi
 auto-recovery escalation ladder, a live-vs-backtest tracking-error report.
 
 ## Changelog (tick off as we build)
+- **2026-08-01 v28** — STUCK-SOCKET HANG diagnosed + recovered, new direct-proof method added to the
+  HUNG-engine playbook. The healthcheck fired a routine `MISSED rebalance` alert; log inspection showed
+  something the earlier hang playbook (v16) didn't anticipate: NOT an active retry storm frozen mid-flight
+  (the v16/v24 pattern), but total silence for ~13h after a SINGLE unretried `tick error #1`. `uptime`
+  ruled out a reboot (4d19h continuous) and the process had no traceback, so this was neither a crash nor
+  the documented false-hang case. Rather than wait out the ambiguous log-heuristic window, checked the
+  socket directly: `ss -tnp` showed the engine's fd stuck in `CLOSE-WAIT` to a Binance edge IP (remote
+  closed its end, ours never did — a blocking read waiting on a dead connection forever) with
+  `ps -o stat,pcpu` showing `S`/sleeping at ~0% CPU. That's unambiguous proof of a genuine hang in seconds,
+  no 5-min observation window needed. PGID-killed (verified dead by `kill -0 <pid>`, not cmd-grep — see the
+  self-match note below) + relaunched KEEPING the DB + APPENDING the log. Recovery: pre-existing 418 (from
+  before the hang) cleared in ~1h via the normal 233→539/542 climb, the `min_refresh_fraction` guard
+  correctly refused the partial panel mid-recovery, then one clean catch-up rebalance to the current 08:00
+  boundary (`errors=0`, 9 orders) — book was flat-held the whole outage, no risk exposure. Added the
+  `ss -tnp` + `ps stat/pcpu` direct-proof method to the HUNG-engine bullet as the preferred diagnostic when
+  the log shows a single-error-then-silence shape rather than a frozen storm. Also reconfirmed (independent
+  occurrence) the self-match trap generalizes past `pkill -f`/`pgrep -f`: `ps -eo cmd | grep run_portfolio_v2`
+  run from a shell whose OWN command line contains that string reports a false "STILL ALIVE" — verify
+  liveness by PID (`kill -0`) or match the venv python path, never a bare cmd-grep, when the grep pattern
+  might appear in your own command.
 - **2026-07-27 v27** — CLOCK DRIFT MADE HARMLESS IN CODE (`4874fba2`), after the host-side fix proved
   unreachable. Continues the v26 incident. The Windows fix could NOT be landed: `w32time` was stopped,
   `DEMAND_START`, never synced (`Source: Local CMOS Clock`), and every corrective command (`sc start`,
