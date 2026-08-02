@@ -324,7 +324,13 @@ def main() -> int:
             f"{expected_times.max().isoformat() if len(expected_times) else 'none'}"
         )
 
-        forward = pd.read_csv(paths["forward_returns"])
+        # The paper writer emits round-trippable decimal floats. Pandas' default fast parser can
+        # reconstruct those one ULP away from the sealed Parquet values, so use its exact parser
+        # before enforcing byte-level equality with the bridge suffix.
+        forward = pd.read_csv(
+            paths["forward_returns"],
+            float_precision="round_trip",
+        )
         forward_times = (
             pd.to_datetime(forward["timestamp"], utc=True, errors="raise")
             if not forward.empty
