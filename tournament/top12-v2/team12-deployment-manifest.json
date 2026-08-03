@@ -28,8 +28,8 @@
     },
     {
       "path": "scripts/team12_paper_healthcheck.py",
-      "sha256": "5551bdc76a40580b987b7b99fb8e2c00c27ef562ea7d482e11e56d39195a46d2",
-      "size": 23083
+      "sha256": "2039ddb0662a315eea3c96e42a34cedc966dd5adce7b536f2cb8936cdb8300bc",
+      "size": 23306
     },
     {
       "path": "scripts/team12_paper_watchdog.sh",

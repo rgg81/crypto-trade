@@ -324,7 +324,12 @@ def main() -> int:
             f"{expected_times.max().isoformat() if len(expected_times) else 'none'}"
         )
 
-        forward = pd.read_csv(paths["forward_returns"])
+        # Paper CSVs use 17 significant digits. Round-trip parsing restores the
+        # evaluator's exact binary floats before comparing them with parquet.
+        forward = pd.read_csv(
+            paths["forward_returns"],
+            float_precision="round_trip",
+        )
         forward_times = (
             pd.to_datetime(forward["timestamp"], utc=True, errors="raise")
             if not forward.empty
