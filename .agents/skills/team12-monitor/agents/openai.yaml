@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team 12 Monitor"
+  short_description: "Monitor Team 12 exact-replay paper trading"
+  default_prompt: "Use $team12-monitor to check Team 12 paper integrity, parity, and forward performance."

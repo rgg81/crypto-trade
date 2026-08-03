@@ -1,0 +1,76 @@
+{
+  "candidate_id": "t12-nbh-center-v1",
+  "files": [
+    {
+      "path": ".agents/skills/team12-monitor/SKILL.md",
+      "sha256": "0c30d35c566f6a99bfd03652f1cfbe30ef05ea96a4081d396dc49291647cf12b",
+      "size": 5940
+    },
+    {
+      "path": ".agents/skills/team12-monitor/agents/openai.yaml",
+      "sha256": "7bec3d6e7ffb34b11bdd698e75abe96f87002dcceef825248640f4379f8ea78a",
+      "size": 218
+    },
+    {
+      "path": "run_team12_paper.py",
+      "sha256": "68701ed9c475bcbb9667af95088333980a769f88a4266628a8aa9cb762d826ad",
+      "size": 17864
+    },
+    {
+      "path": "scripts/team12_backtest.py",
+      "sha256": "33cb682660c2ad627d76bf08c2828495ea72564b211514852d17662afb197b98",
+      "size": 2827
+    },
+    {
+      "path": "scripts/team12_paper_digest.py",
+      "sha256": "d54da722dc483e56512ad1affbc98b5f83e49429640f8bf95e470b44c16080fa",
+      "size": 2203
+    },
+    {
+      "path": "scripts/team12_paper_healthcheck.py",
+      "sha256": "5551bdc76a40580b987b7b99fb8e2c00c27ef562ea7d482e11e56d39195a46d2",
+      "size": 23083
+    },
+    {
+      "path": "scripts/team12_paper_watchdog.sh",
+      "sha256": "6ae6a8f89f593df8341064a2b428ca101d3ae8fad80343e1e7cc25c39d209db7",
+      "size": 575
+    },
+    {
+      "path": "src/crypto_trade/backtest_report.py",
+      "sha256": "fb8f40fe93678e9832e9bbb452bd7895a7104eea9b632d98a3df1a68d19613b3",
+      "size": 9194
+    },
+    {
+      "path": "src/crypto_trade/team12/__init__.py",
+      "sha256": "08744305ee6c95468ac67365c6e895ac3b34ad1489b57bca2e9cf6dd9e320d54",
+      "size": 344
+    },
+    {
+      "path": "src/crypto_trade/team12/authority.py",
+      "sha256": "c13d0f5be4b0e274d4cc451c0a84b6bad6e10e933406476b285668c8f5d403ed",
+      "size": 17092
+    },
+    {
+      "path": "src/crypto_trade/team12/backtest.py",
+      "sha256": "d8eadf13beefda269fde304e6b7f3c2c49b3ccb40f57164755d919be3f0a2977",
+      "size": 20879
+    },
+    {
+      "path": "src/crypto_trade/team12/live.py",
+      "sha256": "25e68080a42c09e7271f60d6401c12a29c41b4af283398a6b111f073c679eafb",
+      "size": 22724
+    },
+    {
+      "path": "src/crypto_trade/team12/live_data.py",
+      "sha256": "d826a6ec326788a5a40c16867bcd69d079a6047604896ba2fc47f911afef3ccd",
+      "size": 81369
+    },
+    {
+      "path": "src/crypto_trade/team12/report.py",
+      "sha256": "1e05eab100020d030f0090519cd4df58d73bc221ddf2e4e642ed6b9e93ff4032",
+      "size": 7480
+    }
+  ],
+  "schema_version": "team12-deployment-authority-v1"
+}
