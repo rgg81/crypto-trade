@@ -28,8 +28,8 @@ def common_risk_scalars(
     maximum_scale: float = 3.0,
 ) -> pd.Series:
     """Gross-return volatility scalars, using only rows strictly before each decision."""
-    if target_annualized_volatility <= 0:
-        raise ValueError("target_annualized_volatility must be positive")
+    if not math.isfinite(target_annualized_volatility) or target_annualized_volatility <= 0:
+        raise ValueError("target_annualized_volatility must be a positive finite number")
     if not 0 < minimum_scale <= maximum_scale:
         raise ValueError("scale band must satisfy 0 < minimum_scale <= maximum_scale")
     bars_per_year = 365 * 24 / interval_hours
