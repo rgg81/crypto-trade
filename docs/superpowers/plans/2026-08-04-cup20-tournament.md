@@ -22,7 +22,8 @@
 - **Universe:** weekly reconstitution, trailing 180-day quote volume, complete-window eligibility, hysteresis entry rank 20 / exit rank 25, target size 20.
 - **Costs:** 5.0 bps taker fee + 2.5 bps slippage per side; every candidate scored at cost multipliers 1, 2 and 3.
 - **Common risk unit:** 10% annualised volatility target, 90-day trailing lookback, scale clamped to `[0.20, 3.0]`.
-- **Evaluator caps:** `max_gross_exposure = 1.0`, `max_abs_net_exposure = 1.0`, `max_symbol_exposure = 0.20`, `max_bar_participation = 0.001`, `initial_equity = 100_000.0`.
+- **Evaluator caps:** `max_gross_exposure = 1.0`, `max_abs_net_exposure = 1.0`, `max_symbol_exposure = 0.20`, `max_bar_participation = 0.001`, `initial_equity = 100_000.0`. The evaluator is unlevered by construction and rejects any gross above 1.0.
+- **Minimum realised volatility floor `0.06`.** Human ruling 2026-08-04: because gross is capped at 1.0, the common risk unit can always scale a book down to the 10% target but cannot scale a very-low-volatility book up past unit gross. A candidate whose neighbourhood-median realised annualised volatility is below 0.06 fails a hard floor, so an under-risked book is disqualified rather than rewarded with an unearned drawdown advantage.
 - **Trial budget:** 12 material trials per team, minimum 8 before nomination. The declared neighbourhood sweep is one trial; the falsification battery is one trial.
 - No team code may read `data/cup20/sealed/`, another team's directory, or any prior-tournament directory.
 - Verified environment in this worktree: pandas 3.0.0, numpy 2.2.6, pyarrow 23.0.1. All reused
@@ -220,6 +221,7 @@ minimum_trial_adjusted_confidence = 0.90
 net_sharpe = 0.80
 double_cost_sharpe = 0.50
 max_drawdown = 0.20
+minimum_realized_volatility = 0.06
 positive_quarter_fraction = 0.50
 minimum_positive_folds = 3
 worst_fold_sharpe = -0.25
@@ -320,6 +322,7 @@ _FROZEN_SCALARS: dict[tuple[str, ...], object] = {
     ("research", "minimum_trials_for_nomination"): 8,
     ("statistics", "minimum_trial_adjusted_confidence"): 0.90,
     ("floors", "max_drawdown"): 0.20,
+    ("floors", "minimum_realized_volatility"): 0.06,
     ("selection", "advancing_slots"): 3,
     ("holdout", "max_drawdown"): 0.25,
 }
@@ -2304,7 +2307,7 @@ git commit -m "Add CUP-20 neighbourhood declaration and per-metric median scorin
 
 **Interfaces:**
 - Consumes: `config.load_config` (Task 1).
-- Produces: `GateVector` (frozen dataclass, fields `checks: Mapping[str, bool]`, property `passed: bool`, property `failures: tuple[str, ...]`); `evaluate_floors(scored: Mapping[str, float], *, floors: Mapping[str, Any], declared_roles: Sequence[str], sign_inversion_passes_core: bool, neighbourhood_positive_fraction: float, trial_adjusted_confidence: float, statistics_config: Mapping[str, Any], research_config: Mapping[str, Any]) -> GateVector`. `scored` must contain the keys `net_sharpe`, `double_cost_sharpe`, `triple_cost_sharpe`, `annualized_return`, `double_cost_annualized_return`, `max_drawdown`, `positive_quarter_fraction`, `positive_fold_count`, `worst_fold_sharpe`, `annualized_turnover`, `gross_edge_bps_per_turnover`, `cost_share_of_positive_gross`, `top5_day_share`, `max_fold_positive_pnl_share`, `trade_count`, `long_gross_pnl`, `short_gross_pnl`.
+- Produces: `GateVector` (frozen dataclass, fields `checks: Mapping[str, bool]`, property `passed: bool`, property `failures: tuple[str, ...]`); `evaluate_floors(scored: Mapping[str, float], *, floors: Mapping[str, Any], declared_roles: Sequence[str], sign_inversion_passes_core: bool, neighbourhood_positive_fraction: float, trial_adjusted_confidence: float, statistics_config: Mapping[str, Any], research_config: Mapping[str, Any]) -> GateVector`. `scored` must contain the keys `net_sharpe`, `double_cost_sharpe`, `triple_cost_sharpe`, `annualized_return`, `double_cost_annualized_return`, `max_drawdown`, `annualized_volatility`, `positive_quarter_fraction`, `positive_fold_count`, `worst_fold_sharpe`, `annualized_turnover`, `gross_edge_bps_per_turnover`, `cost_share_of_positive_gross`, `top5_day_share`, `max_fold_positive_pnl_share`, `trade_count`, `long_gross_pnl`, `short_gross_pnl`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2324,6 +2327,7 @@ PASSING = {
     "annualized_return": 0.18,
     "double_cost_annualized_return": 0.14,
     "max_drawdown": 0.12,
+    "annualized_volatility": 0.10,
     "positive_quarter_fraction": 0.69,
     "positive_fold_count": 4,
     "worst_fold_sharpe": 0.35,
@@ -2374,6 +2378,7 @@ def test_passing_candidate_passes_every_gate():
         ({"triple_cost_sharpe": 0.0}, "triple_cost_sharpe"),
         ({"annualized_return": 0.0}, "annualized_return"),
         ({"max_drawdown": 0.2001}, "max_drawdown"),
+        ({"annualized_volatility": 0.0599}, "annualized_volatility"),
         ({"positive_quarter_fraction": 0.49}, "positive_quarter_fraction"),
         ({"positive_fold_count": 2}, "positive_fold_count"),
         ({"worst_fold_sharpe": -0.26}, "worst_fold_sharpe"),
@@ -2497,6 +2502,12 @@ def evaluate_floors(
         "annualized_return": _positive(scored["annualized_return"]),
         "double_cost_annualized_return": _positive(scored["double_cost_annualized_return"]),
         "max_drawdown": _at_most(scored["max_drawdown"], float(floors["max_drawdown"])),
+        # The evaluator is unlevered, so the common risk unit cannot scale a very-low-volatility
+        # book up to the 10% target. This floor disqualifies an under-risked book instead of
+        # rewarding it with an unearned drawdown advantage.
+        "annualized_volatility": _at_least(
+            scored["annualized_volatility"], float(floors["minimum_realized_volatility"])
+        ),
         "positive_quarter_fraction": _at_least(
             scored["positive_quarter_fraction"], float(floors["positive_quarter_fraction"])
         ),
