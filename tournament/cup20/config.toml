@@ -1,0 +1,103 @@
+# tournament/cup20/config.toml
+schema_version = 1
+name = "cup20"
+policy_status = "pre-activation"
+charter_path = "TOURNAMENT-CHARTER-CUP20.md"
+teams = [
+  "team-01", "team-02", "team-03", "team-04", "team-05", "team-06",
+  "team-07", "team-08", "team-09", "team-10", "team-11", "team-12",
+]
+
+[paths]
+tournament_root = "tournament/cup20"
+reports_root = "reports-cup20"
+team_root = "tournament/cup20/teams"
+research_journal = "tournament/cup20/research-journal.jsonl"
+nomination_registry = "tournament/cup20/nomination-registry.json"
+selection_freeze = "tournament/cup20/selection-freeze.json"
+activation_freeze = "tournament/cup20/activation-freeze.json"
+source_archive_root = "reports-cup20/source-archives/sha256"
+is_reports_root = "reports-cup20/is"
+private_holdout_root = "tournament/cup20/private/holdout"
+holdout_release_root = "reports-cup20/holdout"
+
+[data]
+is_root = "data/cup20/is"
+sealed_root = "data/cup20/sealed"
+
+[splits]
+is_end = "2024-08-01T00:00:00Z"
+sealed_start = "2024-08-01T00:00:00Z"
+sealed_end = "2026-08-01T00:00:00Z"
+
+[universe]
+target_size = 20
+entry_rank = 20
+exit_rank = 25
+lookback_days = 180
+reconstitution_weekday = 0
+minimum_scored_members = 8
+
+[execution]
+interval_hours = 8
+initial_equity = 100_000.0
+taker_fee_bps_per_side = 5.0
+slippage_bps_per_side = 2.5
+max_gross_exposure = 1.0
+max_abs_net_exposure = 1.0
+max_symbol_exposure = 0.20
+max_bar_participation = 0.001
+cost_multipliers = [1, 2, 3]
+
+[risk_unit]
+target_annualized_volatility = 0.10
+lookback_days = 90
+minimum_scale = 0.20
+maximum_scale = 3.0
+
+[research]
+trial_budget = 12
+minimum_trials_for_nomination = 8
+neighbourhood_minimum_points = 7
+neighbourhood_positive_fraction = 0.70
+
+[statistics]
+bootstrap_samples = 2000
+bootstrap_block_days = 10
+bootstrap_seed = 20260804
+minimum_trial_adjusted_confidence = 0.90
+
+[floors]
+net_sharpe = 0.80
+double_cost_sharpe = 0.50
+max_drawdown = 0.20
+positive_quarter_fraction = 0.50
+minimum_positive_folds = 3
+worst_fold_sharpe = -0.25
+max_annualized_turnover = 25.0
+min_gross_edge_bps_per_turnover = 40.0
+max_cost_share_of_positive_gross = 0.30
+max_top5_day_share = 0.35
+max_fold_share_of_positive_pnl = 0.60
+minimum_trades = 500
+
+[selection]
+advancing_slots = 3
+
+[holdout]
+max_drawdown = 0.25
+minimum_positive_quarters = 5
+
+[mandates]
+team-01 = "slow-per-coin-time-series-momentum"
+team-02 = "breakout-channel-position"
+team-03 = "trend-quality-gated-momentum"
+team-04 = "market-residual-cross-sectional-momentum"
+team-05 = "short-horizon-liquidity-shock-reversal"
+team-06 = "downside-risk-low-volatility-selection"
+team-07 = "funding-carry-crowding-crash-protection"
+team-08 = "funding-basis-term-dynamics-reversion"
+team-09 = "taker-flow-price-volume-pressure"
+team-10 = "volatility-regime-risk-on-risk-off-timing"
+team-11 = "calendar-settlement-clock-seasonality"
+team-12 = "preregistered-multi-sleeve-ensemble"
