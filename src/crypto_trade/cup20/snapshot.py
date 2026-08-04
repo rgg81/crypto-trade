@@ -110,6 +110,7 @@ def _slice(
     column = _TIME_COLUMN.get(name)
     if column is None:
         # Timeless datasets (contract metadata) are sorted for byte-stable manifests.
+        _require_unique_key(name, frame, ["symbol"])
         return frame.sort_values("symbol").reset_index(drop=True)
     times = pd.to_datetime(frame[column], utc=True)
     mask = times < end
@@ -117,7 +118,25 @@ def _slice(
         mask &= times >= start
     result = frame.loc[mask].copy()
     result[column] = times.loc[mask]
+    _require_unique_key(name, result, [column, "symbol"])
     return result.sort_values([column, "symbol"]).reset_index(drop=True)
+
+
+def _require_unique_key(name: str, frame: pd.DataFrame, key_columns: list[str]) -> None:
+    """Fail loudly rather than silently reorder: the sort key must be a total order.
+
+    A duplicate key means the byte order of the written parquet -- and therefore the manifest
+    digest -- would depend on the caller's incoming row order, which breaks determinism. A
+    duplicate row here means the upstream acquisition is wrong; picking a tiebreaker would hide
+    that instead of surfacing it.
+    """
+    duplicated = frame.duplicated(subset=key_columns, keep=False)
+    if duplicated.any():
+        example = tuple(frame.loc[duplicated, key_columns].iloc[0])
+        raise ValueError(
+            f"{name} has duplicate rows for key {key_columns} (e.g. {example}); "
+            "sort order would not be deterministic"
+        )
 
 
 def _write(
