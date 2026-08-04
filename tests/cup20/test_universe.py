@@ -80,8 +80,16 @@ def test_hysteresis_keeps_incumbent_between_entry_and_exit_rank():
     )
     first_members = set(members.loc[members["reconstitution_time"] == first, "symbol"])
     second_members = set(members.loc[members["reconstitution_time"] == second, "symbol"])
-    assert "S00USDT" in first_members
-    assert "S00USDT" in second_members
+    # First boundary has no incumbents yet, so it is a plain top-20-by-rank cut.
+    assert first_members == {f"S{position:02d}USDT" for position in range(20)}
+    # Second boundary: S00 falls to rank 23 but every other incumbent (S01..S19) still ranks
+    # 1..19, so no seat opens up and membership is unchanged from the first boundary.
+    assert second_members == first_members
+    # TOURNAMENT-CHARTER-CUP20.md:70-71 -- "keep incumbents with rank <= 25 in rank order,
+    # truncated to 20; fill any remaining slots from non-incumbents with rank <= 20". S20USDT
+    # (rank 20) is a non-incumbent competing for a seat that never opens, so it must lose to the
+    # rank-23 incumbent S00USDT even though S20USDT is individually more liquid.
+    assert "S20USDT" not in second_members
     assert len(second_members) == 20
 
 
@@ -99,6 +107,10 @@ def test_symbol_beyond_exit_rank_is_dropped_and_slot_refilled():
         exit_rank=25,
     )
     second_members = set(members.loc[members["reconstitution_time"] == second, "symbol"])
+    # TOURNAMENT-CHARTER-CUP20.md:70-71 -- S00USDT falls to rank 30 (beyond exit_rank), vacating
+    # its seat; S20USDT is the best-ranked non-incumbent (rank 20 <= entry_rank) and fills it. The
+    # other nineteen incumbents (S01..S19) still rank <= exit_rank and keep their seats untouched.
+    assert second_members == {f"S{position:02d}USDT" for position in range(1, 21)}
     assert "S00USDT" not in second_members
     assert "S20USDT" in second_members
     assert len(second_members) == 20
