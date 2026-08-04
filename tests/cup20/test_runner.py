@@ -171,13 +171,21 @@ def test_run_candidate_produces_all_three_cost_levels():
     # already are here -- see "Fixture-config adaptation" in the task report. Left at its class
     # default (0.10) it would reject ConstantLong's 1/3 per-symbol weight on this 3-symbol
     # fixture outright (a hard raise from the evaluator's _validate_weight_limits, not a scale).
+    # It is set to 0.5, not 1.0 == max_gross_exposure: since abs(weight).max() <= abs(weight).sum()
+    # always holds, a symbol cap equal to (or above) the gross cap can never independently fire --
+    # it would be algebraically inert, not merely loose. 0.5 stays comfortably above 1/3 (this
+    # fixture's 3-symbol equal weight) and 1/2 (the 2-symbol _finer_cadence_snapshot fixture used
+    # below), while remaining strictly below the 1.0 gross cap so the check stays capable of
+    # binding. It is still far above the real production value of 0.20 -- production spreads 20
+    # symbols (equal weight ~0.05), this fixture spreads 2-3. This same 0.5 literal is used at
+    # every ConstantLong call site in this file for consistency.
     run = run_candidate(
         ConstantLong(),
         snapshot,
         decision_times=grid,
         seed=42,
         config=EvaluatorConfig(
-            max_gross_exposure=1.0, max_abs_net_exposure=1.0, max_symbol_exposure=1.0
+            max_gross_exposure=1.0, max_abs_net_exposure=1.0, max_symbol_exposure=0.5
         ),
         risk_unit={"target_annualized_volatility": 0.10, "lookback_days": 90},
     )
@@ -190,14 +198,14 @@ def test_run_candidate_produces_all_three_cost_levels():
 def test_higher_cost_multiplier_never_improves_net_return():
     snapshot = _snapshot()
     grid = decision_grid(snapshot.bars["open_time"].min(), snapshot.bars["open_time"].max())
-    # NOTE: max_symbol_exposure override -- see test_run_candidate_produces_all_three_cost_levels.
+    # NOTE: max_symbol_exposure=0.5 -- see test_run_candidate_produces_all_three_cost_levels.
     run = run_candidate(
         ConstantLong(),
         snapshot,
         decision_times=grid,
         seed=42,
         config=EvaluatorConfig(
-            max_gross_exposure=1.0, max_abs_net_exposure=1.0, max_symbol_exposure=1.0
+            max_gross_exposure=1.0, max_abs_net_exposure=1.0, max_symbol_exposure=0.5
         ),
         risk_unit={"target_annualized_volatility": 0.10, "lookback_days": 90},
     )
@@ -286,6 +294,30 @@ def test_run_candidate_rejects_unsorted_decision_times():
         )
 
 
+def test_run_candidate_rejects_empty_decision_times():
+    # Reproduces the empty-grid scenario: decision_grid(start, end) is empty for start > end.
+    # (NOTE: start == end is *not* empty -- pd.date_range's half-open "left" inclusive mode keeps
+    # a single degenerate point in that case; verified empirically, see the fix-round report.
+    # start > end is the case that actually arises in practice, e.g. a caller accidentally
+    # swapping IS/OOS boundaries.) Without an explicit guard, an empty decision_times would
+    # previously pass sortedness/duplicate checks vacuously and blow up several calls later as an
+    # opaque KeyError('price_pnl') once run_candidate indexed the unscaled book's columnless
+    # return frame -- not a helpful failure for the point where the caller's mistake occurred.
+    snapshot = _snapshot()
+    start = snapshot.bars["open_time"].min()
+    empty_grid = decision_grid(start + pd.Timedelta(hours=8), start)
+    assert empty_grid == ()
+    with pytest.raises(ValueError, match="empty"):
+        run_candidate(
+            ConstantLong(),
+            snapshot,
+            decision_times=empty_grid,
+            seed=42,
+            config=EvaluatorConfig(max_gross_exposure=1.0, max_abs_net_exposure=1.0),
+            risk_unit={"target_annualized_volatility": 0.10, "lookback_days": 90},
+        )
+
+
 def test_run_candidate_rejects_interval_hours_that_do_not_match_bar_cadence():
     # Decision boundaries every 8h, declared ``interval_hours=8``, but the underlying bars (and
     # therefore the evaluator's actual per-bar return series) are spaced every 4h. Nothing in
@@ -305,7 +337,10 @@ def test_run_candidate_rejects_interval_hours_that_do_not_match_bar_cadence():
                 interval_hours=8,
                 max_gross_exposure=1.0,
                 max_abs_net_exposure=1.0,
-                max_symbol_exposure=1.0,
+                # 0.5 -- see test_run_candidate_produces_all_three_cost_levels; this fixture's
+                # 2-symbol ConstantLong weight (1/2 = 0.5) is exactly why 0.5, not something
+                # tighter, was chosen as the one shared literal.
+                max_symbol_exposure=0.5,
             ),
             risk_unit={"target_annualized_volatility": 0.10, "lookback_days": 90},
         )
@@ -316,7 +351,7 @@ def test_risk_scalars_are_derived_from_gross_not_net_returns():
     grid = decision_grid(snapshot.bars["open_time"].min(), snapshot.bars["open_time"].max())
     risk_unit = {"target_annualized_volatility": 0.10, "lookback_days": 90}
     config = EvaluatorConfig(
-        max_gross_exposure=1.0, max_abs_net_exposure=1.0, max_symbol_exposure=1.0
+        max_gross_exposure=1.0, max_abs_net_exposure=1.0, max_symbol_exposure=0.5
     )
     run = run_candidate(
         ConstantLong(),
@@ -356,7 +391,7 @@ def test_unscaled_pass_evaluates_the_unscaled_book_separately_from_the_scaled_bo
         decision_times=grid,
         seed=42,
         config=EvaluatorConfig(
-            max_gross_exposure=1.0, max_abs_net_exposure=1.0, max_symbol_exposure=1.0
+            max_gross_exposure=1.0, max_abs_net_exposure=1.0, max_symbol_exposure=0.5
         ),
         risk_unit={"target_annualized_volatility": 0.10, "lookback_days": 90},
     )
@@ -378,7 +413,7 @@ def test_run_candidate_is_deterministic():
         decision_times=grid,
         seed=42,
         config=EvaluatorConfig(
-            max_gross_exposure=1.0, max_abs_net_exposure=1.0, max_symbol_exposure=1.0
+            max_gross_exposure=1.0, max_abs_net_exposure=1.0, max_symbol_exposure=0.5
         ),
         risk_unit={"target_annualized_volatility": 0.10, "lookback_days": 90},
     )

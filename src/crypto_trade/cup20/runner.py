@@ -100,7 +100,18 @@ def _validate_decision_times(decision_times: Sequence[pd.Timestamp]) -> None:
     duplicated schedule would otherwise reach the risk unit silently -- ``generate_targets``
     itself re-sorts before building the target frame, so a caller mistake here would not surface
     as a crash downstream, just a scalar series keyed off an order the caller never intended.
+
+    Also rejects an empty sequence outright. ``decision_grid(start, end)`` returns one whenever
+    ``start > end`` (a caller mistake such as swapping IS/OOS boundaries), and without this guard
+    that would otherwise pass every check below vacuously (an empty list is trivially "sorted" and
+    "duplicate-free"), only to blow up several calls later as an opaque ``KeyError`` when
+    ``run_candidate`` indexes the unscaled book's columnless return frame.
     """
+    if len(decision_times) == 0:
+        raise ValueError(
+            "decision_times must not be empty (decision_grid(start, end) returns an empty grid "
+            "whenever start > end)"
+        )
     parsed = [pd.Timestamp(t) for t in decision_times]
     if parsed != sorted(parsed):
         raise ValueError("decision_times must be sorted ascending")
