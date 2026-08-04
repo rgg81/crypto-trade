@@ -106,8 +106,9 @@ Owned entirely by the organiser. No team code touches any of it.
   symbols that settle 4-hourly.
 - **Delisting:** force exit at the last executable open. No survivorship rescue.
 - **Participation:** per-symbol executed notional capped as a fraction of the bar's traded volume.
-- **Caps:** gross ≤ 2.0× equity; per-symbol |weight| ≤ 0.20 of equity. Applied after the common
-  risk unit.
+- **Caps:** gross ≤ 1.0× equity — the evaluator is unlevered by construction, which is also the
+  honest setting for a book headed to a real paper desk; per-symbol |weight| ≤ 0.20 of equity.
+  Applied after the common risk unit.
 - **Solvency:** equity must remain finite and strictly positive; a breach is terminal for the run.
 
 ## 5. Blindness — four independent layers
@@ -155,6 +156,15 @@ Order of operations at each decision boundary `t`:
 
 Both the **normalised** book (official, all floors and scores) and the **raw** book (diagnostic)
 are reported for every run.
+
+**Interaction with the unlevered gross cap.** Because gross is capped at 1.0× equity (§4), the
+scalar can always take a book *down* to the common target but cannot take a very-low-volatility
+book *up* past unit gross. Such a book would realise less than the 10% target and collect an
+unearned drawdown advantage in the one contest this tournament ranks on. Two things close that
+hole rather than one: realised annualised volatility is a **disclosed diagnostic on every run**,
+and a candidate whose neighbourhood-median realised volatility falls below **0.06** fails a hard
+floor (§7.3). A book that cannot reach 6% annualised volatility at full unlevered gross is not a
+deployable book, and it is disqualified rather than rewarded for being small.
 
 ## 7. Qualification
 
@@ -225,6 +235,7 @@ lowered, never rounded into compliance, never averaged away. A missing or non-fi
 | Net Sharpe (3× cost) | > 0 |
 | Annualised return (1× and 2×) | > 0 |
 | Maximum drawdown | ≤ 0.20 |
+| Realised annualised volatility | ≥ 0.06 |
 | Positive-quarter fraction | ≥ 0.50 |
 | Folds positive at 2× cost | ≥ 3 of 4 |
 | Worst-fold Sharpe at 2× cost | ≥ −0.25 |

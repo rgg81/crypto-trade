@@ -71,6 +71,7 @@ minimum_trial_adjusted_confidence = 0.90
 net_sharpe = 0.80
 double_cost_sharpe = 0.50
 max_drawdown = 0.20
+minimum_realized_volatility = 0.06
 positive_quarter_fraction = 0.50
 minimum_positive_folds = 3
 worst_fold_sharpe = -0.25

@@ -1,4 +1,5 @@
 # tests/cup20/test_config.py
+import copy
 from pathlib import Path
 
 import pytest
@@ -26,6 +27,7 @@ def test_load_config_returns_bytes_hash_and_policy():
     assert loaded.raw["risk_unit"]["target_annualized_volatility"] == 0.10
     assert loaded.raw["research"]["trial_budget"] == 12
     assert loaded.raw["selection"]["advancing_slots"] == 3
+    assert loaded.raw["floors"]["minimum_realized_volatility"] == 0.06
     assert len(loaded.raw["mandates"]) == 12
 
 
@@ -43,5 +45,45 @@ def test_validate_config_rejects_unknown_table():
     loaded = load_config(CONFIG_PATH)
     tampered = dict(loaded.raw)
     tampered["surprise"] = {}
+    with pytest.raises(ValueError):
+        validate_config(tampered)
+
+
+def test_validate_config_rejects_changed_team_roster():
+    loaded = load_config(CONFIG_PATH)
+    tampered = copy.deepcopy(loaded.raw)
+    tampered["teams"][-1] = "team-99"
+    with pytest.raises(ValueError):
+        validate_config(tampered)
+
+
+def test_validate_config_rejects_non_covering_mandates():
+    loaded = load_config(CONFIG_PATH)
+    tampered = copy.deepcopy(loaded.raw)
+    del tampered["mandates"]["team-12"]
+    with pytest.raises(ValueError):
+        validate_config(tampered)
+
+
+def test_validate_config_rejects_non_distinct_mandates():
+    loaded = load_config(CONFIG_PATH)
+    tampered = copy.deepcopy(loaded.raw)
+    tampered["mandates"]["team-02"] = tampered["mandates"]["team-01"]
+    with pytest.raises(ValueError):
+        validate_config(tampered)
+
+
+def test_validate_config_rejects_changed_cost_multipliers():
+    loaded = load_config(CONFIG_PATH)
+    tampered = copy.deepcopy(loaded.raw)
+    tampered["execution"]["cost_multipliers"] = [1, 2]
+    with pytest.raises(ValueError):
+        validate_config(tampered)
+
+
+def test_validate_config_rejects_missing_cost_multipliers():
+    loaded = load_config(CONFIG_PATH)
+    tampered = copy.deepcopy(loaded.raw)
+    del tampered["execution"]["cost_multipliers"]
     with pytest.raises(ValueError):
         validate_config(tampered)

@@ -62,6 +62,7 @@ _FROZEN_SCALARS: dict[tuple[str, ...], object] = {
     ("research", "minimum_trials_for_nomination"): 8,
     ("statistics", "minimum_trial_adjusted_confidence"): 0.90,
     ("floors", "max_drawdown"): 0.20,
+    ("floors", "minimum_realized_volatility"): 0.06,
     ("selection", "advancing_slots"): 3,
     ("holdout", "max_drawdown"): 0.25,
 }
@@ -98,7 +99,8 @@ def validate_config(raw: Mapping[str, Any]) -> None:
         raise ValueError("CUP-20 config mandates must cover exactly the twelve teams")
     if len(set(raw["mandates"].values())) != len(TEAM_IDS):
         raise ValueError("CUP-20 mandates must be distinct mechanism lanes")
-    if tuple(raw["execution"]["cost_multipliers"]) != (1, 2, 3):
+    cost_multipliers = _lookup(raw, ("execution", "cost_multipliers"))
+    if not isinstance(cost_multipliers, list | tuple) or tuple(cost_multipliers) != (1, 2, 3):
         raise ValueError("CUP-20 cost multipliers are frozen at 1, 2 and 3")
 
 
