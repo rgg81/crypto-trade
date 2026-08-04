@@ -148,6 +148,18 @@ def test_decision_grid_is_eight_hourly_and_half_open():
     assert len(grid) == 3
 
 
+def test_decision_grid_is_empty_when_start_does_not_precede_end():
+    # Pins the full half-open [start, end) contract at every boundary case, including the
+    # degenerate start == end point that fix-round 2 corrected (pd.date_range's own
+    # inclusive="left" does not drop that coincident point on its own; see the fix-round-2 report
+    # section for the empirical trace on this environment's pandas 3.0.0).
+    x = pd.Timestamp("2021-01-01T00:00:00Z")
+    assert decision_grid(x, x) == ()
+    assert decision_grid(x + pd.Timedelta(hours=8), x) == ()  # start > end: already correct
+    assert decision_grid(x, x + pd.Timedelta(hours=8)) == (x,)  # endpoint excluded
+    assert decision_grid(x, x + pd.Timedelta(hours=4)) == (x,)  # non-grid-aligned end excludes too
+
+
 def test_normalise_unit_gross_scales_rows_to_unit_absolute_sum():
     index = pd.date_range("2021-01-01T00:00:00Z", periods=3, freq="8h")
     targets = pd.DataFrame(
@@ -295,17 +307,18 @@ def test_run_candidate_rejects_unsorted_decision_times():
 
 
 def test_run_candidate_rejects_empty_decision_times():
-    # Reproduces the empty-grid scenario: decision_grid(start, end) is empty for start > end.
-    # (NOTE: start == end is *not* empty -- pd.date_range's half-open "left" inclusive mode keeps
-    # a single degenerate point in that case; verified empirically, see the fix-round report.
-    # start > end is the case that actually arises in practice, e.g. a caller accidentally
-    # swapping IS/OOS boundaries.) Without an explicit guard, an empty decision_times would
-    # previously pass sortedness/duplicate checks vacuously and blow up several calls later as an
-    # opaque KeyError('price_pnl') once run_candidate indexed the unscaled book's columnless
-    # return frame -- not a helpful failure for the point where the caller's mistake occurred.
+    # Reproduces the empty-grid scenario: decision_grid(start, start) is empty. Since fix-round 2,
+    # decision_grid honours its documented half-open [start, end) contract at every boundary,
+    # including this degenerate start == end point (see
+    # test_decision_grid_is_empty_when_start_does_not_precede_end and the fix-round-2 report
+    # section), so this is now the simplest construction of an empty grid. Without
+    # run_candidate's explicit guard, an empty decision_times would previously pass
+    # sortedness/duplicate checks vacuously and blow up several calls later as an opaque
+    # KeyError('price_pnl') once run_candidate indexed the unscaled book's columnless return
+    # frame -- not a helpful failure for the point where the caller's mistake occurred.
     snapshot = _snapshot()
     start = snapshot.bars["open_time"].min()
-    empty_grid = decision_grid(start + pd.Timedelta(hours=8), start)
+    empty_grid = decision_grid(start, start)
     assert empty_grid == ()
     with pytest.raises(ValueError, match="empty"):
         run_candidate(

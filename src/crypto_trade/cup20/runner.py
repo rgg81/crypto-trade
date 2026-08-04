@@ -51,12 +51,17 @@ def decision_grid(
     start: pd.Timestamp, end: pd.Timestamp, *, interval_hours: int = 8
 ) -> tuple[pd.Timestamp, ...]:
     """Half-open ``[start, end)`` grid of UTC decision boundaries."""
-    times = pd.date_range(
-        pd.Timestamp(start).tz_convert("UTC"),
-        pd.Timestamp(end).tz_convert("UTC"),
-        freq=f"{interval_hours}h",
-        inclusive="left",
-    )
+    start_utc = pd.Timestamp(start).tz_convert("UTC")
+    end_utc = pd.Timestamp(end).tz_convert("UTC")
+    if start_utc >= end_utc:
+        # A half-open [start, end) interval is empty whenever start does not come strictly
+        # before end. pd.date_range's own inclusive="left" does not enforce this at the
+        # degenerate start == end point -- empirically it keeps that single coincident boundary
+        # rather than dropping it -- so this guard is required, not merely defensive. start > end
+        # was already handled correctly by pd.date_range itself; this also covers that case
+        # explicitly so both "no room in the interval" cases share one clear code path.
+        return ()
+    times = pd.date_range(start_utc, end_utc, freq=f"{interval_hours}h", inclusive="left")
     return tuple(times)
 
 
