@@ -575,20 +575,34 @@ def test_positional_only_parameter_default_is_absent_not_misattributed(tmp_path)
     assert not any("differs" in violation for violation in violations)
 
 
-def test_if_elif_else_with_diverging_values_resolves_to_the_last_written_branch(tmp_path):
-    """Disclosed, accepted residual behaviour, found while stress-testing beyond the
-    coordinator's own examples (which were single-branch: an `if` with no `else`, a `try` with no
-    differing except-path value). When the SAME name is assigned genuinely DIFFERENT values across
-    mutually exclusive if/elif/else branches, this module cannot know which branch a real
-    interpreter would take without evaluating the condition -- which would mean executing team
-    code, forbidden by design. It resolves to whichever branch is written LAST in source order
-    (here, the final `else`), not necessarily the one that would actually run at a given input.
-    Pinned here as a known, disclosed limitation rather than silently unexamined: a team that
-    writes multiple diverging values for what is meant to be a single material parameter can be
-    told 'differs from frozen' even where the real runtime value (at x == 1, the elif's LOOKBACK =
-    60) happens to match its nominee. The honest, unambiguous shape for a material parameter is a
-    single plain module-level assignment; this module does not evaluate conditions to disambiguate
-    branches a team chose to make ambiguous."""
+def test_if_live_guarded_decoy_in_the_else_branch_is_a_conflict(tmp_path):
+    """Fix round 2, finding 2, the coordinator's own exact reproduction: the code genuinely uses 5
+    (LIVE is True), but a team declares nominee=60 -- the value in the textually-last branch -- and
+    fix round 1's 'resolves to whichever branch is written last' behaviour ACCEPTED it. That is a
+    decoy planted in the last branch defeating the exact check whose purpose is proving the
+    nominated point is what the frozen code does; fix round 1 called this a disclosed limitation,
+    but it is a working evasion, not a mere limitation. Fix round 2 closes it: two different values
+    for the same name at module scope, however reached, is now always a conflict. Neither the
+    decoy (60) nor the real value (5) is silently accepted -- a team whose material parameter is
+    genuinely ambiguous like this cannot pass at all, which is the point: the honest fix is a
+    single, unconditional module-level constant."""
+    root = _team(tmp_path, "LIVE = True\nif LIVE:\n    LOOKBACK = 5\nelse:\n    LOOKBACK = 60\n")
+    for candidate_nominee in (5.0, 60.0):
+        declaration = NeighbourhoodDeclaration(
+            nominee={"LOOKBACK": candidate_nominee},
+            points=({"LOOKBACK": 1.0},),
+            coordinates=("LOOKBACK",),
+        )
+        violations = verify_neighbourhood_coordinates(root, declaration)
+        assert any(
+            "LOOKBACK" in violation and "conflict" in violation for violation in violations
+        ), f"nominee={candidate_nominee} unexpectedly accepted: {violations}"
+
+
+def test_if_elif_else_with_three_diverging_values_is_a_conflict(tmp_path):
+    """A second, independent diverging-branch fixture (three branches, not two) confirming the fix
+    generalises beyond the coordinator's exact if/else reproduction -- e.g. an elif chain, not just
+    a plain if/else, and more than two distinct candidate values."""
     root = _team(
         tmp_path,
         "x = 1\n"
@@ -600,35 +614,51 @@ def test_if_elif_else_with_diverging_values_resolves_to_the_last_written_branch(
         "    LOOKBACK = 20\n",
     )
     declaration = NeighbourhoodDeclaration(
-        nominee={"LOOKBACK": 20.0}, points=({"LOOKBACK": 5.0},), coordinates=("LOOKBACK",)
+        nominee={"LOOKBACK": 60.0}, points=({"LOOKBACK": 5.0},), coordinates=("LOOKBACK",)
     )
-    assert verify_neighbourhood_coordinates(root, declaration) == ()
+    violations = verify_neighbourhood_coordinates(root, declaration)
+    assert any("LOOKBACK" in violation and "conflict" in violation for violation in violations)
 
 
 # --- verify_neighbourhood_coordinates: nomination integrity ---------------------------------------
 
 
-def test_a_later_reassignment_overrides_an_earlier_decoy_value(tmp_path):
-    """The frozen-parameters collector must reflect what straight-line top-to-bottom execution
-    actually leaves bound to the name -- Python's own last-assignment-wins rule -- not the first
-    occurrence in the file. Before the fix, _frozen_numeric_parameters used dict.setdefault
-    (first-wins): a team could put its declared, favourable nominee value first and a different,
-    real operative value afterwards, and the check would only ever see the decoy. Confirmed
-    against the brief's literal Step 3 code: this first assertion FAILED there (violations was
-    empty, i.e. the decoy nominee of 90 was silently accepted even though the real, final value is
-    40)."""
+def test_a_later_reassignment_of_a_different_value_is_now_a_conflict(tmp_path):
+    """CONTRACT CHANGE from fix round 2, disclosed explicitly rather than quietly changed: fix
+    round 1 had LOOKBACK = 90 then LOOKBACK = 40 (two DIFFERENT values at module scope) resolve via
+    last-assignment-wins to 40, treating 90 as a superseded decoy -- and this test used to assert
+    exactly that (nominee=90 was a violation, nominee=40 was accepted). Fix round 2 tightened the
+    rule: a coordinate must have exactly one numeric value at module scope, so two different values
+    anywhere -- regardless of which is textually last -- is now ITSELF a violation, neither one
+    silently accepted. This is the direct consequence of closing the diverging-branch decoy fix
+    round 2 found (see test_if_live_guarded_decoy_in_the_else_branch_is_a_conflict below):
+    "textually last" was never a reliable signal for what the frozen code actually does, and a
+    plain top-to-bottom reassignment is not structurally different from an if/else in that respect
+    -- both are two different values for the same name at module scope. An honest team assigning a
+    single constant is unaffected either way, which is why this is the safe direction."""
     root = _team(tmp_path, "LOOKBACK = 90\nLOOKBACK = 40\n")
-    decoy_nominee = NeighbourhoodDeclaration(
-        nominee={"LOOKBACK": 90.0}, points=({"LOOKBACK": 30.0},), coordinates=("LOOKBACK",)
-    )
-    violations = verify_neighbourhood_coordinates(root, decoy_nominee)
-    assert any("differs-from-frozen-40.0" in violation for violation in violations)
+    for candidate_nominee in (90.0, 40.0):
+        declaration = NeighbourhoodDeclaration(
+            nominee={"LOOKBACK": candidate_nominee},
+            points=({"LOOKBACK": 30.0},),
+            coordinates=("LOOKBACK",),
+        )
+        violations = verify_neighbourhood_coordinates(root, declaration)
+        assert any(
+            "LOOKBACK" in violation and "conflict" in violation for violation in violations
+        ), f"nominee={candidate_nominee} unexpectedly accepted: {violations}"
 
-    # Mirror: a nominee that matches the REAL (last, operative) value must pass cleanly.
-    real_nominee = NeighbourhoodDeclaration(
-        nominee={"LOOKBACK": 40.0}, points=({"LOOKBACK": 30.0},), coordinates=("LOOKBACK",)
+
+def test_the_same_value_assigned_twice_is_not_a_conflict(tmp_path):
+    """Explicitly required by the fix round 2 ruling: 'assigning the same value twice is fine'.
+    Two module-level assignments of the identical numeric value must collapse to a single-element
+    set internally and produce no violation -- this is the case that distinguishes 'two different
+    values is a conflict' from 'reassignment itself is suspicious', which it is not."""
+    root = _team(tmp_path, "LOOKBACK = 60\nLOOKBACK = 60\n")
+    declaration = NeighbourhoodDeclaration(
+        nominee={"LOOKBACK": 60.0}, points=({"LOOKBACK": 30.0},), coordinates=("LOOKBACK",)
     )
-    assert verify_neighbourhood_coordinates(root, real_nominee) == ()
+    assert verify_neighbourhood_coordinates(root, declaration) == ()
 
 
 # --- verify_neighbourhood_coordinates: untested raise paths and branches --------------------------
@@ -781,3 +811,142 @@ def test_computed_expression_is_not_a_plain_numeric_literal(tmp_path):
     )
     violations = verify_neighbourhood_coordinates(root, declaration)
     assert any("absent-from-frozen-source" in violation for violation in violations)
+
+
+# --- verify_neighbourhood_coordinates: fix round 2 -- untrusted-input crashes -----------------
+#
+# Round 1's scope-restriction fix, and this module's own tuple-unpacking/unary-negation support,
+# all recurse over untrusted, team-authored ASTs with no depth guard as originally shipped. An
+# elif chain is nested If.orelse, not extra source indentation, so ordinary Python recursion-depth
+# limits never bounded it: a team-supplied file a few thousand branches long, comfortably under a
+# megabyte, raised an uncaught RecursionError/MemoryError THROUGH THE PUBLIC API. In a module whose
+# entire job is resisting a team, a file that crashes the anti-cheat check itself is a cheap denial
+# of service, and a competing team has direct incentive to submit one.
+
+
+def test_elif_chain_far_past_the_former_crash_depth_returns_a_violation_not_a_raise(tmp_path):
+    """Reproduces the coordinator's own finding: an elif chain with a genuinely different value
+    per branch, at a depth comfortably past where the pre-fix module raised an uncaught
+    RecursionError (confirmed directly at n=1200, ~41 KB, and n=5000, ~178 KB -- this test uses
+    n=2000, ~71 KB, comfortably under _MAX_ENTRYPOINT_BYTES so it exercises the real iterative
+    traversal and ast.parse itself, not just the size-cap fast path). Every branch's value
+    differs, so under the fix round 2 single-value rule the correct outcome is a
+    'conflicting-module-level-values' violation -- the point of this test is that it returns
+    that violation cleanly, rather than raising."""
+    depth = 2000
+    lines = ["x = 0", "if x == 0:\n    LOOKBACK = 0"]
+    for i in range(1, depth):
+        lines.append(f"elif x == {i}:\n    LOOKBACK = {i}")
+    lines.append("else:\n    LOOKBACK = -1")
+    root = _team(tmp_path, "\n".join(lines) + "\n")
+    declaration = NeighbourhoodDeclaration(
+        nominee={"LOOKBACK": 0.0}, points=({"LOOKBACK": 1.0},), coordinates=("LOOKBACK",)
+    )
+    violations = verify_neighbourhood_coordinates(root, declaration)  # must not raise
+    assert violations != ()
+    assert all(isinstance(violation, str) for violation in violations)
+    assert any("LOOKBACK" in v and "conflict" in v for v in violations)
+
+
+def test_entrypoint_larger_than_the_size_cap_is_a_violation_not_a_parse_attempt(tmp_path):
+    """A cheap, fast rejection before ever calling ast.parse, which is itself capable of
+    exhausting memory on pathological input regardless of what this module's own traversal does
+    (confirmed: ast.parse alone raised MemoryError on a large enough elif chain). A file just over
+    _MAX_ENTRYPOINT_BYTES is rejected on size alone, never reaching the parser."""
+    from crypto_trade.cup20.archive import _MAX_ENTRYPOINT_BYTES
+
+    root = tmp_path / "team-01"
+    root.mkdir(parents=True)
+    padding = "z" * (_MAX_ENTRYPOINT_BYTES + 1024)
+    (root / "strategy.py").write_text(f"PAD = '{padding}'\nLOOKBACK = 60\n")
+    assert (root / "strategy.py").stat().st_size > _MAX_ENTRYPOINT_BYTES
+    declaration = NeighbourhoodDeclaration(
+        nominee={"LOOKBACK": 60.0}, points=({"LOOKBACK": 1.0},), coordinates=("LOOKBACK",)
+    )
+    violations = verify_neighbourhood_coordinates(root, declaration)
+    assert violations == ("strategy.py:entrypoint-too-large",)
+
+
+# --- verify_neighbourhood_coordinates: fix round 2 -- self-initiated extension -----------------
+#
+# Not named in the coordinator's finding. Found by asking the same adversarial question ("where
+# else does this module recurse over an untrusted AST with no depth guard?") of every recursive
+# site, not just the one the coordinator pointed at. _numeric's UnaryOp handling (chained
+# negation, e.g. `----5`) and _record_numeric_target's Tuple-pairing (nested single-element tuple
+# unpacking) are both EXPRESSION-tree recursions with the identical shape of vulnerability -- and
+# chained negation is cheaper for an attacker than the elif-chain case (about one byte of source
+# per recursion level, vs. ~30-40 for an elif branch). Both are now guarded by the same
+# _MAX_EXPRESSION_DEPTH used nowhere else, confirmed to engage at a precise, isolated boundary
+# (not merely "large enough numbers don't crash").
+
+
+def test_expression_depth_guard_engages_for_unary_negation(tmp_path):
+    """Precise, isolated proof the guard in _numeric actually engages, not just that nothing
+    crashes at an extreme depth (see the extreme-depth test below, where ast.parse's own
+    resilience is really what is being exercised). Confirmed directly: ast.parse itself parses 25
+    nested unary minuses with no difficulty at all (no parser-level failure to confound the
+    result), so if this reports absent, it is because _MAX_EXPRESSION_DEPTH made _numeric give up,
+    not because parsing failed."""
+    root = _team(tmp_path, "LOOKBACK = " + "-" * 25 + "5\n")
+    declaration = NeighbourhoodDeclaration(
+        nominee={"LOOKBACK": 5.0}, points=({"LOOKBACK": 1.0},), coordinates=("LOOKBACK",)
+    )
+    violations = verify_neighbourhood_coordinates(root, declaration)
+    assert any("LOOKBACK" in v and "absent" in v for v in violations)
+
+
+def test_expression_depth_guard_engages_for_nested_tuple_unpacking(tmp_path):
+    """The Tuple-pairing counterpart of the test above -- same precise-boundary proof, same
+    confirmation that ast.parse itself tolerates this depth (25) with no difficulty, isolating
+    _record_numeric_target's own guard as the reason LOOKBACK is reported absent."""
+    depth = 25
+    target = "LOOKBACK"
+    value = "60"
+    for _ in range(depth):
+        target = f"({target},)"
+        value = f"({value},)"
+    root = _team(tmp_path, f"{target} = {value}\n")
+    declaration = NeighbourhoodDeclaration(
+        nominee={"LOOKBACK": 60.0}, points=({"LOOKBACK": 1.0},), coordinates=("LOOKBACK",)
+    )
+    violations = verify_neighbourhood_coordinates(root, declaration)
+    assert any("LOOKBACK" in v and "absent" in v for v in violations)
+
+
+def test_extreme_unary_negation_depth_does_not_raise(tmp_path):
+    """Defense in depth at the far end of the scale: 5000 nested unary minuses (a few KB of
+    source) must not raise, regardless of which guard or layer is what actually stops it."""
+    root = _team(tmp_path, "LOOKBACK = " + "-" * 5000 + "5\n")
+    declaration = NeighbourhoodDeclaration(
+        nominee={"LOOKBACK": 5.0}, points=({"LOOKBACK": 1.0},), coordinates=("LOOKBACK",)
+    )
+    violations = verify_neighbourhood_coordinates(root, declaration)  # must not raise
+    assert isinstance(violations, tuple)
+
+
+def test_extreme_nested_tuple_depth_does_not_raise(tmp_path):
+    """The Tuple counterpart at extreme scale -- and an honest correction to what actually
+    protects it, checked directly rather than assumed: CPython's own parser has a hard-coded
+    nesting guard that has nothing to do with this module, confirmed to raise
+    'SyntaxError: too many nested parentheses' for any depth past roughly 300 (independently of
+    available memory or the interpreter's recursion limit -- 100 parses fine, 300 already fails).
+    That SyntaxError was already caught by _UNPARSEABLE_SOURCE_ERRORS before this fix round
+    existed, so at depth 3000 this test does NOT exercise the round 2 exception-broadening
+    (RecursionError/MemoryError) or prove _record_numeric_target's own depth guard is what saves
+    it -- ast.parse never gets far enough for either to matter. It is still worth keeping: it
+    proves the whole system does not crash at this scale, for whichever reason, and see
+    test_expression_depth_guard_engages_for_nested_tuple_unpacking above for the test that
+    actually isolates this module's own guard (at depth 25, confirmed ast.parse has no difficulty
+    at all, so that result is unambiguously this module's own doing)."""
+    depth = 3000
+    target = "LOOKBACK"
+    value = "60"
+    for _ in range(depth):
+        target = f"({target},)"
+        value = f"({value},)"
+    root = _team(tmp_path, f"{target} = {value}\n")
+    declaration = NeighbourhoodDeclaration(
+        nominee={"LOOKBACK": 60.0}, points=({"LOOKBACK": 1.0},), coordinates=("LOOKBACK",)
+    )
+    violations = verify_neighbourhood_coordinates(root, declaration)  # must not raise
+    assert isinstance(violations, tuple)

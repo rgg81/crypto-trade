@@ -38,10 +38,37 @@ _TEAM_DIRECTORY = re.compile(r"tournament/cup20/teams/(team-\d{2})")
 # a file's size, and always runs.
 _MAX_CONTENT_SCAN_BYTES = 262_144  # 256 KiB -- generous for any real source or config file.
 
+# The frozen entrypoint is parsed, and ast.parse's own C-implemented parser can exhaust the Python
+# call stack or available memory on a pathologically large or pathologically nested source file --
+# confirmed directly: an elif chain of a few thousand branches, well under a megabyte, raises
+# RecursionError or MemoryError depending on exactly how deep it goes. Team code is untrusted and
+# this check's whole job is resisting a team, so a competing team has direct incentive to submit a
+# file engineered to crash the check itself as a cheap denial of service. This cap is a fast,
+# cheap first line of defence -- reject before ever calling ast.parse -- not a complete guarantee
+# by itself (see _UNPARSEABLE_SOURCE_ERRORS and _MAX_EXPRESSION_DEPTH below for the rest).
+_MAX_ENTRYPOINT_BYTES = 262_144  # 256 KiB -- generous for a single frozen strategy file.
+
+# A depth guard for the two places this module recurses over an EXPRESSION tree rather than a
+# statement list (chained unary negation in _numeric; nested tuple-unpacking targets in
+# _record_numeric_target). Both are attacker-cheap: a single `-` character or a single-element
+# tuple nesting level costs about one byte per recursion level, so a modest file can nest either
+# far past any real Python recursion limit long before _MAX_ENTRYPOINT_BYTES would reject it on
+# size alone. 20 is far beyond anything a human would plausibly write by hand.
+_MAX_EXPRESSION_DEPTH = 20
+
 # ast.parse can fail on genuinely malformed team source (bad syntax, a stray null byte, an invalid
-# encoding). The global contract is "failures are violation strings, not raises" -- team code is
-# untrusted, so a team that ships something unparseable must fail the check, not crash the caller.
-_UNPARSEABLE_SOURCE_ERRORS: tuple[type[Exception], ...] = (SyntaxError, ValueError, UnicodeError)
+# encoding) or on pathologically large/nested source that exhausts the interpreter's call stack or
+# memory (RecursionError, MemoryError -- see _MAX_ENTRYPOINT_BYTES above). The global contract is
+# "failures are violation strings, not raises" -- team code is untrusted, so a team that ships
+# something unparseable, or something engineered to make parsing itself blow up, must fail the
+# check, not crash the caller.
+_UNPARSEABLE_SOURCE_ERRORS: tuple[type[Exception], ...] = (
+    SyntaxError,
+    ValueError,
+    UnicodeError,
+    RecursionError,
+    MemoryError,
+)
 
 
 def _files(source_root: Path) -> list[Path]:
@@ -100,51 +127,61 @@ def archive_directory(source_root: str | Path, destination_root: str | Path) -> 
     return digest
 
 
-def _numeric(node: ast.AST) -> float | None:
-    """A literal's numeric value, or ``None`` if it is not a plain (optionally negated) number."""
+def _numeric(node: ast.AST, depth: int = 0) -> float | None:
+    """A literal's numeric value, or ``None`` if it is not a plain (optionally negated) number.
+
+    ``depth`` guards the ``UnaryOp`` recursion (chained negation, e.g. ``----5``) against
+    adversarial nesting: past ``_MAX_EXPRESSION_DEPTH``, this gives up and reports not-numeric
+    rather than recursing further -- a real literal is never nested anywhere near that deep.
+    """
+    if depth > _MAX_EXPRESSION_DEPTH:
+        return None
     if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
         if isinstance(node.value, bool):
             return None
         return float(node.value)
     if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
-        inner = _numeric(node.operand)
+        inner = _numeric(node.operand, depth + 1)
         return None if inner is None else -inner
     return None
 
 
-def _record_numeric_target(target: ast.expr, value: ast.expr, found: dict[str, float]) -> None:
+def _record_numeric_target(
+    target: ast.expr, value: ast.expr, found: dict[str, set[float]], depth: int = 0
+) -> None:
     """Record ``target <- value`` for a plain ``Name`` target with a numeric-literal value, or,
     for a ``Tuple`` target paired with a same-length ``Tuple`` value, recurse elementwise (this
     also naturally covers a nested tuple pattern, since each element pairing is the same rule
-    applied again).
+    applied again). Adds the value to the name's set of distinct values seen -- see
+    ``_collect_from_statements`` for why a set, not a single overwritten value.
+
+    ``depth`` guards the ``Tuple`` recursion against adversarial nesting (thousands of
+    single-element nested tuples), the same concern and the same bound as ``_numeric``'s own
+    ``UnaryOp`` guard.
 
     Any other shape -- a length-mismatched tuple, a starred target, an attribute or subscript
     target -- is silently skipped rather than guessed at: a shape this function does not
     confidently understand must never risk attributing the wrong value to a name. Reporting a
     coordinate absent is always safer than reporting a wrong one.
     """
+    if depth > _MAX_EXPRESSION_DEPTH:
+        return
     if isinstance(target, ast.Name):
         number = _numeric(value)
         if number is not None:
-            found[target.id] = number
+            found.setdefault(target.id, set()).add(number)
     elif (
         isinstance(target, ast.Tuple)
         and isinstance(value, ast.Tuple)
         and len(target.elts) == len(value.elts)
     ):
         for element_target, element_value in zip(target.elts, value.elts):
-            _record_numeric_target(element_target, element_value, found)
+            _record_numeric_target(element_target, element_value, found, depth + 1)
 
 
-def _record_numeric_assign(node: ast.Assign | ast.AnnAssign, found: dict[str, float]) -> None:
+def _record_numeric_assign(node: ast.Assign | ast.AnnAssign, found: dict[str, set[float]]) -> None:
     """Record a module-level plain or annotated assignment's target(s), including tuple/multiple-
-    target unpacking.
-
-    Assigns into ``found`` (does not use ``setdefault``): a later assignment overwrites an earlier
-    one, matching what straight-line top-to-bottom execution actually leaves bound in the
-    namespace. A first-wins rule would let a team put a favourable, declared-nominee-matching value
-    first and a different, real operative value afterwards, and have the check see only the decoy.
-    """
+    target unpacking."""
     if isinstance(node, ast.AnnAssign):
         if node.value is not None:
             _record_numeric_target(node.target, node.value, found)
@@ -153,61 +190,89 @@ def _record_numeric_assign(node: ast.Assign | ast.AnnAssign, found: dict[str, fl
         _record_numeric_target(target, node.value, found)
 
 
-def _collect_from_statements(statements: list[ast.stmt], found: dict[str, float]) -> None:
-    """Populate ``found`` with every module-level numeric constant reachable from these statements.
+def _ordered_children(statement: ast.stmt) -> list[ast.stmt]:
+    """This statement's own nested statement lists, concatenated in natural top-to-bottom source
+    order: ``body``, then each ``except`` handler's body in order, then ``orelse``, then
+    ``finalbody``. That is the order real execution would encounter them in, for whichever single
+    path actually runs. Returns an empty list for anything this module does not recurse into -- a
+    ``FunctionDef``/``AsyncFunctionDef``/``ClassDef`` scope boundary, or a statement with no nested
+    block at all.
+    """
+    if isinstance(statement, (ast.If, ast.For, ast.While)):
+        return [*statement.body, *statement.orelse]
+    if isinstance(statement, ast.With):
+        return list(statement.body)
+    if isinstance(statement, ast.Try):
+        handler_statements = [inner for handler in statement.handlers for inner in handler.body]
+        return [*statement.body, *handler_statements, *statement.orelse, *statement.finalbody]
+    return []
+
+
+def _collect_from_statements(statements: list[ast.stmt]) -> dict[str, set[float]]:
+    """Collect every DISTINCT numeric value assigned to each module-level name.
 
     Recurses through module-level control flow -- ``if``/``for``/``while``/``with``/``try`` and
-    their ``else``/``finally``/``except`` bodies -- because a name assigned there genuinely is a
-    module-level name: the statement is bound as part of ordinary module load, not as a variable
-    scoped to a function or method call. (Whether a *particular* branch runs on any given import is
-    not something a static parse can decide without executing team code, which it must never do;
-    treating every syntactically reachable module-level assignment as a candidate is the fail-safe
-    direction -- see the docstring of ``_frozen_numeric_parameters`` for why the alternative, an
-    absolute "module level only" reading that excluded these, was worse.)
+    their ``else``/``finally``/``except`` bodies (see ``_ordered_children``) -- because a name
+    assigned there genuinely is a module-level name: the statement is bound as part of ordinary
+    module load, not as a variable scoped to a function or method call. (Whether a *particular*
+    branch runs on any given import is not something a static parse can decide without executing
+    team code, which it must never do; treating every syntactically reachable module-level
+    assignment as a candidate is the fail-safe direction.)
 
     Never recurses into a ``FunctionDef``, ``AsyncFunctionDef`` or ``ClassDef`` body: a
     function-local variable or a class attribute is not a module-level parameter. Refusing to look
-    there is what eliminates cross-scope name collisions entirely -- without this boundary, a class
-    attribute that happens to share a real module-level constant's name could silently overwrite it
-    in ``found``, manufacturing a false "differs from frozen source" report against a team that
-    declared the objectively correct value.
+    there is what eliminates cross-scope name collisions entirely -- a class attribute that happens
+    to share a real module-level constant's name can no longer interact with it at all.
+
+    Returns a mapping from name to the SET of distinct numeric values it was assigned anywhere at
+    module scope, not a single "winning" value. A name assigned the same value more than once
+    collapses to a single-element set (no conflict); a name assigned two or more DIFFERENT values
+    -- by plain reassignment, or across mutually exclusive branches -- has a multi-element set. A
+    team can plant a decoy value in a branch that never actually runs (e.g. an ``if``/``else``
+    where the condition is always true) just as easily as in the branch that does; "whichever was
+    assigned last, textually" is not a reliable signal for what the frozen code actually does, so
+    the caller (``verify_neighbourhood_coordinates``) treats more than one distinct value as an
+    unresolvable conflict rather than picking one.
+
+    Implemented iteratively with an explicit work stack, not by calling itself: an ``elif`` chain
+    is represented as nested ``If.orelse``, not extra source indentation, so ordinary Python
+    recursion depth limits do not bound how deep it can go -- a team-supplied file a few thousand
+    branches long is well within a modest byte budget and previously raised an uncaught
+    ``RecursionError`` through this exact function. The stack is pushed and popped in a way that
+    preserves the same left-to-right, depth-first order plain recursion would visit statements in
+    (each container's children are pushed, reversed, onto the top of the stack, so they are
+    processed immediately -- before whatever sibling statements were already queued below).
     """
-    for statement in statements:
+    found: dict[str, set[float]] = {}
+    stack: list[ast.stmt] = list(reversed(statements))
+    while stack:
+        statement = stack.pop()
         if isinstance(statement, (ast.Assign, ast.AnnAssign)):
             _record_numeric_assign(statement, found)
-        elif isinstance(statement, (ast.If, ast.For, ast.While)):
-            _collect_from_statements(statement.body, found)
-            _collect_from_statements(statement.orelse, found)
-        elif isinstance(statement, ast.With):
-            _collect_from_statements(statement.body, found)
-        elif isinstance(statement, ast.Try):
-            _collect_from_statements(statement.body, found)
-            for handler in statement.handlers:
-                _collect_from_statements(handler.body, found)
-            _collect_from_statements(statement.orelse, found)
-            _collect_from_statements(statement.finalbody, found)
-        # FunctionDef / AsyncFunctionDef / ClassDef: a scope boundary, deliberately never
-        # recursed into -- see the docstring above.
+        else:
+            stack.extend(reversed(_ordered_children(statement)))
+    return found
 
 
-def _frozen_numeric_parameters(path: Path) -> dict[str, float]:
+def _frozen_numeric_parameters(path: Path) -> dict[str, set[float]]:
     """Collect module-level numeric constants from a frozen entrypoint by parsing, never importing.
 
     Team code is untrusted and must never execute during verification, so this uses ``ast``. A
     coordinate must be a module-level numeric constant: a plain or annotated assignment (including
     tuple/multiple-target unpacking) reachable from the module's top level through control flow
-    alone, never through a function or class boundary (see ``_collect_from_statements``).
+    alone, never through a function or class boundary (see ``_collect_from_statements``, which also
+    documents why the return type is a set of values per name rather than one).
 
     Function keyword defaults and class attributes are deliberately NOT collected, even though an
     earlier version of this module supported both. Two reasons converged on dropping them rather
     than fixing them: (1) a class attribute sharing a module-level constant's name collided with it
-    in a flat ``dict[str, float]`` keyed only by bare name -- an unrelated class defining its own,
-    differently-valued attribute of the same name could silently overwrite (or be overwritten by)
-    the real module-level value, manufacturing a false "differs from frozen source" report against
-    a team that had declared the objectively correct value; (2) the keyword-default collector's
-    alignment of ``ast.arguments.defaults`` against parameter names broke -- not merely omitted a
-    parameter, but MISATTRIBUTED one parameter's default value to a different parameter's name --
-    for any signature mixing positional-only parameters with defaults and ordinary ones (e.g.
+    in a flat dict keyed only by bare name -- an unrelated class defining its own, differently-
+    valued attribute of the same name could silently overwrite (or be overwritten by) the real
+    module-level value, manufacturing a false "differs from frozen source" report against a team
+    that had declared the objectively correct value; (2) the keyword-default collector's alignment
+    of ``ast.arguments.defaults`` against parameter names broke -- not merely omitted a parameter,
+    but MISATTRIBUTED one parameter's default value to a different parameter's name -- for any
+    signature mixing positional-only parameters with defaults and ordinary ones (e.g.
     ``def f(a=1, /, b=2)``), again producing a false "differs from frozen source" report against a
     correct nominee. A function parameter's default and a class's own attribute are, in real Python
     semantics, never a bare module-level name in the first place -- ``lookback`` inside
@@ -219,9 +284,7 @@ def _frozen_numeric_parameters(path: Path) -> dict[str, float]:
     also the shape most legibly "the frozen code actually does."
     """
     tree = ast.parse(path.read_text())
-    found: dict[str, float] = {}
-    _collect_from_statements(tree.body, found)
-    return found
+    return _collect_from_statements(tree.body)
 
 
 def verify_neighbourhood_coordinates(
@@ -237,18 +300,36 @@ def verify_neighbourhood_coordinates(
     a team can declare a fictional coordinate, satisfy every other gate, and claim a plateau across
     a surface it never explored. Requiring the nominee's value to match the frozen source also
     forces the nominated point to be what the frozen code actually does.
+
+    A coordinate must have exactly one numeric value at module scope. A name assigned two or more
+    genuinely DIFFERENT values -- by plain reassignment, or across mutually exclusive branches such
+    as an ``if``/``else`` -- is reported as a conflict, never silently resolved to either one:
+    "textually last" is not a reliable signal for what the frozen code actually does (deciding
+    which branch a real interpreter would take means evaluating the condition, i.e. executing team
+    code, which this function must never do), so a team could otherwise plant a decoy value in
+    whichever branch is written last and have it accepted over the value the code actually uses.
+    Assigning the same value more than once is fine and is not a conflict.
     """
     entry = Path(source_root) / entrypoint
     if not entry.is_file():
         return (f"{entrypoint}:missing-entrypoint",)
+    if entry.stat().st_size > _MAX_ENTRYPOINT_BYTES:
+        return (f"{entrypoint}:entrypoint-too-large",)
     try:
         parameters = _frozen_numeric_parameters(entry)
     except _UNPARSEABLE_SOURCE_ERRORS:
         return (f"{entrypoint}:unparseable-source",)
     violations: list[str] = []
     for coordinate in declaration.coordinates:
-        if coordinate not in parameters:
+        values = parameters.get(coordinate)
+        if not values:
             violations.append(f"{entrypoint}:{coordinate}:absent-from-frozen-source")
+            continue
+        if len(values) > 1:
+            conflicting = "-vs-".join(str(value) for value in sorted(values))
+            violations.append(
+                f"{entrypoint}:{coordinate}:conflicting-module-level-values-{conflicting}"
+            )
             continue
         if coordinate not in declaration.nominee:
             # NeighbourhoodDeclaration.validate() would normally catch this (the nominee must
@@ -259,7 +340,7 @@ def verify_neighbourhood_coordinates(
             violations.append(f"{entrypoint}:{coordinate}:nominee-missing-declared-coordinate")
             continue
         declared = float(declaration.nominee[coordinate])
-        frozen = parameters[coordinate]
+        (frozen,) = values  # exactly one element, guaranteed by the len(values) > 1 branch above
         if not math.isclose(declared, frozen, rel_tol=1e-9, abs_tol=1e-12):
             violations.append(
                 f"{entrypoint}:{coordinate}:nominee-{declared}-differs-from-frozen-{frozen}"
