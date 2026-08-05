@@ -1,6 +1,12 @@
 """CUP-20 tournament policy, evaluation and scoring."""
 
 from crypto_trade.cup20.activation import build_activation_record, verify_activation
+from crypto_trade.cup20.adjudication import (
+    Adjudication,
+    CandidateAdjudication,
+    adjudicate_candidate,
+    adjudicate_population,
+)
 from crypto_trade.cup20.archive import (
     archive_directory,
     bundle_digest,
@@ -53,6 +59,20 @@ from crypto_trade.cup20.runner import (
     normalise_unit_gross,
     run_candidate,
 )
+from crypto_trade.cup20.scored_metrics import (
+    ASSEMBLED_METRIC_KEYS,
+    BASE_COST,
+    DOUBLE_COST,
+    DOUBLE_COST_RANKING_KEYS,
+    FLOOR_METRIC_KEYS,
+    RANKING_METRIC_KEYS,
+    RANKING_ONLY_KEYS,
+    REQUIRED_COST_LEVELS,
+    TRIPLE_COST,
+    assemble_scored_metrics,
+    neighbourhood_median,
+    ranking_metrics,
+)
 from crypto_trade.cup20.scoring import (
     RankedEntry,
     rank_entries,
@@ -73,23 +93,37 @@ from crypto_trade.cup20.universe import (
 )
 
 __all__ = [
+    "ASSEMBLED_METRIC_KEYS",
+    "Adjudication",
+    "BASE_COST",
+    "CandidateAdjudication",
+    "CandidateRun",
+    "DOUBLE_COST",
+    "DOUBLE_COST_RANKING_KEYS",
+    "FLOOR_METRIC_KEYS",
+    "GateVector",
     "IS_END",
     "LIQUIDITY_MEASURE",
-    "SEALED_END",
-    "SEALED_START",
-    "TEAM_IDS",
-    "CandidateRun",
-    "GateVector",
     "LoadedConfig",
     "NeighbourhoodDeclaration",
+    "RANKING_METRIC_KEYS",
+    "RANKING_ONLY_KEYS",
+    "REQUIRED_COST_LEVELS",
     "RankedEntry",
+    "SEALED_END",
+    "SEALED_START",
     "Snapshot",
     "SnapshotPaths",
+    "TEAM_IDS",
+    "TRIPLE_COST",
     "WindowMetrics",
     "accepted_trial_count",
+    "adjudicate_candidate",
+    "adjudicate_population",
     "append_record",
     "apply_risk_scalars",
     "archive_directory",
+    "assemble_scored_metrics",
     "atomic_release",
     "build_activation_record",
     "build_membership",
@@ -110,9 +144,11 @@ __all__ = [
     "load_snapshot",
     "max_drawdown",
     "median_metrics",
+    "neighbourhood_median",
     "normalise_unit_gross",
     "positive_point_fraction",
     "rank_entries",
+    "ranking_metrics",
     "read_records",
     "resolve_is_start",
     "robustness_score",

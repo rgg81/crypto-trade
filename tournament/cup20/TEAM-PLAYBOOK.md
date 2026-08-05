@@ -262,7 +262,10 @@ not.
   Sharpe ≥ 0.80 at 1× cost and ≥ 0.50 at 2×, maximum drawdown ≤ 0.20, realised volatility ≥ 0.06,
   annualised one-way turnover ≤ 25×, gross edge ≥ 40 bps per unit turnover, cost share of positive
   gross PnL ≤ 30%, ≥ 500 executed trades, ≥ 70% of neighbourhood points positive, and
-  trial-adjusted confidence ≥ 0.90.
+  trial-adjusted confidence ≥ 0.90. **Every floor names its cost level in §7.3, and a floor that
+  names none is evaluated at base (1×) cost.** The §7.4 ranking reads its inputs at 2× instead, so
+  drawdown, positive-quarter fraction and turnover are each measured twice, at two levels — the
+  floors gate the realistic book, the ranking rewards the one that survives a cost shock.
 - The confidence floor is `max(0, min(1, 1 - T * (1 - B)))`, where `T` is your **complete accepted
   trial count**. Every trial you spend raises the bar the same candidate has to clear. Spend them
   on questions, not on variations.

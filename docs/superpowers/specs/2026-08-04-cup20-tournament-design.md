@@ -287,30 +287,45 @@ lowered, never rounded into compliance, never averaged away. A missing or non-fi
 - execution contract applied by the frozen evaluator;
 - solvency and completeness: the full scored window completes.
 
+**Cost levels are stated, never inferred.** Every performance floor below names the cost
+multiplier it is evaluated at, and none is left unqualified. Where a floor names no multiplier —
+and after this amendment none does — the rule is **base (1×) cost**, because 1× is the actual cost
+model the tournament trades under, and because the charter already carries dedicated 2× and 3×
+Sharpe floors, which is where cost resilience is stressed. `maxDD ≤ 0.20` asks whether the real
+book would have been survivable, which is a question about the real book.
+
+§7.4's ranking inputs are read at **2×** instead. Three metrics — maximum drawdown,
+positive-quarter fraction and annualised turnover — are consumed by both, so they are computed
+**twice, at two different cost levels**, and both values are carried through scoring. That
+duplication is deliberate and is not an inconsistency: the floors gate the realistic book, the
+ranking rewards the book that survives a cost shock. This rule governs every floor in this
+charter, including the holdout eligibility floors of §8.
+
 **Performance floors:**
 
-| Metric | Floor |
-|---|---:|
-| Net Sharpe (1× cost) | ≥ 0.80 |
-| Net Sharpe (2× cost) | ≥ 0.50 |
-| Net Sharpe (3× cost) | > 0 |
-| Annualised return (1× and 2×) | > 0 |
-| Maximum drawdown | ≤ 0.20 |
-| Realised annualised volatility | ≥ 0.06 |
-| Positive-quarter fraction | ≥ 0.50 |
-| Folds positive at 2× cost | ≥ 3 of 4 |
-| Worst-fold Sharpe at 2× cost | ≥ −0.25 |
-| Long gross PnL, short gross PnL | each > 0, for every side the book actually traded |
-| Declared roles agree with the sides actually traded | **required** |
-| Annualised one-way turnover | ≤ 25× equity |
-| Gross edge per unit one-way turnover | ≥ 40 bps |
-| Base cost share of positive gross PnL | ≤ 30% |
-| Five largest absolute daily returns | ≤ 35% of total absolute daily return |
-| Any single fold's share of positive PnL | ≤ 60% |
-| Executed trades over IS | ≥ 500 |
-| Neighbourhood points with positive return **and** positive 2× Sharpe | ≥ 70% |
-| Trial-adjusted confidence | ≥ 0.90 |
-| Exact sign inversion clears the core floors | **disqualifying** |
+| Metric | Cost level | Floor |
+|---|---|---:|
+| Net Sharpe | 1× | ≥ 0.80 |
+| Net Sharpe | 2× | ≥ 0.50 |
+| Net Sharpe | 3× | > 0 |
+| Annualised return | 1× | > 0 |
+| Annualised return | 2× | > 0 |
+| Maximum drawdown | 1× | ≤ 0.20 |
+| Realised annualised volatility | 1× | ≥ 0.06 |
+| Positive-quarter fraction | 1× | ≥ 0.50 |
+| Folds positive | 2× | ≥ 3 of 4 |
+| Worst-fold Sharpe | 2× | ≥ −0.25 |
+| Long gross PnL, short gross PnL | 1× | each > 0, for every side the book actually traded |
+| Declared roles agree with the sides actually traded | 1× (roles read off the 1× gross PnL) | **required** |
+| Annualised one-way turnover | 1× | ≤ 25× equity |
+| Gross edge per unit one-way turnover | 1× | ≥ 40 bps |
+| Cost share of positive gross PnL | 1× | ≤ 30% |
+| Five largest absolute daily returns | 1× | ≤ 35% of total absolute daily return |
+| Any single fold's share of positive PnL | 1× | ≤ 60% |
+| Executed trades over IS | 1× | ≥ 500 |
+| Neighbourhood points with positive return **and** positive 2× Sharpe | 1× return, 2× Sharpe | ≥ 70% |
+| Trial-adjusted confidence | cost-free (bootstrapped on 1× daily returns; see below) | ≥ 0.90 |
+| Exact sign inversion clears the core floors | each core floor at its own level | **disqualifying** |
 
 **Roles are observed, not declared.** A candidate's roles are derived from which sides its book
 **materially** traded — a side whose gross PnL is more than 1e-6 of the book's total gross activity
@@ -342,9 +357,11 @@ the same noise floor:
 
 If `IS_START` exceeds 2020-08-01, F1 absorbs the shortfall and its shorter length is disclosed.
 
-**Trial-adjusted confidence.** Daily returns, 2000-sample circular block bootstrap, fixed 10-day
-blocks. With `B` the fraction of bootstrap arithmetic means above zero and `T` the team's complete
-accepted-trial count at nomination:
+**Trial-adjusted confidence.** **Base-cost (1×)** daily returns, 2000-sample circular block
+bootstrap, fixed 10-day blocks. It is computed **once** and is never recomputed per cost level:
+the same single value is the §7.3 floor input and the §7.4 ranking term. With `B` the fraction of
+bootstrap arithmetic means above zero and `T` the team's complete accepted-trial count at
+nomination:
 
 ```
 confidence = max(0, min(1, 1 - T * (1 - B)))
@@ -358,33 +375,39 @@ the apparent edge is a construction artifact rather than a mechanism. Separately
 placebo is scored on **gross** edge, never on net: a net-of-cost placebo null is structurally broken
 because any costed random book centres at −cost rather than at zero.
 
-**Metric definitions.** `calmar_2x` = annualised 2×-cost return ÷ maximum drawdown magnitude.
-`worst_fold_sharpe_2x` / `median_fold_sharpe_2x` = the minimum and median of the four fold Sharpes
-at 2× cost. `gross edge per unit one-way turnover` = gross arithmetic PnL ÷ total one-way turnover,
-expressed in basis points. A trade is one non-zero executed symbol/boundary fill after evaluator
-netting; funding alone is not a trade and order fragmentation cannot inflate the count. Maximum
-drawdown is a non-negative magnitude. A regime or fold is positive only when its Sharpe is strictly
-greater than zero. Zero is not positive.
+**Metric definitions.** `calmar_2x` = annualised 2×-cost return ÷ the **2×-cost** maximum drawdown
+magnitude. `worst_fold_sharpe_2x` / `median_fold_sharpe_2x` = the minimum and median of the four
+fold Sharpes at 2× cost; `positive_fold_count` counts the same four 2×-cost fold Sharpes that are
+strictly greater than zero. The fold PnL-concentration floor is the maximum, over the four folds,
+of each fold's share of **base-cost** positive PnL. `gross edge per unit one-way turnover` = gross
+arithmetic PnL ÷ total one-way turnover, expressed in basis points. A trade is one non-zero
+executed symbol/boundary fill after evaluator netting; funding alone is not a trade and order
+fragmentation cannot inflate the count. Maximum drawdown is a non-negative magnitude. A regime or
+fold is positive only when its Sharpe is strictly greater than zero. Zero is not positive.
 
 ### 7.4 Ranking score G
 
-Only floor-passers are ranked. All inputs are neighbourhood medians on the common risk unit at 2×
-cost unless stated. `C(x) = min(1, max(0, x))`.
+Only floor-passers are ranked. All inputs are neighbourhood medians on the common risk unit, and
+every metric input is read **at 2× cost** — including `max_drawdown_2x`,
+`positive_quarter_fraction_2x` and the turnover tie-break, each of which §7.3 floors at 1×. Those
+three are therefore computed twice, at two levels, and the two values are not interchangeable. The
+single exception is `trial_adjusted_confidence`, which is cost-free: it is the one value §7.3
+defines, not recomputed at 2×. `C(x) = min(1, max(0, x))`.
 
 ```
 G = 30 * C((worst_fold_sharpe_2x + 0.25) / 1.00)
   + 20 * C((median_fold_sharpe_2x - 0.25) / 0.75)
-  + 20 * C((0.20 - max_drawdown) / 0.15)
+  + 20 * C((0.20 - max_drawdown_2x) / 0.15)
   + 15 * C(calmar_2x / 1.50)
-  +  8 * C((positive_quarter_fraction - 0.50) / 0.375)
+  +  8 * C((positive_quarter_fraction_2x - 0.50) / 0.375)
   +  7 * C((trial_adjusted_confidence - 0.90) / 0.10)
 ```
 
 `G` ranges 0–100: **58 points of generalisation, 35 points of drawdown control, 7 of multiplicity
 honesty.** It is a ranking score, not an additional veto.
 
-Ties break by: lower maximum drawdown, then higher worst-fold 2× Sharpe, then lower annualised
-turnover, then lexicographically smaller team id.
+Ties break by: lower 2×-cost maximum drawdown, then higher worst-fold 2× Sharpe, then lower
+2×-cost annualised turnover, then lexicographically smaller team id.
 
 **The top three advance.** If fewer than three clear the floors, only the actual qualifiers
 advance. Floors are never lowered and no empty slot is backfilled after holdout access.
@@ -508,7 +531,7 @@ reports-cup20/{is/, holdout/, source-archives/sha256/}   ORGANISER-ONLY, gitigno
 data/cup20/{is/, sealed/, acquisition/}                  distinct manifests; only is/ is a team input
 src/crypto_trade/cup20/
   config.py universe.py snapshot.py engine.py risk_unit.py journal.py
-  qualification.py scoring.py runner.py report.py paper.py
+  qualification.py scoring.py scored_metrics.py adjudication.py runner.py report.py paper.py
 tests/cup20/
 ```
 
