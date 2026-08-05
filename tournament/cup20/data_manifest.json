@@ -1,0 +1,131 @@
+{
+  "files": [
+    {
+      "name": "archive_provenance",
+      "path": "data/cup20/acquisition/archive_provenance.jsonl",
+      "rows": 43965,
+      "sha256": "766aecb8e83fec630ebf9cb0d8ea21ce0e25f9ae7fd4066111f9d5dd6b0c2569",
+      "size": 29666646
+    },
+    {
+      "name": "bars",
+      "path": "data/cup20/acquisition/bars.parquet",
+      "rows": 1779501,
+      "sha256": "393aa6374ca61533ccc5661c13c0ae7ec73cd1892ac52377b8bbc50518c0f11a",
+      "size": 81958805
+    },
+    {
+      "name": "contract_metadata",
+      "path": "data/cup20/acquisition/contract_metadata.parquet",
+      "rows": 670,
+      "sha256": "85eed55257f897f494c6829ae0e58ecf22567f5ad3a633cb125e78f4d8dfd9ce",
+      "size": 16053
+    },
+    {
+      "name": "coverage",
+      "path": "data/cup20/acquisition/coverage.json",
+      "rows": 670,
+      "sha256": "683f98db2776ddf7421477c0ed69ea8bec0e2ce8334c159c860a755344c0e609",
+      "size": 612541
+    },
+    {
+      "name": "exchange_info",
+      "path": "data/cup20/acquisition/exchange_info.json",
+      "rows": 852,
+      "sha256": "087e57ac78ad885033f50364d592c4a59cd28f6c21de0b4cb4afc308f8ef6cc5",
+      "size": 1726189
+    },
+    {
+      "name": "funding",
+      "path": "data/cup20/acquisition/funding.parquet",
+      "rows": 1033757,
+      "sha256": "04ed4a7da83ffe20db06e9d685e09bd2c24d0e53ea5a5b7d8ed6d3d0b3c96766",
+      "size": 10418169
+    },
+    {
+      "name": "mark_prices",
+      "path": "data/cup20/acquisition/mark_prices.parquet",
+      "rows": 891715,
+      "sha256": "089ab502cc03cf2bebcdf693e7f2de6ccc6a35cb48e7fe09a6ad4b78c8ca54d4",
+      "size": 6436248
+    },
+    {
+      "name": "mark_rest_provenance",
+      "path": "data/cup20/acquisition/mark_rest_provenance.jsonl",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "name": "membership",
+      "path": "data/cup20/acquisition/membership.parquet",
+      "rows": 19163,
+      "sha256": "e6c19f360e968f43e15631bd29910fa064331eb26d6a1c7f540a97de7c19efab",
+      "size": 175962
+    },
+    {
+      "name": "rest_provenance",
+      "path": "data/cup20/acquisition/rest_provenance.jsonl",
+      "rows": 10,
+      "sha256": "c2a6429f4c89b4d223a0924b8c2efadf7bfafc41eb6858ddaa45916a03209961",
+      "size": 4869
+    },
+    {
+      "name": "btc_daily_returns",
+      "path": "reports-cup20/common/btc_daily_returns.csv",
+      "rows": 2224,
+      "sha256": "5e9df5b3b6a147651e9d62f40b601ad407146d16f5d50204ce32e421c7a2be4b",
+      "size": 105268
+    },
+    {
+      "name": "btc_regimes",
+      "path": "reports-cup20/common/btc_regimes.csv",
+      "rows": 2224,
+      "sha256": "bc26e9476e6dcca6385881fefc0b77a2bef2ff92504b93d77dd02929e10de513",
+      "size": 69420
+    }
+  ],
+  "limitations": [
+    "Binance does not publish complete point-in-time exchangeInfo/filter history.",
+    "Archive-only plain USDT symbols are inferred to be crypto perpetuals; known historical composite/index symbols BLUEBIRDUSDT, BTCDOMUSDT, DEFIUSDT, DOTECOUSDT, and FOOTBALLUSDT are explicitly excluded.",
+    "Archive-only onboard/delivery bounds are inferred from first/last executable 8h bars.",
+    "Funding mark price is the exact floor-hour 1h mark open (a boundary-open proxy); actual funding timestamps are preserved and must have less than one second of boundary jitter.",
+    "Risk exposure uses exact 8h boundary opens from Binance 1h mark-price archives; transaction klines remain the execution and participation source.",
+    "Exact required marks absent from a checksummed monthly markPriceKlines archive use the checksummed Binance daily markPriceKlines archive first, then exact-hour REST only when the daily object is absent or lacks that hour; no mark is interpolated.",
+    "Monthly archive gaps are treated as non-executable intervals, not silently interpolated; funding coverage is required for every month in which a weekly member has executable bars.",
+    "Official fundingRate REST responses used only for required archive gaps have no upstream SHA-256 sidecar and Binance may revise that API history; exact parameters, retrieval time, canonical response bytes, and a local SHA-256 are frozen for every request.",
+    "Official markPriceKlines REST responses used only for exact required hourly marks absent from checksummed monthly and daily archives have no upstream SHA-256 sidecar and Binance may revise that API history; exact parameters, retrieval time, canonical response bytes, fallback reason, archive SHA-256, and a local response SHA-256 are frozen for every request.",
+    "Transaction bars before a symbol's first Top-40 admission remain available as research history but are non-executable; no risk mark is required or synthesized for those bars."
+  ],
+  "parser_version": "cup20-snapshot-v1",
+  "schema_version": 1,
+  "sources": {
+    "archive_base_url": "https://data.binance.vision",
+    "archive_count": 43965,
+    "archive_provenance_path": "data/cup20/acquisition/archive_provenance.jsonl",
+    "archive_provenance_sha256": "766aecb8e83fec630ebf9cb0d8ea21ce0e25f9ae7fd4066111f9d5dd6b0c2569",
+    "archive_s3_url": "https://s3-ap-northeast-1.amazonaws.com/data.binance.vision",
+    "builder_path": "src/crypto_trade/tournament/snapshot.py",
+    "builder_sha256": "a686c2388c6943340de8bfd4b5e565873f1342540f8c63674b82ce151b5a7e95",
+    "checksum_policy": "require-binance-sha256-sidecar",
+    "config_path": "tournament/cup20/snapshot-config.toml",
+    "config_sha256": "23e8e86d459ce25b9b5b657bf814990365bed96fbb9359896cf00e5a3413c99b",
+    "exchange_info_retrieved_at_utc": "2026-08-05T12:58:51.118745+00:00",
+    "exchange_info_server_time": 1785931217594,
+    "exchange_info_url": "https://fapi.binance.com/fapi/v1/exchangeInfo",
+    "funding_rate_url": "https://fapi.binance.com/fapi/v1/fundingRate",
+    "mark_price_klines_url": "https://fapi.binance.com/fapi/v1/markPriceKlines",
+    "mark_rest_provenance_path": "data/cup20/acquisition/mark_rest_provenance.jsonl",
+    "mark_rest_provenance_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mark_rest_request_count": 0,
+    "rest_provenance_path": "data/cup20/acquisition/rest_provenance.jsonl",
+    "rest_provenance_sha256": "c2a6429f4c89b4d223a0924b8c2efadf7bfafc41eb6858ddaa45916a03209961",
+    "rest_request_count": 10,
+    "source": "binance-public-usdm"
+  },
+  "window": {
+    "evaluation_start": "2020-06-29T00:00:00+00:00",
+    "hard_end_exclusive": "2026-08-01T00:00:00+00:00",
+    "warmup_start": "2020-01-01T00:00:00+00:00"
+  }
+}
