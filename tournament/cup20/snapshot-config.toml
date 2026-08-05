@@ -19,6 +19,12 @@ archive_s3_url = "https://s3-ap-northeast-1.amazonaws.com/data.binance.vision"
 exchange_info_url = "https://fapi.binance.com/fapi/v1/exchangeInfo"
 funding_rate_url = "https://fapi.binance.com/fapi/v1/fundingRate"
 mark_price_klines_url = "https://fapi.binance.com/fapi/v1/markPriceKlines"
+# Binance USD-M launched 2019-09-08 and the charter defines warm-up as "symbol listing ->
+# IS_START", so this asks for everything from the venue's own beginning. Disclosed limitation:
+# data.binance.vision's monthly USD-M kline archives actually begin 2020-01, so the realised
+# warm-up starts there. The value is left at the venue's start rather than 2020-01 so the config
+# states the intent and picks up any earlier month Binance ever publishes; `in_sample_start` below
+# is set from the data that exists, not from this.
 warmup_start = "2019-09-01"
 hard_end_exclusive = "2026-08-01"
 transaction_interval = "8h"
@@ -35,12 +41,16 @@ parser_version = "cup20-snapshot-v1"
 # is never written down here. This one only has to satisfy `_build_membership`, which requires a
 # non-empty size-60 universe at EVERY Monday from this date onward, and a symbol qualifies only
 # after 180 complete prior trading days (`trailing_days`/`minimum_history_days` below). Binance
-# USD-M's first contract listed 2019-09-08, so nothing at all qualifies until ~2020-03-06: the
-# plan's 2020-02-03 (inherited from the top-40 config, which used a 30-day window) fails closed
-# with "empty point-in-time universe at reconstitutions". 2020-04-06 is the first Monday with a
-# month of margin over that bound, and sits four months before CUP-20's IS_START, so the
-# acquisition membership still covers every boundary CUP-20 ships.
-in_sample_start = "2020-04-06"
+# and on the immediately preceding date. The public archives begin 2020-01-01, so nothing qualifies
+# until 180 complete days later. The plan's 2020-02-03 (inherited from the top-40 config, which used
+# a 30-day window) fails closed with "empty point-in-time universe at reconstitutions", and so does
+# any date guessed from the venue's launch rather than from the archives.
+#
+# 2020-06-29 is MEASURED, not guessed: it is the first Monday at which any symbol has 180 complete
+# 3-bar days in the trailing 180-day window (BCHUSDT, BTCUSDT and ETHUSDT, each with unbroken
+# coverage from 2020-01-01). It sits before CUP-20's own computed IS_START, so the acquisition
+# membership covers every boundary CUP-20 ships.
+in_sample_start = "2020-06-29"
 in_sample_end_inclusive = "2024-07-31"
 public_oos_start = "2024-08-01"
 public_oos_end_inclusive = "2026-07-31"
