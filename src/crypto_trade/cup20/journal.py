@@ -68,16 +68,33 @@ def append_record(path: str | Path, event_type: str, payload: Mapping[str, Any])
 
 
 def verify_chain(path: str | Path) -> int:
-    """Verify sequence numbers, parent links and digests. Return the record count."""
+    """Verify record structure, sequence numbers, parent links and digests. Return the record
+    count.
+
+    Fails closed on three structural shapes, alongside the original three chain-integrity
+    checks: a record that is not itself a mapping (e.g. a bare `42` -- valid JSON, but not an
+    object, so read_records' JSON-syntax-only guard lets it through), a record whose
+    `event_type` is not a string, and a record whose `payload` is not a mapping.
+    accepted_trial_count deliberately fails OPEN on the same conditions (skips the record, so
+    one bad entry cannot take every team's count down) -- this function is the other half of
+    that design: the counter stays available, the validator refuses to bless the journal that
+    made the skip necessary in the first place.
+    """
     records = read_records(path)
     previous: str | None = None
     for index, record in enumerate(records, start=1):
+        if not isinstance(record, Mapping):
+            raise ValueError(f"journal record at position {index} is not a mapping")
         if record.get("sequence") != index:
             raise ValueError(f"journal sequence break at position {index}")
         if record.get("previous_sha256") != previous:
             raise ValueError(f"journal parent link break at sequence {index}")
         if _record_digest(record) != record.get("record_sha256"):
             raise ValueError(f"journal record digest mismatch at sequence {index}")
+        if not isinstance(record.get("event_type"), str):
+            raise ValueError(f"journal record event_type is not a string at sequence {index}")
+        if not isinstance(record.get("payload"), Mapping):
+            raise ValueError(f"journal record payload is not a mapping at sequence {index}")
         previous = str(record["record_sha256"])
     return len(records)
 

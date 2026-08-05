@@ -332,6 +332,13 @@ def test_accepted_trial_count_skips_a_non_mapping_payload_without_crashing(tmp_p
     reasoning for skip over raise is in the fix-round report section. This test proves both
     halves: no crash, AND other teams' counts are completely unaffected by the malformed
     record.
+
+    Fix round 2 note: this test no longer asserts anything about verify_chain on this journal --
+    round 2 makes verify_chain correctly REJECT exactly this malformed record (see
+    test_verify_chain_rejects_a_non_mapping_payload below). The two functions have different
+    jobs and are tested separately: the counter must stay available in the presence of one bad
+    record (asserted here, unchanged), the validator must refuse to bless a journal containing
+    one (asserted there).
     """
     path = tmp_path / "journal.jsonl"
     append_record(path, "trial_accepted", {"team_id": "team-01"})
@@ -353,14 +360,96 @@ def test_accepted_trial_count_skips_a_non_mapping_payload_without_crashing(tmp_p
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(malformed, sort_keys=True, separators=(",", ":")) + "\n")
 
-    # verify_chain does not inspect payload's type at all -- only sequence/previous/digest --
-    # so the malformed record is, correctly, still part of a perfectly valid chain.
-    assert verify_chain(path) == 3
-
     # No crash, and the malformed record must not affect ANY other team's count.
     assert accepted_trial_count(path, "team-01") == 1
     assert accepted_trial_count(path, "team-02") == 1
     assert accepted_trial_count(path, "team-03") == 0
+
+
+def test_verify_chain_rejects_a_non_mapping_payload(tmp_path):
+    """Fix round 2: verify_chain must fail closed on a record whose payload is not a mapping --
+    the ordinary, non-adversarial case the coordinator named: an organiser-side bug writes a
+    payload of the wrong shape. Before this fix, verify_chain returned a clean count for exactly
+    this journal (it never inspected payload's type at all), while accepted_trial_count silently
+    skipped the malformed record (see the test above) -- a team's trial count could quietly drop
+    with the journal's own validator reporting no problem, which is precisely the direction of
+    failure this journal exists to prevent: fewer recorded trials means a lighter multiplicity
+    penalty means a candidate that should be disqualified passes. Built with the malformed
+    record specifically in the MIDDLE (matching the coordinator's own repro: "a three-record
+    chain whose middle record has payload: null"), with a legitimate record appended after it
+    too, so the reported position must be exactly 2, not 1 or 3, and the check must fire even
+    though a perfectly valid record follows.
+    """
+    path = tmp_path / "journal.jsonl"
+    append_record(path, "trial_accepted", {"team_id": "team-01"})
+
+    records = list(read_records(path))
+    malformed = {
+        "schema_version": records[-1]["schema_version"],
+        "sequence": len(records) + 1,
+        "event_type": "trial_accepted",
+        "payload": None,
+        "previous_sha256": records[-1]["record_sha256"],
+    }
+    malformed["record_sha256"] = _adversarial_digest(malformed)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(malformed, sort_keys=True, separators=(",", ":")) + "\n")
+
+    append_record(path, "trial_accepted", {"team_id": "team-01"})  # a valid record after it too
+
+    with pytest.raises(ValueError, match="payload is not a mapping at sequence 2"):
+        verify_chain(path)
+
+
+def test_verify_chain_rejects_a_non_string_event_type(tmp_path):
+    """Fix round 2, my own reasoned extension alongside the mandated payload check (see the
+    fix-round-2 report section for the full reasoning on why event_type earns this and sequence
+    does not): event_type carries the exact same documented `str` contract as payload carries
+    `Mapping[str, Any]` -- both are explicit parameter type hints on append_record -- and
+    accepted_trial_count's `== "trial_accepted"` comparison fails open on a non-string
+    event_type in exactly the same silent, validator-blind way its `.get("team_id")` call used
+    to fail open (pre round-1) on a non-mapping payload.
+    """
+    path = tmp_path / "journal.jsonl"
+    append_record(path, "trial_accepted", {"team_id": "team-01"})
+
+    records = list(read_records(path))
+    malformed = {
+        "schema_version": records[-1]["schema_version"],
+        "sequence": len(records) + 1,
+        "event_type": None,
+        "payload": {"team_id": "team-01"},
+        "previous_sha256": records[-1]["record_sha256"],
+    }
+    malformed["record_sha256"] = _adversarial_digest(malformed)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(malformed, sort_keys=True, separators=(",", ":")) + "\n")
+
+    with pytest.raises(ValueError, match="event_type is not a string at sequence 2"):
+        verify_chain(path)
+
+
+def test_verify_chain_rejects_a_record_that_is_not_a_mapping(tmp_path):
+    """Fix round 2: a line can be valid JSON while decoding to something other than a JSON
+    object -- a bare `42`, a string, a list -- and read_records (which, even after round 1's
+    Finding 2 fix, only guards against JSON SYNTAX errors, not the parsed TYPE) happily returns
+    it as though it were a normal record. Without this check, every downstream `.get(...)` call
+    in verify_chain's loop would raise AttributeError instead of a clear, positioned ValueError
+    -- the same crash-and-take-everyone-down shape as round 1's Finding 1, one level up (the
+    record itself, not just its payload field). This is the adjacent gap flagged, unfixed, in
+    the original task-11 report.
+    """
+    path = tmp_path / "journal.jsonl"
+    append_record(path, "trial_accepted", {"team_id": "team-01"})
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write("42\n")
+
+    # read_records itself does not crash -- confirming the malformed value genuinely reaches
+    # verify_chain's loop rather than being filtered out earlier.
+    assert read_records(path)[1] == 42
+
+    with pytest.raises(ValueError, match="position 2 is not a mapping"):
+        verify_chain(path)
 
 
 # --- digest exclusion is by key NAME, at the TOP LEVEL of the record only ---
