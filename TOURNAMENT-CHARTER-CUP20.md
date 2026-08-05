@@ -172,7 +172,22 @@ deployable book, and it is disqualified rather than rewarded for being small.
 
 Every organiser-recognised evaluation is appended to a per-team, append-only, hash-chained journal
 **before** market data are opened. Acceptance consumes the trial even if the run crashes or is
-abandoned. A material trial is any evaluation whose tuple of (source bytes, config, feature set,
+abandoned.
+
+**What the hash chain does and does not guarantee.** It makes accidental corruption, naive
+deletion, renumbering, reordering and truncation detectable — each breaks a sequence number, a
+parent link or a record digest. It is **not** a defence against an actor with write access to the
+journal file who deletes a record and correctly re-chains every record after it: the digest is
+keyless SHA-256 over public bytes, so anyone who can edit the file can also recompute the suffix.
+Git-committing the journal does not close this either, since an actor who can edit the file in the
+working tree can generally also amend local history, and there is a window between an append and
+the commit that captures it.
+
+What actually makes the trial count trustworthy is that **the journal is organiser-owned and teams
+never write to it** — teams write only under their own directory (§5). The chain is an audit trail
+and an accident detector layered on top of that access boundary, not a substitute for it. This is
+stated plainly because a tamper-evidence claim that overstates its own strength is worse than none:
+it invites reliance the mechanism cannot carry. A material trial is any evaluation whose tuple of (source bytes, config, feature set,
 seed, parameters, window, cost model, risk policy) differs from an earlier one.
 
 **Budget: 12 material trials per team. Nomination requires ≥ 8 accepted trials.** No team may
@@ -199,9 +214,18 @@ additional points such that:
 
 - the neighbourhood has at least `max(7, 2k + 1)` points, where `k` is the number of material
   parameters;
+- **every point is distinct** — no duplicates, and no point equal to the nominee. A neighbourhood
+  padded with repeated points is a handful of samples wearing a costume, and padding one side of
+  the nominee is a direct lever on the median;
 - for **every** declared coordinate there is at least one point strictly above and one strictly
-  below the nominated value;
-- every coordinate maps to an identically named numeric material parameter in the frozen source.
+  below the nominated value, and each of those variations is **material**: at least 5% of the
+  nominee's magnitude for that coordinate, or a strictly positive absolute change when the nominee
+  is zero. A variation of 1e-9 is not an exploration of the surface;
+- every coordinate maps to an identically named numeric material parameter in the frozen source,
+  **and the nominee's declared value equals the value in that frozen source**, so the nominated
+  point is what the frozen code actually does rather than a favourable point merely labelled as
+  the nominee. Verified by parsing the entrypoint, never by importing it — team code is untrusted
+  and is never executed during verification.
 
 **Every scored metric is the per-metric median across the neighbourhood's runs.** The nominated
 point's own coherent metric vector, and the coherent vector of the median-performing point, are
