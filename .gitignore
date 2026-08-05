@@ -90,3 +90,6 @@ notebooks/.ipynb_checkpoints/
 !.claude/commands/
 !.claude/skills/
 !.claude/agents/
+
+# SDD scratch workspaces: hold build ledgers that can name sealed-window symbols
+.superpowers/
