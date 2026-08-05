@@ -178,7 +178,7 @@ def test_coordinate_without_a_downward_variation_is_rejected():
         {"lookback": 70.0, "threshold": 0.9},
         {"lookback": 120.0, "threshold": 1.1},
     ]
-    with pytest.raises(ValueError, match="no downward variation"):
+    with pytest.raises(ValueError, match="no material downward variation"):
         _declaration(points=points).validate()
 
 
@@ -261,7 +261,7 @@ def test_upward_check_ignores_a_nan_coordinate_value():
         {"lookback": 58.0, "threshold": 0.85},
         {"lookback": float("nan"), "threshold": 1.15},
     ]
-    with pytest.raises(ValueError, match="no upward variation"):
+    with pytest.raises(ValueError, match="no material upward variation"):
         _declaration(points=points).validate()
 
 
@@ -276,7 +276,7 @@ def test_downward_check_ignores_a_nan_coordinate_value():
         {"lookback": 80.0, "threshold": 0.85},
         {"lookback": float("nan"), "threshold": 1.15},
     ]
-    with pytest.raises(ValueError, match="no downward variation"):
+    with pytest.raises(ValueError, match="no material downward variation"):
         _declaration(points=points).validate()
 
 
@@ -348,3 +348,130 @@ def test_load_declaration_propagates_validation_errors(tmp_path):
     )
     with pytest.raises(ValueError, match="at least"):
         load_declaration(path)
+
+
+# --- fix round 1: padding, epsilon "variation", and a bare KeyError --------
+#
+# Reviewer finding: validate() accepted adversarial neighbourhoods that
+# defeat the stated purpose of every one of its existing gates without
+# tripping any of them -- padding with duplicate points (including copies of
+# the nominee itself) satisfies the point-count floor and, since the
+# direction check only asks whether *any* point lies on each side, can leave
+# the direction check satisfied too while contributing zero real information
+# and pulling the median toward whichever value is repeated. A separate
+# finding: the strict above/below check had no materiality floor, so an
+# epsilon nudge satisfied "strictly above/below" while exploring nothing.
+
+
+def test_duplicate_neighbourhood_points_are_rejected():
+    # 6 points collapsing to 2 distinct values (3 copies each). Both values
+    # individually supply real, material direction -- this fixture is
+    # otherwise a fully valid declaration -- so this isolates the
+    # distinctness gate specifically, not a side effect of some other check.
+    points = [
+        {"lookback": 80.0, "threshold": 1.2},
+        {"lookback": 80.0, "threshold": 1.2},
+        {"lookback": 80.0, "threshold": 1.2},
+        {"lookback": 40.0, "threshold": 0.8},
+        {"lookback": 40.0, "threshold": 0.8},
+        {"lookback": 40.0, "threshold": 0.8},
+    ]
+    with pytest.raises(ValueError, match="duplicates another declared point"):
+        _declaration(points=points).validate()
+
+
+def test_neighbourhood_points_that_duplicate_the_nominee_are_rejected():
+    # 4 of 6 points are literal copies of the nominee -- pads the count floor
+    # exactly like the case above, and would silently drag any median toward
+    # the nominee's own metric if it were allowed through.
+    points = [
+        {"lookback": 60.0, "threshold": 1.0},
+        {"lookback": 60.0, "threshold": 1.0},
+        {"lookback": 60.0, "threshold": 1.0},
+        {"lookback": 60.0, "threshold": 1.0},
+        {"lookback": 80.0, "threshold": 1.2},
+        {"lookback": 40.0, "threshold": 0.8},
+    ]
+    with pytest.raises(ValueError, match="duplicates the nominee"):
+        _declaration(points=points).validate()
+
+
+def test_distinctness_is_checked_on_the_full_coordinate_vector_not_one_axis():
+    # Every "lookback" value here repeats at least once (80, 80, 40, 40) and
+    # every "threshold" value repeats at least once (1.2, 1.3, 0.8, 0.7, 0.8,
+    # 1.2) -- deliberately, so a distinctness check that (wrongly) compared
+    # only one coordinate at a time would find a "duplicate" somewhere here.
+    # All 6 points are nonetheless distinct as FULL (lookback, threshold)
+    # vectors, so a correct implementation must accept this; this is not the
+    # same fixture as test_valid_declaration_passes, which only has this
+    # property incidentally rather than by deliberate, exhaustive design.
+    points = [
+        {"lookback": 80.0, "threshold": 1.2},
+        {"lookback": 80.0, "threshold": 1.3},
+        {"lookback": 40.0, "threshold": 0.8},
+        {"lookback": 40.0, "threshold": 0.7},
+        {"lookback": 90.0, "threshold": 0.8},
+        {"lookback": 30.0, "threshold": 1.2},
+    ]
+    _declaration(points=points).validate()
+
+
+def test_coordinate_with_epsilon_variation_in_one_direction_is_rejected():
+    # Material upward (delta=20-40 on a 60-nominee, far above the 3.0 floor)
+    # but only an epsilon downward (delta=1e-6) -- the asymmetric case a team
+    # would actually try: keep the direction that helps and barely touch the
+    # other one to satisfy the letter of "both directions" without really
+    # exploring it.
+    points = [
+        {"lookback": 80.0, "threshold": 1.2},
+        {"lookback": 60.0 - 1e-6, "threshold": 0.8},
+        {"lookback": 90.0, "threshold": 1.1},
+        {"lookback": 70.0, "threshold": 0.9},
+        {"lookback": 100.0, "threshold": 1.15},
+        {"lookback": 65.0, "threshold": 0.85},
+    ]
+    with pytest.raises(ValueError, match="no material downward variation"):
+        _declaration(points=points).validate()
+
+
+def test_material_variation_exactly_at_the_five_percent_threshold_is_accepted():
+    # The rule is ">=", inclusive. 63.0 is exactly 3.0 above the 60.0
+    # nominee, and 0.05 * 60.0 == 3.0 exactly in IEEE-754 double (verified by
+    # hand before writing this test -- 60 and 0.05 do not round awkwardly
+    # here, unlike some nominee/threshold combinations). It is deliberately
+    # the *only* point above the nominee, so if the boundary were exclusive
+    # (">") instead of inclusive (">="), this would fail "no material upward
+    # variation" and the whole declaration would be rejected.
+    points = [
+        {"lookback": 63.0, "threshold": 1.3},
+        {"lookback": 40.0, "threshold": 0.7},
+        {"lookback": 45.0, "threshold": 1.2},
+        {"lookback": 50.0, "threshold": 0.8},
+        {"lookback": 55.0, "threshold": 1.15},
+        {"lookback": 58.0, "threshold": 0.85},
+    ]
+    _declaration(points=points).validate()
+
+
+def test_positive_point_fraction_raises_value_error_for_a_point_missing_annualized_return():
+    # neighbourhood.py previously subscripted point["annualized_return"]
+    # directly, so a missing key raised a bare KeyError -- this module's
+    # convention (and the global "fail closed with a clear ValueError")
+    # requires ValueError instead. pytest.raises(ValueError) does not catch
+    # KeyError, so this test would fail with an uncaught KeyError against the
+    # pre-fix implementation.
+    per_point = [
+        {"annualized_return": 0.1, "double_cost_sharpe": 0.5},
+        {"double_cost_sharpe": 0.5},
+    ]
+    with pytest.raises(ValueError, match="annualized_return"):
+        positive_point_fraction(per_point)
+
+
+def test_positive_point_fraction_raises_value_error_for_a_point_missing_double_cost_sharpe():
+    per_point = [
+        {"annualized_return": 0.1, "double_cost_sharpe": 0.5},
+        {"annualized_return": 0.2},
+    ]
+    with pytest.raises(ValueError, match="double_cost_sharpe"):
+        positive_point_fraction(per_point)

@@ -40,13 +40,35 @@ class NeighbourhoodDeclaration:
             missing = set(self.coordinates) - set(point)
             if missing:
                 raise ValueError(f"neighbourhood point omits coordinates: {sorted(missing)}")
+        # Every point must be a genuinely new sample, not padding: compared on the FULL
+        # coordinate vector (not any single coordinate), so a point that only repeats one
+        # coordinate while varying another still counts as distinct. Without this, a team can
+        # declare N copies of whichever value it wants the median to lean toward -- including the
+        # nominee itself -- and clear the max(7, 2k+1) floor on cardinality alone while exploring
+        # nothing.
+        nominee_vector = tuple(float(self.nominee[coordinate]) for coordinate in self.coordinates)
+        seen_vectors: list[tuple[float, ...]] = []
+        for point in self.points:
+            vector = tuple(float(point[coordinate]) for coordinate in self.coordinates)
+            if vector == nominee_vector:
+                raise ValueError(f"neighbourhood point duplicates the nominee: {dict(point)}")
+            if vector in seen_vectors:
+                raise ValueError(
+                    f"neighbourhood point duplicates another declared point: {dict(point)}"
+                )
+            seen_vectors.append(vector)
         for coordinate in self.coordinates:
             centre = float(self.nominee[coordinate])
+            # A variation must be material, not an epsilon nudge that satisfies the letter of
+            # "strictly above/below" while exploring nothing: at least 5% of the nominee's own
+            # magnitude, or -- since 5% of exactly zero is zero, which would make the materiality
+            # check vacuous -- any nonzero change at all when the nominee is zero.
+            threshold = 0.05 * abs(centre) if centre != 0.0 else 0.0
             values = [float(point[coordinate]) for point in self.points]
-            if not any(value > centre for value in values):
-                raise ValueError(f"coordinate {coordinate} has no upward variation")
-            if not any(value < centre for value in values):
-                raise ValueError(f"coordinate {coordinate} has no downward variation")
+            if not any(value > centre and abs(value - centre) >= threshold for value in values):
+                raise ValueError(f"coordinate {coordinate} has no material upward variation")
+            if not any(value < centre and abs(value - centre) >= threshold for value in values):
+                raise ValueError(f"coordinate {coordinate} has no material downward variation")
 
 
 def median_metrics(per_point: Sequence[Mapping[str, float]]) -> dict[str, float]:
@@ -67,6 +89,14 @@ def positive_point_fraction(per_point: Sequence[Mapping[str, float]]) -> float:
     """Fraction of points with positive annualised return AND positive 2x-cost Sharpe."""
     if not per_point:
         raise ValueError("positive_point_fraction requires at least one point")
+    required_keys = {"annualized_return", "double_cost_sharpe"}
+    for point in per_point:
+        missing = required_keys - set(point)
+        if missing:
+            raise ValueError(
+                f"positive_point_fraction requires {sorted(required_keys)} on every point; "
+                f"a point is missing {sorted(missing)}"
+            )
     passing = sum(
         1
         for point in per_point
