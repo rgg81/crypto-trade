@@ -78,10 +78,11 @@ def write_split_snapshots(
 
     ``contract_metadata`` is timeless (see ``_TIME_COLUMN``) and ``_slice`` ships it whole into
     every split -- correct for the sealed side (organiser-only, needs the truth), wrong for the IS
-    side: ``onboard_date`` and ``delivery_date`` are themselves future universe composition, the
-    same leak class as ``membership.reconstitution_time``, just carried by a different dataset.
-    ``_censor_contract_metadata_for_is`` scrubs both before the IS write; the sealed side is left
-    untouched.
+    side: ``onboard_date``, ``delivery_date``, and (once a ``delivery_date`` is censored)
+    ``metadata_source`` / ``underlying_type`` are themselves future universe composition, the same
+    leak class as ``membership.reconstitution_time``, just carried by a different dataset.
+    ``_censor_contract_metadata_for_is`` scrubs all of it before the IS write; the sealed side is
+    left untouched.
     """
     frames = {
         "bars": bars,
@@ -150,33 +151,61 @@ def _require_unique_key(name: str, frame: pd.DataFrame, key_columns: list[str]) 
         )
 
 
-def _perpetual_delivery_sentinel(contract_metadata: pd.DataFrame) -> pd.Timestamp:
-    """The ``delivery_date`` value meaning "no scheduled delivery is known" -- derived from the
-    data itself as its single most common value, not hardcoded: the overwhelming majority of any
-    real contract universe is perpetual and shares one placeholder date (Binance's own convention
-    is ``2100-12-25T08:00:00Z`` / epoch ms ``4133404800000``). Deriving it here means this keeps
-    working unmodified if the exchange's own placeholder ever changes, rather than silently
-    drifting out of sync with a hardcoded literal.
+def _dominant_value(values: pd.Series, *, label: str) -> object:
+    """The single most common value in ``values`` -- derived from the data, never hardcoded, so
+    normalising a censored row keeps working unmodified if the acquisition pipeline's own
+    conventions ever change.
 
-    Fails loudly rather than guessing: this value stands in for every post-cutoff
-    ``delivery_date`` in the IS snapshot, so an absent, null, or ambiguous derivation must raise --
-    never fail open into skipping censorship or picking an arbitrary candidate.
+    Used to normalise a censored row's non-date columns to whatever an ORDINARY, still-listed
+    contract shows, so a censored row carries no residual, reconstructible trace of its true
+    future status in any column -- not just ``delivery_date``. Fails loudly rather than guessing
+    on an empty series, a null value, or a tie for the mode: a wrong or arbitrary guess here would
+    ship a value that itself might distinguish a censored row from an ordinary one, which is
+    exactly the failure this function exists to prevent.
     """
-    if "delivery_date" not in contract_metadata.columns or contract_metadata.empty:
-        raise ValueError(
-            "cannot derive a perpetual delivery sentinel: contract_metadata is empty or has no "
-            "delivery_date column"
-        )
-    values = pd.to_datetime(contract_metadata["delivery_date"], utc=True)
+    if values.empty:
+        raise ValueError(f"cannot derive a dominant {label} value: no rows to derive it from")
     if values.isna().any():
-        raise ValueError("contract_metadata delivery_date contains null values")
+        raise ValueError(f"contract_metadata {label} contains null values")
     mode = values.mode()
     if len(mode) != 1:
         raise ValueError(
-            "contract_metadata delivery_date has no single unambiguous mode across "
-            f"{len(contract_metadata)} rows -- cannot derive a perpetual sentinel"
+            f"contract_metadata {label} has no single unambiguous mode across {len(values)} rows "
+            "-- cannot derive a dominant value"
         )
-    return pd.Timestamp(mode.iloc[0])
+    return mode.iloc[0]
+
+
+def _perpetual_delivery_sentinel(delivery_date: pd.Series) -> pd.Timestamp:
+    """The ``delivery_date`` value meaning "no scheduled delivery is known" -- derived from the
+    data itself (Binance's own real convention is ``2100-12-25T08:00:00Z`` / epoch ms
+    ``4133404800000``, but this never hardcodes it; see ``_dominant_value``).
+    """
+    return pd.Timestamp(
+        _dominant_value(pd.to_datetime(delivery_date, utc=True), label="delivery_date")
+    )
+
+
+# The two contract_metadata columns known to be stamped with an acquisition-pipeline-specific
+# sentinel for exactly the symbols absent from live exchangeInfo at data-build time -- which is to
+# say, for symbols that have already delisted -- verified directly against
+# crypto_trade/tournament/snapshot.py's `_contract_metadata` (the acquisition function that
+# actually sets every field in this schema): archive-inferred rows get
+# underlying_type="ARCHIVE_INFERRED_COIN" and metadata_source="archive_inference", where a
+# genuinely still-listed contract shows the exchange's own `underlyingType` (validated elsewhere
+# to always be "COIN" for this pure-crypto universe -- see
+# crypto_trade/tournament/pure_crypto_universe_v6.py's `current_contract_violations`) and
+# metadata_source="current_exchangeInfo". Combined with a delivery_date censored to the perpetual
+# sentinel, either field alone is an exact, unambiguous reconstruction of "this contract delists
+# after the IS cutoff" -- found the hard way, as a real false-assurance defect, during fix-round 3.
+#
+# contract_type, quote_asset, margin_asset, and is_crypto are NOT in this list: all four are
+# hardcoded to the identical literal ("PERPETUAL" / "USDT" / "USDT" / True) on the archive-inferred
+# branch of `_contract_metadata`, and separately validated by `current_contract_violations` /
+# `_contract_metadata` itself to be forced to those same values on the current-exchangeInfo branch
+# too (a row violating either is rejected before it ever reaches this universe) -- so none of the
+# four can carry this correlation. Checked directly against both functions' source, not assumed.
+_ARCHIVE_STATUS_COLUMNS = ("metadata_source", "underlying_type")
 
 
 def _censor_contract_metadata_for_is(
@@ -185,7 +214,7 @@ def _censor_contract_metadata_for_is(
     """Scrub future universe composition out of ``contract_metadata`` before it enters the IS
     snapshot.
 
-    Two independent leaks, both future universe composition -- the same class this module's own
+    Three independent leaks, all future universe composition -- the same class this module's own
     docstring calls out for the time-keyed datasets, just carried by columns rather than rows:
 
       - A row whose ``onboard_date`` is at or after ``is_end`` was not listed yet as of the IS
@@ -194,11 +223,17 @@ def _censor_contract_metadata_for_is(
       - A row whose ``delivery_date`` is at or after ``is_end`` carries a future delisting date no
         IS-era observer could know. Replaced with the perpetual sentinel (see
         ``_perpetual_delivery_sentinel``) -- the value the data itself already uses for
-        genuinely-perpetual contracts, so a censored row is indistinguishable from one that was
-        never going to delist at all.
+        genuinely-perpetual contracts.
+      - The same row's ``metadata_source`` / ``underlying_type`` (see ``_ARCHIVE_STATUS_COLUMNS``)
+        are normalised to whatever an ordinary, still-listed contract shows (``_dominant_value``,
+        derived from every OTHER row -- never from the row being censored itself). A censored
+        ``delivery_date`` alone is not enough: these two columns independently reveal that a
+        symbol has already delisted by acquisition build time, regardless of when, which is
+        exactly as severe a leak as the date itself once combined with the sentinel.
 
     A no-op when ``onboard_date`` / ``delivery_date`` are absent (older or synthetic fixtures
-    without them): nothing to censor.
+    without them): nothing to censor. ``metadata_source`` / ``underlying_type`` are normalised only
+    if present.
     """
     frame = contract_metadata
     if "onboard_date" in frame.columns:
@@ -206,10 +241,25 @@ def _censor_contract_metadata_for_is(
         frame = frame.loc[onboard < is_end].reset_index(drop=True)
     if frame.empty or "delivery_date" not in frame.columns:
         return frame
-    sentinel = _perpetual_delivery_sentinel(frame)
     delivery = pd.to_datetime(frame["delivery_date"], utc=True)
+    sentinel = _perpetual_delivery_sentinel(frame["delivery_date"])
+    # A row needs censoring only if its delivery_date is a GENUINE post-cutoff date, not the
+    # sentinel itself: the sentinel already sits at or after is_end for any is_end this tournament
+    # will ever use (it means "no delivery date known", conventionally far in the future), so a
+    # naive `delivery >= is_end` mask would also flag every already-safe, genuinely-perpetual row
+    # -- shrinking the "ordinary" reference population derived below, in the worst case to empty
+    # (found the hard way, as a real crash, while verifying this fix).
+    censor_mask = (delivery >= is_end) & (delivery != sentinel)
+    if not censor_mask.any():
+        return frame
+    ordinary = frame.loc[~censor_mask]
     frame = frame.copy()
-    frame.loc[delivery >= is_end, "delivery_date"] = sentinel
+    frame.loc[censor_mask, "delivery_date"] = sentinel
+    for column in _ARCHIVE_STATUS_COLUMNS:
+        if column not in frame.columns:
+            continue
+        dominant = _dominant_value(ordinary[column], label=column)
+        frame.loc[censor_mask, column] = dominant
     return frame
 
 

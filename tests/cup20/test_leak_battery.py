@@ -139,7 +139,25 @@ def _synthetic(seed=3, symbols=("AUSDT", "BUSDT", "CUSDT", "DUSDT")):
         ],
         ignore_index=True,
     )
-    metadata = pd.DataFrame({"symbol": list(symbols), "contract_type": "PERPETUAL"})
+    # Full nine-column production schema (crypto_trade/cup20/snapshot.py's own _TIME_COLUMN
+    # docstring; crypto_trade/tournament/snapshot.py's _contract_metadata is the acquisition
+    # function that actually sets every field), not a narrow hand-picked subset -- fix-round 3
+    # found a real leak (metadata_source / underlying_type) hiding behind exactly that kind of
+    # narrowness. Every fixture symbol here is an ordinary, currently-listed contract: the values
+    # a real still-listed row carries on the acquisition pipeline's current_exchangeInfo branch.
+    metadata = pd.DataFrame(
+        {
+            "symbol": list(symbols),
+            "contract_type": "PERPETUAL",
+            "quote_asset": "USDT",
+            "margin_asset": "USDT",
+            "is_crypto": True,
+            "onboard_date": pd.Timestamp("2020-01-01T00:00:00Z"),
+            "delivery_date": pd.Timestamp("2100-12-25T08:00:00Z"),
+            "underlying_type": "COIN",
+            "metadata_source": "current_exchangeInfo",
+        }
+    )
     return Snapshot(bars, funding, marks, membership, metadata, manifest_sha256="synthetic")
 
 
@@ -274,6 +292,17 @@ def test_risk_unit_scales_realised_volatility_to_within_a_band_of_the_common_tar
     target weights at the SAME 1x cost multiplier and are therefore bit-identical -- a fact true
     regardless of the fixture's volatility, the target, or any band. ``run.unscaled`` was otherwise
     referenced nowhere in this file.
+
+    Fix-round 3 found neither guard catches a HARDCODED CONSTANT MULTIPLIER (as opposed to an
+    inert 1.0x no-op): ``run.risk_scalars`` pinned to a constant 0.5 for every decision still
+    differs from ``run.unscaled`` (0.5x != 1x, so the structural assertion passes) and lands at
+    ratio ~1.006 -- empirically confirmed directly against this fixture as part of fix-round 3,
+    matching the coordinator's claim almost exactly -- comfortably inside ``[0.85, 1.20]``. Only
+    ``risk_scalars.nunique()`` tells the two apart: the real, correctly-derived scalar has 630
+    distinct values across this fixture's decision grid (one per lookback-window position), while
+    any constant multiplier -- 0.5, 1.0, or otherwise -- collapses to exactly 1. A time-varying
+    target-vol scalar and a constant multiplier are different mechanisms even when their tail-slice
+    standard deviation coincides; this is the assertion that actually tells them apart.
     """
     snapshot = _synthetic()
     grid = decision_grid(snapshot.bars["open_time"].min(), snapshot.bars["open_time"].max())
@@ -290,6 +319,11 @@ def test_risk_unit_scales_realised_volatility_to_within_a_band_of_the_common_tar
     # Guaranteed catch, independent of the band: the scaled and unscaled books must not be the
     # same evaluation wearing two names.
     assert not scaled.equals(unscaled)
+
+    # Guaranteed catch, independent of the band or the structural check above: a genuinely
+    # time-varying, causally-derived scalar cannot be a constant multiplier wearing a different
+    # number. Neither check above distinguishes these two mechanisms (see docstring).
+    assert run.risk_scalars.nunique() > 1
 
     ratio = scaled.iloc[tail].std() / target
     assert 0.85 <= ratio <= 1.20
@@ -377,6 +411,30 @@ def test_is_snapshot_written_to_disk_contains_no_sealed_row(tmp_path):
         )
 
 
+def _ordinary_metadata(
+    existing_symbols: list[str], not_yet_listed: tuple[str, pd.Timestamp]
+) -> pd.DataFrame:
+    """Full nine-column production schema for ``existing_symbols`` plus one not-yet-onboarded
+    symbol, all as ordinary, currently-listed contracts -- callers overwrite specific rows/columns
+    to plant a delisting.
+    """
+    not_yet_listed_symbol, onboard_date = not_yet_listed
+    return pd.DataFrame(
+        {
+            "symbol": [*existing_symbols, not_yet_listed_symbol],
+            "contract_type": "PERPETUAL",
+            "quote_asset": "USDT",
+            "margin_asset": "USDT",
+            "is_crypto": True,
+            "onboard_date": [pd.Timestamp("2020-01-01T00:00:00Z")] * len(existing_symbols)
+            + [onboard_date],
+            "delivery_date": pd.Timestamp("2100-12-25T08:00:00Z"),
+            "underlying_type": "COIN",
+            "metadata_source": "current_exchangeInfo",
+        }
+    )
+
+
 def test_is_snapshot_censors_future_contract_metadata(tmp_path):
     """``contract_metadata`` is timeless (``crypto_trade/cup20/snapshot.py``'s own
     ``_TIME_COLUMN`` mapping) and would otherwise ship WHOLE, unfiltered, into the IS snapshot --
@@ -386,6 +444,19 @@ def test_is_snapshot_censors_future_contract_metadata(tmp_path):
     (147 of 667 symbols carry a genuine delist date; 112 of those fall inside the sealed window),
     not merely as an unasserted test gap.
 
+    Fix-round 3 found the round-2 fix incomplete: the acquisition pipeline
+    (``crypto_trade/tournament/snapshot.py``'s ``_contract_metadata``) also stamps
+    ``metadata_source="archive_inference"`` / ``underlying_type="ARCHIVE_INFERRED_COIN"`` for
+    exactly the symbols absent from live exchangeInfo at data-build time -- i.e. already-delisted
+    symbols -- independent of ``delivery_date``. The conjunction ``metadata_source=="archive_
+    inference" AND delivery_date==sentinel`` reconstructed "this contract delists after the IS
+    cutoff" against real production metadata (4 of 667 rows, including 2 of CUP-20's 3 real
+    sealed-window delistings) even after round-2's date-only censoring. This fixture now carries
+    the FULL nine-column production schema (not a narrow hand-picked subset) so a future column
+    carrying the same fact cannot hide behind an incomplete fixture, and the reconstruction
+    assertion below checks every non-identity, non-onboard column JOINTLY, not just the two
+    columns this round happened to find.
+
     A symbol that delists inside the sealed window, and a symbol that isn't even listed until
     inside the sealed window, must both reveal nothing of that in the IS snapshot; the sealed
     snapshot must still carry the truth.
@@ -393,26 +464,23 @@ def test_is_snapshot_censors_future_contract_metadata(tmp_path):
     snapshot = _synthetic()
     cutoff = pd.Timestamp("2021-06-01T00:00:00Z")
     sealed_end = pd.Timestamp("2022-01-01T00:00:00Z")
-    # Binance's own real convention for "no delivery date scheduled" -- used here only to build a
-    # realistic fixture. write_split_snapshots derives this value from the data itself rather than
-    # trusting this literal (see snapshot.py's _perpetual_delivery_sentinel).
-    perpetual_sentinel = pd.Timestamp("2100-12-25T08:00:00Z")
     delisting_date = pd.Timestamp("2021-09-01T00:00:00Z")  # inside the sealed window
     onboard_date = pd.Timestamp("2021-08-01T00:00:00Z")  # also inside the sealed window
+    perpetual_sentinel = pd.Timestamp("2100-12-25T08:00:00Z")
 
     existing_symbols = list(snapshot.contract_metadata["symbol"])
     delisting_symbol = existing_symbols[0]
     not_yet_listed_symbol = "EUSDT"
-    metadata = pd.DataFrame(
-        {
-            "symbol": [*existing_symbols, not_yet_listed_symbol],
-            "contract_type": "PERPETUAL",
-            "onboard_date": [pd.Timestamp("2020-01-01T00:00:00Z")] * len(existing_symbols)
-            + [onboard_date],
-            "delivery_date": [perpetual_sentinel] * (len(existing_symbols) + 1),
-        }
-    )
+    metadata = _ordinary_metadata(existing_symbols, (not_yet_listed_symbol, onboard_date))
     metadata.loc[metadata["symbol"] == delisting_symbol, "delivery_date"] = delisting_date
+    # The real acquisition-pipeline values (crypto_trade/tournament/snapshot.py's
+    # _contract_metadata) for a symbol absent from live exchangeInfo at data-build time -- i.e.
+    # already delisted -- independent of the date itself. This is the exact conjunction
+    # fix-round 3 found reconstructible in production metadata.
+    metadata.loc[metadata["symbol"] == delisting_symbol, "underlying_type"] = (
+        "ARCHIVE_INFERRED_COIN"
+    )
+    metadata.loc[metadata["symbol"] == delisting_symbol, "metadata_source"] = "archive_inference"
 
     is_paths, sealed_paths = write_split_snapshots(
         snapshot.bars,
@@ -433,19 +501,109 @@ def test_is_snapshot_censors_future_contract_metadata(tmp_path):
     assert not_yet_listed_symbol not in set(is_metadata["symbol"])
     assert not_yet_listed_symbol in set(sealed_metadata["symbol"])
 
-    # The delisting symbol's real future date never appears in the IS snapshot -- censored to the
-    # perpetual sentinel, indistinguishable from a genuinely-perpetual contract -- but the sealed
-    # snapshot still carries the truth.
+    # The delisting symbol's real future status never appears in the IS snapshot -- delivery_date
+    # censored to the perpetual sentinel, underlying_type/metadata_source normalised to an
+    # ordinary still-listed contract's values -- but the sealed snapshot still carries the truth
+    # across all three fields the acquisition pipeline actually stamps for a delisted contract,
+    # not delivery_date alone.
     is_row = is_metadata.loc[is_metadata["symbol"] == delisting_symbol]
     assert len(is_row) == 1, "the delisting symbol itself must still be present pre-cutoff"
     assert pd.Timestamp(is_row["delivery_date"].iloc[0]) == perpetual_sentinel
+    assert is_row["underlying_type"].iloc[0] == "COIN"
+    assert is_row["metadata_source"].iloc[0] == "current_exchangeInfo"
     sealed_row = sealed_metadata.loc[sealed_metadata["symbol"] == delisting_symbol]
     assert len(sealed_row) == 1
     assert pd.Timestamp(sealed_row["delivery_date"].iloc[0]) == delisting_date
+    assert sealed_row["underlying_type"].iloc[0] == "ARCHIVE_INFERRED_COIN"
+    assert sealed_row["metadata_source"].iloc[0] == "archive_inference"
 
     # No row in the IS snapshot carries a real (non-sentinel) date at or after the cutoff.
     is_delivery = pd.to_datetime(is_metadata["delivery_date"], utc=True)
     assert ((is_delivery < cutoff) | (is_delivery == perpetual_sentinel)).all()
+
+    # The reconstruction assertion fix-round 3 exists to add: no COMBINATION of IS-visible
+    # columns separates the censored row from an ordinary listed one. Checked jointly (as a
+    # tuple), not column-by-column, so a defect that only shows up as a correlation between two
+    # columns (e.g. delivery_date censored correctly but metadata_source left untouched) cannot
+    # hide behind per-column checks that each happen to pass individually. ``symbol`` is identity,
+    # not a leak; ``onboard_date`` is a separate, legitimate per-symbol historical fact untouched
+    # by delisting status (the NaT asymmetry between onboard_date/delivery_date is explicitly out
+    # of scope for fix-round 3).
+    reconstruction_columns = [c for c in is_metadata.columns if c not in ("symbol", "onboard_date")]
+    ordinary_symbols = [s for s in existing_symbols if s != delisting_symbol]
+    ordinary_rows = is_metadata.loc[
+        is_metadata["symbol"].isin(ordinary_symbols), reconstruction_columns
+    ]
+    assert len(ordinary_rows) == len(ordinary_symbols), "ordinary reference population is short"
+    ordinary_signatures = {tuple(row) for row in ordinary_rows.itertuples(index=False)}
+    delisting_signature = tuple(is_row[reconstruction_columns].iloc[0])
+    assert delisting_signature in ordinary_signatures, (
+        f"the censored row's signature {delisting_signature} matches none of the ordinary "
+        f"signatures {ordinary_signatures} -- some combination of columns still reveals "
+        "delisting status"
+    )
+    # Weaker, per-column form of the same property, kept only for a more localized failure
+    # message: every reconstruction column must independently collapse to a single value across
+    # the whole IS metadata frame, not merely match between these two particular rows.
+    for column in reconstruction_columns:
+        distinct = is_metadata[column].nunique()
+        assert distinct == 1, (
+            f"{column} has {distinct} distinct IS values -- still separates listed from "
+            "delisted contracts"
+        )
+
+
+def test_is_snapshot_preserves_real_delivery_date_for_pre_cutoff_delistings(tmp_path):
+    """The 'preserve' half of censoring, uncovered until fix-round 3: a contract that delisted
+    BEFORE the IS cutoff is legitimate in-sample information -- no different from any other
+    historical bar a team could observe in real time -- and must NOT be touched.
+
+    ``_censor_contract_metadata_for_is``'s predicate is ``delivery_date >= is_end``, a strictly
+    FUTURE-date check. A regression that widened it to something like ``.notna()`` -- censor every
+    row with ANY delivery_date at all, not just a future one -- would pass every other assertion
+    in this file, since none of them plant a genuine pre-cutoff delisting: it would silently
+    destroy real in-sample information, leaving a team unable to distinguish a contract that
+    genuinely delisted last month from one still trading. Mutation-verified directly (see the
+    fix-round-3 report) by widening the predicate exactly this way and confirming this test, and
+    only this test, catches it.
+    """
+    snapshot = _synthetic()
+    cutoff = pd.Timestamp("2021-06-01T00:00:00Z")
+    sealed_end = pd.Timestamp("2022-01-01T00:00:00Z")
+    real_delisting_date = pd.Timestamp("2021-03-01T00:00:00Z")  # BEFORE the IS cutoff
+
+    existing_symbols = list(snapshot.contract_metadata["symbol"])
+    pre_cutoff_delisted_symbol = existing_symbols[0]
+    metadata = snapshot.contract_metadata.copy()
+    metadata.loc[metadata["symbol"] == pre_cutoff_delisted_symbol, "delivery_date"] = (
+        real_delisting_date
+    )
+    metadata.loc[metadata["symbol"] == pre_cutoff_delisted_symbol, "underlying_type"] = (
+        "ARCHIVE_INFERRED_COIN"
+    )
+    metadata.loc[metadata["symbol"] == pre_cutoff_delisted_symbol, "metadata_source"] = (
+        "archive_inference"
+    )
+
+    is_paths, _ = write_split_snapshots(
+        snapshot.bars,
+        snapshot.funding,
+        snapshot.mark_prices,
+        snapshot.membership,
+        metadata,
+        is_root=tmp_path / "is",
+        sealed_root=tmp_path / "sealed",
+        is_end=cutoff,
+        sealed_end=sealed_end,
+    )
+    is_metadata = load_snapshot(is_paths.root).contract_metadata
+    is_row = is_metadata.loc[is_metadata["symbol"] == pre_cutoff_delisted_symbol]
+    assert len(is_row) == 1, (
+        "a pre-cutoff delisting is ordinary in-sample history, not a future row"
+    )
+    assert pd.Timestamp(is_row["delivery_date"].iloc[0]) == real_delisting_date
+    assert is_row["underlying_type"].iloc[0] == "ARCHIVE_INFERRED_COIN"
+    assert is_row["metadata_source"].iloc[0] == "archive_inference"
 
 
 # --- Public-surface completeness -----------------------------------------------------------
