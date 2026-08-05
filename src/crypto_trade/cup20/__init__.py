@@ -1,5 +1,6 @@
 """CUP-20 tournament policy, evaluation and scoring."""
 
+from crypto_trade.cup20.activation import build_activation_record, verify_activation
 from crypto_trade.cup20.archive import (
     archive_directory,
     bundle_digest,
@@ -85,6 +86,7 @@ __all__ = [
     "apply_risk_scalars",
     "archive_directory",
     "atomic_release",
+    "build_activation_record",
     "build_membership",
     "build_packet",
     "bundle_digest",
@@ -115,6 +117,7 @@ __all__ = [
     "sharpe",
     "trial_adjusted_confidence",
     "validate_config",
+    "verify_activation",
     "verify_chain",
     "verify_neighbourhood_coordinates",
     "weekly_reconstitution_times",

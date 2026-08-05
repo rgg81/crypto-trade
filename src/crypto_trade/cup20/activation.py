@@ -1,0 +1,183 @@
+"""Activation freeze: one record binding every authority before the first result.
+
+The record is the tournament's root of trust. Everything a result could later be argued about --
+the policy, the charter the teams read, the two data windows, the interpreter's dependency set and
+the test run that declared the machinery sound -- is reduced to six digests here, before any team
+has seen a number. After activation, any of those changing is a fact about the tournament, not a
+detail: ``verify_activation`` recomputes all six from the same paths and refuses to agree.
+
+The record itself is deliberately NOT self-authenticating -- a digest of the record inside the
+record proves nothing. Its integrity comes from being committed to version control at freeze time;
+the digests inside it are what make everything *else* immutable.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+from typing import Any
+
+from crypto_trade.cup20.archive import bundle_digest
+from crypto_trade.cup20.config import load_config
+from crypto_trade.cup20.snapshot import load_snapshot
+
+# Every bound authority, in record order, paired with the label used to attribute drift. Adding a
+# row here is the only way to bind a new authority, and tests/cup20/test_activation.py asserts its
+# own mutation table covers this tuple exactly -- so a new authority cannot ship unverified.
+#
+# The list is the charter's own sentence, item for item: "an activation record hash-binds this
+# charter, the config, the implementation, the dependency lock, the data authority, the pure-crypto
+# audit and the focused test output". "The data authority" is the two snapshot manifests -- the
+# bytes the tournament actually evaluates against, on both sides of the cutoff.
+_AUTHORITIES: tuple[tuple[str, str], ...] = (
+    ("config_sha256", "config"),
+    ("charter_sha256", "charter"),
+    ("implementation_sha256", "implementation"),
+    ("is_manifest_sha256", "IS snapshot"),
+    ("sealed_manifest_sha256", "sealed snapshot"),
+    ("pure_crypto_audit_sha256", "pure-crypto audit"),
+    ("dependency_lock_sha256", "dependency lock"),
+    ("test_output_sha256", "test output"),
+)
+
+# The paths ``verify_activation`` re-reads. Stored as given -- relative paths stay relative, so a
+# record frozen from the repository root must also be verified from the repository root.
+_PATH_FIELDS: tuple[str, ...] = (
+    "config_path",
+    "charter_path",
+    "implementation_root",
+    "is_root",
+    "sealed_root",
+    "pure_crypto_audit_path",
+    "dependency_lock_path",
+    "test_output_path",
+)
+
+_REQUIRED_FIELDS: tuple[str, ...] = tuple(key for key, _ in _AUTHORITIES) + _PATH_FIELDS
+_HEX_DIGITS = frozenset("0123456789abcdef")
+
+# ``bundle_digest`` over a tree with no files. Not an error inside ``archive.py`` -- an empty team
+# submission is a legitimate thing for it to describe -- but as an ACTIVATION authority it is a
+# fail-open: a mistyped or unmounted implementation root would hash to this constant and freeze
+# cleanly while binding nothing at all.
+_EMPTY_BUNDLE_DIGEST = hashlib.sha256().hexdigest()
+
+
+def _digest(path: Path) -> str:
+    """SHA-256 of a file's exact bytes. Propagates ``FileNotFoundError``, which names the path."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _implementation_digest(root: Path) -> str:
+    """Bundle digest of the evaluation code, with the empty-tree fail-open closed."""
+    if not root.is_dir():
+        raise FileNotFoundError(f"implementation root is not a directory: {root}")
+    digest = bundle_digest(root)
+    if digest == _EMPTY_BUNDLE_DIGEST:
+        raise ValueError(f"implementation root contains no files: {root}")
+    return digest
+
+
+def _snapshot_digest(root: Path, label: str) -> str:
+    """The snapshot's manifest digest, RECOMPUTED from the files on disk.
+
+    Reading ``manifest.json``'s ``manifest_sha256`` field and hashing that would bind the
+    snapshot's own *claim* about its contents rather than the contents: swapping ``bars.parquet``
+    while leaving ``manifest.json`` alone would leave the claim, and any digest of it, byte-for-byte
+    unchanged. ``load_snapshot`` recomputes every file's digest and rejects the snapshot if the
+    manifest's claim disagrees, so the value returned here is only ever a digest of data that was
+    verified to be present and intact at this moment.
+
+    That rejection is re-raised carrying ``label`` because it IS the drift signal for a swapped
+    file, and it arrives before the comparison loop below ever runs -- without the label an
+    operator would be told a snapshot is inconsistent but not which of the two.
+    """
+    try:
+        return load_snapshot(root).manifest_sha256
+    except ValueError as error:
+        raise ValueError(f"{label} at {root} does not match its own manifest: {error}") from error
+
+
+def build_activation_record(
+    config_path: str | Path,
+    charter_path: str | Path,
+    is_root: str | Path,
+    sealed_root: str | Path,
+    test_output: str | Path,
+    dependency_lock: str | Path = "uv.lock",
+    implementation_root: str | Path = "src/crypto_trade/cup20",
+    pure_crypto_audit: str | Path = "tournament/cup20/pure-crypto-audit.json",
+) -> dict[str, str]:
+    """Hash-bind charter, config, implementation, data authorities, audit, lock and test output.
+
+    ``config_path`` is loaded through ``load_config``, not merely hashed: an authority that fails
+    its own validation is drift already, and freezing its digest would notarise the drift instead
+    of catching it.
+    """
+    is_manifest = _snapshot_digest(Path(is_root), "IS snapshot")
+    sealed_manifest = _snapshot_digest(Path(sealed_root), "sealed snapshot")
+    if is_manifest == sealed_manifest:
+        # Two roots resolving to one snapshot means either the teams were handed the sealed window
+        # or the holdout was handed the in-sample one. Refuse to notarise it.
+        raise ValueError("IS and sealed snapshots must have distinct manifest digests")
+    return {
+        "config_sha256": load_config(config_path).sha256,
+        "charter_sha256": _digest(Path(charter_path)),
+        "implementation_sha256": _implementation_digest(Path(implementation_root)),
+        "is_manifest_sha256": is_manifest,
+        "sealed_manifest_sha256": sealed_manifest,
+        "pure_crypto_audit_sha256": _digest(Path(pure_crypto_audit)),
+        "dependency_lock_sha256": _digest(Path(dependency_lock)),
+        "test_output_sha256": _digest(Path(test_output)),
+        "config_path": str(config_path),
+        "charter_path": str(charter_path),
+        "implementation_root": str(implementation_root),
+        "is_root": str(is_root),
+        "sealed_root": str(sealed_root),
+        "pure_crypto_audit_path": str(pure_crypto_audit),
+        "dependency_lock_path": str(dependency_lock),
+        "test_output_path": str(test_output),
+    }
+
+
+def _load_record(path: Path) -> dict[str, str]:
+    """Parse a frozen record and reject any shape that would make the comparison below unsound."""
+    payload: Any = json.loads(path.read_text())
+    if not isinstance(payload, dict):
+        raise ValueError(f"activation record {path} must be a JSON object")
+    for field in _REQUIRED_FIELDS:
+        if field not in payload:
+            raise ValueError(f"activation record {path} is missing {field}")
+        value = payload[field]
+        if not isinstance(value, str):
+            raise ValueError(f"activation record {path} field {field} must be a string")
+    for key, _ in _AUTHORITIES:
+        value = payload[key]
+        if len(value) != 64 or not set(value) <= _HEX_DIGITS:
+            raise ValueError(f"activation record {path} field {key} is not a SHA-256 digest")
+    return payload
+
+
+def verify_activation(path: str | Path) -> dict[str, str]:
+    """Recompute every bound authority and fail on any drift.
+
+    Returns the frozen record unchanged when every authority still matches, so a caller can use the
+    return value as the authoritative record without re-reading the file.
+    """
+    record_path = Path(path)
+    record = _load_record(record_path)
+    current = build_activation_record(
+        record["config_path"],
+        record["charter_path"],
+        record["is_root"],
+        record["sealed_root"],
+        record["test_output_path"],
+        record["dependency_lock_path"],
+        record["implementation_root"],
+        record["pure_crypto_audit_path"],
+    )
+    for key, label in _AUTHORITIES:
+        if current[key] != record[key]:
+            raise ValueError(f"activation authority changed: {label}")
+    return record
