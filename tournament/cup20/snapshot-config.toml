@@ -52,9 +52,9 @@ parser_version = "cup20-snapshot-v1"
 # The ACQUISITION's own evaluation start, not CUP-20's IS_START -- CUP-20's is computed by
 # `resolve_is_start` as the first weekly boundary whose top-20 is full (measured at 2020-08-17) and
 # is never written down here. This one only has to satisfy `_build_membership`, which requires a
-# non-empty size-60 universe at EVERY Monday from this date onward, and a symbol qualifies only
-# after 180 complete prior trading days (`trailing_days`/`minimum_history_days` below). Binance
-# and on the immediately preceding date. The public archives begin 2020-01-01, so nothing qualifies
+# non-empty universe at EVERY Monday from this date onward, and a symbol qualifies only after
+# `minimum_history_days` complete prior 3-bar days in the trailing window and a trade on the
+# immediately preceding date. The public archives begin 2020-01-01, so nothing qualifies
 # until 180 complete days later. The plan's 2020-02-03 (inherited from the top-40 config, which used
 # a 30-day window) fails closed with "empty point-in-time universe at reconstitutions", and so does
 # any date guessed from the venue's launch rather than from the archives.
