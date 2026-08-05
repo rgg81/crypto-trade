@@ -1,29 +1,8 @@
 {
   "distinct_is_members": 63,
-  "distinct_members": 79,
   "is_end": "2024-08-01 00:00:00+00:00",
   "is_manifest_sha256": "4c7a839e09c19ec6e761412c03da71889b9fcf856972a1da6aa00ae572a0994f",
+  "is_reconstitutions": 207,
   "is_start": "2020-08-17 00:00:00+00:00",
-  "is_warmup_start": "2020-01-01 00:00:00+00:00",
-  "reconstitutions": 311,
-  "sealed_end": "2026-08-01 00:00:00+00:00",
-  "sealed_manifest_sha256": "22302522458907ad4b800a119ee49b3d12b8ba80ffd820d343079ff3e4725c9d",
-  "sealed_only_members": [
-    "1000BONKUSDT",
-    "1000SATSUSDT",
-    "BOMEUSDT",
-    "ENAUSDT",
-    "FARTCOINUSDT",
-    "HBARUSDT",
-    "HYPEUSDT",
-    "NEIROUSDT",
-    "ONDOUSDT",
-    "PEOPLEUSDT",
-    "PNUTUSDT",
-    "PUMPUSDT",
-    "RIVERUSDT",
-    "TAOUSDT",
-    "TIAUSDT",
-    "TRUMPUSDT"
-  ]
+  "is_warmup_start": "2020-01-01 00:00:00+00:00"
 }

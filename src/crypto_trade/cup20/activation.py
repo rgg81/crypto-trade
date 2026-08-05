@@ -108,7 +108,13 @@ def build_activation_record(
     test_output: str | Path,
     dependency_lock: str | Path = "uv.lock",
     implementation_root: str | Path = "src/crypto_trade/cup20",
-    pure_crypto_audit: str | Path = "tournament/cup20/pure-crypto-audit.json",
+    # Organiser-only. The audit necessarily names every universe member, including the sixteen that
+    # enter only during the holdout, and reports which members had already delisted at build time
+    # -- the exact fact snapshot.py censors out of the IS contract metadata. It stays a bound
+    # authority, from a path teams are prohibited from reading, rather than being restricted to IS
+    # members: an attestation over 63 of 79 members would no longer be the attestation the charter
+    # claims, and would not close the leak anyway, since the post-cutoff delisters are IS members.
+    pure_crypto_audit: str | Path = "tournament/cup20/private/pure-crypto-audit.json",
 ) -> dict[str, str]:
     """Hash-bind charter, config, implementation, data authorities, audit, lock and test output.
 

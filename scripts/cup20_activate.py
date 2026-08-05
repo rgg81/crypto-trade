@@ -17,7 +17,7 @@ from crypto_trade.cup20.config import load_config
 CONFIG_PATH = Path("tournament/cup20/config.toml")
 IMPLEMENTATION_ROOT = Path("src/crypto_trade/cup20")
 DEPENDENCY_LOCK = Path("uv.lock")
-PURE_CRYPTO_AUDIT = Path("tournament/cup20/pure-crypto-audit.json")
+PURE_CRYPTO_AUDIT = Path("tournament/cup20/private/pure-crypto-audit.json")
 
 
 def main() -> None:

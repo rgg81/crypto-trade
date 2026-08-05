@@ -21,8 +21,38 @@ from crypto_trade.tournament.snapshot import build_snapshot
 ACQUISITION_CONFIG = Path("tournament/cup20/snapshot-config.toml")
 ACQUISITION_DIR = Path("data/cup20/acquisition")
 TOURNAMENT_CONFIG = Path("tournament/cup20/config.toml")
+
+# Two summaries, not one. The organiser's own summary describes BOTH sides of the cutoff -- how many
+# distinct names the universe ever held, which of them enter it only during the holdout, how many
+# reconstitutions there are in total -- and every one of those is a fact about the sealed window's
+# composition. `sealed_only_members` named all sixteen outright, and `distinct_members` minus
+# `distinct_is_members` re-derives the count even with the names removed. None of it is a team
+# input; teams never need to know anything about the holdout's membership.
+#
+# So the team-visible file carries IS-window facts only (PUBLIC_SUMMARY_FIELDS below), and
+# everything else -- along with the full-universe pure-crypto audit, which repeats the same roster
+# and additionally identifies the post-cutoff delistings by name, undoing the contract-metadata
+# censoring in snapshot.py -- moves under `private/`, which is gitignored, named in
+# FORBIDDEN_PATTERNS and prohibited by the playbook. The audit stays hash-bound by the activation
+# record from its new path: it is the attestation that cleared the WHOLE universe, and restricting
+# it to IS members would both weaken the attestation and fail to close the leak anyway, since the
+# post-cutoff delisters are themselves IS members.
+PRIVATE_DIR = Path("tournament/cup20/private")
 SUMMARY_PATH = Path("tournament/cup20/universe-summary.json")
-AUDIT_PATH = Path("tournament/cup20/pure-crypto-audit.json")
+PRIVATE_SUMMARY_PATH = PRIVATE_DIR / "universe-summary.json"
+AUDIT_PATH = PRIVATE_DIR / "pure-crypto-audit.json"
+
+# Selected explicitly by name rather than by removing sealed-side keys, so a field added to the
+# organiser's summary later is private by default and becomes visible only by a deliberate edit
+# here. Every one of these is already derivable by a team from the IS snapshot it holds.
+PUBLIC_SUMMARY_FIELDS: tuple[str, ...] = (
+    "is_start",
+    "is_warmup_start",
+    "is_end",
+    "is_reconstitutions",
+    "distinct_is_members",
+    "is_manifest_sha256",
+)
 
 
 def acquire() -> None:
@@ -214,9 +244,12 @@ def main() -> None:
     sealed_only = sorted(set(members) - is_members)
 
     # Persisted, not merely printed: the activation record binds this file, so the audit that
-    # cleared the universe is frozen alongside the data it cleared.
+    # cleared the universe is frozen alongside the data it cleared. It lives under `private/`
+    # because it necessarily names every member -- including the sixteen that enter the universe
+    # only during the holdout -- and reports which of them had already delisted at build time,
+    # which is precisely the fact snapshot.py censors out of the IS contract metadata.
     audit = pure_crypto_audit(members, metadata, exchange_info)
-    AUDIT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PRIVATE_DIR.mkdir(parents=True, exist_ok=True)
     AUDIT_PATH.write_text(json.dumps(audit, indent=2, sort_keys=True) + "\n")
     print(f"pure-crypto audit: {audit['status']} over {audit['members_audited']} members")
 
@@ -260,6 +293,7 @@ def main() -> None:
         sealed_end=SEALED_END,
     )
     is_bars = pd.read_parquet(is_paths.bars, columns=["open_time"])
+    boundaries = pd.to_datetime(membership["reconstitution_time"], utc=True)
     summary = {
         "is_start": str(is_start),
         "is_warmup_start": str(pd.to_datetime(is_bars["open_time"], utc=True).min()),
@@ -268,12 +302,26 @@ def main() -> None:
         "distinct_members": len(members),
         "distinct_is_members": len(is_members),
         "sealed_only_members": sealed_only,
-        "reconstitutions": int(membership["reconstitution_time"].nunique()),
+        "reconstitutions": int(boundaries.nunique()),
+        "is_reconstitutions": int(boundaries[boundaries < IS_END].nunique()),
         "is_manifest_sha256": json.loads(is_paths.manifest.read_text())["manifest_sha256"],
         "sealed_manifest_sha256": json.loads(sealed_paths.manifest.read_text())["manifest_sha256"],
     }
-    SUMMARY_PATH.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
-    print(json.dumps(summary, indent=2, sort_keys=True))
+    PRIVATE_SUMMARY_PATH.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
+
+    public = {field: summary[field] for field in PUBLIC_SUMMARY_FIELDS}
+    public_text = json.dumps(public, indent=2, sort_keys=True) + "\n"
+    # Post-condition, not a comment: no sealed-only member may be named in the team-visible file,
+    # and the sealed side's own totals may not appear either. A future field whose VALUE happens to
+    # carry a holdout name -- not only a field obviously called `sealed_...` -- fails the build
+    # here rather than shipping.
+    for name in sealed_only:
+        if name in public_text:
+            raise SystemExit(f"team-visible universe summary names sealed-only member {name}")
+    if set(public) - set(PUBLIC_SUMMARY_FIELDS):
+        raise SystemExit("team-visible universe summary carries an undeclared field")
+    SUMMARY_PATH.write_text(public_text)
+    print(public_text)
 
 
 if __name__ == "__main__":
