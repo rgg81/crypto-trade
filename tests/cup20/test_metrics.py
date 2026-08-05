@@ -291,3 +291,52 @@ def test_window_metrics_stays_finite_through_ruin_end_to_end():
     assert metrics.max_drawdown == pytest.approx(1.0)
     assert math.isfinite(metrics.max_drawdown)
     assert math.isfinite(metrics.calmar)
+
+
+# --- Task 10 fix round 2: max_drawdown must anchor at inception, not the first post-return
+# equity value ---------------------------------------------------------------------------------
+#
+# Without an inception anchor, a drawdown whose peak IS the starting capital (the very first
+# return is already negative) is measured against a peak that already reflects that loss,
+# understating it. A drawdown whose peak is reached mid-series (the first return is positive, or
+# a later point exceeds it) is unaffected either way. All four cases are the coordinator's own
+# worked examples, reproduced directly for traceability against their table.
+
+INCEPTION_ANCHOR_CASES = [
+    # returns, expected max_drawdown
+    ([-0.20, 0.00, 0.00], 0.20),  # single bar: peak is inception itself; pre-fix gave 0.0
+    ([-0.30, 0.50, -0.10], 0.30),  # peak is inception; pre-fix gave 0.10 -- a 3x understatement
+    ([0.50, -0.40, 0.10], 0.40),  # peak set immediately by the first (positive) return: unaffected
+    ([0.20, 0.10, -0.30], 0.30),  # peak set mid-series, after two positive returns: unaffected
+]
+
+
+@pytest.mark.parametrize(("returns", "expected"), INCEPTION_ANCHOR_CASES)
+def test_max_drawdown_anchors_at_inception_capital(returns, expected):
+    drawdown = max_drawdown(pd.Series(returns))
+    assert drawdown == pytest.approx(expected)
+    assert math.isfinite(drawdown)
+
+
+def test_max_drawdown_ruin_cases_still_return_exactly_one_after_the_inception_anchor():
+    # Confirms composition with fix round 1 rather than assuming it. The inception anchor keeps
+    # the running peak at >= 1.0 for the WHOLE series, so the exact-ruin case (equity hits 0.0)
+    # no longer even needs the explicit ruin clamp to avoid NaN -- 1 - 0/1 = 1.0 falls out of the
+    # plain ratio now that the peak can never again be non-positive. The worse-than-ruin case
+    # (equity goes negative) still needs the explicit clamp: without it, [-1.5, 0.0, 0.0] would
+    # compute peaks = [1.0, 1.0, 1.0, 1.0] (the inception peak of 1.0 stays the running max,
+    # since -0.5 never exceeds it) and 1 - (-0.5)/1.0 = 1.5 -- an even WORSE fail-open than round
+    # 1's pre-fix 0.0, not a safer one. The explicit clamp is doing real, non-redundant work here.
+    assert max_drawdown(pd.Series([-1.0, 0.0, 0.0])) == pytest.approx(1.0)  # exact ruin
+    assert max_drawdown(pd.Series([-1.5, 0.0, 0.0])) == pytest.approx(1.0)  # worse than ruin
+
+
+def test_window_metrics_reflects_the_inception_anchored_drawdown_end_to_end():
+    # Not explicitly requested, but directly demonstrates the coordinator's own stated stakes: a
+    # 20-point hard floor and ranking component, plus calmar's denominator. One nonzero bar per
+    # UTC day, so the daily series equals the coordinator's [-0.30, +0.50, -0.10] example exactly,
+    # independent of daily_returns()'s own grouping logic.
+    bars = [-0.30, 0.0, 0.0, 0.50, 0.0, 0.0, -0.10] + [0.0] * 83
+    metrics = window_metrics(_result(bars))
+    assert metrics.max_drawdown == pytest.approx(0.30)
+    assert math.isfinite(metrics.calmar)

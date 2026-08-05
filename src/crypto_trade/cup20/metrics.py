@@ -111,17 +111,27 @@ def sharpe(series: pd.Series) -> float:
 def max_drawdown(series: pd.Series) -> float:
     """Maximum peak-to-trough decline of the compounded curve, as a non-negative magnitude.
 
+    The curve is anchored at the initial capital (1.0) BEFORE any return has occurred, not just
+    at the first post-return equity value. Without that anchor, a drawdown whose peak IS the
+    starting capital (the very first return is already negative) is measured against a peak that
+    already reflects that loss, understating it -- e.g. returns [-0.30, +0.50, -0.10] have a true
+    peak-to-trough of 0.30 (from inception), not 0.10 (from the post-first-return high of 0.70).
+    A drawdown whose peak is reached mid-series is unaffected by this anchor either way.
+
     Compounded equity reaching zero or below is total ruin, reported as the 1.0 (100%) ceiling
     rather than through the peak-to-trough ratio: at equity == 0 the ratio is a 0/0 division
     (NaN); at equity < 0 it is arithmetically defined but dishonest, since a negative running
     peak inverts the ratio's sign and can report a SMALLER number than an ordinary drawdown (a
     book that lost more than everything must never score better than one that merely lost a lot).
-    Ruin is checked before any division runs, so this never raises a RuntimeWarning either.
+    Ruin is checked before any division runs, so this never raises a RuntimeWarning either. (The
+    inception anchor alone would already keep the running peak at or above 1.0 for the exact-
+    ruin case, avoiding the 0/0 division; it does NOT avoid the negative-equity case, where the
+    ratio is well-defined but wrong, so the explicit ruin check stays regardless.)
     """
     values = series.dropna().to_numpy(dtype=float)
     if values.size == 0:
         return 0.0
-    equity = np.cumprod(1.0 + values)
+    equity = np.concatenate(([1.0], np.cumprod(1.0 + values)))
     if np.any(equity <= 0.0):
         return 1.0
     peaks = np.maximum.accumulate(equity)
