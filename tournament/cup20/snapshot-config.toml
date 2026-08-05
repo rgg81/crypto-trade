@@ -1,0 +1,48 @@
+# tournament/cup20/snapshot-config.toml
+#
+# Acquisition config for the CUP-20 raw data build.
+#
+# The acquisition universe is deliberately WIDER than CUP-20's tournament universe: ranking by the
+# same trailing 180-day volume at size 60 makes the CUP-20 top-20 a provable subset (anything
+# ranked <= 25 by that measure is certainly ranked <= 60), which scripts/cup20_build_snapshot.py
+# then asserts by containment.
+#
+# This file is NOT the tournament machine contract -- tournament/cup20/config.toml is. This one
+# only governs how raw Binance USD-M data is downloaded and verified.
+schema_version = 1
+name = "cup20-acquisition"
+
+[data]
+source = "binance-public-usdm"
+archive_base_url = "https://data.binance.vision"
+archive_s3_url = "https://s3-ap-northeast-1.amazonaws.com/data.binance.vision"
+exchange_info_url = "https://fapi.binance.com/fapi/v1/exchangeInfo"
+funding_rate_url = "https://fapi.binance.com/fapi/v1/fundingRate"
+mark_price_klines_url = "https://fapi.binance.com/fapi/v1/markPriceKlines"
+warmup_start = "2019-09-01"
+hard_end_exclusive = "2026-08-01"
+transaction_interval = "8h"
+mark_price_interval = "1h"
+snapshot_dir = "data/cup20/acquisition"
+manifest_path = "tournament/cup20/data_manifest.json"
+common_report_dir = "reports-cup20/common"
+checksum_policy = "require-binance-sha256-sidecar"
+parser_version = "cup20-snapshot-v1"
+
+[splits]
+in_sample_start = "2020-02-03"
+in_sample_end_inclusive = "2024-07-31"
+public_oos_start = "2024-08-01"
+public_oos_end_inclusive = "2026-07-31"
+public_oos_visible_to_teams = false
+quarantined_gap_start = "2026-08-01"
+forward_paper_start = "winner-freeze-next-8h-boundary"
+
+[universe]
+venue = "binance-usdm"
+instrument = "linear-usdt-perpetual"
+size = 60
+reconstitution = "weekly-monday-00:00-utc"
+liquidity_measure = "median-daily-quote-volume"
+trailing_days = 180
+minimum_history_days = 180
