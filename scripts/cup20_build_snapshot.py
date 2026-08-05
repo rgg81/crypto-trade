@@ -148,7 +148,6 @@ def main() -> None:
     members = sorted(set(membership["symbol"].astype(str)))
     is_members = _is_visible_symbols(membership)
     sealed_only = sorted(set(members) - is_members)
-    warmup_start = is_start - pd.Timedelta(days=int(config["lookback_days"]))
 
     def restrict(frame: pd.DataFrame, column: str) -> pd.DataFrame:
         """Keep IS-side rows only for IS-visible symbols; sealed-side rows for every member.
@@ -156,10 +155,17 @@ def main() -> None:
         A single frame is enough because ``write_split_snapshots`` splits on the same cutoff: rows
         kept below ``IS_END`` land in the IS snapshot and rows kept at or above it land in the
         sealed one, so per-side symbol scoping composes with the per-side time slicing.
+
+        No lower time bound. The charter's evidence-layer table defines the warm-up window as
+        "symbol listing -> IS_START", so an IS-visible symbol ships every bar the acquisition holds
+        for it. Truncating warm-up to ``is_start - lookback_days`` would supply exactly enough
+        history to reconstruct membership and not one bar more, silently capping the formation
+        horizons lanes 01, 03 and 06 are chartered to explore -- and earlier history can never be a
+        leak, since a row before the cutoff says nothing about a row after it.
         """
         times = pd.to_datetime(frame[column], utc=True)
         symbols = frame["symbol"].astype(str)
-        in_sample = (times >= warmup_start) & (times < IS_END) & symbols.isin(is_members)
+        in_sample = (times < IS_END) & symbols.isin(is_members)
         sealed = (times >= IS_END) & symbols.isin(members)
         return frame.loc[in_sample | sealed]
 
@@ -168,14 +174,24 @@ def main() -> None:
         restrict(funding, "funding_time"),
         restrict(marks, "mark_time"),
         membership,
+        # IS-visible symbols only, on BOTH sides. `write_split_snapshots` ships the timeless
+        # metadata frame whole into each split, so scoping it is the only way to keep a
+        # sealed-only member's row out of the IS snapshot -- and a metadata row for a symbol with
+        # no bars is both the same future-composition leak and an inconsistency naive team code
+        # would trip over. The organiser's full-truth metadata, including sealed-only members,
+        # remains in data/cup20/acquisition/contract_metadata.parquet, pinned by
+        # tournament/cup20/data_manifest.json; nothing in the evaluation path reads the split
+        # snapshots' copy.
         metadata.loc[metadata["symbol"].astype(str).isin(is_members)],
         is_root="data/cup20/is",
         sealed_root="data/cup20/sealed",
         is_end=IS_END,
         sealed_end=SEALED_END,
     )
+    is_bars = pd.read_parquet(is_paths.bars, columns=["open_time"])
     summary = {
         "is_start": str(is_start),
+        "is_warmup_start": str(pd.to_datetime(is_bars["open_time"], utc=True).min()),
         "is_end": str(IS_END),
         "sealed_end": str(SEALED_END),
         "distinct_members": len(members),
