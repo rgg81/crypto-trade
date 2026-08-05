@@ -21,6 +21,38 @@ Fold = tuple[str, pd.Timestamp, pd.Timestamp]
 UNDEFINED_CALMAR = 1_000.0  # drawdown is zero and return positive: unbounded, reported as capped
 UNDEFINED_COST_SHARE = 1.0  # no positive gross PnL at all: reported as costs consuming everything
 
+# The charter defines a trade as "one non-zero executed symbol/boundary fill after evaluator
+# netting", and `trade_count` gates a hard floor of 500. So this is an ALLOWLIST of the event types
+# that ARE a fill, enumerated by reading every event-emitting site in
+# `crypto_trade.tournament.engine_v2`, not a denylist of the ones that are not. The nine event types
+# the evaluator emits, and why each is in or out:
+#
+#   trade                    IN   the ordinary rebalance fill
+#   risk_reduction           IN   a real execution: the central exposure-cap pass trims a position
+#                                 at the bar open, and pays fee and slippage for it
+#   forced_exit              IN   a real execution: delisting or terminal liquidation at the last
+#                                 executable price, likewise paying fee and slippage
+#   risk_policy_action       IN   a real execution: the declared risk policy's own stop-out, timeout
+#                                 or gross-scale fill, with quantity, price, notional, fee and
+#                                 slippage all populated from policy_filled_notional
+#   mark_to_market           OUT  bookkeeping. Emitted once per HELD symbol per bar with a non-zero
+#                                 notional, so it counts position-bars, not executions
+#   funding                  OUT  a funding settlement, not an order
+#   risk_policy_block        OUT  an order the policy REFUSED; nothing was executed
+#   conservative_settlement  OUT  a 100% haircut written off against a delisting residual that could
+#                                 not be traded out of; zero fee, zero slippage, no counterparty
+#   unresolved_residual      OUT  a terminal position that could not be exited at all
+#
+# A denylist is what produced the defect being fixed here: `event_type != "funding"` counted every
+# mark_to_market row, so on the organiser's own battery fixture the count read 7,904 against 3,472
+# real fills, and over the real in-sample window mark-to-market alone yields roughly 87,000 against
+# a floor of 500 -- any continuously-invested book cleared the floor about 170x over no matter how
+# rarely it actually traded. An allowlist also fails in the safe direction as the evaluator grows: a
+# new bookkeeping event type is excluded until someone deliberately adds it here.
+EXECUTED_EVENT_TYPES: frozenset[str] = frozenset(
+    {"trade", "risk_reduction", "forced_exit", "risk_policy_action"}
+)
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class WindowMetrics:
@@ -169,12 +201,17 @@ def window_metrics(result: EvaluationResult) -> WindowMetrics:
     top5 = float(absolute_daily.nlargest(5).sum())
     absolute_total = float(absolute_daily.sum())
 
-    if result.events.empty or "notional" not in result.events.columns:
+    # A missing `event_type` column counts ZERO, not everything. Without it there is no way to tell
+    # a fill from a mark-to-market row, and this number gates a hard floor -- the unknown case must
+    # fail the floor rather than clear it. The evaluator always emits the column alongside
+    # `notional`; the two are written by the same dict literals.
+    columns = result.events.columns
+    if result.events.empty or "notional" not in columns or "event_type" not in columns:
         trade_count = 0
     else:
         notional = result.events["notional"].fillna(0.0).astype(float)
-        types = result.events.get("event_type", pd.Series("trade", index=result.events.index))
-        trade_count = int(((notional.abs() > 0.0) & (types != "funding")).sum())
+        executed = result.events["event_type"].isin(EXECUTED_EVENT_TYPES)
+        trade_count = int(((notional.abs() > 0.0) & executed).sum())
 
     return WindowMetrics(
         net_sharpe=sharpe(daily),

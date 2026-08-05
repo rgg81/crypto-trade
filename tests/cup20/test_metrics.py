@@ -92,6 +92,73 @@ def test_trade_count_ignores_funding_and_zero_notional_rows():
     assert metrics.trade_count == 3
 
 
+# --- the >=500 executed-trades floor counts fills, never bookkeeping -------------------------
+#
+# `trade_count` used to count every non-zero-notional row whose type was not "funding", which swept
+# in mark_to_market -- emitted once per HELD symbol per bar, so it measures position-bars. Over the
+# real in-sample window that alone is ~87,000 rows against a floor of 500, so any continuously
+# invested book cleared the floor ~170x over no matter how rarely it traded, and the floor could not
+# do the one job it has. These fixtures make the two populations differ, so a regression back to a
+# denylist changes a specific number rather than passing silently.
+
+# Every event type crypto_trade.tournament.engine_v2 emits, with the four that are genuine
+# executions first. Kept as one list so a new evaluator event type shows up here as an omission.
+_EVERY_EVENT_TYPE = [
+    ("trade", True),
+    ("risk_reduction", True),
+    ("forced_exit", True),
+    ("risk_policy_action", True),
+    ("mark_to_market", False),
+    ("funding", False),
+    ("risk_policy_block", False),
+    ("conservative_settlement", False),
+    ("unresolved_residual", False),
+]
+
+
+def test_trade_count_equals_the_number_of_real_fills_not_the_number_of_event_rows():
+    # 4 fills among 9 non-zero-notional rows: a direct-value assertion on a fixture where "rows
+    # with notional" and "fills" are deliberately different numbers.
+    events = {
+        "event_type": [name for name, _ in _EVERY_EVENT_TYPE],
+        "notional": [100.0] * len(_EVERY_EVENT_TYPE),
+    }
+    metrics = window_metrics(_result([0.0] * 90, events=events))
+    assert len(events["event_type"]) == 9
+    assert metrics.trade_count == 4
+
+
+@pytest.mark.parametrize(("event_type", "is_a_fill"), _EVERY_EVENT_TYPE)
+def test_each_evaluator_event_type_is_counted_only_when_it_is_a_fill(event_type, is_a_fill):
+    events = {"event_type": [event_type] * 7, "notional": [100.0] * 7}
+    metrics = window_metrics(_result([0.0] * 90, events=events))
+    assert metrics.trade_count == (7 if is_a_fill else 0)
+
+
+def test_mark_to_market_rows_contribute_nothing_to_the_trade_count():
+    # The exact shape the evaluator produces for a book holding 20 symbols across many bars while
+    # trading twice: two fills, hundreds of position-bars. The old rule returned 402 here.
+    events = {
+        "event_type": ["trade", "trade"] + ["mark_to_market"] * 400,
+        "notional": [100.0, -100.0] + [5_000.0] * 400,
+    }
+    metrics = window_metrics(_result([0.0] * 90, events=events))
+    assert metrics.trade_count == 2
+
+    without_bookkeeping = window_metrics(
+        _result([0.0] * 90, events={"event_type": ["trade", "trade"], "notional": [100.0, -100.0]})
+    )
+    assert metrics.trade_count == without_bookkeeping.trade_count
+
+
+def test_trade_count_is_zero_when_the_event_type_column_is_absent():
+    # Fails the floor rather than clearing it: without the column there is no way to separate a
+    # fill from a mark-to-market row, and this number gates a hard >=500 floor.
+    events = {"notional": [100.0] * 900}
+    metrics = window_metrics(_result([0.0] * 90, events=events))
+    assert metrics.trade_count == 0
+
+
 def test_top5_day_share_is_bounded_and_correct():
     values = [0.0] * 300
     for position in range(5):

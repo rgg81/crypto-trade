@@ -13,6 +13,8 @@ import pandas as pd
 import pytest
 
 import crypto_trade.cup20 as cup20
+import crypto_trade.cup20.metrics as metrics_module
+from crypto_trade.cup20.metrics import window_metrics
 from crypto_trade.cup20.runner import decision_grid, run_candidate
 from crypto_trade.cup20.snapshot import Snapshot, load_snapshot, write_split_snapshots
 from crypto_trade.tournament.engine_v2 import EvaluatorConfig
@@ -267,6 +269,39 @@ def test_evaluation_is_bit_reproducible():
         first.results[1].returns, second.results[1].returns, check_exact=True
     )
     pd.testing.assert_series_equal(first.risk_scalars, second.risk_scalars, check_exact=True)
+
+
+def test_trade_count_counts_fills_not_mark_to_market_rows_on_a_real_evaluator_run():
+    """The >=500 executed-trades floor, measured on the evaluator's own output.
+
+    tests/cup20/test_metrics.py pins the rule against hand-built event frames; this pins that those
+    frames are not hypothetical. The evaluator really does emit one `mark_to_market` row per held
+    symbol per bar, with a NON-ZERO notional, so the previous rule (`event_type != "funding"`)
+    counted position-bars as trades. Over the real in-sample window that is roughly 87,000 rows
+    against a floor of 500 -- any continuously-invested book cleared it about 170x over no matter
+    how rarely it traded.
+    """
+    snapshot = _synthetic()
+    grid = decision_grid(snapshot.bars["open_time"].min(), snapshot.bars["open_time"].max())
+    events = _run(snapshot, grid).results[1].events
+    counts = events["event_type"].value_counts()
+
+    # Not vacuous in either direction: the run must contain BOTH real fills and bookkeeping rows,
+    # and the bookkeeping rows must carry the non-zero notional that made them countable at all.
+    bookkeeping = events.loc[events["event_type"] == "mark_to_market"]
+    assert len(bookkeeping) > 0
+    assert (bookkeeping["notional"].abs() > 0.0).all()
+    assert counts.get("trade", 0) > 0
+
+    expected_fills = int(sum(counts.get(name, 0) for name in metrics_module.EXECUTED_EVENT_TYPES))
+    superseded_rule = int(
+        ((events["notional"].fillna(0.0).abs() > 0.0) & (events["event_type"] != "funding")).sum()
+    )
+    assert window_metrics(_run(snapshot, grid).results[1]).trade_count == expected_fills
+    # The two rules must genuinely disagree here, by exactly the bookkeeping rows -- otherwise this
+    # fixture could not tell the fixed rule from the broken one.
+    assert superseded_rule == expected_fills + len(bookkeeping)
+    assert superseded_rule > expected_fills
 
 
 def test_risk_unit_scales_realised_volatility_to_within_a_band_of_the_common_target():
