@@ -893,6 +893,28 @@ _INTENTIONALLY_UNEXPORTED: dict[str, frozenset[str]] = {
         }
     ),
     "universe.py": frozenset({"MEMBERSHIP_COLUMNS"}),
+    # Schema strings, filenames, journal event types and one tuning constant. Every CALLABLE in
+    # quarantine.py is exported; these are the values those callables agree on, importable from the
+    # module by anyone who needs them and not part of the package's public surface.
+    "quarantine.py": frozenset(
+        {
+            "RECEIPT_SCHEMA_VERSION",
+            "BASELINE_SCHEMA_VERSION",
+            "CANARY_FILENAME",
+            "CANARY_TOKEN_FILENAME",
+            "CANARY_TOKEN_PREFIX",
+            "QUARANTINE_EVENT",
+            "RESTORE_EVENT",
+            "TRIAL_EVENT",
+            "SEALED_TREE",
+            "ACQUISITION_TREE",
+            "TREE_NAMES",
+            "ARMED_ATIME_LAG_SECONDS",
+        }
+    ),
+    # The two stage names ARE exported (a caller of assemble_scored_metrics needs them); the tuple
+    # of both is an internal validation table.
+    "scored_metrics.py": frozenset({"STAGES"}),
 }
 
 

@@ -23,6 +23,17 @@ not a deduction. The same applies to the acquisition snapshot in `data/cup20/acq
 other tournament's data directory, and to any market data you fetch yourself. Your only market
 inputs are the rows the organiser streams to you.
 
+While you are researching, both of those directories have been **moved out of the working tree
+altogether** — not hidden, not permissioned, physically elsewhere. If you find yourself resolving a
+path under `data/cup20/sealed/` or `data/cup20/acquisition/`, you will get a missing directory, and
+the attempt is recorded in whatever file you wrote it in. They come back only after the field is
+closed and every team has stopped, and when they do, the sealed tree carries a tripwire file whose
+contents appear nowhere else in this repository. The organiser's post-tournament review scans your
+**entire workspace** — notes, notebooks, logs, scratch files, `__pycache__`, symlinks and their
+targets, not just the files you froze — for that content and for every prohibited path. None of
+this is here to catch an honest team out; it is here so that an honest team's result is worth
+something afterwards.
+
 The sealed rows are not merely absent from your data root — they are also described, by name and by
 number, in organiser artifacts that live outside it. **Reading, referencing or naming any of these
 is the same disqualification as opening the sealed snapshot itself:**

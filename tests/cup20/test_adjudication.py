@@ -15,6 +15,7 @@ Two mutations dominate this file:
 import dataclasses
 import math
 
+import pandas as pd
 import pytest
 
 from crypto_trade.cup20.adjudication import (
@@ -23,9 +24,37 @@ from crypto_trade.cup20.adjudication import (
     adjudicate_holdout_candidate,
     adjudicate_population,
 )
-from crypto_trade.cup20.config import load_config
-from crypto_trade.cup20.scored_metrics import ASSEMBLED_METRIC_KEYS, ranking_metrics
+from crypto_trade.cup20.config import IS_END, SEALED_END, SEALED_START, load_config
+from crypto_trade.cup20.metrics import holdout_folds, is_folds
+from crypto_trade.cup20.scored_metrics import (
+    ASSEMBLED_METRIC_KEYS,
+    STAGE_HOLDOUT,
+    STAGE_IN_SAMPLE,
+    MetricProvenance,
+    ScoredVector,
+    ranking_metrics,
+)
 from crypto_trade.cup20.scoring import robustness_score
+
+IS_START = pd.Timestamp("2020-08-01T00:00:00Z")
+
+# The adjudicators refuse a bare mapping, so every fixture here has to declare which stage it came
+# from -- exactly as a real caller does, by routing through `assemble_scored_metrics`. Building the
+# provenance directly keeps this file's fixtures hand-written (its whole point is pinning the 1x
+# and 2x twins to different values) without reopening the hole those fixtures would otherwise
+# drive straight through.
+
+
+def _vector(metrics, stage=STAGE_IN_SAMPLE):
+    if stage == STAGE_HOLDOUT:
+        window, folds = (SEALED_START, SEALED_END), holdout_folds(SEALED_START, SEALED_END)
+    else:
+        window, folds = (IS_START, IS_END), is_folds(IS_START, IS_END)
+    return ScoredVector(
+        metrics,
+        MetricProvenance(stage=stage, window_start=window[0], window_end=window[1], folds=folds),
+    )
+
 
 CONFIG = load_config("tournament/cup20/config.toml").raw
 DRAWDOWN_FLOOR = float(CONFIG["floors"]["max_drawdown"])
@@ -77,7 +106,7 @@ def _adjudicate(scored=None, *, team_id="team-01", candidate_id="c1", **override
         else:
             metrics[key] = value
     return adjudicate_candidate(
-        metrics,
+        _vector(metrics),
         team_id=team_id,
         candidate_id=candidate_id,
         floors=CONFIG["floors"],
@@ -172,7 +201,7 @@ def test_the_score_uses_the_two_x_drawdown_and_quarter_fraction():
 def test_the_holdout_drawdown_floor_can_be_rebased_without_touching_the_floors():
     at_is = _adjudicate()
     rebased = adjudicate_candidate(
-        dict(PASSING),
+        _vector(dict(PASSING)),
         team_id="team-01",
         candidate_id="c1",
         floors=CONFIG["floors"],
@@ -344,7 +373,7 @@ def _holdout(scored=None, *, nominated=0.11, **overrides):
     metrics = dict(PASSING if scored is None else scored)
     metrics.update(overrides)
     return adjudicate_holdout_candidate(
-        metrics,
+        _vector(metrics, STAGE_HOLDOUT),
         team_id="team-01",
         candidate_id="c1",
         holdout=HOLDOUT,
@@ -491,7 +520,7 @@ def test_a_missing_holdout_config_key_raises_rather_than_defaulting():
         partial = {k: v for k, v in HOLDOUT.items() if k != missing}
         with pytest.raises(KeyError):
             adjudicate_holdout_candidate(
-                dict(PASSING),
+                _vector(dict(PASSING), STAGE_HOLDOUT),
                 team_id="team-01",
                 candidate_id="c1",
                 holdout=partial,

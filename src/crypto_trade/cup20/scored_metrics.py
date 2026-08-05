@@ -32,16 +32,19 @@ one level to both consumers, and nothing in either consumer could have noticed.
 
 from __future__ import annotations
 
+import dataclasses
 import math
 import statistics
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 
 import pandas as pd
 
+from crypto_trade.cup20.config import IS_END, SEALED_END, SEALED_START
 from crypto_trade.cup20.metrics import (
     Fold,
     fold_positive_pnl_shares,
     fold_sharpes,
+    holdout_folds,
     is_folds,
     window_metrics,
 )
@@ -126,6 +129,62 @@ ASSEMBLED_METRIC_KEYS: frozenset[str] = (
 )
 
 
+STAGE_IN_SAMPLE = "in_sample"
+STAGE_HOLDOUT = "holdout"
+STAGES: tuple[str, ...] = (STAGE_IN_SAMPLE, STAGE_HOLDOUT)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class MetricProvenance:
+    """Which stage, window and folds produced a scored vector.
+
+    A flat ``dict[str, float]`` cannot answer "where did these numbers come from", and the two
+    adjudicators ask exactly that question in opposite directions. Without provenance riding along
+    with the numbers, a caller that assembled in-sample metrics and handed them to
+    :func:`~crypto_trade.cup20.adjudication.adjudicate_holdout_candidate` would have the wrong
+    window scored against section 8's conditions, with every value finite, every key present and
+    nothing anywhere in a position to notice.
+    """
+
+    stage: str
+    window_start: pd.Timestamp
+    window_end: pd.Timestamp
+    folds: tuple[Fold, ...]
+
+    def describe(self) -> str:
+        names = ",".join(name for name, _, _ in self.folds)
+        return f"{self.stage} over [{self.window_start}, {self.window_end}) on folds {names}"
+
+
+class ScoredVector(Mapping[str, float]):
+    """An assembled metric vector that remembers the stage it was assembled for.
+
+    A ``Mapping`` rather than a wrapper object on purpose: ``evaluate_floors``,
+    ``evaluate_holdout_eligibility``, ``ranking_metrics`` and ``neighbourhood_median`` all consume
+    ``Mapping[str, float]`` and none of them needs to change. What changes is that the two
+    adjudicators can now REFUSE a bare mapping, because a bare mapping carries no claim about where
+    it came from and an unverifiable claim must fail closed rather than be assumed correct.
+    """
+
+    __slots__ = ("_metrics", "provenance")
+
+    def __init__(self, metrics: Mapping[str, float], provenance: MetricProvenance) -> None:
+        self._metrics: dict[str, float] = dict(metrics)
+        self.provenance: MetricProvenance = provenance
+
+    def __getitem__(self, key: str) -> float:
+        return self._metrics[key]
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._metrics)
+
+    def __len__(self) -> int:
+        return len(self._metrics)
+
+    def __repr__(self) -> str:
+        return f"ScoredVector({self.provenance.describe()}, {len(self._metrics)} metrics)"
+
+
 def _utc(value: object, label: str) -> pd.Timestamp:
     """Normalise a boundary to UTC, refusing a naive timestamp rather than guessing its zone.
 
@@ -174,18 +233,58 @@ def _validate_folds(
     return tuple(normalised)
 
 
+def _canonical_folds(stage: str, start: pd.Timestamp, end: pd.Timestamp) -> tuple[Fold, ...]:
+    """The one fold construction the charter states for this stage over this window."""
+    return is_folds(start, end) if stage == STAGE_IN_SAMPLE else holdout_folds(start, end)
+
+
+def _validate_stage_window(stage: str, start: pd.Timestamp, end: pd.Timestamp) -> None:
+    """Reject a window that is not the one this stage is defined over.
+
+    The two stages are pinned to different degrees, and the asymmetry is real rather than an
+    oversight. The sealed window is frozen at BOTH ends by ``[splits]`` -- ``sealed_start`` and
+    ``sealed_end`` are entries in ``config._FROZEN_SCALARS`` -- so a holdout assembly can be
+    required to be exactly it, and that single equality is what makes "these metrics came from the
+    sealed window" a fact rather than a caller's assertion. The in-sample window's START is
+    computed at snapshot build (``resolve_is_start`` finds the first boundary with twenty eligible
+    names) and so cannot be pinned to a constant; its END is the frozen cutoff, and an in-sample
+    window that reaches past the cutoff is the leak this whole apparatus exists to prevent, so that
+    end is checked.
+    """
+    if stage == STAGE_HOLDOUT:
+        if (start, end) != (SEALED_START, SEALED_END):
+            raise ValueError(
+                f"a holdout assembly must cover exactly the sealed window "
+                f"[{SEALED_START}, {SEALED_END}); it was handed [{start}, {end})"
+            )
+        return
+    if end > IS_END:
+        raise ValueError(
+            f"an in-sample assembly must end at or before the cutoff {IS_END}; its window "
+            f"[{start}, {end}) reaches into the sealed side"
+        )
+
+
 def assemble_scored_metrics(
     run: CandidateRun,
     *,
+    stage: str,
     is_start: pd.Timestamp,
     is_end: pd.Timestamp,
     folds: Sequence[Fold] | None = None,
-) -> dict[str, float]:
+) -> ScoredVector:
     """Every metric the floors and the ranking consume, each read at its declared cost level.
 
     One point's vector, not a neighbourhood's: section 7.2 scores the per-metric median across the
     declared neighbourhood, so callers assemble one of these per point and then take
     :func:`neighbourhood_median`.
+
+    ``stage`` is required and is the vector's provenance: it selects the fold construction, pins
+    the window (see :func:`_validate_stage_window`), and travels with the returned
+    :class:`ScoredVector` so the adjudicator for the OTHER stage can refuse it. Passing an explicit
+    ``folds`` sequence is still allowed -- it is how a caller proves the folds are the ones it
+    meant -- but it must equal the canonical construction for the stage and window, so the override
+    can no longer be the route by which the wrong window gets scored.
     """
     missing_levels = [level for level in REQUIRED_COST_LEVELS if level not in run.results]
     if missing_levels:
@@ -196,11 +295,21 @@ def assemble_scored_metrics(
 
     window_start = _utc(is_start, "is_start")
     window_end = _utc(is_end, "is_end")
+    if stage not in STAGES:
+        raise ValueError(f"stage must be one of {list(STAGES)}, got {stage!r}")
+    _validate_stage_window(stage, window_start, window_end)
     resolved_folds = _validate_folds(
-        is_folds(window_start, window_end) if folds is None else folds,
+        _canonical_folds(stage, window_start, window_end) if folds is None else folds,
         window_start,
         window_end,
     )
+    canonical = _canonical_folds(stage, window_start, window_end)
+    if resolved_folds != canonical:
+        raise ValueError(
+            f"a {stage} assembly must use the folds the charter states for its window "
+            f"({[name for name, _, _ in canonical]} over [{window_start}, {window_end})); it was "
+            f"handed {[name for name, _, _ in resolved_folds]} with different bounds"
+        )
 
     at_base_cost = window_metrics(run.results[BASE_COST])
     at_double_cost = window_metrics(run.results[DOUBLE_COST])
@@ -220,7 +329,7 @@ def assemble_scored_metrics(
     # which is the direction a hard-floor input must fail in.
     double_cost_positive_folds = sum(1 for value in double_cost_fold_sharpes if value > 0.0)
 
-    return {
+    metrics = {
         # --- section 7.3 floors, at the level section 7.3 names --------------------------------
         "net_sharpe": float(at_base_cost.net_sharpe),  # 1x: "Net Sharpe (1x cost)"
         "double_cost_sharpe": float(at_double_cost.net_sharpe),  # 2x: "Net Sharpe (2x cost)"
@@ -259,9 +368,20 @@ def assemble_scored_metrics(
         ),
         "double_cost_annualized_turnover": float(at_double_cost.annualized_turnover),  # 2x
     }
+    return ScoredVector(
+        metrics,
+        MetricProvenance(
+            stage=stage,
+            window_start=window_start,
+            window_end=window_end,
+            folds=resolved_folds,
+        ),
+    )
 
 
-def neighbourhood_median(per_point: Sequence[Mapping[str, float]]) -> dict[str, float]:
+def neighbourhood_median(
+    per_point: Sequence[Mapping[str, float]],
+) -> dict[str, float] | ScoredVector:
     """Per-metric median across the neighbourhood, failing closed on a non-finite point.
 
     ``median_metrics`` delegates to ``statistics.median``, which SORTS its input -- and NaN has no
@@ -270,12 +390,33 @@ def neighbourhood_median(per_point: Sequence[Mapping[str, float]]) -> dict[str, 
     samples behind it was not a number at all: a fail-open on precisely the value every hard floor
     is written to reject. Any metric that is non-finite at ANY point therefore medians to NaN
     here, which every floor comparison then fails, and the gate vector names which one.
+
+    Provenance survives the median when every point has it and they agree, which is what lets the
+    adjudicators check a NEIGHBOURHOOD-median vector rather than only a single point's. Points that
+    disagree about their stage, window or folds are rejected outright: a median taken across two
+    different windows is not a statistic about either of them. A neighbourhood of plain mappings
+    still medians to a plain mapping -- the adjudicators reject those on arrival, so nothing is
+    silently blessed -- but a MIXTURE of the two is refused here, because a median that quietly
+    dropped the one provenance it had would be exactly the fail-open this is preventing.
     """
     medians = median_metrics(per_point)
     for key in medians:
         if not all(math.isfinite(float(point[key])) for point in per_point):
             medians[key] = math.nan
-    return medians
+    provenances = [point.provenance for point in per_point if isinstance(point, ScoredVector)]
+    if not provenances:
+        return medians
+    if len(provenances) != len(per_point):
+        raise ValueError(
+            f"{len(provenances)} of {len(per_point)} neighbourhood points carry provenance; a "
+            "neighbourhood is assembled all at once or not at all"
+        )
+    distinct = {provenance.describe() for provenance in provenances}
+    if len(distinct) != 1:
+        raise ValueError(
+            f"neighbourhood points disagree about their provenance: {sorted(distinct)}"
+        )
+    return ScoredVector(medians, provenances[0])
 
 
 def ranking_metrics(

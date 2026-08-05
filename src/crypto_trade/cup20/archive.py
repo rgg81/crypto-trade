@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import ast
+import dataclasses
 import hashlib
 import json
 import math
+import os
 import re
 import tarfile
+from collections.abc import Sequence
 from pathlib import Path
 
 from crypto_trade.cup20.neighbourhood import NeighbourhoodDeclaration
@@ -24,6 +27,12 @@ FORBIDDEN_PATTERNS: tuple[str, ...] = (
     # sealed window's last day) was tracked here and matched no pattern while only the holdout
     # subdirectory was named.
     r"reports-cup20",
+    # The tripwire planted inside the sealed tree (crypto_trade.cup20.quarantine.CANARY_FILENAME).
+    # Its NAME appearing anywhere in a team's files means the sealed directory was at least listed;
+    # its CONTENT carries a token that is matched separately, by value, because the token is never
+    # committed and so cannot be a literal here. A test asserts this pattern still matches the
+    # canary's filename, so the two cannot drift apart.
+    r"HOLDOUT-CANARY-DO-NOT-READ",
     # Prior-tournament evidence of any kind.
     r"crypto_trade\.tournament\.top40",
     r"tournament/top40",
@@ -355,17 +364,34 @@ def verify_neighbourhood_coordinates(
     return tuple(violations)
 
 
-def _line_violations(relative: str, text: str, line_number: int, team_id: str | None) -> list[str]:
+def _line_violations(
+    relative: str,
+    text: str,
+    line_number: int,
+    team_id: str | None,
+    *,
+    extra: tuple[tuple[str, re.Pattern[str]], ...] = (),
+    tokens: tuple[str, ...] = (),
+) -> list[str]:
     """Every forbidden-pattern / foreign-team-directory hit in one piece of text.
 
     Shared between the path-identity check and the line-content check below, so a forbidden
     reference is caught the same way regardless of whether a team typed it into a line of source or
     spelled it into a directory or file name instead.
+
+    ``extra`` carries patterns that cannot be frozen into ``FORBIDDEN_PATTERNS`` because they are
+    only known at review time -- above all the quarantine root, which is chosen when the tournament
+    starts. ``tokens`` carries literal strings matched by value rather than as regexes: the sealed
+    tree's canary token is high-entropy, is never committed, and would be neither expressible nor
+    safe to write down here.
     """
     found: list[str] = []
-    for pattern, compiled in _COMPILED:
+    for pattern, compiled in _COMPILED + extra:
         if compiled.search(text):
             found.append(f"{relative}:{line_number}:{pattern}")
+    for token in tokens:
+        if token and token in text:
+            found.append(f"{relative}:{line_number}:sealed-canary-token")
     for match in _TEAM_DIRECTORY.finditer(text):
         if match.group(1) != team_id:
             found.append(f"{relative}:{line_number}:foreign-team-directory")
@@ -415,3 +441,122 @@ def scan_for_blindness_violations(
         for number, line in enumerate(path.read_text(errors="replace").splitlines(), start=1):
             violations.extend(_line_violations(relative, line, number, team_id))
     return tuple(violations)
+
+
+# A team's WORKSPACE is not a frozen archive: it legitimately holds research notebooks, cached
+# frames, plots and logs, several of which are far larger than any source file. The frozen-archive
+# cap would therefore skip a lot of a real workspace, so the workspace scan reads much more before
+# it gives up -- and, unlike the archive scan, it REPORTS whatever it could not read instead of
+# passing over it silently. An unreadable file in a submission is an organiser decision, not an
+# exemption the tool grants on its own.
+_MAX_WORKSPACE_CONTENT_BYTES = 8_388_608  # 8 MiB
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class WorkspaceScan:
+    """What a workspace scan found, and what it could not look at.
+
+    ``violations`` is the verdict; ``unscanned`` is the disclosed hole in it. A review that reads
+    only ``violations`` and ignores a non-empty ``unscanned`` has checked less than it thinks.
+    """
+
+    root: str
+    violations: tuple[str, ...]
+    unscanned: tuple[str, ...]
+    files_scanned: int
+
+    @property
+    def clean(self) -> bool:
+        """No violations AND nothing left unread. Both, deliberately."""
+        return not self.violations and not self.unscanned
+
+
+def scan_workspace_for_blindness_violations(
+    workspace_root: str | Path,
+    *,
+    team_id: str | None = None,
+    canary_tokens: Sequence[str] = (),
+    extra_patterns: Sequence[str] = (),
+    max_content_bytes: int = _MAX_WORKSPACE_CONTENT_BYTES,
+) -> WorkspaceScan:
+    """Scan a team's ENTIRE working directory, not just the archive it chose to freeze.
+
+    :func:`scan_for_blindness_violations` reads a frozen candidate bundle -- the handful of files a
+    team nominated. That is the right surface for a pre-flight gate and the wrong one for an
+    integrity review: a team that opened the sealed snapshot and left the evidence in
+    ``research/scratch.md``, a notebook cell, a ``.pyc`` or a shell log has left the archive
+    entirely clean. This scans everything under ``workspace_root`` instead, so the question becomes
+    "is there evidence anywhere in this team's tree" rather than "is there evidence in the files
+    they handed in".
+
+    What is scanned, and what is not:
+
+    * **Every regular file**, with no extension allowlist and no directory exclusions --
+      ``__pycache__`` included, which the archive scan skips as derived. A team can delete a ``.py``
+      and keep its ``.pyc``, and the forbidden string survives in the compiled constant pool;
+      content is read with ``errors="replace"`` so binary files are searched as text rather than
+      skipped.
+    * **Both surfaces** of every file, exactly as the archive scan does: the file's own relative
+      path (reported at line ``0``) and its content line by line.
+    * **Symlinks** are reported as violations in their own right AND their target text is scanned,
+      so a link pointing at ``../../../data/cup20/sealed`` is named twice -- once as a symlink,
+      once as the specific prohibited path. This is the cheapest evasion available and the archive
+      scan can only see the first half of it, because a symlink never reaches the archive.
+    * **Canary tokens** are matched by value. A token planted inside the sealed tree that turns up
+      in a workspace file is the strongest single piece of evidence this scan can produce.
+    * **Files larger than ``max_content_bytes``** have their PATH scanned but not their content,
+      and every one is listed in ``unscanned``. Nothing is skipped for being the wrong kind of
+      file; the only reason content goes unread is size, and the reviewer is told which files and
+      how big.
+
+    Its limits are the archive scan's limits, and they are not fixed here: this is a literal
+    string search, so a forbidden reference assembled at runtime by concatenation or formatting
+    does not match, and a team that read the sealed data and wrote down only conclusions leaves
+    nothing to find. That is why quarantine, not scanning, is the load-bearing control for the
+    research phase.
+    """
+    root = Path(workspace_root).resolve()
+    extra = tuple((pattern, re.compile(pattern)) for pattern in extra_patterns)
+    tokens = tuple(canary_tokens)
+    violations: list[str] = []
+    unscanned: list[str] = []
+    scanned = 0
+
+    for path in sorted(entry for entry in root.rglob("*") if entry.is_symlink()):
+        relative = path.relative_to(root).as_posix()
+        violations.append(f"{relative}:0:symlink-not-allowed")
+        violations.extend(
+            _line_violations(relative, relative, 0, team_id, extra=extra, tokens=tokens)
+        )
+        try:
+            target = os.readlink(path)
+        except OSError:  # pragma: no cover - readlink on an entry is_symlink() just confirmed
+            target = ""
+        if target:
+            violations.extend(
+                _line_violations(relative, target, 0, team_id, extra=extra, tokens=tokens)
+            )
+
+    for path in sorted(
+        entry for entry in root.rglob("*") if entry.is_file() and not entry.is_symlink()
+    ):
+        relative = path.relative_to(root).as_posix()
+        scanned += 1
+        violations.extend(
+            _line_violations(relative, relative, 0, team_id, extra=extra, tokens=tokens)
+        )
+        size = path.stat().st_size
+        if size > max_content_bytes:
+            unscanned.append(f"{relative}:{size}")
+            continue
+        for number, line in enumerate(path.read_text(errors="replace").splitlines(), start=1):
+            violations.extend(
+                _line_violations(relative, line, number, team_id, extra=extra, tokens=tokens)
+            )
+
+    return WorkspaceScan(
+        root=str(root),
+        violations=tuple(violations),
+        unscanned=tuple(unscanned),
+        files_scanned=scanned,
+    )

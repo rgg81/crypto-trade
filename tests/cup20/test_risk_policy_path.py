@@ -34,6 +34,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from crypto_trade.cup20.config import IS_END
 from crypto_trade.cup20.metrics import is_folds
 from crypto_trade.cup20.runner import (
     apply_exposure_caps,
@@ -41,7 +42,7 @@ from crypto_trade.cup20.runner import (
     normalise_unit_gross,
     run_candidate,
 )
-from crypto_trade.cup20.scored_metrics import assemble_scored_metrics
+from crypto_trade.cup20.scored_metrics import STAGE_IN_SAMPLE, assemble_scored_metrics
 from crypto_trade.cup20.snapshot import Snapshot
 from crypto_trade.tournament.engine_v2 import EvaluatorConfig
 from crypto_trade.tournament.protocol import REBALANCE_INSTRUCTION_COLUMN
@@ -545,13 +546,15 @@ def test_the_policy_is_not_silently_ignored():
 def test_the_declared_policy_reaches_the_metric_vector_the_tournament_is_decided_on():
     """End to end: the policy is not just visible in the evaluator's diagnostics, it moves the
     numbers the floors and the ranking read."""
-    window = (TIMES[0], TIMES[0] + pd.DateOffset(years=4))
+    # The window must end at or before the frozen cutoff, because that is what an in-sample
+    # assembly means; `TIMES[0] + 4 years` would reach into the sealed side.
+    window = (TIMES[0], IS_END)
     folds = is_folds(*window)
     with_policy = assemble_scored_metrics(
-        BRAKE_RUN, is_start=window[0], is_end=window[1], folds=folds
+        BRAKE_RUN, stage=STAGE_IN_SAMPLE, is_start=window[0], is_end=window[1], folds=folds
     )
     without_policy = assemble_scored_metrics(
-        NO_POLICY_RUN, is_start=window[0], is_end=window[1], folds=folds
+        NO_POLICY_RUN, stage=STAGE_IN_SAMPLE, is_start=window[0], is_end=window[1], folds=folds
     )
     moved = [key for key in with_policy if with_policy[key] != without_policy[key]]
     assert "max_drawdown" in moved

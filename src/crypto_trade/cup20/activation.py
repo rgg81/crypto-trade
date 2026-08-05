@@ -166,11 +166,25 @@ def _load_record(path: Path) -> dict[str, str]:
     return payload
 
 
-def verify_activation(path: str | Path) -> dict[str, str]:
+def verify_activation(
+    path: str | Path, *, sealed_root_override: str | Path | None = None
+) -> dict[str, str]:
     """Recompute every bound authority and fail on any drift.
 
     Returns the frozen record unchanged when every authority still matches, so a caller can use the
     return value as the authoritative record without re-reading the file.
+
+    ``sealed_root_override`` changes only WHERE the sealed snapshot is read from -- never what it
+    must hash to. It exists for the window in which ``crypto_trade.cup20.quarantine`` has moved the
+    sealed tree out of the working tree entirely: without it, the single most important check in
+    this module would be unavailable for the whole research phase, which is exactly when the
+    organiser most needs to be able to run it. It cannot weaken the verification, because the
+    comparison below is still against the digest frozen before any team started: a tampered tree
+    pointed at by an override fails just as loudly as one in place. What it CAN do is verify a
+    pristine copy while a tampered copy sits at the record's own ``sealed_root`` -- so it is only
+    sound in combination with ``quarantine.verify_quarantine_in_effect``, which asserts that no
+    tree exists at that path at all, and ``quarantine.restore_holdout`` calls this a second time
+    with no override once the tree is back.
     """
     record_path = Path(path)
     record = _load_record(record_path)
@@ -178,7 +192,7 @@ def verify_activation(path: str | Path) -> dict[str, str]:
         record["config_path"],
         record["charter_path"],
         record["is_root"],
-        record["sealed_root"],
+        record["sealed_root"] if sealed_root_override is None else sealed_root_override,
         record["test_output_path"],
         record["dependency_lock_path"],
         record["implementation_root"],

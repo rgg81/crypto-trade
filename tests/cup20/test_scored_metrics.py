@@ -43,6 +43,8 @@ from crypto_trade.cup20.scored_metrics import (
     FLOOR_METRIC_KEYS,
     HOLDOUT_ONLY_KEYS,
     RANKING_METRIC_KEYS,
+    STAGE_HOLDOUT,
+    STAGE_IN_SAMPLE,
     TRIPLE_COST,
     assemble_scored_metrics,
     neighbourhood_median,
@@ -171,7 +173,7 @@ def _run(**results: EvaluationResult) -> CandidateRun:
 
 RUN = _run(**{"1": BASE_RESULT, "2": DOUBLE_RESULT, "3": TRIPLE_RESULT})
 SWAPPED_RUN = _run(**{"1": DOUBLE_RESULT, "2": BASE_RESULT, "3": TRIPLE_RESULT})
-ASSEMBLED = assemble_scored_metrics(RUN, is_start=IS_START, is_end=IS_END)
+ASSEMBLED = assemble_scored_metrics(RUN, stage=STAGE_IN_SAMPLE, is_start=IS_START, is_end=IS_END)
 
 
 # --- the fixture itself, without which every assertion below is vacuous ---------------------
@@ -214,7 +216,7 @@ def test_a_fold_whose_sharpe_is_exactly_zero_is_not_counted_as_positive():
     assert sum(1 for value in sharpes.values() if value > 0.0) == 3
 
     run = _run(**{"1": BASE_RESULT, "2": flat, "3": TRIPLE_RESULT})
-    scored = assemble_scored_metrics(run, is_start=IS_START, is_end=IS_END)
+    scored = assemble_scored_metrics(run, stage=STAGE_IN_SAMPLE, is_start=IS_START, is_end=IS_END)
     assert scored["positive_fold_count"] == 3.0  # not 4: the zero fold is excluded
 
 
@@ -328,7 +330,9 @@ def test_every_cost_level_parametrisation_covers_the_whole_assembled_vector():
 
 
 def test_swapping_base_and_double_results_moves_every_cost_dependent_key():
-    swapped = assemble_scored_metrics(SWAPPED_RUN, is_start=IS_START, is_end=IS_END)
+    swapped = assemble_scored_metrics(
+        SWAPPED_RUN, stage=STAGE_IN_SAMPLE, is_start=IS_START, is_end=IS_END
+    )
     for key in ASSEMBLED_METRIC_KEYS - {"triple_cost_sharpe"}:
         assert ASSEMBLED[key] != pytest.approx(swapped[key]), key
     # The one key that reads neither swapped level must be untouched, which proves the swap
@@ -473,34 +477,44 @@ def test_assembly_raises_when_a_cost_level_is_absent(absent):
         }
     )
     with pytest.raises(ValueError, match=f"missing \\[{absent}\\]"):
-        assemble_scored_metrics(partial, is_start=IS_START, is_end=IS_END)
+        assemble_scored_metrics(partial, stage=STAGE_IN_SAMPLE, is_start=IS_START, is_end=IS_END)
 
 
 def test_assembly_raises_on_a_naive_is_start():
     with pytest.raises(ValueError, match="is_start must be timezone-aware"):
-        assemble_scored_metrics(RUN, is_start=pd.Timestamp("2020-08-01"), is_end=IS_END)
+        assemble_scored_metrics(
+            RUN, stage=STAGE_IN_SAMPLE, is_start=pd.Timestamp("2020-08-01"), is_end=IS_END
+        )
 
 
 def test_assembly_raises_on_a_naive_is_end():
     with pytest.raises(ValueError, match="is_end must be timezone-aware"):
-        assemble_scored_metrics(RUN, is_start=IS_START, is_end=pd.Timestamp("2024-08-01"))
+        assemble_scored_metrics(
+            RUN, stage=STAGE_IN_SAMPLE, is_start=IS_START, is_end=pd.Timestamp("2024-08-01")
+        )
 
 
 def test_assembly_raises_on_an_empty_fold_sequence():
     with pytest.raises(ValueError, match="at least one fold"):
-        assemble_scored_metrics(RUN, is_start=IS_START, is_end=IS_END, folds=())
+        assemble_scored_metrics(
+            RUN, stage=STAGE_IN_SAMPLE, is_start=IS_START, is_end=IS_END, folds=()
+        )
 
 
 def test_assembly_raises_when_the_folds_do_not_start_at_the_window_start():
     late = ((FOLDS[0][0], FOLDS[0][1] + pd.Timedelta(days=1), FOLDS[0][2]), *FOLDS[1:])
     with pytest.raises(ValueError, match="folds must tile"):
-        assemble_scored_metrics(RUN, is_start=IS_START, is_end=IS_END, folds=late)
+        assemble_scored_metrics(
+            RUN, stage=STAGE_IN_SAMPLE, is_start=IS_START, is_end=IS_END, folds=late
+        )
 
 
 def test_assembly_raises_when_the_folds_do_not_end_at_the_window_end():
     short = (*FOLDS[:-1], (FOLDS[-1][0], FOLDS[-1][1], FOLDS[-1][2] - pd.Timedelta(days=1)))
     with pytest.raises(ValueError, match="folds must tile"):
-        assemble_scored_metrics(RUN, is_start=IS_START, is_end=IS_END, folds=short)
+        assemble_scored_metrics(
+            RUN, stage=STAGE_IN_SAMPLE, is_start=IS_START, is_end=IS_END, folds=short
+        )
 
 
 def test_assembly_raises_when_two_folds_leave_a_gap():
@@ -509,7 +523,9 @@ def test_assembly_raises_when_two_folds_leave_a_gap():
         *FOLDS[1:],
     )
     with pytest.raises(ValueError, match="do not abut"):
-        assemble_scored_metrics(RUN, is_start=IS_START, is_end=IS_END, folds=gapped)
+        assemble_scored_metrics(
+            RUN, stage=STAGE_IN_SAMPLE, is_start=IS_START, is_end=IS_END, folds=gapped
+        )
 
 
 def test_assembly_raises_on_a_zero_width_fold():
@@ -518,13 +534,17 @@ def test_assembly_raises_on_a_zero_width_fold():
         ("F2", IS_START, IS_END),
     )
     with pytest.raises(ValueError, match="fold F1 has non-positive width"):
-        assemble_scored_metrics(RUN, is_start=IS_START, is_end=IS_END, folds=degenerate)
+        assemble_scored_metrics(
+            RUN, stage=STAGE_IN_SAMPLE, is_start=IS_START, is_end=IS_END, folds=degenerate
+        )
 
 
 def test_assembly_raises_on_a_naive_fold_boundary():
     naive = (("F1", pd.Timestamp("2020-08-01"), IS_END),)
     with pytest.raises(ValueError, match="fold F1 start must be timezone-aware"):
-        assemble_scored_metrics(RUN, is_start=IS_START, is_end=IS_END, folds=naive)
+        assemble_scored_metrics(
+            RUN, stage=STAGE_IN_SAMPLE, is_start=IS_START, is_end=IS_END, folds=naive
+        )
 
 
 def test_the_folds_override_is_what_lets_the_holdout_reuse_this_assembly():
@@ -533,7 +553,9 @@ def test_the_folds_override_is_what_lets_the_holdout_reuse_this_assembly():
     sealed_start = pd.Timestamp("2024-08-01T00:00:00Z")
     sealed_end = pd.Timestamp("2026-08-01T00:00:00Z")
     holdout = holdout_folds(sealed_start, sealed_end)
-    scored = assemble_scored_metrics(RUN, is_start=sealed_start, is_end=sealed_end, folds=holdout)
+    scored = assemble_scored_metrics(
+        RUN, stage=STAGE_HOLDOUT, is_start=sealed_start, is_end=sealed_end, folds=holdout
+    )
     assert set(scored) == ASSEMBLED_METRIC_KEYS
 
 
@@ -545,7 +567,9 @@ def test_holdout_folds_against_the_in_sample_window_are_rejected():
         pd.Timestamp("2024-08-01T00:00:00Z"), pd.Timestamp("2026-08-01T00:00:00Z")
     )
     with pytest.raises(ValueError, match="folds must tile"):
-        assemble_scored_metrics(RUN, is_start=IS_START, is_end=IS_END, folds=holdout)
+        assemble_scored_metrics(
+            RUN, stage=STAGE_IN_SAMPLE, is_start=IS_START, is_end=IS_END, folds=holdout
+        )
 
 
 # --- neighbourhood median -----------------------------------------------------------------
@@ -618,7 +642,9 @@ def test_the_full_chain_composes_from_candidate_runs_to_a_verdict():
                 "3": TRIPLE_RESULT,
             }
         )
-        points.append(assemble_scored_metrics(run, is_start=IS_START, is_end=IS_END))
+        points.append(
+            assemble_scored_metrics(run, stage=STAGE_IN_SAMPLE, is_start=IS_START, is_end=IS_END)
+        )
 
     scored = neighbourhood_median(points)
     assert set(scored) == ASSEMBLED_METRIC_KEYS

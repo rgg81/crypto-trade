@@ -124,7 +124,27 @@ Owned entirely by the organiser. No team code touches any of it.
   Applied after the common risk unit.
 - **Solvency:** equity must remain finite and strictly positive; a breach is terminal for the run.
 
-## 5. Blindness — four independent layers
+## 5. Blindness — physical custody first, then four checked layers
+
+Blindness has one control that is physical and four that are checks. The difference matters more
+than the count, so custody is stated first and separately.
+
+**Layer 0 — quarantine, for the whole research phase.** Before the first team starts, both
+`data/cup20/sealed/` and `data/cup20/acquisition/` (the un-truncated superset, which leaks the same
+rows) are **moved out of the working tree entirely**, to a location outside the repository. For the
+entire period teams are running, there is no path a team process can name that reaches the holdout,
+because the bytes are not under any of them. This is the only layer that does not depend on anyone
+keeping a promise, and it covers the only window in which a team is in a position to act.
+
+Quarantine writes a committed receipt recording where each tree went, its whole-tree digest, and
+the sealed manifest digest the activation record bound. Restoring is refused unless every one of
+those still matches, measured **at the quarantine location, before anything moves**, so a holdout
+that was altered while out of the tree never re-enters it. Restoring is also refused until the
+selection freeze exists: the holdout does not come back while a team could still act on it. Both
+events are appended to the hash-chained journal, which is what makes the coverage claim
+*reviewable*: `holdout_quarantined` at a lower sequence number than every `trial_accepted`, and
+`holdout_restored` above all of them, is evidence that no trial was accepted while the holdout was
+reachable — and re-ordering that to look otherwise breaks the chain.
 
 1. **Truncated data root.** Teams receive `data/cup20/is/`, containing bars, funding, membership,
    contract metadata and exchange info **strictly before 2024-08-01**. Not one row at or after the
@@ -132,17 +152,18 @@ Owned entirely by the organiser. No team code touches any of it.
    that a symbol delisting after the cutoff is indistinguishable from one still trading. Holdout
    rows live in `data/cup20/sealed/` under a different manifest hash.
 
-   What this layer does **not** claim: the holdout rows are not physically absent from the machine.
-   As deployed, `data/cup20/sealed/` sits on the same filesystem, under the same account, with the
-   same permissions as the in-sample snapshot, and so do the acquisition snapshot and the
-   organiser-only artifacts under `tournament/cup20/private/`. Nothing at the operating-system level
-   stops a team process from opening any of them. What is true is narrower and worth stating
-   precisely: those rows are **not in the team's data root**, so no ordinary path — a glob of the
-   data directory, a merge, a `read_parquet` of what was handed over — can reach them by accident.
-   Deliberate access is what layers 3 and 4 are for: the playbook prohibits every organiser-only
-   path by name, and the pre-flight source scan matches those paths against both the content and the
-   file names of the frozen archive before a single number is scored. Blindness therefore rests on
-   absence-from-the-data-root **plus** the prohibition **plus** the scan — not on absence alone.
+   What this layer does **not** claim: outside the quarantine window the holdout rows are not
+   physically absent from the machine. Once restored, `data/cup20/sealed/` sits on the same
+   filesystem, under the same account, with the same permissions as the in-sample snapshot, and so
+   do the acquisition snapshot and the organiser-only artifacts under `tournament/cup20/private/`.
+   Nothing at the operating-system level stops a process from opening any of them. What is true is
+   narrower and worth stating precisely: those rows are **not in the team's data root**, so no
+   ordinary path — a glob of the data directory, a merge, a `read_parquet` of what was handed over —
+   can reach them by accident. Deliberate access is what layers 3 and 4 are for: the playbook
+   prohibits every organiser-only path by name, and the pre-flight source scan matches those paths
+   against both the content and the file names of the frozen archive before a single number is
+   scored. Blindness therefore rests on custody **plus** absence-from-the-data-root **plus** the
+   prohibition **plus** the scan — not on absence alone.
 
    The same is true of version control, and for the same reason it is stated rather than claimed
    away: organiser artifacts that described the holdout were committed and later removed, and a
@@ -165,8 +186,38 @@ Owned entirely by the organiser. No team code touches any of it.
    surface, each of which is a pattern in `FORBIDDEN_PATTERNS` and a row in the playbook's
    prohibited table: `data/cup20/sealed/`, `data/cup20/acquisition/`,
    `tournament/cup20/private/` and the whole of `reports-cup20/`.
+
+   The pre-flight scan reads the frozen archive, which is the right surface for a gate and the
+   wrong one for a review: a team that left its evidence in a research note, a notebook, a log or a
+   `.pyc` hands in a clean archive. The integrity review therefore scans each team's **entire
+   workspace** — every regular file, no extension allowlist, no directory exclusions, symlinks
+   reported both as symlinks and by where they point, and any file too large to read reported
+   rather than skipped.
 4. **Future-corruption test.** The organiser corrupts every row strictly after each decision
    boundary and asserts byte-identical target weights. Failure is terminal.
+
+**The window custody cannot cover.** Scoring the finalists (phase 3) requires the sealed data to be
+present and readable, so two tripwires watch that window instead, and both are weaker than
+quarantine:
+
+- A **canary file** inside the sealed tree carries a high-entropy token that exists nowhere else.
+  The token turning up in any team artifact is evidence the tree's bytes were read and kept. It
+  detects a bulk read that persisted its output; it does **not** detect a targeted read of one
+  parquet file, which never touches the canary.
+- An **access-time tripwire**. Every sealed file's `atime` is back-dated 48 hours and the armed
+  value recorded, so that under `relatime` — which updates `atime` on read only when the stored
+  value is older than the file's own modification time or older than 24 hours — the next read is
+  always recorded. It does **not** work on a `noatime` mount (the report says so from
+  `/proc/mounts` rather than reporting a clean result), it can be bypassed with `O_NOATIME` by the
+  file's own owner, it can be reset by anyone who can call `utime`, and it says nothing about who
+  read the file or about a copy of the tree read elsewhere.
+
+**Reviewability.** After the tournament, the organiser runs the written procedure in
+`tournament/cup20/INTEGRITY-REVIEW.md` before advancing anyone: quarantine bracketed the whole
+research phase, every team's workspace scans clean, every nomination's frozen archive scans clean,
+every declared neighbourhood coordinate verifies against the frozen source, the journal chains
+verify, and the sealed manifest is unchanged from activation. The tournament's claim is not that
+cheating was impossible; it is that the record can be checked and says what happened.
 
 ## 6. Common risk unit
 
@@ -568,6 +619,10 @@ TOURNAMENT-CHARTER-CUP20.md          charter (meaning; authoritative on intent)
 tournament/cup20/
   config.toml                        machine contract (numbers; authoritative on policy)
   activation-freeze.json             binds charter+config+impl+lock+data+audit+tests
+  INTEGRITY-REVIEW.md                the post-tournament procedure, run before anyone advances
+  quarantine-receipt.json            where the holdout went, and what it must hash to on return
+  quarantine-restore.json            written on restore; its absence means custody still holds
+  sealed-access-baseline.json        armed access times for the phase-3 tripwire
   research-journal.jsonl             append-only, hash-chained
   nomination-registry.json
   selection-freeze.json
@@ -582,8 +637,10 @@ tournament/cup20/
 reports-cup20/{is/, holdout/, source-archives/sha256/}   ORGANISER-ONLY, gitignored
 data/cup20/{is/, sealed/, acquisition/}                  distinct manifests; only is/ is a team input
 src/crypto_trade/cup20/
-  config.py universe.py snapshot.py engine.py risk_unit.py journal.py
+  config.py universe.py snapshot.py engine.py risk_unit.py journal.py quarantine.py
   qualification.py scoring.py scored_metrics.py adjudication.py runner.py report.py paper.py
+scripts/cup20_quarantine.py          quarantine / restore / verify, from the command line
+scripts/cup20_integrity_review.py    runs every check in INTEGRITY-REVIEW.md and prints a verdict
 tests/cup20/
 ```
 
@@ -604,11 +661,17 @@ charter and config.
 | Phase | Content | Gate to exit |
 |---|---|---|
 | 0 | Charter, config, dual snapshot, universe, evaluator + risk unit, journal, qualification, scoring, tests | activation freeze recorded |
+| 0b | **Quarantine**: sealed + acquisition snapshots moved out of the working tree, canary planted, event journalled | receipt committed; `verify_quarantine_in_effect` passes |
 | 1 | 12 teams research IS in parallel (QR + QE per team), ≥8 trials, certificate, nominate | nomination registry closed at one journal head |
 | 2 | Mechanical qualification, falsification DQs, `G` ranking | selection freeze: top-3 + ensemble weights |
+| 2b | **Restore**: quarantined trees verified against the activation-bound digests and moved back; access tripwire armed | digests match; restore stamp written |
 | 3 | Holdout observations, private build, hash-verified bundle | single release authorisation |
-| 4 | Comparative Critic review, final report, ensemble report | leaderboard published |
+| 4 | Integrity review, comparative Critic review, final report, ensemble report | `INTEGRITY-REVIEW.md` passes; leaderboard published |
 | 5 | Six-month paper desk for the winner | forward gates pre-registered, parity asserted |
+
+Quarantine happens **before the first team starts**, and restore happens **only after the selection
+freeze exists**. Neither ordering is advisory: `quarantine_holdout` refuses to run twice and
+`restore_holdout` refuses to run at all until the selection freeze is on disk.
 
 ## 13. Authority and amendments
 
@@ -639,3 +702,20 @@ as a valid submission.
    deliberate consequence of levelling risk before comparing drawdowns, and it is disclosed rather
    than mitigated: a strategy whose edge depends on running at its own chosen scale is not one this
    tournament can rank.
+7. Blindness is enforced by the operating system only during quarantine (§5, layer 0). Phase 3
+   needs the sealed data readable, and every agent runs as one account, so during that window the
+   controls are detection rather than prevention. The residual, precisely: a phase-3 process that
+   reads one sealed parquet file directly, keeps nothing, and writes down only a conclusion leaves
+   no canary token, and its `atime` evidence is destroyed by anything that resets access times. No
+   control in this tournament closes that. What the record can show is narrower and is what §5
+   claims: that custody held for the whole research phase, that no workspace or archive carries
+   evidence of a read, and that the sealed bytes are the ones activation bound.
+
+   Two controls would close it, and neither is available here. Running each team agent under its
+   own operating-system account, with the sealed tree owned by the organiser at mode `0700`, would
+   make phase-3 blindness a kernel guarantee rather than a detection problem; it requires the agent
+   harness to launch processes as different users, which this repository does not control. A
+   kernel read audit (`auditd -w data/cup20/sealed -p r`, or an equivalent `fanotify`/eBPF watch)
+   would name the process and the moment of every read rather than inferring one from a timestamp;
+   it requires root. An organiser who can arrange either should, and should say so in the record —
+   both supersede the tripwires in §5 rather than supplementing them.

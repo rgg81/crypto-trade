@@ -25,7 +25,13 @@ from crypto_trade.cup20.qualification import (
     evaluate_floors,
     evaluate_holdout_eligibility,
 )
-from crypto_trade.cup20.scored_metrics import ASSEMBLED_METRIC_KEYS, ranking_metrics
+from crypto_trade.cup20.scored_metrics import (
+    ASSEMBLED_METRIC_KEYS,
+    STAGE_HOLDOUT,
+    STAGE_IN_SAMPLE,
+    ScoredVector,
+    ranking_metrics,
+)
 from crypto_trade.cup20.scoring import (
     RankedEntry,
     rank_entries,
@@ -87,6 +93,39 @@ class Adjudication:
         return tuple(candidate for candidate in self.candidates if not candidate.qualified)
 
 
+def _require_assembled_vector(
+    scored: Mapping[str, float], *, stage: str, subject: str
+) -> ScoredVector:
+    """Refuse to adjudicate metrics that cannot prove which stage produced them.
+
+    ``ASSEMBLED_METRIC_KEYS`` checks the SHAPE of a vector and nothing about its origin, so every
+    stage produces the same twenty-six keys and a vector from the wrong window passes that check
+    untouched. This is the check that closes it: a caller that assembled in-sample metrics --
+    correct window, correct folds, correct cost levels, every value finite -- and handed them to
+    the holdout adjudicator would otherwise have section 8's five conditions and ``G`` evaluated
+    against four years of research data, and nothing anywhere would raise. The wrong-window verdict
+    would simply be published.
+
+    A bare ``Mapping`` is refused rather than trusted. It may well be a correct vector, but the
+    only thing that makes it usable as evidence is a claim about where it came from, and it makes
+    no claim at all -- so the fail-closed direction is to reject it and require the caller to route
+    through :func:`~crypto_trade.cup20.scored_metrics.assemble_scored_metrics`, which is the one
+    place that knows.
+    """
+    if not isinstance(scored, ScoredVector):
+        raise ValueError(
+            f"{subject}: the scored vector carries no provenance, so it cannot be shown to have "
+            f"come from the {stage} stage. Assemble it with assemble_scored_metrics(stage="
+            f"{stage!r}, ...) rather than building the mapping by hand."
+        )
+    if scored.provenance.stage != stage:
+        raise ValueError(
+            f"{subject}: these metrics were assembled for the {scored.provenance.stage!r} stage "
+            f"({scored.provenance.describe()}), but they are being adjudicated as {stage!r}"
+        )
+    return scored
+
+
 def adjudicate_candidate(
     scored: Mapping[str, float],
     *,
@@ -118,6 +157,9 @@ def adjudicate_candidate(
             f"candidate {team_id}/{candidate_id}: the scored vector is missing {missing}; "
             "it must be an assembled metric vector, whose cost levels are the frozen policy"
         )
+    scored = _require_assembled_vector(
+        scored, stage=STAGE_IN_SAMPLE, subject=f"candidate {team_id}/{candidate_id}"
+    )
     gates = evaluate_floors(
         scored,
         floors=floors,
@@ -133,7 +175,7 @@ def adjudicate_candidate(
         return CandidateAdjudication(
             team_id=team_id,
             candidate_id=candidate_id,
-            scored=dict(scored),
+            scored=scored,
             ranking_inputs=inputs,
             gates=gates,
             score=None,
@@ -154,7 +196,7 @@ def adjudicate_candidate(
     return CandidateAdjudication(
         team_id=team_id,
         candidate_id=candidate_id,
-        scored=dict(scored),
+        scored=scored,
         ranking_inputs=inputs,
         gates=gates,
         score=robustness_score(inputs, drawdown_floor=drawdown_floor),
@@ -179,9 +221,13 @@ def adjudicate_holdout_candidate(
     there is exactly one right answer and section 8 states it.
 
     ``scored`` must be assembled over the SEALED window with ``holdout_folds`` -- the fold terms
-    of ``G`` are "computed over four 6-month holdout blocks". ``assemble_scored_metrics`` enforces
-    that its folds tile the window it was handed, so a caller that passed in-sample fold bounds
-    raises there rather than silently scoring four empty folds.
+    of ``G`` are "computed over four 6-month holdout blocks" -- and that is now VERIFIED here
+    rather than assumed of the caller. ``assemble_scored_metrics`` enforces that its folds tile the
+    window it was handed, which catches holdout folds against the in-sample window; it does not,
+    and cannot, catch the in-sample window paired with in-sample folds, because that combination is
+    internally consistent and produces a perfectly well-formed vector of the wrong four years.
+    :func:`_require_assembled_vector` is what closes it: the stage the vector was assembled for
+    travels with the numbers, and a vector assembled as ``in_sample`` is refused here by name.
     """
     missing = sorted(ASSEMBLED_METRIC_KEYS - set(scored))
     if missing:
@@ -189,6 +235,9 @@ def adjudicate_holdout_candidate(
             f"finalist {team_id}/{candidate_id}: the scored vector is missing {missing}; "
             "it must be an assembled metric vector, whose cost levels are the frozen policy"
         )
+    scored = _require_assembled_vector(
+        scored, stage=STAGE_HOLDOUT, subject=f"finalist {team_id}/{candidate_id}"
+    )
     gates = evaluate_holdout_eligibility(
         scored,
         holdout=holdout,
@@ -199,7 +248,7 @@ def adjudicate_holdout_candidate(
         return CandidateAdjudication(
             team_id=team_id,
             candidate_id=candidate_id,
-            scored=dict(scored),
+            scored=scored,
             ranking_inputs=inputs,
             gates=gates,
             score=None,
@@ -213,7 +262,7 @@ def adjudicate_holdout_candidate(
     return CandidateAdjudication(
         team_id=team_id,
         candidate_id=candidate_id,
-        scored=dict(scored),
+        scored=scored,
         ranking_inputs=inputs,
         gates=gates,
         score=robustness_score(inputs, drawdown_floor=float(holdout["max_drawdown"])),
