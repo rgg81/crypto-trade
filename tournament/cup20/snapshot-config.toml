@@ -2,10 +2,19 @@
 #
 # Acquisition config for the CUP-20 raw data build.
 #
-# The acquisition universe is deliberately WIDER than CUP-20's tournament universe: ranking by the
-# same trailing 180-day volume at size 60 makes the CUP-20 top-20 a provable subset (anything
-# ranked <= 25 by that measure is certainly ranked <= 60), which scripts/cup20_build_snapshot.py
-# then asserts by containment.
+# The acquisition universe is deliberately WIDER than CUP-20's tournament universe, because it
+# decides which symbols get funding and mark prices at all: `build_snapshot` fetches those only for
+# its OWN membership, so a CUP-20 member outside it arrives with bars and nothing else.
+#
+# `size` is therefore MEASURED, not argued. The plan's 60 rested on "anything ranked <= 25 by that
+# measure is certainly ranked <= 60", which is false twice over: the two rankings do not use the
+# same measure (CUP-20's `build_membership` ranks on the MEAN of daily quote volume, the
+# acquisition's `point_in_time_top40` on the MEDIAN), and the hysteresis exit rank is 25 rather
+# than 20. Ranking all 6220 CUP-20 member-boundary pairs under the acquisition's own median measure
+# gives a maximum rank of 113 (TRBUSDT, 2023-10-09; then XLMUSDT 83, HBARUSDT 79, RAVEUSDT 74), so
+# 60 excluded real members -- RAVEUSDT reached the CUP-20 top-20 in 2026 with 689 bars, zero funding
+# rows and zero mark prices, which the containment assertion in
+# scripts/cup20_build_snapshot.py caught. 150 clears the measured maximum by roughly a third.
 #
 # This file is NOT the tournament machine contract -- tournament/cup20/config.toml is. This one
 # only governs how raw Binance USD-M data is downloaded and verified.
@@ -65,7 +74,7 @@ forward_paper_start = "winner-freeze-next-8h-boundary"
 [universe]
 venue = "binance-usdm"
 instrument = "linear-usdt-perpetual"
-size = 60
+size = 150
 reconstitution = "weekly-monday-00:00-utc"
 liquidity_measure = "median-daily-quote-volume"
 trailing_days = 180
