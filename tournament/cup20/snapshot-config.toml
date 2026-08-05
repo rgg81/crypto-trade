@@ -30,7 +30,17 @@ checksum_policy = "require-binance-sha256-sidecar"
 parser_version = "cup20-snapshot-v1"
 
 [splits]
-in_sample_start = "2020-02-03"
+# The ACQUISITION's own evaluation start, not CUP-20's IS_START -- CUP-20's is computed by
+# `resolve_is_start` as the first weekly boundary whose top-20 is full (measured at 2020-08-17) and
+# is never written down here. This one only has to satisfy `_build_membership`, which requires a
+# non-empty size-60 universe at EVERY Monday from this date onward, and a symbol qualifies only
+# after 180 complete prior trading days (`trailing_days`/`minimum_history_days` below). Binance
+# USD-M's first contract listed 2019-09-08, so nothing at all qualifies until ~2020-03-06: the
+# plan's 2020-02-03 (inherited from the top-40 config, which used a 30-day window) fails closed
+# with "empty point-in-time universe at reconstitutions". 2020-04-06 is the first Monday with a
+# month of margin over that bound, and sits four months before CUP-20's IS_START, so the
+# acquisition membership still covers every boundary CUP-20 ships.
+in_sample_start = "2020-04-06"
 in_sample_end_inclusive = "2024-07-31"
 public_oos_start = "2024-08-01"
 public_oos_end_inclusive = "2026-07-31"

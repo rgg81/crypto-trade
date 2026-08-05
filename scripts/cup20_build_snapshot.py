@@ -136,15 +136,18 @@ def main() -> None:
 
     config = dict(load_config(TOURNAMENT_CONFIG).raw["universe"])
     membership, is_start = build_universe(bars, metadata, config)
+    membership = membership.loc[membership["reconstitution_time"] >= is_start].reset_index(
+        drop=True
+    )
 
-    # Containment: every CUP-20 member must exist in the audited acquisition universe.
+    # Containment: every CUP-20 member must exist in the audited acquisition universe. Checked on
+    # the SHIPPED membership, after the IS_START filter: the CUP-20 grid begins as soon as any
+    # symbol has a full lookback, which is earlier than the acquisition's own evaluation start, and
+    # a mismatch confined to boundaries that are then discarded is not a fact about the tournament.
     missing = set(membership["symbol"]) - set(acquired["symbol"].astype(str))
     if missing:
         raise SystemExit(f"CUP-20 members absent from the acquisition universe: {sorted(missing)}")
 
-    membership = membership.loc[membership["reconstitution_time"] >= is_start].reset_index(
-        drop=True
-    )
     members = sorted(set(membership["symbol"].astype(str)))
     is_members = _is_visible_symbols(membership)
     sealed_only = sorted(set(members) - is_members)
