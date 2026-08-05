@@ -74,7 +74,15 @@ def write_split_snapshots(
     is_end: pd.Timestamp,
     sealed_end: pd.Timestamp,
 ) -> tuple[SnapshotPaths, SnapshotPaths]:
-    """Write the IS snapshot (strictly before ``is_end``) and the sealed snapshot."""
+    """Write the IS snapshot (strictly before ``is_end``) and the sealed snapshot.
+
+    ``contract_metadata`` is timeless (see ``_TIME_COLUMN``) and ``_slice`` ships it whole into
+    every split -- correct for the sealed side (organiser-only, needs the truth), wrong for the IS
+    side: ``onboard_date`` and ``delivery_date`` are themselves future universe composition, the
+    same leak class as ``membership.reconstitution_time``, just carried by a different dataset.
+    ``_censor_contract_metadata_for_is`` scrubs both before the IS write; the sealed side is left
+    untouched.
+    """
     frames = {
         "bars": bars,
         "funding": funding,
@@ -83,6 +91,9 @@ def write_split_snapshots(
         "contract_metadata": contract_metadata,
     }
     is_frames = {name: _slice(name, frame, None, is_end) for name, frame in frames.items()}
+    is_frames["contract_metadata"] = _censor_contract_metadata_for_is(
+        is_frames["contract_metadata"], is_end
+    )
     sealed_frames = {
         name: _slice(name, frame, is_end, sealed_end) for name, frame in frames.items()
     }
@@ -137,6 +148,69 @@ def _require_unique_key(name: str, frame: pd.DataFrame, key_columns: list[str]) 
             f"{name} has duplicate rows for key {key_columns} (e.g. {example}); "
             "sort order would not be deterministic"
         )
+
+
+def _perpetual_delivery_sentinel(contract_metadata: pd.DataFrame) -> pd.Timestamp:
+    """The ``delivery_date`` value meaning "no scheduled delivery is known" -- derived from the
+    data itself as its single most common value, not hardcoded: the overwhelming majority of any
+    real contract universe is perpetual and shares one placeholder date (Binance's own convention
+    is ``2100-12-25T08:00:00Z`` / epoch ms ``4133404800000``). Deriving it here means this keeps
+    working unmodified if the exchange's own placeholder ever changes, rather than silently
+    drifting out of sync with a hardcoded literal.
+
+    Fails loudly rather than guessing: this value stands in for every post-cutoff
+    ``delivery_date`` in the IS snapshot, so an absent, null, or ambiguous derivation must raise --
+    never fail open into skipping censorship or picking an arbitrary candidate.
+    """
+    if "delivery_date" not in contract_metadata.columns or contract_metadata.empty:
+        raise ValueError(
+            "cannot derive a perpetual delivery sentinel: contract_metadata is empty or has no "
+            "delivery_date column"
+        )
+    values = pd.to_datetime(contract_metadata["delivery_date"], utc=True)
+    if values.isna().any():
+        raise ValueError("contract_metadata delivery_date contains null values")
+    mode = values.mode()
+    if len(mode) != 1:
+        raise ValueError(
+            "contract_metadata delivery_date has no single unambiguous mode across "
+            f"{len(contract_metadata)} rows -- cannot derive a perpetual sentinel"
+        )
+    return pd.Timestamp(mode.iloc[0])
+
+
+def _censor_contract_metadata_for_is(
+    contract_metadata: pd.DataFrame, is_end: pd.Timestamp
+) -> pd.DataFrame:
+    """Scrub future universe composition out of ``contract_metadata`` before it enters the IS
+    snapshot.
+
+    Two independent leaks, both future universe composition -- the same class this module's own
+    docstring calls out for the time-keyed datasets, just carried by columns rather than rows:
+
+      - A row whose ``onboard_date`` is at or after ``is_end`` was not listed yet as of the IS
+        cutoff. Its very presence -- let alone its ``onboard_date`` -- tells a team a symbol
+        exists before it does. Dropped entirely.
+      - A row whose ``delivery_date`` is at or after ``is_end`` carries a future delisting date no
+        IS-era observer could know. Replaced with the perpetual sentinel (see
+        ``_perpetual_delivery_sentinel``) -- the value the data itself already uses for
+        genuinely-perpetual contracts, so a censored row is indistinguishable from one that was
+        never going to delist at all.
+
+    A no-op when ``onboard_date`` / ``delivery_date`` are absent (older or synthetic fixtures
+    without them): nothing to censor.
+    """
+    frame = contract_metadata
+    if "onboard_date" in frame.columns:
+        onboard = pd.to_datetime(frame["onboard_date"], utc=True)
+        frame = frame.loc[onboard < is_end].reset_index(drop=True)
+    if frame.empty or "delivery_date" not in frame.columns:
+        return frame
+    sentinel = _perpetual_delivery_sentinel(frame)
+    delivery = pd.to_datetime(frame["delivery_date"], utc=True)
+    frame = frame.copy()
+    frame.loc[delivery >= is_end, "delivery_date"] = sentinel
+    return frame
 
 
 def _write(

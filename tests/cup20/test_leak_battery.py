@@ -252,29 +252,47 @@ def test_evaluation_is_bit_reproducible():
 
 
 def test_risk_unit_scales_realised_volatility_to_within_a_band_of_the_common_target():
-    """A band on the ratio to target, not a comparison against the unscaled book.
+    """A structural guarantee (scaled must differ from unscaled) PLUS a tight band on the ratio to
+    target -- neither alone is enough.
 
-    The original form (``|scaled - target| < |unscaled - target|``) reduces algebraically to
-    ``scaled < unscaled`` whenever unscaled sits comfortably above target -- true on this fixture,
-    where unscaled realises ~2x target. That is satisfied by ANY shrink at all: a risk unit
-    permanently pinned to ``minimum_scale``, one that annualises with the wrong bars-per-year, or
-    one hardcoded to a small fixed multiplier would all still pass. A band on ``scaled / target``
-    is falsifiable against exactly that failure class while staying robust on synthetic data: on
-    the real, correctly-scaled pipeline the ratio lands at ~1.02 (empirically probed as part of
-    fix-round 1), comfortably inside ``[0.5, 2.0]`` with wide margin in both directions.
+    The band alone is not a guaranteed catch: ``scaled_vol ~= target / sqrt(bars_per_year)``, so
+    ``ratio ~= sqrt(1095 / B)`` for whatever ``bars_per_year=B`` the implementation actually uses
+    -- independent of this fixture's data entirely. Fix-round 1 shipped ``[0.5, 2.0]``, which
+    admits any ``B`` in (273.75, 4380): ``B=365`` (annualising 8h bars as if they were daily -- the
+    single most plausible mistake) lands at ratio ~1.75, comfortably inside that band. Tightened
+    here to ``[0.85, 1.20]``: the real, correctly-scaled pipeline measures ~1.016 (empirically
+    probed as part of fix-round 2), keeping ~18% headroom while rejecting ``B=365`` (~1.75),
+    ``B=252`` (~2.05), an inert risk unit (~2.01), and a risk unit pinned to ``minimum_scale``
+    (~0.40) -- see the fix-round-2 report for the exact reproduction.
+
+    The structural assertion exists because no band, however tight, is a GUARANTEED catch on its
+    own: a coincidentally in-range ratio is still possible for some wrong ``B``, and fix-round 1's
+    own ``[0.5, 2.0]`` band let the single most realistic wiring bug (an inert risk unit --
+    ``run_candidate`` passing unscaled ``targets`` instead of ``scaled_targets``, or
+    ``apply_risk_scalars`` degenerating into a no-op) through with only a 0.6% margin. When that
+    mutation is present, ``run.results[1]`` and ``run.unscaled`` are evaluated from IDENTICAL
+    target weights at the SAME 1x cost multiplier and are therefore bit-identical -- a fact true
+    regardless of the fixture's volatility, the target, or any band. ``run.unscaled`` was otherwise
+    referenced nowhere in this file.
     """
     snapshot = _synthetic()
     grid = decision_grid(snapshot.bars["open_time"].min(), snapshot.bars["open_time"].max())
     run = _run(snapshot, grid)
     scaled = run.results[1].returns["net_return"]
+    unscaled = run.unscaled.returns["net_return"]
     target = 0.10 / np.sqrt(1095)
     tail = slice(300, None)
     # Not vacuous: std() of an empty/all-NaN slice is NaN, and every comparison with NaN is False
     # -- the band assertion below already fails closed on that, but an explicit check here reports
     # the actual cause instead of a bare "assert False".
     assert len(scaled.iloc[tail]) > 0
+
+    # Guaranteed catch, independent of the band: the scaled and unscaled books must not be the
+    # same evaluation wearing two names.
+    assert not scaled.equals(unscaled)
+
     ratio = scaled.iloc[tail].std() / target
-    assert 0.5 <= ratio <= 2.0
+    assert 0.85 <= ratio <= 1.20
 
 
 def test_costs_are_strictly_monotone_in_the_multiplier():
@@ -357,6 +375,77 @@ def test_is_snapshot_written_to_disk_contains_no_sealed_row(tmp_path):
         assert sealed_frame[column].min() >= cutoff, (
             f"sealed {name} contains a row before the IS cutoff"
         )
+
+
+def test_is_snapshot_censors_future_contract_metadata(tmp_path):
+    """``contract_metadata`` is timeless (``crypto_trade/cup20/snapshot.py``'s own
+    ``_TIME_COLUMN`` mapping) and would otherwise ship WHOLE, unfiltered, into the IS snapshot --
+    but ``onboard_date`` and ``delivery_date`` are themselves future universe composition: exactly
+    the leak class this battery treats as CRITICAL for ``membership.reconstitution_time``, just
+    carried by columns instead of rows. Found live in prior-tournament metadata during fix-round 2
+    (147 of 667 symbols carry a genuine delist date; 112 of those fall inside the sealed window),
+    not merely as an unasserted test gap.
+
+    A symbol that delists inside the sealed window, and a symbol that isn't even listed until
+    inside the sealed window, must both reveal nothing of that in the IS snapshot; the sealed
+    snapshot must still carry the truth.
+    """
+    snapshot = _synthetic()
+    cutoff = pd.Timestamp("2021-06-01T00:00:00Z")
+    sealed_end = pd.Timestamp("2022-01-01T00:00:00Z")
+    # Binance's own real convention for "no delivery date scheduled" -- used here only to build a
+    # realistic fixture. write_split_snapshots derives this value from the data itself rather than
+    # trusting this literal (see snapshot.py's _perpetual_delivery_sentinel).
+    perpetual_sentinel = pd.Timestamp("2100-12-25T08:00:00Z")
+    delisting_date = pd.Timestamp("2021-09-01T00:00:00Z")  # inside the sealed window
+    onboard_date = pd.Timestamp("2021-08-01T00:00:00Z")  # also inside the sealed window
+
+    existing_symbols = list(snapshot.contract_metadata["symbol"])
+    delisting_symbol = existing_symbols[0]
+    not_yet_listed_symbol = "EUSDT"
+    metadata = pd.DataFrame(
+        {
+            "symbol": [*existing_symbols, not_yet_listed_symbol],
+            "contract_type": "PERPETUAL",
+            "onboard_date": [pd.Timestamp("2020-01-01T00:00:00Z")] * len(existing_symbols)
+            + [onboard_date],
+            "delivery_date": [perpetual_sentinel] * (len(existing_symbols) + 1),
+        }
+    )
+    metadata.loc[metadata["symbol"] == delisting_symbol, "delivery_date"] = delisting_date
+
+    is_paths, sealed_paths = write_split_snapshots(
+        snapshot.bars,
+        snapshot.funding,
+        snapshot.mark_prices,
+        snapshot.membership,
+        metadata,
+        is_root=tmp_path / "is",
+        sealed_root=tmp_path / "sealed",
+        is_end=cutoff,
+        sealed_end=sealed_end,
+    )
+    is_metadata = load_snapshot(is_paths.root).contract_metadata
+    sealed_metadata = load_snapshot(sealed_paths.root).contract_metadata
+
+    # The not-yet-onboarded symbol is entirely absent from the IS snapshot -- its presence alone
+    # would leak that it exists before it does -- but present in the sealed one.
+    assert not_yet_listed_symbol not in set(is_metadata["symbol"])
+    assert not_yet_listed_symbol in set(sealed_metadata["symbol"])
+
+    # The delisting symbol's real future date never appears in the IS snapshot -- censored to the
+    # perpetual sentinel, indistinguishable from a genuinely-perpetual contract -- but the sealed
+    # snapshot still carries the truth.
+    is_row = is_metadata.loc[is_metadata["symbol"] == delisting_symbol]
+    assert len(is_row) == 1, "the delisting symbol itself must still be present pre-cutoff"
+    assert pd.Timestamp(is_row["delivery_date"].iloc[0]) == perpetual_sentinel
+    sealed_row = sealed_metadata.loc[sealed_metadata["symbol"] == delisting_symbol]
+    assert len(sealed_row) == 1
+    assert pd.Timestamp(sealed_row["delivery_date"].iloc[0]) == delisting_date
+
+    # No row in the IS snapshot carries a real (non-sentinel) date at or after the cutoff.
+    is_delivery = pd.to_datetime(is_metadata["delivery_date"], utc=True)
+    assert ((is_delivery < cutoff) | (is_delivery == perpetual_sentinel)).all()
 
 
 # --- Public-surface completeness -----------------------------------------------------------
