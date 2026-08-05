@@ -217,10 +217,33 @@ def test_truncated_last_line_raises_a_value_error(tmp_path):
     # Chop well inside the final record's JSON object -- not just the trailing newline (which
     # read_records tolerates fine) -- so the last line is syntactically broken JSON.
     path.write_text(text[:-20])
-    # json.JSONDecodeError is a ValueError subclass, so "raising ValueError on any break" holds
-    # here too, even though this is a parse failure rather than one of verify_chain's own three
-    # named integrity checks -- see the task report for the honest caveat on this specific case.
-    with pytest.raises(ValueError):
+    # Fix round 1, Finding 2: read_records now wraps the per-line parse and names the actual
+    # record position (2 here -- the second and last record) instead of raising the raw
+    # json.JSONDecodeError, whose own line/column numbers are always relative to that one line
+    # (always "line 1") and would otherwise misreport the position in a multi-record file.
+    with pytest.raises(ValueError, match="position 2"):
+        verify_chain(path)
+
+
+def test_malformed_json_names_the_broken_records_position_not_line_one(tmp_path):
+    """Fix round 1, Finding 2: each line is parsed independently, so json.JSONDecodeError's own
+    line/column numbers are relative to that single line's own content -- always "line 1" no
+    matter which record actually broke, confirmed empirically by the reviewer on a five-record
+    file with record four truncated. Corrupting the FOURTH of five records (not the first, and
+    not via a whole-file tail truncation like the sibling test above) means an implementation
+    that still reports "line 1", or that merely re-raises the raw JSONDecodeError untouched,
+    cannot pass this by coincidence.
+    """
+    path = tmp_path / "journal.jsonl"
+    for i in range(5):
+        append_record(path, "trial_accepted", {"team_id": "team-01", "i": i})
+    lines = path.read_text().splitlines()
+    lines[3] = lines[3][:-10]  # corrupt record 4 (0-indexed 3) specifically
+    path.write_text("\n".join(lines) + "\n")
+
+    with pytest.raises(ValueError, match="position 4"):
+        read_records(path)
+    with pytest.raises(ValueError, match="position 4"):
         verify_chain(path)
 
 
@@ -295,6 +318,49 @@ def test_accepted_trial_count_ignores_payload_missing_team_id(tmp_path):
     append_record(path, "trial_accepted", {"candidate_id": "c1"})  # no team_id key at all
     append_record(path, "trial_accepted", {"team_id": "team-01"})
     assert accepted_trial_count(path, "team-01") == 1
+
+
+def test_accepted_trial_count_skips_a_non_mapping_payload_without_crashing(tmp_path):
+    """Fix round 1, Finding 1: `record.get("payload", {}).get("team_id")` only substitutes the
+    `{}` default when the "payload" KEY is missing, not when its VALUE is present but not a
+    mapping (e.g. a corrupted or hand-edited `payload: null`) -- that used to raise
+    AttributeError. Because the scan walks every record for every team's query, one such
+    record anywhere in the shared journal broke EVERY team's count, not just its own -- an
+    availability attack on the exact disqualification computation this journal exists to
+    protect. Chosen fix: skip (never raise) a non-mapping payload, since it cannot name any
+    team and so is treated exactly like a mapping that is simply missing the team_id key; full
+    reasoning for skip over raise is in the fix-round report section. This test proves both
+    halves: no crash, AND other teams' counts are completely unaffected by the malformed
+    record.
+    """
+    path = tmp_path / "journal.jsonl"
+    append_record(path, "trial_accepted", {"team_id": "team-01"})
+    append_record(path, "trial_accepted", {"team_id": "team-02"})
+
+    # Splice in a record with a non-mapping payload, correctly re-chained. This must be built
+    # by direct file manipulation -- append_record's own `dict(payload)` call rejects
+    # payload=None outright -- matching the same write-access threat model as the rest of this
+    # module's tamper tests: a hand-edited or corrupted journal, not a legitimate append.
+    records = list(read_records(path))
+    malformed = {
+        "schema_version": records[-1]["schema_version"],
+        "sequence": len(records) + 1,
+        "event_type": "trial_accepted",
+        "payload": None,
+        "previous_sha256": records[-1]["record_sha256"],
+    }
+    malformed["record_sha256"] = _adversarial_digest(malformed)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(malformed, sort_keys=True, separators=(",", ":")) + "\n")
+
+    # verify_chain does not inspect payload's type at all -- only sequence/previous/digest --
+    # so the malformed record is, correctly, still part of a perfectly valid chain.
+    assert verify_chain(path) == 3
+
+    # No crash, and the malformed record must not affect ANY other team's count.
+    assert accepted_trial_count(path, "team-01") == 1
+    assert accepted_trial_count(path, "team-02") == 1
+    assert accepted_trial_count(path, "team-03") == 0
 
 
 # --- digest exclusion is by key NAME, at the TOP LEVEL of the record only ---

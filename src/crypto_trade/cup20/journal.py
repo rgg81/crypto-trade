@@ -25,11 +25,28 @@ def _record_digest(record: Mapping[str, Any]) -> str:
 
 
 def read_records(path: str | Path) -> tuple[dict[str, Any], ...]:
-    """Every record in file order."""
+    """Every record in file order.
+
+    Raises ValueError naming the record's position if a line is not valid JSON. Each line is
+    parsed independently, so json.JSONDecodeError's own line/column numbers are relative to
+    that single line's content and would otherwise always misreport "line 1" regardless of
+    which record in the file actually broke.
+    """
     journal = Path(path)
     if not journal.exists():
         return ()
-    return tuple(json.loads(line) for line in journal.read_text().splitlines() if line.strip())
+    records: list[dict[str, Any]] = []
+    for line in journal.read_text().splitlines():
+        if not line.strip():
+            continue
+        position = len(records) + 1
+        try:
+            records.append(json.loads(line))
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                f"journal record at position {position} is not valid JSON: {exc}"
+            ) from exc
+    return tuple(records)
 
 
 def append_record(path: str | Path, event_type: str, payload: Mapping[str, Any]) -> str:
@@ -66,10 +83,18 @@ def verify_chain(path: str | Path) -> int:
 
 
 def accepted_trial_count(path: str | Path, team_id: str) -> int:
-    """Count accepted material trials for one team."""
+    """Count accepted material trials for one team.
+
+    A payload that is not itself a mapping (for example a hand-edited or corrupted
+    `payload: null`) cannot name any team, so the record is skipped for every team's count --
+    the same graceful non-match already given to a mapping that is simply missing the
+    `team_id` key -- rather than raising and denying every other team's count over one
+    malformed record elsewhere in the shared journal.
+    """
     return sum(
         1
         for record in read_records(path)
         if record.get("event_type") == "trial_accepted"
+        and isinstance(record.get("payload"), Mapping)
         and record.get("payload", {}).get("team_id") == team_id
     )
