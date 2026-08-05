@@ -372,72 +372,86 @@ def test_tie_break_level_4_team_id_full_chain():
     assert ordered == ["team-01", "team-05", "team-12"]
 
 
-# --- non-finite values IN the tie-break metrics themselves (item a) ------------------------
+# --- non-finite tie-break metrics now fail loudly, not silently (fix round 1, finding 1) ---
 #
-# +inf and -inf are perfectly well-defined against any finite float (`5.0 < inf` and `inf < 5.0`
-# are never simultaneously ambiguous), so these six cases get the same adversarial-team_id
-# treatment as the tie-break-level tests above and assert a specific, correct winner. NaN is
-# different in kind -- see the two tests further down.
+# Coordinator finding: rank_entries had no floor upstream to actually rely on -- the reviewer
+# grepped the package and found rank_entries/robustness_score/select_advancing have zero
+# callers outside this test file, so "Task 6/9 already guarantee finite input" was not a
+# designed safeguard, just the absence of any real caller at all. The brief's own global
+# constraint ("ranking must be a total order -- no dependence on input sequence") carries no
+# upstream-filtering carve-out. Fixed by failing closed instead of inventing a NaN/+inf/-inf
+# ordering policy across three differently-oriented fields: `_finite_tie_break` raises
+# `ValueError` naming the offending team and field, mirroring qualification.py's own convention
+# ("a missing key raises; a non-finite value fails"). This SUPERSEDES three tests this fix round
+# removed: a 6-case battery asserting +inf/-inf resolved a winner directionally (they now raise,
+# same as NaN, instead of resolving anything); a test asserting NaN "does not crash the sort"
+# (it now DOES raise, intentionally -- that is the fix); and a test that documented the
+# permutation-invariance gap as a known, unfixed limitation (the gap is closed: a non-finite
+# tie-break value can no longer silently reach any comparison, input-order-dependent or not).
 
-TIE_BREAK_INFINITY_CASES = [
-    # field, value given to entry "x", does x win (rank first)?
-    ("max_drawdown", float("inf"), False),  # larger drawdown is worse -> x loses
-    ("max_drawdown", float("-inf"), True),  # "smaller" drawdown is best -> x wins
-    ("worst_fold_sharpe", float("inf"), True),  # higher worst-fold sharpe is better -> x wins
-    ("worst_fold_sharpe", float("-inf"), False),  # lower is worse -> x loses
-    ("annualized_turnover", float("inf"), False),  # larger turnover is worse -> x loses
-    ("annualized_turnover", float("-inf"), True),  # "smaller" turnover is best -> x wins
-]
-
-
-@pytest.mark.parametrize(("field", "value", "x_should_win"), TIE_BREAK_INFINITY_CASES)
-def test_infinite_tie_break_metric_resolves_in_the_correct_direction(field, value, x_should_win):
-    base_scored = dict(BASE, max_drawdown=0.10, worst_fold_sharpe=0.5, annualized_turnover=10.0)
-    x_team_id = "team-99" if x_should_win else "team-01"
-    y_team_id = "team-01" if x_should_win else "team-99"
-    entry_x = RankedEntry(x_team_id, "cx", 50.0, dict(base_scored, **{field: value}))
-    entry_y = RankedEntry(y_team_id, "cy", 50.0, dict(base_scored))
-    ordered = [entry.team_id for entry in rank_entries([entry_x, entry_y])]
-    assert ordered == ["team-99", "team-01"]
+NON_FINITE_TIE_BREAK_FIELDS = ["max_drawdown", "worst_fold_sharpe", "annualized_turnover"]
+NON_FINITE_TIE_BREAK_VALUES = [float("nan"), float("inf"), float("-inf")]
 
 
-def test_nan_in_a_tied_drawdown_field_does_not_crash_the_sort():
-    """Characterizes defence-in-depth behaviour; does not claim it is a full guarantee.
+@pytest.mark.parametrize("field", NON_FINITE_TIE_BREAK_FIELDS)
+@pytest.mark.parametrize("value", NON_FINITE_TIE_BREAK_VALUES)
+def test_non_finite_tie_break_metric_raises_naming_the_team_and_field(value, field):
+    # A single entry is enough: the finiteness check runs unconditionally while building each
+    # entry's sort key -- the same "eager, not lazy" evaluation already proven by
+    # test_missing_tie_break_metric_raises_even_when_scores_differ below -- so it does not
+    # require an actual tie, or even a second entry, to fire.
+    scored = dict(BASE, max_drawdown=0.10, worst_fold_sharpe=0.5, annualized_turnover=10.0)
+    scored[field] = value
+    entries = [RankedEntry("team-07", "c7", 50.0, scored)]
+    with pytest.raises(ValueError) as excinfo:
+        rank_entries(entries)
+    message = str(excinfo.value)
+    assert "team-07" in message
+    assert field in message
 
-    Metrics reaching this module are expected to be finite (Task 6 emits named finite
-    sentinels instead of infinities/NaN). This is the "should never happen" case: it must not
-    crash, and for a FIXED input order it must be deterministic. See the next test for what it
-    is NOT guaranteed to do (permutation invariance), and task-10-report.md for the writeup.
-    """
-    tied = dict(BASE, worst_fold_sharpe=0.5, annualized_turnover=10.0)
-    entry_a = RankedEntry("team-a", "ca", 50.0, dict(tied, max_drawdown=float("nan")))
-    entry_b = RankedEntry("team-b", "cb", 50.0, dict(tied, max_drawdown=0.10))
-    ranked = rank_entries([entry_a, entry_b])
-    assert {entry.team_id for entry in ranked} == {"team-a", "team-b"}
+
+def test_select_advancing_also_raises_on_a_non_finite_tie_break_metric():
+    # Not explicitly requested, but cheap and directly on point: select_advancing delegates
+    # straight to rank_entries, and it is the function that actually picks who advances -- the
+    # guard must be visible through that entry point too, not just the one this fix round tests
+    # most heavily.
+    scored = dict(BASE, max_drawdown=float("nan"), worst_fold_sharpe=0.5, annualized_turnover=10.0)
+    entries = [RankedEntry("team-07", "c7", 50.0, scored)]
+    with pytest.raises(ValueError, match="max_drawdown"):
+        select_advancing(entries, slots=3)
 
 
-def test_nan_tie_break_metric_breaks_permutation_invariance_known_limitation():
-    """Documents, empirically and exactly, a real gap against the global constraint
-    "ranking must be a total order -- no dependence on input sequence."
-
-    Python tuple/sort comparison with NaN is not a total order: `nan < x` and `x < nan` are
-    both False, so once every key up to and including a NaN-valued tie-break field is tied
-    between two entries, they compare as mutually "not less than" and Timsort leaves their
-    RELATIVE input order undisturbed -- so the output depends on which one appeared first in
-    the input. Reproduced directly below (not asserted as a contract to be relied on). Not
-    fixed here: rank_entries is transcribed verbatim from the brief, which -- unlike _clamp --
-    specifies no non-finite handling for the raw tie-break comparison keys, and Task 6 already
-    guarantees finite metrics reach this layer, so the scenario is outside the contracted
-    domain. Flagged in task-10-report.md for a coordinator fix-round decision.
-    """
-    tied = dict(BASE, worst_fold_sharpe=0.5, annualized_turnover=10.0)
-    entry_a = RankedEntry("team-a", "ca", 50.0, dict(tied, max_drawdown=float("nan")))
-    entry_b = RankedEntry("team-b", "cb", 50.0, dict(tied, max_drawdown=0.10))
-    forward = [entry.team_id for entry in rank_entries([entry_a, entry_b])]
-    backward = [entry.team_id for entry in rank_entries([entry_b, entry_a])]
-    assert forward == ["team-a", "team-b"]
-    assert backward == ["team-b", "team-a"]
-    assert forward != backward  # the documented gap, proven rather than asserted away
+def test_all_finite_tie_break_metrics_rank_normally_after_the_finiteness_guard():
+    # The guard must not false-positive on legitimate data. Reuses the same multi-level tie
+    # structure as test_ranking_is_invariant_to_input_order_across_all_tie_break_levels below
+    # (unique top score; a tie broken first by drawdown, then by worst_fold_sharpe; unique
+    # bottom score) to prove the fix leaves ordinary, all-finite ranking untouched.
+    top = RankedEntry(
+        "team-04",
+        "c4",
+        80.0,
+        dict(BASE, max_drawdown=0.10, worst_fold_sharpe=0.5, annualized_turnover=10.0),
+    )
+    tied_best = RankedEntry(
+        "team-01",
+        "c1",
+        60.0,
+        dict(BASE, max_drawdown=0.05, worst_fold_sharpe=0.9, annualized_turnover=10.0),
+    )
+    tied_worst = RankedEntry(
+        "team-07",
+        "c7",
+        60.0,
+        dict(BASE, max_drawdown=0.05, worst_fold_sharpe=0.5, annualized_turnover=10.0),
+    )
+    bottom = RankedEntry(
+        "team-11",
+        "c11",
+        40.0,
+        dict(BASE, max_drawdown=0.20, worst_fold_sharpe=0.1, annualized_turnover=10.0),
+    )
+    ordered = [entry.team_id for entry in rank_entries([bottom, tied_worst, top, tied_best])]
+    assert ordered == ["team-04", "team-01", "team-07", "team-11"]
 
 
 def test_missing_tie_break_metric_raises_even_when_scores_differ():

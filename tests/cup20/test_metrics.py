@@ -12,6 +12,7 @@ from crypto_trade.cup20.metrics import (
     fold_sharpes,
     holdout_folds,
     is_folds,
+    max_drawdown,
     window_metrics,
 )
 from crypto_trade.tournament.engine_v2 import EvaluationResult
@@ -252,3 +253,41 @@ def test_long_and_short_gross_pnl_are_independent_role_sums():
 
     assert metrics.long_gross_pnl == pytest.approx(float(long_price.sum() + long_funding.sum()))
     assert metrics.short_gross_pnl == pytest.approx(float(short_price.sum() + short_funding.sum()))
+
+
+# --- Task 10 fix round 1: max_drawdown must not fail open on ruin --------------------------
+#
+# A -100% day sends compounded equity to exactly zero (0/0 in the peak-to-trough ratio -> NaN,
+# plus a RuntimeWarning). Anything worse than -100% sends it negative, where the ratio is
+# arithmetically defined but dishonest: a negative running peak can make the formula report a
+# SMALLER drawdown than an ordinary, non-ruinous loss -- exactly the fail-open a book that lost
+# everything must never receive. `max_drawdown` is public (like `sharpe`, per Task 6's own
+# report) and tested directly here, the same way the coordinator's own repro called it.
+
+
+def test_max_drawdown_reports_the_ceiling_on_exact_total_loss():
+    # A single -100% day: compounded equity hits exactly 0.0, so the ratio is 0/0.
+    drawdown = max_drawdown(pd.Series([-1.0, 0.0, 0.0]))
+    assert drawdown == pytest.approx(1.0)
+    assert math.isfinite(drawdown)
+
+
+def test_max_drawdown_reports_the_ceiling_on_worse_than_total_loss():
+    # A -150% day (leveraged ruin beyond total loss): compounded equity goes negative. The bare
+    # ratio formula would report 0.0 here (verified against the unpatched function before this
+    # fix) -- the single worst possible answer for the single worst possible book.
+    drawdown = max_drawdown(pd.Series([-1.5, 0.0, 0.0]))
+    assert drawdown == pytest.approx(1.0)
+    assert math.isfinite(drawdown)
+    assert drawdown != 0.0
+
+
+def test_window_metrics_stays_finite_through_ruin_end_to_end():
+    # Not explicitly requested, but Task 13 serialises WindowMetrics as a whole, not just the
+    # bare function -- confirms the fix survives daily_returns()'s compounding and calmar's own
+    # division by drawdown, with nothing downstream reintroducing NaN or a RuntimeWarning.
+    bars = [0.05, 0.0, 0.0, -1.5, 0.0, 0.0] + [0.0] * 84
+    metrics = window_metrics(_result(bars))
+    assert metrics.max_drawdown == pytest.approx(1.0)
+    assert math.isfinite(metrics.max_drawdown)
+    assert math.isfinite(metrics.calmar)

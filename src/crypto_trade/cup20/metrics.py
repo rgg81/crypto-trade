@@ -109,11 +109,21 @@ def sharpe(series: pd.Series) -> float:
 
 
 def max_drawdown(series: pd.Series) -> float:
-    """Maximum peak-to-trough decline of the compounded curve, as a non-negative magnitude."""
+    """Maximum peak-to-trough decline of the compounded curve, as a non-negative magnitude.
+
+    Compounded equity reaching zero or below is total ruin, reported as the 1.0 (100%) ceiling
+    rather than through the peak-to-trough ratio: at equity == 0 the ratio is a 0/0 division
+    (NaN); at equity < 0 it is arithmetically defined but dishonest, since a negative running
+    peak inverts the ratio's sign and can report a SMALLER number than an ordinary drawdown (a
+    book that lost more than everything must never score better than one that merely lost a lot).
+    Ruin is checked before any division runs, so this never raises a RuntimeWarning either.
+    """
     values = series.dropna().to_numpy(dtype=float)
     if values.size == 0:
         return 0.0
     equity = np.cumprod(1.0 + values)
+    if np.any(equity <= 0.0):
+        return 1.0
     peaks = np.maximum.accumulate(equity)
     return float(np.max(1.0 - equity / peaks))
 

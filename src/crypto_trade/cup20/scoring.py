@@ -53,6 +53,25 @@ def robustness_score(scored: Mapping[str, float], *, drawdown_floor: float) -> f
     )
 
 
+def _finite_tie_break(entry: RankedEntry, field: str) -> float:
+    """Read a tie-break metric, failing loudly rather than sorting on it if it isn't finite.
+
+    Unlike the six ``robustness_score`` components, a tie-break metric is never routed through
+    ``_clamp``: it is a raw comparison key, and NaN in particular is not a total order (``nan <
+    x`` and ``x < nan`` are both False), so it can silently make the resulting ranking depend on
+    input order — the ranking must be a total order with no dependence on input sequence, no
+    exception carved out for "upstream should have filtered this." Rather than invent a NaN/
+    ``+inf``/``-inf`` ordering policy across three differently-oriented fields, this fails
+    closed the same way ``qualification.py`` does for the hard floors: a non-finite value fails.
+    """
+    value = float(entry.scored[field])
+    if not math.isfinite(value):
+        raise ValueError(
+            f"team {entry.team_id!r}: tie-break metric {field!r} is not finite: {value!r}"
+        )
+    return value
+
+
 def rank_entries(entries: Sequence[RankedEntry]) -> tuple[RankedEntry, ...]:
     """Descending score, then lower drawdown, higher worst fold, lower turnover, team id."""
     return tuple(
@@ -60,9 +79,9 @@ def rank_entries(entries: Sequence[RankedEntry]) -> tuple[RankedEntry, ...]:
             entries,
             key=lambda entry: (
                 -entry.score,
-                float(entry.scored["max_drawdown"]),
-                -float(entry.scored["worst_fold_sharpe"]),
-                float(entry.scored["annualized_turnover"]),
+                _finite_tie_break(entry, "max_drawdown"),
+                -_finite_tie_break(entry, "worst_fold_sharpe"),
+                _finite_tie_break(entry, "annualized_turnover"),
                 entry.team_id,
             ),
         )
