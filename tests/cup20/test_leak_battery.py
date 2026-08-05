@@ -606,6 +606,125 @@ def test_is_snapshot_preserves_real_delivery_date_for_pre_cutoff_delistings(tmp_
     assert is_row["metadata_source"].iloc[0] == "archive_inference"
 
 
+def test_is_snapshot_normalises_archive_markers_even_at_the_delivery_sentinel(tmp_path):
+    """The residual coupling fix-round 3 left behind, found while assembling activation.
+
+    Round 3 normalised ``metadata_source`` / ``underlying_type`` only for rows selected by
+    ``censor_mask`` -- and that mask deliberately EXCLUDES rows already sitting at the perpetual
+    sentinel. Those two conditions answer different questions: the mask asks "is this delivery DATE
+    a real future date", the markers ask "has this contract already delisted, whenever that was".
+    A row satisfying the second but not the first therefore kept its archive markers in the IS
+    snapshot, and an archive marker on a symbol still trading at the cutoff reconstructs a
+    post-cutoff delisting with no help from the date at all.
+
+    Not hypothetical in general, only in today's data: ``_perpetual_delivery_sentinel`` derives the
+    sentinel as the MODE of ``delivery_date``, so any member set whose dominant delivery date is
+    shared by archive-inferred rows produces exactly this row shape. The acquisition pipeline
+    currently keeps them apart by construction (its archive branch dates rows at
+    ``min(last_bar + 8h, hard_end)``, never at 2100-12-25), which is a property of today's
+    ``hard_end`` -- not an invariant this module is entitled to assume.
+
+    Every metadata row here carries the sentinel, so ``censor_mask`` is empty and the pre-fix code
+    returns the frame untouched: this test fails against it.
+    """
+    snapshot = _synthetic()
+    cutoff = pd.Timestamp("2021-06-01T00:00:00Z")
+    sealed_end = pd.Timestamp("2022-01-01T00:00:00Z")
+    perpetual_sentinel = pd.Timestamp("2100-12-25T08:00:00Z")
+
+    symbols = list(snapshot.contract_metadata["symbol"])
+    delisted_symbol = symbols[0]
+    metadata = snapshot.contract_metadata.copy()
+    metadata.loc[metadata["symbol"] == delisted_symbol, "underlying_type"] = "ARCHIVE_INFERRED_COIN"
+    metadata.loc[metadata["symbol"] == delisted_symbol, "metadata_source"] = "archive_inference"
+    assert (pd.to_datetime(metadata["delivery_date"], utc=True) == perpetual_sentinel).all(), (
+        "the fixture must leave every delivery_date at the sentinel, or censor_mask is non-empty "
+        "and this test no longer isolates the marker path"
+    )
+
+    is_paths, sealed_paths = write_split_snapshots(
+        snapshot.bars,
+        snapshot.funding,
+        snapshot.mark_prices,
+        snapshot.membership,
+        metadata,
+        is_root=tmp_path / "is",
+        sealed_root=tmp_path / "sealed",
+        is_end=cutoff,
+        sealed_end=sealed_end,
+    )
+    is_metadata = load_snapshot(is_paths.root).contract_metadata
+    sealed_metadata = load_snapshot(sealed_paths.root).contract_metadata
+
+    is_row = is_metadata.loc[is_metadata["symbol"] == delisted_symbol]
+    assert len(is_row) == 1
+    assert is_row["metadata_source"].iloc[0] == "current_exchangeInfo"
+    assert is_row["underlying_type"].iloc[0] == "COIN"
+    assert pd.Timestamp(is_row["delivery_date"].iloc[0]) == perpetual_sentinel
+    for column in ("metadata_source", "underlying_type", "delivery_date"):
+        assert is_metadata[column].nunique() == 1, (
+            f"{column} still separates the archive-inferred row from an ordinary one"
+        )
+    sealed_row = sealed_metadata.loc[sealed_metadata["symbol"] == delisted_symbol]
+    assert sealed_row["metadata_source"].iloc[0] == "archive_inference"
+    assert sealed_row["underlying_type"].iloc[0] == "ARCHIVE_INFERRED_COIN"
+
+
+def test_is_snapshot_refuses_to_ship_an_archive_marker_it_cannot_normalise_away(tmp_path):
+    """The guard behind the fix, and a real failure mode rather than a decorative assertion.
+
+    Normalisation replaces a censored row's markers with ``_dominant_value`` of the rows it is NOT
+    touching. When that dominant value is ITSELF an archive marker, normalisation writes the marker
+    straight back and the leak survives its own fix, silently. A long in-sample window in which
+    pre-cutoff delistings (legitimately preserved, see the test above) outnumber live contracts
+    produces exactly that.
+
+    The fixture below is that shape: three genuine pre-cutoff delistings, two live perpetuals, and
+    two archive-inferred rows parked at the sentinel. The three pre-cutoff rows dominate the
+    reference population, so both marker columns normalise to the archive values -- and the write
+    must abort rather than publish them.
+    """
+    snapshot = _synthetic()
+    cutoff = pd.Timestamp("2021-06-01T00:00:00Z")
+    sealed_end = pd.Timestamp("2022-01-01T00:00:00Z")
+    perpetual_sentinel = pd.Timestamp("2100-12-25T08:00:00Z")
+    pre_cutoff_delisting = pd.Timestamp("2021-03-01T00:00:00Z")
+
+    metadata = pd.DataFrame(
+        {
+            "symbol": ["PUSDT", "QUSDT", "RUSDT", "LUSDT", "MUSDT", "XUSDT", "YUSDT"],
+            "contract_type": "PERPETUAL",
+            "quote_asset": "USDT",
+            "margin_asset": "USDT",
+            "is_crypto": True,
+            "onboard_date": pd.Timestamp("2020-01-01T00:00:00Z"),
+            # Three pre-cutoff delistings, two live perpetuals, two archive-inferred rows at the
+            # sentinel. The sentinel is the strict mode (4 rows vs 3), so it is still derived
+            # correctly; the reference population is 3 archive rows against 2 live ones.
+            "delivery_date": [pre_cutoff_delisting] * 3 + [perpetual_sentinel] * 4,
+            "underlying_type": ["ARCHIVE_INFERRED_COIN"] * 3
+            + ["COIN"] * 2
+            + ["ARCHIVE_INFERRED_COIN"] * 2,
+            "metadata_source": ["archive_inference"] * 3
+            + ["current_exchangeInfo"] * 2
+            + ["archive_inference"] * 2,
+        }
+    )
+
+    with pytest.raises(ValueError, match="archive-inference marker"):
+        write_split_snapshots(
+            snapshot.bars,
+            snapshot.funding,
+            snapshot.mark_prices,
+            snapshot.membership,
+            metadata,
+            is_root=tmp_path / "is",
+            sealed_root=tmp_path / "sealed",
+            is_end=cutoff,
+            sealed_end=sealed_end,
+        )
+
+
 # --- Public-surface completeness -----------------------------------------------------------
 #
 # The brief's own hardcoded __all__ list predates several functions added to cup20 modules during

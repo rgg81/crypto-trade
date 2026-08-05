@@ -95,6 +95,10 @@ def write_split_snapshots(
     is_frames["contract_metadata"] = _censor_contract_metadata_for_is(
         is_frames["contract_metadata"], is_end
     )
+    # Checked here, on the frame that is actually about to be written, rather than inside the
+    # censor: the censor has several early-return paths and a post-condition that only holds on
+    # some of them is not a post-condition.
+    _require_no_archive_marker_after_cutoff(is_frames["contract_metadata"], is_end)
     sealed_frames = {
         name: _slice(name, frame, is_end, sealed_end) for name, frame in frames.items()
     }
@@ -207,6 +211,52 @@ def _perpetual_delivery_sentinel(delivery_date: pd.Series) -> pd.Timestamp:
 # four can carry this correlation. Checked directly against both functions' source, not assumed.
 _ARCHIVE_STATUS_COLUMNS = ("metadata_source", "underlying_type")
 
+# The exact literals `_contract_metadata` writes on its archive-inferred branch, read directly out
+# of that function rather than assumed. A row carrying either one is a row the acquisition pipeline
+# could not find in live exchangeInfo -- i.e. one that has already delisted by data-build time.
+_ARCHIVE_MARKER_VALUES = {
+    "metadata_source": "archive_inference",
+    "underlying_type": "ARCHIVE_INFERRED_COIN",
+}
+
+
+def _archive_marker_mask(frame: pd.DataFrame) -> pd.Series:
+    """Rows carrying an acquisition-pipeline "already delisted" marker in any known column."""
+    mask = pd.Series(False, index=frame.index)
+    for column, marker in _ARCHIVE_MARKER_VALUES.items():
+        if column in frame.columns:
+            mask |= frame[column].astype(str).eq(marker)
+    return mask
+
+
+def _require_no_archive_marker_after_cutoff(frame: pd.DataFrame, is_end: pd.Timestamp) -> None:
+    """Post-condition on the IS metadata: an "already delisted" marker may only survive alongside a
+    delivery date the in-sample observer could genuinely have known -- one strictly before the
+    cutoff.
+
+    Reachable, not decorative. ``_censor_contract_metadata_for_is`` normalises the marker columns
+    to ``_dominant_value`` of the rows it is NOT touching; if that dominant value is itself an
+    archive marker -- a member set in which pre-cutoff delistings outnumber live contracts, which
+    this tournament's long IS window makes entirely possible -- normalisation writes the marker
+    straight back and the leak survives its own fix. This is the check that catches that.
+
+    ``~(delivery < is_end)`` rather than ``delivery >= is_end``: a ``NaT`` delivery date compares
+    ``False`` against everything, so the positive form would wave an undated row through. The
+    negated form treats an unknown date as not-provably-past, which is the fail-closed reading.
+    """
+    if "delivery_date" not in frame.columns:
+        return
+    delivery = pd.to_datetime(frame["delivery_date"], utc=True)
+    offending = _archive_marker_mask(frame) & ~(delivery < is_end)
+    if not offending.any():
+        return
+    symbols = sorted(frame.loc[offending, "symbol"].astype(str)) if "symbol" in frame else []
+    raise ValueError(
+        "IS contract_metadata still carries an archive-inference marker with a delivery_date at "
+        f"or after the IS cutoff for {symbols} -- that combination reconstructs a post-cutoff "
+        "delisting"
+    )
+
 
 def _censor_contract_metadata_for_is(
     contract_metadata: pd.DataFrame, is_end: pd.Timestamp
@@ -249,17 +299,30 @@ def _censor_contract_metadata_for_is(
     # naive `delivery >= is_end` mask would also flag every already-safe, genuinely-perpetual row
     # -- shrinking the "ordinary" reference population derived below, in the worst case to empty
     # (found the hard way, as a real crash, while verifying this fix).
-    censor_mask = (delivery >= is_end) & (delivery != sentinel)
-    if not censor_mask.any():
+    #
+    # The marker normalisation below is deliberately NOT gated on `censor_mask`. Doing so couples
+    # two independent facts: `censor_mask` answers "is this delivery DATE a real future date", the
+    # markers answer "has this contract already delisted, whenever that was". A row that is
+    # archive-inferred while its delivery_date already equals the sentinel satisfies the second and
+    # not the first, so a censor-gated normalisation leaves its markers in the IS snapshot -- and
+    # those markers, against a symbol still trading at the cutoff, reconstruct a post-cutoff
+    # delisting on their own, without the date. `_dominant_value` derives the sentinel as the MODE
+    # of delivery_date, so a member set in which archive-inferred rows share the dominant date puts
+    # exactly that row shape on the IS side. `_require_no_archive_marker_after_cutoff` (called by
+    # `write_split_snapshots`) asserts the resulting post-condition rather than trusting this.
+    future_delivery = ~(delivery < is_end)
+    censor_mask = future_delivery & (delivery != sentinel)
+    normalise_mask = censor_mask | (future_delivery & _archive_marker_mask(frame))
+    if not normalise_mask.any():
         return frame
-    ordinary = frame.loc[~censor_mask]
+    ordinary = frame.loc[~normalise_mask]
     frame = frame.copy()
     frame.loc[censor_mask, "delivery_date"] = sentinel
     for column in _ARCHIVE_STATUS_COLUMNS:
         if column not in frame.columns:
             continue
         dominant = _dominant_value(ordinary[column], label=column)
-        frame.loc[censor_mask, column] = dominant
+        frame.loc[normalise_mask, column] = dominant
     return frame
 
 
