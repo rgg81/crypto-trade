@@ -4294,7 +4294,12 @@ period and a universe that reaches 20 members around 2020-08.
   that constant. Module-level means the top level of the module, including inside a module-level
   `if`/`try`; a value defined inside a function body or a class body does not count and will be
   reported as absent. This rule exists so the nominated point is provably what the frozen code
-  actually does, and it is stated here so an honest submission is never surprised by it;
+  actually does, and it is stated here so an honest submission is never surprised by it. The
+  constant must have exactly **one** value: if a coordinate name is assigned two different numeric
+  values anywhere at module scope — by reassignment or across branches of an `if`/`try` — the
+  submission is rejected as ambiguous. Verification parses your code and never runs it, so it
+  cannot know which branch would execute, and a name whose value depends on a branch is therefore
+  not a frozen parameter;
 - your research certificate must cover: baseline, exact sign inversion, ≥3 formation horizons, ≥2
   rebalance/holding horizons with the phase offset swept for any cadence longer than one bar,
   controls-off and individual-control and combined-control ablations, long/short/chop role checks,
