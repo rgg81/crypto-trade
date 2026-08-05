@@ -35,6 +35,7 @@ target_size = 20
 entry_rank = 20
 exit_rank = 25
 lookback_days = 180
+liquidity_measure = "median-daily-quote-volume"
 reconstitution_weekday = 0
 minimum_scored_members = 8
 

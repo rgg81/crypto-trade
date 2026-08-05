@@ -2,7 +2,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from crypto_trade.cup20.universe import build_membership, weekly_reconstitution_times
+from crypto_trade.cup20.universe import (
+    LIQUIDITY_MEASURE,
+    build_membership,
+    weekly_reconstitution_times,
+)
 
 
 def _frames(symbols, days, volumes):
@@ -49,6 +53,81 @@ def test_ranking_is_by_trailing_volume_descending():
     ordered = members.sort_values("liquidity_rank")["symbol"].tolist()
     assert ordered == ["BUSDT", "CUSDT", "AUSDT"]
     assert members.sort_values("liquidity_rank")["liquidity_rank"].tolist() == [1, 2, 3]
+
+
+def _spike_frames(days=200, steady=100.0, quiet=1.0, spike=1e7):
+    """One steadily-liquid symbol against one that traded once, enormously.
+
+    ``SPIKEUSDT``'s single day dominates a MEAN over the window and barely moves a MEDIAN, so the
+    two statistics rank this pair in opposite orders. That is the entire difference between the
+    universe rules, expressed in the smallest fixture that can hold it.
+    """
+    index = pd.date_range("2020-01-01", periods=days, freq="D", tz="UTC")
+    volume = pd.DataFrame(
+        {
+            "STEADYUSDT": np.full(days, steady, dtype=float),
+            "SPIKEUSDT": np.full(days, quiet, dtype=float),
+        },
+        index=index,
+    )
+    volume.loc[index[days // 2], "SPIKEUSDT"] = spike
+    eligible = pd.DataFrame(True, index=index, columns=["STEADYUSDT", "SPIKEUSDT"])
+    return volume, eligible
+
+
+def test_a_single_volume_spike_does_not_outrank_steady_liquidity():
+    """The property the median buys, and the one nothing else in this file asserts.
+
+    Every other fixture here uses volumes that are constant within each lookback window, where mean
+    and median coincide exactly -- which is why the universe ranked on the mean for a full build
+    without a single test noticing. This one separates them.
+
+    The arithmetic is asserted first, so the test cannot quietly become vacuous if a future fixture
+    edit stops making the two statistics disagree: if SPIKEUSDT ever fails to win on the mean, the
+    ranking assertion below would prove nothing.
+    """
+    volume, eligible = _spike_frames()
+    boundary = pd.Timestamp("2020-06-29T00:00:00Z")
+    window = volume.loc[volume.index < boundary].iloc[-180:]
+    assert window["SPIKEUSDT"].mean() > window["STEADYUSDT"].mean(), (
+        "fixture no longer separates the statistics: the spike must win on the mean"
+    )
+    assert window["SPIKEUSDT"].median() < window["STEADYUSDT"].median()
+
+    members = build_membership(
+        volume,
+        eligible=eligible,
+        reconstitution_times=[boundary],
+        lookback_days=180,
+        target_size=20,
+    )
+    ordered = members.sort_values("liquidity_rank")["symbol"].tolist()
+    assert ordered == ["STEADYUSDT", "SPIKEUSDT"], (
+        "ranking followed the mean: a one-day volume spike outranked steady liquidity"
+    )
+    # The reported liquidity is the ranking statistic itself, not some other summary of the window.
+    reported = members.set_index("symbol")["trailing_quote_volume"]
+    assert reported["STEADYUSDT"] == pytest.approx(window["STEADYUSDT"].median())
+    assert reported["SPIKEUSDT"] == pytest.approx(window["SPIKEUSDT"].median())
+
+
+def test_a_spiking_symbol_loses_the_only_seat_to_a_steady_one():
+    """The same property at the level that actually matters: who gets into the index.
+
+    Ranking order alone is a weaker claim than membership -- with one seat available, the spiking
+    symbol must not take it.
+    """
+    volume, eligible = _spike_frames()
+    members = build_membership(
+        volume,
+        eligible=eligible,
+        reconstitution_times=[pd.Timestamp("2020-06-29T00:00:00Z")],
+        lookback_days=180,
+        target_size=1,
+        entry_rank=1,
+        exit_rank=1,
+    )
+    assert list(members["symbol"]) == ["STEADYUSDT"]
 
 
 def _ranked_frames(count=30, days=40):
@@ -141,6 +220,11 @@ def test_lookback_window_excludes_the_reconstitution_day_itself():
         target_size=20,
     )
     assert members["trailing_quote_volume"].iloc[0] == pytest.approx(10.0)
+
+
+def test_the_declared_liquidity_measure_names_the_median():
+    """A one-line guard against renaming the constant without changing what it means."""
+    assert LIQUIDITY_MEASURE == "median-daily-quote-volume"
 
 
 def test_naive_timestamps_are_rejected():

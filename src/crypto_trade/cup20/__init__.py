@@ -66,10 +66,15 @@ from crypto_trade.cup20.snapshot import (
     resolve_is_start,
     write_split_snapshots,
 )
-from crypto_trade.cup20.universe import build_membership, weekly_reconstitution_times
+from crypto_trade.cup20.universe import (
+    LIQUIDITY_MEASURE,
+    build_membership,
+    weekly_reconstitution_times,
+)
 
 __all__ = [
     "IS_END",
+    "LIQUIDITY_MEASURE",
     "SEALED_END",
     "SEALED_START",
     "TEAM_IDS",

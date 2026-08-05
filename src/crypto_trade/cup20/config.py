@@ -11,6 +11,8 @@ from typing import Any
 
 import pandas as pd
 
+from crypto_trade.cup20.universe import LIQUIDITY_MEASURE
+
 IS_END = pd.Timestamp("2024-08-01T00:00:00Z")
 SEALED_START = pd.Timestamp("2024-08-01T00:00:00Z")
 SEALED_END = pd.Timestamp("2026-08-01T00:00:00Z")
@@ -49,6 +51,12 @@ _FROZEN_SCALARS: dict[tuple[str, ...], object] = {
     ("universe", "entry_rank"): 20,
     ("universe", "exit_rank"): 25,
     ("universe", "lookback_days"): 180,
+    # Imported from the implementation, not repeated as a literal: the config can only declare the
+    # statistic `build_membership` actually computes. A config saying "median" while the code
+    # ranked on the mean is precisely the drift that reached a frozen snapshot once, and it
+    # survived because the statistic was named only in a descriptive acquisition-config string
+    # that nothing validated.
+    ("universe", "liquidity_measure"): LIQUIDITY_MEASURE,
     ("execution", "interval_hours"): 8,
     ("execution", "taker_fee_bps_per_side"): 5.0,
     ("execution", "slippage_bps_per_side"): 2.5,
