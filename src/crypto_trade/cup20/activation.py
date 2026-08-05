@@ -1,10 +1,11 @@
 """Activation freeze: one record binding every authority before the first result.
 
 The record is the tournament's root of trust. Everything a result could later be argued about --
-the policy, the charter the teams read, the two data windows, the interpreter's dependency set and
-the test run that declared the machinery sound -- is reduced to six digests here, before any team
-has seen a number. After activation, any of those changing is a fact about the tournament, not a
-detail: ``verify_activation`` recomputes all six from the same paths and refuses to agree.
+the policy, the charter the teams read, the evaluation code, the two data windows, the audit that
+cleared the universe, the interpreter's dependency set and the test run that declared the machinery
+sound -- is reduced to one digest each here, before any team has seen a number. After activation,
+any of those changing is a fact about the tournament, not a detail: ``verify_activation`` recomputes
+every one of them from the same paths and refuses to agree.
 
 The record itself is deliberately NOT self-authenticating -- a digest of the record inside the
 record proves nothing. Its integrity comes from being committed to version control at freeze time;
