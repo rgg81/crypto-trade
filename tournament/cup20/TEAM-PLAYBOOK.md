@@ -23,6 +23,21 @@ not a deduction. The same applies to the acquisition snapshot in `data/cup20/acq
 other tournament's data directory, and to any market data you fetch yourself. Your only market
 inputs are the rows the organiser streams to you.
 
+The sealed rows are not merely absent from your data root — they are also described, by name and by
+number, in organiser artifacts that live outside it. **Reading, referencing or naming any of these
+is the same disqualification as opening the sealed snapshot itself:**
+
+| Prohibited path | What it holds |
+|---|---|
+| `data/cup20/sealed/` | the holdout bars, funding, marks and membership |
+| `data/cup20/acquisition/` | the uncensored full-window acquisition snapshot |
+| `tournament/cup20/private/` | organiser-only summaries and the full-universe pure-crypto audit, both of which name the holdout's members |
+| `reports-cup20/` | every derived organiser report, including a common BTC daily-return and regime-label series that runs to the end of the holdout |
+
+This list is enforced, not merely stated: each entry is a pattern in
+`crypto_trade.cup20.archive.FORBIDDEN_PATTERNS`, and the pre-flight source scan matches it against
+both the content of every file in your frozen archive and the archive's own path names.
+
 The universe is the point-in-time top-20 by trailing 180-day median daily quote volume,
 reconstituted weekly on Monday 00:00 UTC, with 20-in / 25-out hysteresis. Membership is already
 point-in-time in the snapshot: the row for a boundary reflects only information available before

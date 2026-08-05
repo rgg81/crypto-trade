@@ -15,8 +15,15 @@ from crypto_trade.cup20.neighbourhood import NeighbourhoodDeclaration
 FORBIDDEN_PATTERNS: tuple[str, ...] = (
     # Sealed and organiser-only surfaces.
     r"data/cup20/sealed",
+    r"data/cup20/acquisition",
     r"tournament/cup20/private",
-    r"reports-cup20/holdout",
+    # The WHOLE reports tree, not just its holdout subdirectory. Nothing under reports-cup20/ is a
+    # team input -- a team's only market inputs are the rows the runner streams to it out of
+    # data/cup20/is/ -- and the tree carries organiser artifacts derived across BOTH sides of the
+    # cutoff. The acquisition's own common BTC report (daily returns and regime labels through the
+    # sealed window's last day) was tracked here and matched no pattern while only the holdout
+    # subdirectory was named.
+    r"reports-cup20",
     # Prior-tournament evidence of any kind.
     r"crypto_trade\.tournament\.top40",
     r"tournament/top40",

@@ -3,6 +3,8 @@ import os
 import tarfile
 from pathlib import Path
 
+import pytest
+
 from crypto_trade.cup20.archive import (
     archive_directory,
     bundle_digest,
@@ -43,6 +45,31 @@ def test_sealed_data_path_is_a_violation(tmp_path):
 def test_post_cutoff_date_literal_is_a_violation(tmp_path):
     root = _team(tmp_path, "CUTOFF = '2025-03-01'\n")
     assert scan_for_blindness_violations(root)
+
+
+# Every organiser surface that describes the sealed side must be a violation in its own right, not
+# only `data/cup20/sealed`. Each of these was reachable at some point in the build while matching
+# no pattern: `reports-cup20/common/btc_daily_returns.csv` and `btc_regimes.csv` were git-tracked
+# and carried 730 daily rows inside the sealed window (its realised drawdown and its day-by-day
+# regime sequence); `data/cup20/acquisition/` is the uncensored both-sides snapshot; and
+# `tournament/cup20/private/` now holds the artifacts that name the holdout's members. The whole
+# `reports-cup20` tree is named rather than its holdout subdirectory alone -- nothing under it is
+# ever a team input.
+@pytest.mark.parametrize(
+    "path",
+    [
+        "data/cup20/sealed/bars.parquet",
+        "data/cup20/acquisition/bars.parquet",
+        "tournament/cup20/private/pure-crypto-audit.json",
+        "reports-cup20/common/btc_daily_returns.csv",
+        "reports-cup20/common/btc_regimes.csv",
+        "reports-cup20/is/team-01/summary.json",
+        "reports-cup20/holdout/release.json",
+    ],
+)
+def test_every_organiser_only_surface_is_a_violation(tmp_path, path):
+    root = _team(tmp_path, f"PATH = {path!r}\n")
+    assert scan_for_blindness_violations(root), f"{path} matched no forbidden pattern"
 
 
 def test_prior_tournament_directory_is_a_violation(tmp_path):

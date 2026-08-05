@@ -69,6 +69,18 @@ reports-v3/**/*.parquet
 # benchmark under version control, but not per-team Parquet/CSV output directories.
 reports-top40/team-*/
 
+# CUP-20. Everything under reports-cup20/ is a derived organiser artifact, and several of the
+# derived artifacts are computed over BOTH sides of the 2024-08-01 cutoff -- the acquisition's
+# common BTC report is a daily return and regime-label series running to the sealed window's last
+# day, which would hand a team the holdout's realised drawdown and its day-by-day regime sequence.
+# Unlike the top-40 track, none of it is a team input: teams read data/cup20/is/ and nothing else.
+# Regenerable from the acquisition snapshot by scripts/cup20_build_snapshot.py.
+reports-cup20/
+# Organiser-only CUP-20 surfaces: the full-universe pure-crypto audit and the organiser's own
+# universe summary both describe the sealed side's composition by name. Hash-bound by the
+# activation record and held on disk exactly like data/cup20/sealed/, never committed.
+tournament/cup20/private/
+
 # Notebook outputs and checkpoints
 notebooks/output/
 notebooks/.ipynb_checkpoints/
