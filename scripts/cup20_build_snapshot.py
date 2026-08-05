@@ -11,15 +11,17 @@ import pandas as pd
 from crypto_trade.cup20.config import IS_END, SEALED_END, load_config
 from crypto_trade.cup20.snapshot import resolve_is_start, write_split_snapshots
 from crypto_trade.cup20.universe import build_membership, weekly_reconstitution_times
-from crypto_trade.tournament.pure_crypto_universe_v6 import audit_pure_crypto_universe
+from crypto_trade.tournament.pure_crypto_universe_v6 import (
+    REVIEWED_ARCHIVE_ONLY_CRYPTO,
+    current_contract_violations,
+    symbol_policy_violations,
+)
 from crypto_trade.tournament.snapshot import build_snapshot
 
 ACQUISITION_CONFIG = Path("tournament/cup20/snapshot-config.toml")
 ACQUISITION_DIR = Path("data/cup20/acquisition")
 TOURNAMENT_CONFIG = Path("tournament/cup20/config.toml")
 SUMMARY_PATH = Path("tournament/cup20/universe-summary.json")
-# Persisted, not merely printed: the activation record binds this file, so the audit that cleared
-# the universe of non-crypto contracts is frozen alongside the data it cleared.
 AUDIT_PATH = Path("tournament/cup20/pure-crypto-audit.json")
 
 
@@ -82,6 +84,69 @@ def _is_visible_symbols(membership: pd.DataFrame) -> set[str]:
     return set(membership.loc[times < IS_END, "symbol"].astype(str))
 
 
+def pure_crypto_audit(
+    members: list[str], metadata: pd.DataFrame, exchange_info: dict[str, object]
+) -> dict[str, object]:
+    """Verify every shipped CUP-20 member is a native crypto USDT-margined perpetual.
+
+    NOT ``crypto_trade.tournament.pure_crypto_universe_v6.audit_pure_crypto_universe``. That
+    function looks reusable and is not: it is an attestation of one specific frozen artifact, with
+    ``tournament/top40/data_manifest.json`` and its SHA-256 compiled in as module constants
+    (``DATA_MANIFEST_PATH`` / ``DATA_MANIFEST_SHA256``), so pointed at any other snapshot it fails
+    on the binding rather than on the universe. Its *predicates*, though, are pure and carry the
+    reviewed policy, so they are reused verbatim here and the snapshot-specific shell is not.
+
+    Fails closed. Every member is checked at three independent levels -- the symbol's own name, the
+    acquisition's contract metadata, and, for a contract still listed at build time, live
+    exchangeInfo including underlying type and subtype. A member absent from live exchangeInfo has
+    already delisted and has no contract left to inspect; it is reported rather than silently
+    accepted, and separately flagged when it is not in the previously reviewed archive-only set.
+    """
+    records = {str(row["symbol"]): row for _, row in metadata.iterrows() if pd.notna(row["symbol"])}
+    raw_symbols = exchange_info.get("symbols", [])
+    contracts = {
+        str(item["symbol"]): item
+        for item in (raw_symbols if isinstance(raw_symbols, list) else [])
+        if isinstance(item, dict) and item.get("symbol")
+    }
+    violations: dict[str, list[str]] = {}
+    archive_only: list[str] = []
+    for symbol in members:
+        reasons = list(symbol_policy_violations(symbol))
+        record = records.get(symbol)
+        if record is None:
+            reasons.append("metadata-row-missing")
+        else:
+            if not bool(record["is_crypto"]):
+                reasons.append("metadata-is-crypto-false")
+            for column, expected in (
+                ("contract_type", "PERPETUAL"),
+                ("quote_asset", "USDT"),
+                ("margin_asset", "USDT"),
+            ):
+                if str(record[column]) != expected:
+                    reasons.append(f"metadata-{column.replace('_', '-')}-not-{expected.lower()}")
+        contract = contracts.get(symbol)
+        if contract is None:
+            archive_only.append(symbol)
+        else:
+            reasons.extend(current_contract_violations(contract, expected_symbol=symbol))
+        if reasons:
+            violations[symbol] = sorted(dict.fromkeys(reasons))
+    if violations:
+        raise SystemExit(f"CUP-20 pure-crypto audit failed: {json.dumps(violations, indent=2)}")
+    return {
+        "policy_id": "cup20-pure-crypto-usdt-perpetual-v1",
+        "status": "PURE_CRYPTO_UNIVERSE_VERIFIED",
+        "members_audited": len(members),
+        "live_contracts_checked": sorted(set(members) & set(contracts)),
+        "archive_only_members": sorted(archive_only),
+        "archive_only_members_outside_reviewed_set": sorted(
+            symbol for symbol in archive_only if symbol not in REVIEWED_ARCHIVE_ONLY_CRYPTO
+        ),
+    }
+
+
 def build_universe(
     bars: pd.DataFrame, metadata: pd.DataFrame, universe: dict[str, object]
 ) -> tuple[pd.DataFrame, pd.Timestamp]:
@@ -123,16 +188,12 @@ def main() -> None:
         print("acquisition complete; re-run with --skip-acquire to derive the universe")
         return
 
-    audit = audit_pure_crypto_universe(ACQUISITION_DIR)
-    AUDIT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    AUDIT_PATH.write_text(json.dumps(audit, indent=2, sort_keys=True, default=str) + "\n")
-    print(f"pure-crypto audit: {audit.get('status', audit)}")
-
     bars = pd.read_parquet(ACQUISITION_DIR / "bars.parquet")
     funding = pd.read_parquet(ACQUISITION_DIR / "funding.parquet")
     marks = pd.read_parquet(ACQUISITION_DIR / "mark_prices.parquet")
     metadata = pd.read_parquet(ACQUISITION_DIR / "contract_metadata.parquet")
     acquired = pd.read_parquet(ACQUISITION_DIR / "membership.parquet")
+    exchange_info = json.loads((ACQUISITION_DIR / "exchange_info.json").read_text())
 
     config = dict(load_config(TOURNAMENT_CONFIG).raw["universe"])
     membership, is_start = build_universe(bars, metadata, config)
@@ -151,6 +212,13 @@ def main() -> None:
     members = sorted(set(membership["symbol"].astype(str)))
     is_members = _is_visible_symbols(membership)
     sealed_only = sorted(set(members) - is_members)
+
+    # Persisted, not merely printed: the activation record binds this file, so the audit that
+    # cleared the universe is frozen alongside the data it cleared.
+    audit = pure_crypto_audit(members, metadata, exchange_info)
+    AUDIT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    AUDIT_PATH.write_text(json.dumps(audit, indent=2, sort_keys=True) + "\n")
+    print(f"pure-crypto audit: {audit['status']} over {audit['members_audited']} members")
 
     def restrict(frame: pd.DataFrame, column: str) -> pd.DataFrame:
         """Keep IS-side rows only for IS-visible symbols; sealed-side rows for every member.
