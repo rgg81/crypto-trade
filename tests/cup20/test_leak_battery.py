@@ -886,6 +886,10 @@ _INTENTIONALLY_UNEXPORTED: dict[str, frozenset[str]] = {
             "UNDEFINED_COST_SHARE",
             "MINIMUM_IS_WINDOW",
             "MINIMUM_HOLDOUT_WINDOW",
+            # Which evaluator event types are a fill. Internal to how trade_count is computed, in
+            # the same category as DAYS_PER_YEAR: a tuning constant, not a callable surface. This
+            # test caught it on the run that added it -- which is what it is for.
+            "EXECUTED_EVENT_TYPES",
         }
     ),
     "universe.py": frozenset({"MEMBERSHIP_COLUMNS"}),
