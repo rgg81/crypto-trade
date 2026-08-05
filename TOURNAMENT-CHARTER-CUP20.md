@@ -88,13 +88,20 @@ authoritative.
 | Weekly, 180d volume, no hysteresis | 0.68 | 154 / 327 | 121 |
 | **Weekly, complete-180d volume, hysteresis 20/25** | **0.29** | **239 / 309** | **70** |
 
-The three rows above were measured at design time on a weekly-sampled proxy. Re-measured on the
-built snapshot's own daily bars across all 311 reconstitutions, the adopted rule delivers **0.24
-changes per week, 248 of 310 weeks completely unchanged, and 72 distinct names** across six years —
-confirming the design-time estimate. The ranking statistic is the **median** daily quote volume
-over the trailing window, not the mean: a coin's launch-week volume spike lifts a mean far more
-than a median, and ranking on the mean was measured to admit three transient listings the median
-excludes in favour of established names.
+The three rows above were measured at design time on a weekly-sampled proxy. The authoritative
+numbers are the built artifact's own: across its 311 reconstitutions the adopted rule delivers
+**0.26 changes per week, 241 of 310 weeks completely unchanged, and 79 distinct names** over six
+years, with exactly 20 members at every boundary and 63 distinct names inside the IS window. That
+confirms the design-time estimate's direction and magnitude while being measured on the real thing
+rather than a proxy.
+
+The ranking statistic is the **median** daily quote volume over the trailing window, not the mean.
+A coin's launch-week volume spike lifts a 180-day mean far more than a 180-day median, so ranking
+on the mean admits transient listings into a universe meant to be blue-chip. Measured on the built
+data, the mean gave 91 distinct names and 0.32 changes per week and put PIPPIN, RAVE, SIREN, ASTER,
+MYX, XPL, PENGU, NOT and 1000FLOKI into the index; the median replaces them with AAVE, FIL and LTC.
+The statistic is a validated field of the machine contract, so the config and the implementation
+cannot silently disagree about it.
 
 The adopted rule produces memberships that read as a blue-chip crypto index
 (BTC/ETH/BNB/XRP/SOL/DOGE/ADA/LINK/LTC/AVAX/DOT/…) and eliminates the transient hype names that
