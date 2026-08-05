@@ -28,8 +28,15 @@ FORBIDDEN_PATTERNS: tuple[str, ...] = (
     r"(?<!\d)20(?:2[5-9]|[3-9]\d)-\d{2}-\d{2}",
 )
 _COMPILED = tuple((pattern, re.compile(pattern)) for pattern in FORBIDDEN_PATTERNS)
-_SCANNED_SUFFIXES = frozenset({".py", ".toml", ".json", ".md", ".cfg", ".txt", ".yaml", ".yml"})
 _TEAM_DIRECTORY = re.compile(r"tournament/cup20/teams/(team-\d{2})")
+
+# Content scanning has no extension allowlist: path.read_text(errors="replace") already tolerates
+# non-UTF8 bytes, so restricting *which* files get their content read bought no safety, only a
+# blind spot. This cap exists purely so a large, legitimate data/model file cannot make the scan
+# pathologically slow -- not to exempt any kind of file's content from being read. Path/filename
+# scanning (see scan_for_blindness_violations) is unaffected: it is always cheap, regardless of
+# a file's size, and always runs.
+_MAX_CONTENT_SCAN_BYTES = 262_144  # 256 KiB -- generous for any real source or config file.
 
 # ast.parse can fail on genuinely malformed team source (bad syntax, a stray null byte, an invalid
 # encoding). The global contract is "failures are violation strings, not raises" -- team code is
@@ -105,67 +112,115 @@ def _numeric(node: ast.AST) -> float | None:
     return None
 
 
+def _record_numeric_target(target: ast.expr, value: ast.expr, found: dict[str, float]) -> None:
+    """Record ``target <- value`` for a plain ``Name`` target with a numeric-literal value, or,
+    for a ``Tuple`` target paired with a same-length ``Tuple`` value, recurse elementwise (this
+    also naturally covers a nested tuple pattern, since each element pairing is the same rule
+    applied again).
+
+    Any other shape -- a length-mismatched tuple, a starred target, an attribute or subscript
+    target -- is silently skipped rather than guessed at: a shape this function does not
+    confidently understand must never risk attributing the wrong value to a name. Reporting a
+    coordinate absent is always safer than reporting a wrong one.
+    """
+    if isinstance(target, ast.Name):
+        number = _numeric(value)
+        if number is not None:
+            found[target.id] = number
+    elif (
+        isinstance(target, ast.Tuple)
+        and isinstance(value, ast.Tuple)
+        and len(target.elts) == len(value.elts)
+    ):
+        for element_target, element_value in zip(target.elts, value.elts):
+            _record_numeric_target(element_target, element_value, found)
+
+
 def _record_numeric_assign(node: ast.Assign | ast.AnnAssign, found: dict[str, float]) -> None:
-    """Record a plain or annotated assignment's target(s), if its value is a plain numeric literal.
+    """Record a module-level plain or annotated assignment's target(s), including tuple/multiple-
+    target unpacking.
 
     Assigns into ``found`` (does not use ``setdefault``): a later assignment overwrites an earlier
     one, matching what straight-line top-to-bottom execution actually leaves bound in the
     namespace. A first-wins rule would let a team put a favourable, declared-nominee-matching value
     first and a different, real operative value afterwards, and have the check see only the decoy.
     """
-    if isinstance(node, ast.AnnAssign) and node.value is None:
+    if isinstance(node, ast.AnnAssign):
+        if node.value is not None:
+            _record_numeric_target(node.target, node.value, found)
         return
-    value = _numeric(node.value)
-    if value is None:
-        return
-    targets: list[ast.expr] = node.targets if isinstance(node, ast.Assign) else [node.target]
-    for target in targets:
-        if isinstance(target, ast.Name):
-            found[target.id] = value
+    for target in node.targets:
+        _record_numeric_target(target, node.value, found)
 
 
-def _numeric_keyword_defaults(node: ast.FunctionDef | ast.AsyncFunctionDef) -> dict[str, float]:
-    """Numeric keyword defaults on one function's own signature (not the defaults of any callee)."""
-    args = node.args
-    names = [arg.arg for arg in args.args + args.kwonlyargs]
-    defaults = list(args.defaults) + list(args.kw_defaults)
-    found: dict[str, float] = {}
-    for name, default in zip(names[-len(defaults) :] if defaults else [], defaults):
-        if default is None:
-            continue
-        value = _numeric(default)
-        if value is not None:
-            found[name] = value
-    return found
+def _collect_from_statements(statements: list[ast.stmt], found: dict[str, float]) -> None:
+    """Populate ``found`` with every module-level numeric constant reachable from these statements.
+
+    Recurses through module-level control flow -- ``if``/``for``/``while``/``with``/``try`` and
+    their ``else``/``finally``/``except`` bodies -- because a name assigned there genuinely is a
+    module-level name: the statement is bound as part of ordinary module load, not as a variable
+    scoped to a function or method call. (Whether a *particular* branch runs on any given import is
+    not something a static parse can decide without executing team code, which it must never do;
+    treating every syntactically reachable module-level assignment as a candidate is the fail-safe
+    direction -- see the docstring of ``_frozen_numeric_parameters`` for why the alternative, an
+    absolute "module level only" reading that excluded these, was worse.)
+
+    Never recurses into a ``FunctionDef``, ``AsyncFunctionDef`` or ``ClassDef`` body: a
+    function-local variable or a class attribute is not a module-level parameter. Refusing to look
+    there is what eliminates cross-scope name collisions entirely -- without this boundary, a class
+    attribute that happens to share a real module-level constant's name could silently overwrite it
+    in ``found``, manufacturing a false "differs from frozen source" report against a team that
+    declared the objectively correct value.
+    """
+    for statement in statements:
+        if isinstance(statement, (ast.Assign, ast.AnnAssign)):
+            _record_numeric_assign(statement, found)
+        elif isinstance(statement, (ast.If, ast.For, ast.While)):
+            _collect_from_statements(statement.body, found)
+            _collect_from_statements(statement.orelse, found)
+        elif isinstance(statement, ast.With):
+            _collect_from_statements(statement.body, found)
+        elif isinstance(statement, ast.Try):
+            _collect_from_statements(statement.body, found)
+            for handler in statement.handlers:
+                _collect_from_statements(handler.body, found)
+            _collect_from_statements(statement.orelse, found)
+            _collect_from_statements(statement.finalbody, found)
+        # FunctionDef / AsyncFunctionDef / ClassDef: a scope boundary, deliberately never
+        # recursed into -- see the docstring above.
 
 
 def _frozen_numeric_parameters(path: Path) -> dict[str, float]:
-    """Collect numeric parameters from a frozen entrypoint by parsing, never importing.
+    """Collect module-level numeric constants from a frozen entrypoint by parsing, never importing.
 
-    Team code is untrusted and must never execute during verification, so this uses ``ast`` and is
-    scoped STRICTLY to module level: a direct module-level assignment or annotated assignment, a
-    numeric keyword default on a module-level function, or -- for a dataclass-field-style
-    declaration -- a class attribute default or a method's keyword default, for a class defined
-    directly at module level. Nothing nested one scope deeper than that is material: not a local
-    variable inside a function body, not an assignment guarded by a module-level
-    ``if``/``for``/``while``/``try``, and not a class or function defined inside another function.
-    A scan that walked every nested scope (e.g. via ``ast.walk``) would let a team plant a
-    same-named decoy assignment anywhere in the file -- including inside a branch that can never
-    execute -- and have it accepted as if it were a real, governing parameter of the strategy.
+    Team code is untrusted and must never execute during verification, so this uses ``ast``. A
+    coordinate must be a module-level numeric constant: a plain or annotated assignment (including
+    tuple/multiple-target unpacking) reachable from the module's top level through control flow
+    alone, never through a function or class boundary (see ``_collect_from_statements``).
+
+    Function keyword defaults and class attributes are deliberately NOT collected, even though an
+    earlier version of this module supported both. Two reasons converged on dropping them rather
+    than fixing them: (1) a class attribute sharing a module-level constant's name collided with it
+    in a flat ``dict[str, float]`` keyed only by bare name -- an unrelated class defining its own,
+    differently-valued attribute of the same name could silently overwrite (or be overwritten by)
+    the real module-level value, manufacturing a false "differs from frozen source" report against
+    a team that had declared the objectively correct value; (2) the keyword-default collector's
+    alignment of ``ast.arguments.defaults`` against parameter names broke -- not merely omitted a
+    parameter, but MISATTRIBUTED one parameter's default value to a different parameter's name --
+    for any signature mixing positional-only parameters with defaults and ordinary ones (e.g.
+    ``def f(a=1, /, b=2)``), again producing a false "differs from frozen source" report against a
+    correct nominee. A function parameter's default and a class's own attribute are, in real Python
+    semantics, never a bare module-level name in the first place -- ``lookback`` inside
+    ``def f(lookback=60)`` is not a name in the module's namespace at all, only a parameter of
+    ``f`` -- so treating a coordinate declared against one of these as material was already a
+    stretch beyond "module-level numeric constant." A team whose real, governing values live only
+    behind a keyword default or a class attribute is reported absent under the current rule; the
+    honest fix on the team's side is to expose the value as a plain module-level constant, which is
+    also the shape most legibly "the frozen code actually does."
     """
     tree = ast.parse(path.read_text())
     found: dict[str, float] = {}
-    for statement in tree.body:
-        if isinstance(statement, (ast.Assign, ast.AnnAssign)):
-            _record_numeric_assign(statement, found)
-        elif isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            found.update(_numeric_keyword_defaults(statement))
-        elif isinstance(statement, ast.ClassDef):
-            for member in statement.body:
-                if isinstance(member, (ast.Assign, ast.AnnAssign)):
-                    _record_numeric_assign(member, found)
-                elif isinstance(member, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    found.update(_numeric_keyword_defaults(member))
+    _collect_from_statements(tree.body, found)
     return found
 
 
@@ -238,8 +293,11 @@ def scan_for_blindness_violations(
     forbidden pattern and the foreign-team-directory check run against two independent surfaces:
     each scanned file's OWN relative path (line number ``0`` in the reported violation -- so a
     forbidden reference spelled into a directory or file name, not typed into a line of source,
-    cannot slip through), and the line-by-line content of every file whose extension marks it as
-    text worth reading.
+    cannot slip through), and the line-by-line content of every file, regardless of extension, up
+    to ``_MAX_CONTENT_SCAN_BYTES`` (a size cap, not an extension allowlist -- content is read with
+    ``errors="replace"`` and already tolerates non-UTF8 bytes, so restricting *which* extensions
+    got read was never a safety measure, only a self-imposed blind spot; the cap exists solely so a
+    large, legitimate data or model file cannot make the scan pathologically slow).
 
     A symlink anywhere in the tree is always a violation in its own right, regardless of its
     target or where it points: ``bundle_digest``/``archive_directory`` exclude symlinks entirely
@@ -250,11 +308,11 @@ def scan_for_blindness_violations(
 
     Known, disclosed limitation: this is a static, line-based regex scan of literal source text. It
     does not evaluate expressions, so a forbidden string built at parse-time by concatenation (e.g.
-    ``"data/cup20/" + "sealed"``) or by any other computed construction will not match, and content
-    inside a file extension outside ``_SCANNED_SUFFIXES`` is not read at all (though its path is
-    still checked, per the paragraph above). This is acceptable because blindness is enforced
-    primarily by absence -- the sealed rows are simply never present in a team's data directory --
-    and this scan is a second, disclosed-imperfect layer on top of that, not the only one.
+    ``"data/cup20/" + "sealed"``) or by any other computed construction will not match -- closing
+    this would need AST constant-folding over ``BinOp`` chains, and f-strings/``%``-formatting would
+    stay open regardless. This is acceptable because blindness is enforced primarily by absence --
+    the sealed rows are simply never present in a team's data directory -- and this scan is a
+    second, disclosed-imperfect layer on top of that, not the only one.
     """
     root = Path(source_root).resolve()
     violations: list[str] = []
@@ -264,7 +322,7 @@ def scan_for_blindness_violations(
     for path in _files(root):
         relative = path.relative_to(root).as_posix()
         violations.extend(_line_violations(relative, relative, 0, team_id))
-        if path.suffix not in _SCANNED_SUFFIXES:
+        if path.stat().st_size > _MAX_CONTENT_SCAN_BYTES:
             continue
         for number, line in enumerate(path.read_text(errors="replace").splitlines(), start=1):
             violations.extend(_line_violations(relative, line, number, team_id))

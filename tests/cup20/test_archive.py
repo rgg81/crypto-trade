@@ -246,15 +246,19 @@ def test_archive_sidecar_and_tar_members_match_the_digest_and_source_tree(tmp_pa
 # --- scan_for_blindness_violations: evasion attempts ----------------------------------------------
 
 
-def test_forbidden_pattern_hidden_in_a_directory_path_is_caught_off_the_scanned_suffix_list(
+def test_forbidden_pattern_hidden_in_a_directory_path_is_caught_independent_of_content(
     tmp_path,
 ):
-    """A team could try to smuggle sealed data by naming a subdirectory 'data/cup20/sealed' and
-    storing an unscanned-extension file inside it, banking on _SCANNED_SUFFIXES never reading the
-    content. The path itself must still be checked, regardless of the file's own extension."""
+    """A team could try to smuggle sealed data by naming a subdirectory 'data/cup20/sealed'. The
+    path itself must be checked independently of content -- this fixture's own bytes are the raw
+    0-255 value range, which does not happen to reproduce the forbidden pattern as text, so if this
+    test passes it is specifically because of path-scanning, not a content-scan coincidence (now
+    that content scanning is no longer suffix-gated, see test_content_is_scanned_regardless_of_
+    file_extension below, a fixture that put the pattern in content too would no longer isolate
+    which check caught it)."""
     root = tmp_path / "team-01"
     (root / "data" / "cup20" / "sealed").mkdir(parents=True)
-    (root / "data" / "cup20" / "sealed" / "cache.dat").write_bytes(b"\x00\x01binary")
+    (root / "data" / "cup20" / "sealed" / "cache.dat").write_bytes(bytes(range(256)))
     violations = scan_for_blindness_violations(root)
     assert any("data/cup20/sealed" in violation for violation in violations)
 
@@ -281,16 +285,40 @@ def test_string_concatenation_evades_the_content_scan(tmp_path):
     assert scan_for_blindness_violations(root) == ()
 
 
-def test_content_of_an_unlisted_extension_is_not_scanned_but_its_path_still_is(tmp_path):
-    """Documented, disclosed limitation for CONTENT specifically: _SCANNED_SUFFIXES is a fixed
-    allowlist, so a forbidden string typed into a .dat file's content is not read. This is a
-    narrower gap than it looks, though: the path-based check (see the directory-path test above)
-    is not scoped to that allowlist, so only a forbidden reference that appears SOLELY in an
-    unlisted file's content, nowhere in its path, escapes entirely -- which this test pins."""
+def test_content_is_scanned_regardless_of_file_extension(tmp_path):
+    """Fix round: the extension allowlist (_SCANNED_SUFFIXES) was removed. It was a self-imposed
+    filter, not a safety measure -- path.read_text(errors='replace') already tolerated non-UTF8
+    bytes, so restricting which extensions got read bought no safety, only a blind spot. A
+    forbidden string typed into a .dat file's content, with nothing in its path hinting at it,
+    must now be caught."""
     root = tmp_path / "team-01"
     root.mkdir(parents=True)
     (root / "notes.dat").write_text("PATH = 'data/cup20/sealed/bars.parquet'\n")
-    assert scan_for_blindness_violations(root) == ()
+    violations = scan_for_blindness_violations(root)
+    assert any("data/cup20/sealed" in violation for violation in violations)
+
+
+def test_content_scan_is_skipped_above_the_size_cap_but_path_scan_is_not(tmp_path):
+    """The size cap that replaced the extension allowlist exists purely so a large, legitimate
+    data/model file cannot make the scan pathologically slow -- it must not become a reinstated
+    allowlist by another name. A file just over the cap, with the forbidden reference only in
+    CONTENT (nothing in its path), is not flagged; an otherwise-identical file just under the cap
+    still is. Path-scanning itself is size-independent (proven separately by the directory-path
+    and bare-filename tests above, both using tiny fixtures) and is not re-tested for cap
+    sensitivity here."""
+    from crypto_trade.cup20.archive import _MAX_CONTENT_SCAN_BYTES
+
+    root = tmp_path / "team-01"
+    root.mkdir(parents=True)
+    (root / "small.py").write_text("x = 1\n" * 10 + "PATH = 'data/cup20/sealed/x'\n")
+    padding = "z" * (_MAX_CONTENT_SCAN_BYTES + 1024)
+    (root / "large.py").write_text(f"PAD = '{padding}'\nPATH = 'data/cup20/sealed/x'\n")
+    assert (root / "small.py").stat().st_size < _MAX_CONTENT_SCAN_BYTES
+    assert (root / "large.py").stat().st_size > _MAX_CONTENT_SCAN_BYTES
+
+    violations = scan_for_blindness_violations(root)
+    assert any("small.py" in v and "data/cup20/sealed" in v for v in violations)
+    assert not any("large.py" in v and "data/cup20/sealed" in v for v in violations)
 
 
 def test_symlink_anywhere_in_the_tree_is_a_violation(tmp_path):
@@ -342,18 +370,6 @@ def test_function_body_local_variable_is_not_a_frozen_parameter(tmp_path):
     assert any("LOOKBACK" in violation and "absent" in violation for violation in violations)
 
 
-def test_module_level_conditional_assignment_is_not_a_frozen_parameter(tmp_path):
-    """An assignment guarded by a module-level if/for/while/try is not unconditionally material:
-    'if False: LOOKBACK = 90' satisfied the brief's literal ast.walk scan (confirmed) while never
-    actually binding LOOKBACK to anything at runtime."""
-    root = _team(tmp_path, "if False:\n    LOOKBACK = 90\n")
-    declaration = NeighbourhoodDeclaration(
-        nominee={"LOOKBACK": 90.0}, points=({"LOOKBACK": 40.0},), coordinates=("LOOKBACK",)
-    )
-    violations = verify_neighbourhood_coordinates(root, declaration)
-    assert any("LOOKBACK" in violation and "absent" in violation for violation in violations)
-
-
 def test_class_defined_inside_a_function_is_not_a_frozen_parameter(tmp_path):
     """A class (and therefore its attributes) defined inside a function is not part of the
     module's own top-level surface -- the class object does not even exist until the function
@@ -368,20 +384,33 @@ def test_class_defined_inside_a_function_is_not_a_frozen_parameter(tmp_path):
     assert any("LOOKBACK" in violation and "absent" in violation for violation in violations)
 
 
-def test_dataclass_style_class_attribute_default_is_a_frozen_parameter(tmp_path):
-    """The positive case the brief's own docstring names ('dataclass field default') that none of
-    the brief's 12 given tests exercise: a class attribute on a class defined directly at module
-    level is intentionally supported material."""
+def test_class_attribute_alone_is_reported_absent(tmp_path):
+    """Fix-round negative control: a class attribute, with no name collision against a
+    module-level constant, must still be reported absent -- proving the exclusion is a real scope
+    rule on its own, not merely a side effect of the collision-avoidance regression test below."""
     root = _team(tmp_path, "class Config:\n    LOOKBACK = 60\n")
     declaration = NeighbourhoodDeclaration(
         nominee={"LOOKBACK": 60.0}, points=({"LOOKBACK": 40.0},), coordinates=("LOOKBACK",)
     )
-    assert verify_neighbourhood_coordinates(root, declaration) == ()
+    violations = verify_neighbourhood_coordinates(root, declaration)
+    assert any("LOOKBACK" in violation and "absent" in violation for violation in violations)
 
 
-def test_method_keyword_default_on_a_module_level_class_is_a_frozen_parameter(tmp_path):
-    """A very common real pattern the brief's own tests never reach either:
-    'class Strategy: def __init__(self, lookback=60)'."""
+def test_module_level_function_keyword_default_is_no_longer_collected(tmp_path):
+    """Fix-round negative control: function keyword defaults were dropped as a collection source
+    entirely (see _frozen_numeric_parameters), not merely fixed -- a coordinate declared against
+    one is now reported absent, never matched."""
+    root = _team(tmp_path, "def get_signal(symbol, lookback=60):\n    return lookback\n")
+    declaration = NeighbourhoodDeclaration(
+        nominee={"lookback": 60.0}, points=({"lookback": 40.0},), coordinates=("lookback",)
+    )
+    violations = verify_neighbourhood_coordinates(root, declaration)
+    assert any("lookback" in violation and "absent" in violation for violation in violations)
+
+
+def test_method_keyword_default_is_no_longer_collected(tmp_path):
+    """The method-default mirror of the test above -- also dropped, doubly so (it is both a
+    function keyword default and nested inside a class body)."""
     root = _team(
         tmp_path,
         "class Strategy:\n    def __init__(self, lookback=60):\n        self.lookback = lookback\n",
@@ -389,16 +418,189 @@ def test_method_keyword_default_on_a_module_level_class_is_a_frozen_parameter(tm
     declaration = NeighbourhoodDeclaration(
         nominee={"lookback": 60.0}, points=({"lookback": 40.0},), coordinates=("lookback",)
     )
+    violations = verify_neighbourhood_coordinates(root, declaration)
+    assert any("lookback" in violation and "absent" in violation for violation in violations)
+
+
+# --- verify_neighbourhood_coordinates: fix round 1 -- false accusations against honest teams ------
+#
+# The scope-restriction fix above closed a real evasion (a decoy assignment buried in a function
+# body or a dead conditional branch) but, as first shipped, opened the more dangerous failure in
+# the opposite direction: falsely accusing an HONEST team. A missed evasion lets one cheat through;
+# a false accusation disqualifies someone honest and, in a tournament, brands them dishonest. Every
+# test below reproduces one of the confirmed false positives/misattributions against the pre-fix
+# code and asserts the corrected, honest outcome.
+
+
+def test_if_guarded_module_level_assignment_is_a_frozen_parameter(tmp_path):
+    """A name assigned inside a module-level `if` (no `else`) is a genuine module-level name --
+    an extremely common real pattern (an environment/PROD guard). Before this fix round,
+    scope-restriction excluded ALL module-level control flow, including this, and reported
+    'absent' for a team that had declared the objectively correct value."""
+    root = _team(tmp_path, "PROD = True\nif PROD:\n    LOOKBACK = 60\n")
+    declaration = NeighbourhoodDeclaration(
+        nominee={"LOOKBACK": 60.0}, points=({"LOOKBACK": 40.0},), coordinates=("LOOKBACK",)
+    )
     assert verify_neighbourhood_coordinates(root, declaration) == ()
 
 
-def test_module_level_function_keyword_default_is_a_frozen_parameter(tmp_path):
-    """The plain function-keyword-default branch, positively exercised: the brief's own 12 tests
-    only ever use bare module-level assignments and never reach this branch of
-    _frozen_numeric_parameters at all."""
-    root = _team(tmp_path, "def get_signal(symbol, lookback=60):\n    return lookback\n")
+def test_try_except_body_assignment_is_a_frozen_parameter(tmp_path):
+    """A name assigned inside a module-level try body (defensive-coding pattern) is likewise a
+    genuine module-level name."""
+    root = _team(tmp_path, "try:\n    LOOKBACK = 60\nexcept Exception:\n    pass\n")
     declaration = NeighbourhoodDeclaration(
-        nominee={"lookback": 60.0}, points=({"lookback": 40.0},), coordinates=("lookback",)
+        nominee={"LOOKBACK": 60.0}, points=({"LOOKBACK": 40.0},), coordinates=("LOOKBACK",)
+    )
+    assert verify_neighbourhood_coordinates(root, declaration) == ()
+
+
+def test_try_except_handler_body_assignment_is_a_frozen_parameter(tmp_path):
+    """The ruling names handlers explicitly ('else/finally/handlers'): an assignment inside the
+    except block itself must be reached too, not only the try body."""
+    root = _team(tmp_path, "try:\n    1 / 0\nexcept ZeroDivisionError:\n    LOOKBACK = 60\n")
+    declaration = NeighbourhoodDeclaration(
+        nominee={"LOOKBACK": 60.0}, points=({"LOOKBACK": 40.0},), coordinates=("LOOKBACK",)
+    )
+    assert verify_neighbourhood_coordinates(root, declaration) == ()
+
+
+def test_try_else_body_assignment_is_a_frozen_parameter(tmp_path):
+    """try's own `else` clause (runs only if no exception was raised) is a separate body from
+    both `body` and `finalbody` and must be reached too."""
+    root = _team(
+        tmp_path, "try:\n    pass\nexcept Exception:\n    pass\nelse:\n    LOOKBACK = 60\n"
+    )
+    declaration = NeighbourhoodDeclaration(
+        nominee={"LOOKBACK": 60.0}, points=({"LOOKBACK": 40.0},), coordinates=("LOOKBACK",)
+    )
+    assert verify_neighbourhood_coordinates(root, declaration) == ()
+
+
+def test_try_finally_body_assignment_is_a_frozen_parameter(tmp_path):
+    root = _team(tmp_path, "try:\n    pass\nfinally:\n    LOOKBACK = 60\n")
+    declaration = NeighbourhoodDeclaration(
+        nominee={"LOOKBACK": 60.0}, points=({"LOOKBACK": 40.0},), coordinates=("LOOKBACK",)
+    )
+    assert verify_neighbourhood_coordinates(root, declaration) == ()
+
+
+def test_for_loop_body_assignment_is_a_frozen_parameter(tmp_path):
+    root = _team(tmp_path, "for _ in range(1):\n    LOOKBACK = 60\n")
+    declaration = NeighbourhoodDeclaration(
+        nominee={"LOOKBACK": 60.0}, points=({"LOOKBACK": 40.0},), coordinates=("LOOKBACK",)
+    )
+    assert verify_neighbourhood_coordinates(root, declaration) == ()
+
+
+def test_while_loop_body_assignment_is_a_frozen_parameter(tmp_path):
+    root = _team(tmp_path, "while False:\n    LOOKBACK = 60\n    break\n")
+    declaration = NeighbourhoodDeclaration(
+        nominee={"LOOKBACK": 60.0}, points=({"LOOKBACK": 40.0},), coordinates=("LOOKBACK",)
+    )
+    assert verify_neighbourhood_coordinates(root, declaration) == ()
+
+
+def test_with_block_body_assignment_is_a_frozen_parameter(tmp_path):
+    root = _team(
+        tmp_path,
+        "class _Ctx:\n"
+        "    def __enter__(self):\n"
+        "        return self\n"
+        "    def __exit__(self, *args):\n"
+        "        return False\n"
+        "\n"
+        "with _Ctx():\n"
+        "    LOOKBACK = 60\n",
+    )
+    declaration = NeighbourhoodDeclaration(
+        nominee={"LOOKBACK": 60.0}, points=({"LOOKBACK": 40.0},), coordinates=("LOOKBACK",)
+    )
+    assert verify_neighbourhood_coordinates(root, declaration) == ()
+
+
+def test_tuple_unpacking_assignment_is_a_frozen_parameter(tmp_path):
+    """The ruling explicitly calls out excluding this as having 'no anti-cheat benefit
+    whatsoever' -- a module-level tuple assignment executes unconditionally exactly like a plain
+    one."""
+    root = _team(tmp_path, "LOOKBACK, THRESHOLD = 60, 1.5\n")
+    declaration = NeighbourhoodDeclaration(
+        nominee={"LOOKBACK": 60.0, "THRESHOLD": 1.5},
+        points=({"LOOKBACK": 40.0, "THRESHOLD": 1.2},),
+        coordinates=("LOOKBACK", "THRESHOLD"),
+    )
+    assert verify_neighbourhood_coordinates(root, declaration) == ()
+
+
+def test_tuple_unpacking_with_a_starred_target_is_not_paired(tmp_path):
+    """A shape this function does not confidently understand -- here, unpacking with a starred
+    target, so the target tuple (2 elements) and value tuple (3 elements) have different lengths
+    -- must be skipped, not guessed at: reported absent, never misattributed."""
+    root = _team(tmp_path, "LOOKBACK, *rest = 60, 1, 2\n")
+    declaration = NeighbourhoodDeclaration(
+        nominee={"LOOKBACK": 60.0}, points=({"LOOKBACK": 40.0},), coordinates=("LOOKBACK",)
+    )
+    violations = verify_neighbourhood_coordinates(root, declaration)
+    assert any("LOOKBACK" in violation and "absent" in violation for violation in violations)
+
+
+def test_class_attribute_of_an_unrelated_class_does_not_clobber_a_module_level_constant(tmp_path):
+    """The exact false accusation confirmed empirically against the pre-fix code: a module-level
+    LOOKBACK of 60 (correct) followed by an UNRELATED class's own, differently-valued LOOKBACK
+    attribute (999) must not overwrite the real value in the collector. Class bodies are never
+    recursed into at all now, so there is no shared namespace for the two to collide in -- before
+    this fix, both lived in the same flat found[str, float] dict keyed only by bare name, and
+    whichever was visited last (here, the class attribute) silently won."""
+    root = _team(tmp_path, "LOOKBACK = 60\nclass UnrelatedConfig:\n    LOOKBACK = 999\n")
+    declaration = NeighbourhoodDeclaration(
+        nominee={"LOOKBACK": 60.0}, points=({"LOOKBACK": 40.0},), coordinates=("LOOKBACK",)
+    )
+    assert verify_neighbourhood_coordinates(root, declaration) == ()
+
+
+def test_positional_only_parameter_default_is_absent_not_misattributed(tmp_path):
+    """The posonlyargs bug: the OLD keyword-default collector aligned ast.arguments.defaults
+    against `args.args + args.kwonlyargs`, omitting posonlyargs from the name list entirely. For
+    `def get_signal(a=1, /, lookback=2)`, this zipped lookback's own default (2) away and instead
+    attributed a's default (1) to the name 'lookback' -- so a team declaring the objectively
+    correct nominee lookback=2.0 got 'nominee-2.0-differs-from-frozen-1.0': a false accusation of
+    having declared the WRONG value, not merely an omission. Function keyword defaults are now
+    dropped as a collection source entirely, so the correct outcome is 'absent' -- never again a
+    wrong 'differs' value attributed to the wrong parameter."""
+    root = _team(tmp_path, "def get_signal(a=1, /, lookback=2):\n    return a, lookback\n")
+    declaration = NeighbourhoodDeclaration(
+        nominee={"lookback": 2.0}, points=({"lookback": 0.5},), coordinates=("lookback",)
+    )
+    violations = verify_neighbourhood_coordinates(root, declaration)
+    assert violations == ("strategy.py:lookback:absent-from-frozen-source",)
+    assert not any("differs" in violation for violation in violations)
+
+
+def test_if_elif_else_with_diverging_values_resolves_to_the_last_written_branch(tmp_path):
+    """Disclosed, accepted residual behaviour, found while stress-testing beyond the
+    coordinator's own examples (which were single-branch: an `if` with no `else`, a `try` with no
+    differing except-path value). When the SAME name is assigned genuinely DIFFERENT values across
+    mutually exclusive if/elif/else branches, this module cannot know which branch a real
+    interpreter would take without evaluating the condition -- which would mean executing team
+    code, forbidden by design. It resolves to whichever branch is written LAST in source order
+    (here, the final `else`), not necessarily the one that would actually run at a given input.
+    Pinned here as a known, disclosed limitation rather than silently unexamined: a team that
+    writes multiple diverging values for what is meant to be a single material parameter can be
+    told 'differs from frozen' even where the real runtime value (at x == 1, the elif's LOOKBACK =
+    60) happens to match its nominee. The honest, unambiguous shape for a material parameter is a
+    single plain module-level assignment; this module does not evaluate conditions to disambiguate
+    branches a team chose to make ambiguous."""
+    root = _team(
+        tmp_path,
+        "x = 1\n"
+        "if x == 0:\n"
+        "    LOOKBACK = 10\n"
+        "elif x == 1:\n"
+        "    LOOKBACK = 60\n"
+        "else:\n"
+        "    LOOKBACK = 20\n",
+    )
+    declaration = NeighbourhoodDeclaration(
+        nominee={"LOOKBACK": 20.0}, points=({"LOOKBACK": 5.0},), coordinates=("LOOKBACK",)
     )
     assert verify_neighbourhood_coordinates(root, declaration) == ()
 
