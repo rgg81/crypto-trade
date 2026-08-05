@@ -4289,6 +4289,12 @@ period and a universe that reaches 20 members around 2020-08.
   least eight to nominate, the declared neighbourhood sweep is one trial and the falsification
   battery is one trial;
 - you fix your nominee **before** declaring the neighbourhood; moving it afterwards voids the sweep;
+- every neighbourhood coordinate must be a **module-level numeric constant** in your frozen
+  `strategy.py`, named identically to the coordinate, and the nominee's declared value must equal
+  that constant. Module-level means the top level of the module, including inside a module-level
+  `if`/`try`; a value defined inside a function body or a class body does not count and will be
+  reported as absent. This rule exists so the nominated point is provably what the frozen code
+  actually does, and it is stated here so an honest submission is never surprised by it;
 - your research certificate must cover: baseline, exact sign inversion, ≥3 formation horizons, ≥2
   rebalance/holding horizons with the phase offset swept for any cadence longer than one bar,
   controls-off and individual-control and combined-control ablations, long/short/chop role checks,
