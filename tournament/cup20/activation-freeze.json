@@ -1,18 +1,18 @@
 {
   "charter_path": "TOURNAMENT-CHARTER-CUP20.md",
-  "charter_sha256": "677b6d558892d45d0767368a354fb8b13cdd509b7ac9cfaedc8e00004a5208d0",
+  "charter_sha256": "c8be6f4b62fc83b32b90070e1d45c1e6a6b847ad3bae4814bf61aa4d264c0cbd",
   "config_path": "tournament/cup20/config.toml",
-  "config_sha256": "1ef291fe91bf564dba7eafac0a3de24e038371eab926163093ed6c19a12fa0d7",
+  "config_sha256": "5f482f2987411003e4f619291b094fe2eaceb8b800b3887f86683e32412219ce",
   "dependency_lock_path": "uv.lock",
   "dependency_lock_sha256": "869cd3380346a9c9a219fc762868e23cd494a18e22dd9b314ba18621d991faa5",
   "implementation_root": "src/crypto_trade/cup20",
-  "implementation_sha256": "86b2b60daadfea5103e3b39d75b27a7a229c93c00a55f7f5172e39cac499aeb9",
-  "is_manifest_sha256": "03c9716ab742509a4134e5a816710afdbb361d07dc4bd5e3129c4d40e4a71633",
+  "implementation_sha256": "e25d403db98de1c18a798bd8f3dd6b927ae2a0496fe0c7ba26dfb4eb8ddb934c",
+  "is_manifest_sha256": "4c7a839e09c19ec6e761412c03da71889b9fcf856972a1da6aa00ae572a0994f",
   "is_root": "data/cup20/is",
   "pure_crypto_audit_path": "tournament/cup20/pure-crypto-audit.json",
-  "pure_crypto_audit_sha256": "a0faf37b4d3ec71ca917378bc8cffbf6c249aed3e744307cb1b54937bd5c5c33",
-  "sealed_manifest_sha256": "a9c65156b39e8ace6dad1fa8b7f653102d9a21534f16be2d500ae8d00d3230f3",
+  "pure_crypto_audit_sha256": "f99f052baea9fe2f21eda950978e09e744385c1ed6f0f356a801c1dc7ba5a40d",
+  "sealed_manifest_sha256": "22302522458907ad4b800a119ee49b3d12b8ba80ffd820d343079ff3e4725c9d",
   "sealed_root": "data/cup20/sealed",
   "test_output_path": "tournament/cup20/activation-tests.out",
-  "test_output_sha256": "5296ad959d411e5b8f4af050646a4ab2aaf899f91b69e590b436033cba513703"
+  "test_output_sha256": "ac26b620d9ce1a5eb25892ca6b41f7f9be512eb0d9a7b05ff9fee83f301c3aa7"
 }
