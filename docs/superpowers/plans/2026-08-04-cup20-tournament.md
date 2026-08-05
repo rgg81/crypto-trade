@@ -2977,8 +2977,23 @@ git commit -m "Add CUP-20 append-only hash-chained research journal"
 - Test: `tests/cup20/test_archive.py`
 
 **Interfaces:**
-- Consumes: nothing.
-- Produces: `archive_directory(source_root: str | Path, destination_root: str | Path) -> str` returning the bundle digest and writing `<destination_root>/<digest>.tar` plus `<digest>.json`; `bundle_digest(source_root: str | Path) -> str`; `FORBIDDEN_PATTERNS: tuple[str, ...]`; `scan_for_blindness_violations(source_root: str | Path) -> tuple[str, ...]` returning `"<relative_path>:<line_number>:<pattern>"` strings.
+- Consumes: `NeighbourhoodDeclaration` from Task 8.
+- Produces: `archive_directory(source_root: str | Path, destination_root: str | Path) -> str` returning the bundle digest and writing `<destination_root>/<digest>.tar` plus `<digest>.json`; `bundle_digest(source_root: str | Path) -> str`; `FORBIDDEN_PATTERNS: tuple[str, ...]`; `scan_for_blindness_violations(source_root: str | Path, *, team_id: str | None = None) -> tuple[str, ...]` returning `"<relative_path>:<line_number>:<pattern>"` strings; and `verify_neighbourhood_coordinates(source_root, declaration, *, entrypoint: str = "strategy.py") -> tuple[str, ...]` returning violation strings.
+
+**Why `verify_neighbourhood_coordinates` is here.** Design spec §7.2 requires that "every coordinate
+maps to an identically named numeric material parameter in the frozen source." Task 8's
+`NeighbourhoodDeclaration.validate()` can only check internal self-consistency — that the declared
+coordinate list matches the points' keys. It cannot know whether `lookback` is a real parameter of
+the team's strategy or a name invented to satisfy the count. Without this check a team can declare
+fictional coordinates, pass every internal gate, and claim a plateau it never explored. This module
+already owns "what is in the frozen source", so the check belongs here.
+
+The check parses the frozen entrypoint with `ast` — never imports or executes it — collects every
+module-level numeric assignment, numeric keyword default and dataclass field default, then requires
+for each declared coordinate that (1) a parameter of exactly that name exists, and (2) the nominee's
+declared value equals the value in the frozen source. Requirement (2) is what forces the nominated
+point to actually be what the frozen code does, rather than a favourable point the team labelled as
+its nominee.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -3041,6 +3056,59 @@ def test_own_team_directory_is_allowed(tmp_path):
     assert scan_for_blindness_violations(root, team_id="team-01") == ()
 
 
+def test_declared_coordinate_absent_from_frozen_source_is_a_violation(tmp_path):
+    from crypto_trade.cup20.archive import verify_neighbourhood_coordinates
+    from crypto_trade.cup20.neighbourhood import NeighbourhoodDeclaration
+
+    root = _team(tmp_path, "LOOKBACK = 60\nTHRESHOLD = 1.0\n")
+    declaration = NeighbourhoodDeclaration(
+        nominee={"LOOKBACK": 60.0, "INVENTED": 3.0},
+        points=({"LOOKBACK": 40.0, "INVENTED": 2.0},),
+        coordinates=("LOOKBACK", "INVENTED"),
+    )
+    violations = verify_neighbourhood_coordinates(root, declaration)
+    assert any("INVENTED" in violation for violation in violations)
+    assert not any("LOOKBACK" in violation for violation in violations)
+
+
+def test_nominee_value_must_match_the_frozen_source(tmp_path):
+    from crypto_trade.cup20.archive import verify_neighbourhood_coordinates
+    from crypto_trade.cup20.neighbourhood import NeighbourhoodDeclaration
+
+    root = _team(tmp_path, "LOOKBACK = 60\n")
+    declaration = NeighbourhoodDeclaration(
+        nominee={"LOOKBACK": 90.0},
+        points=({"LOOKBACK": 40.0},),
+        coordinates=("LOOKBACK",),
+    )
+    assert verify_neighbourhood_coordinates(root, declaration)
+
+
+def test_matching_coordinates_and_values_have_no_violations(tmp_path):
+    from crypto_trade.cup20.archive import verify_neighbourhood_coordinates
+    from crypto_trade.cup20.neighbourhood import NeighbourhoodDeclaration
+
+    root = _team(tmp_path, "LOOKBACK = 60\nTHRESHOLD = 1.5\n")
+    declaration = NeighbourhoodDeclaration(
+        nominee={"LOOKBACK": 60.0, "THRESHOLD": 1.5},
+        points=({"LOOKBACK": 40.0, "THRESHOLD": 1.2},),
+        coordinates=("LOOKBACK", "THRESHOLD"),
+    )
+    assert verify_neighbourhood_coordinates(root, declaration) == ()
+
+
+def test_verify_never_imports_the_frozen_source(tmp_path):
+    from crypto_trade.cup20.archive import verify_neighbourhood_coordinates
+    from crypto_trade.cup20.neighbourhood import NeighbourhoodDeclaration
+
+    # Importing this module would raise; parsing it must not.
+    root = _team(tmp_path, "LOOKBACK = 60\nraise RuntimeError('team code must never execute')\n")
+    declaration = NeighbourhoodDeclaration(
+        nominee={"LOOKBACK": 60.0}, points=({"LOOKBACK": 40.0},), coordinates=("LOOKBACK",)
+    )
+    assert verify_neighbourhood_coordinates(root, declaration) == ()
+
+
 def test_clean_source_has_no_violations(tmp_path):
     root = _team(
         tmp_path,
@@ -3064,11 +3132,15 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'crypto_trade.cup20.ar
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
+import math
 import re
 import tarfile
 from pathlib import Path
+
+from crypto_trade.cup20.neighbourhood import NeighbourhoodDeclaration
 
 FORBIDDEN_PATTERNS: tuple[str, ...] = (
     # Sealed and organiser-only surfaces.
@@ -3132,6 +3204,82 @@ def archive_directory(source_root: str | Path, destination_root: str | Path) -> 
     }
     (destination / f"{digest}.json").write_text(json.dumps(sidecar, indent=2, sort_keys=True) + "\n")
     return digest
+
+
+def _frozen_numeric_parameters(path: Path) -> dict[str, float]:
+    """Collect module-level numeric parameters from a frozen entrypoint by parsing, never importing.
+
+    Team code is untrusted and must never execute during verification, so this uses ``ast`` and
+    reads module-level assignments, annotated assignments, dataclass field defaults and numeric
+    keyword defaults on function signatures.
+    """
+    tree = ast.parse(path.read_text())
+    found: dict[str, float] = {}
+
+    def _numeric(node: ast.AST) -> float | None:
+        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+            if isinstance(node.value, bool):
+                return None
+            return float(node.value)
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+            inner = _numeric(node.operand)
+            return None if inner is None else -inner
+        return None
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            value = _numeric(node.value)
+            if value is not None:
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        found.setdefault(target.id, value)
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            value = _numeric(node.value)
+            if value is not None and isinstance(node.target, ast.Name):
+                found.setdefault(node.target.id, value)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            args = node.args
+            names = [arg.arg for arg in args.args + args.kwonlyargs]
+            defaults = list(args.defaults) + list(args.kw_defaults)
+            for name, default in zip(names[-len(defaults) :] if defaults else [], defaults):
+                if default is None:
+                    continue
+                value = _numeric(default)
+                if value is not None:
+                    found.setdefault(name, value)
+    return found
+
+
+def verify_neighbourhood_coordinates(
+    source_root: str | Path,
+    declaration: NeighbourhoodDeclaration,
+    *,
+    entrypoint: str = "strategy.py",
+) -> tuple[str, ...]:
+    """Check every declared coordinate is a real numeric parameter of the frozen source.
+
+    Design spec section 7.2 requires that every coordinate map to an identically named numeric
+    material parameter in the frozen source. Internal self-consistency is not enough: without this,
+    a team can declare a fictional coordinate, satisfy every other gate, and claim a plateau across
+    a surface it never explored. Requiring the nominee's value to match the frozen source also
+    forces the nominated point to be what the frozen code actually does.
+    """
+    entry = Path(source_root) / entrypoint
+    if not entry.exists():
+        return (f"{entrypoint}:missing-entrypoint",)
+    parameters = _frozen_numeric_parameters(entry)
+    violations: list[str] = []
+    for coordinate in declaration.coordinates:
+        if coordinate not in parameters:
+            violations.append(f"{entrypoint}:{coordinate}:absent-from-frozen-source")
+            continue
+        declared = float(declaration.nominee[coordinate])
+        frozen = parameters[coordinate]
+        if not math.isclose(declared, frozen, rel_tol=1e-9, abs_tol=1e-12):
+            violations.append(
+                f"{entrypoint}:{coordinate}:nominee-{declared}-differs-from-frozen-{frozen}"
+            )
+    return tuple(violations)
 
 
 def scan_for_blindness_violations(
