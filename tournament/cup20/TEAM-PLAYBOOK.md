@@ -116,7 +116,11 @@ none of it is yours to reimplement:
 - native per-event funding summed into the holding interval;
 - force exit at the last executable open on delisting, with no survivorship rescue;
 - per-symbol participation capped as a fraction of the bar's traded volume;
-- gross ≤ 1.0× equity (the book is unlevered by construction) and per-symbol |weight| ≤ 0.20;
+- gross ≤ 1.0× equity (the book is unlevered by construction) and per-symbol |weight| ≤ 0.20.
+  These are applied *after* the common risk unit, by reduction. Your own normalised weights are a
+  different matter: a target row that breaches the per-symbol cap on its own is a breach of this
+  contract and **fails the run outright** rather than being trimmed, so a book concentrated in
+  fewer than five names will not evaluate at all;
 - the **common risk unit**: your normalised targets are evaluated once with your declared risk
   policy applied to produce a *reference book*; the evaluator then scales your normalised weights
   by `clamp(0.10 / σ_t, 0.20, 3.0)`, where `σ_t` is the trailing-90-day annualised volatility of
