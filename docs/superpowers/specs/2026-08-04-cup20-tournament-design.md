@@ -167,7 +167,22 @@ deployable book, and it is disqualified rather than rewarded for being small.
 
 Every organiser-recognised evaluation is appended to a per-team, append-only, hash-chained journal
 **before** market data are opened. Acceptance consumes the trial even if the run crashes or is
-abandoned. A material trial is any evaluation whose tuple of (source bytes, config, feature set,
+abandoned.
+
+**What the hash chain does and does not guarantee.** It makes accidental corruption, naive
+deletion, renumbering, reordering and truncation detectable — each breaks a sequence number, a
+parent link or a record digest. It is **not** a defence against an actor with write access to the
+journal file who deletes a record and correctly re-chains every record after it: the digest is
+keyless SHA-256 over public bytes, so anyone who can edit the file can also recompute the suffix.
+Git-committing the journal does not close this either, since an actor who can edit the file in the
+working tree can generally also amend local history, and there is a window between an append and
+the commit that captures it.
+
+What actually makes the trial count trustworthy is that **the journal is organiser-owned and teams
+never write to it** — teams write only under their own directory (§5). The chain is an audit trail
+and an accident detector layered on top of that access boundary, not a substitute for it. This is
+stated plainly because a tamper-evidence claim that overstates its own strength is worse than none:
+it invites reliance the mechanism cannot carry. A material trial is any evaluation whose tuple of (source bytes, config, feature set,
 seed, parameters, window, cost model, risk policy) differs from an earlier one.
 
 **Budget: 12 material trials per team. Nomination requires ≥ 8 accepted trials.** No team may
