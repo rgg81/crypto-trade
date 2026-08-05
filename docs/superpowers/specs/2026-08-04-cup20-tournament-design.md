@@ -480,9 +480,13 @@ tournament/cup20/
   teams/team-NN/{MANDATE.md, candidates/<id>/{strategy.py,risk_policy.json,README.md},
                  research/, RESEARCH-CERTIFICATE.md}
   certificates/
-  private/holdout/                   organiser-only outputs, pre-release
-reports-cup20/{is/, holdout/, source-archives/sha256/}
-data/cup20/{is/, sealed/}            physically separated snapshots, distinct manifests
+  universe-summary.json              team-visible; in-sample facts only
+  private/                           ORGANISER-ONLY, gitignored, prohibited to teams
+    holdout/                         holdout outputs, pre-release
+    universe-summary.json            full-window figures, incl. sealed-side composition
+    pure-crypto-audit.json           the universe attestation the activation record binds
+reports-cup20/{is/, holdout/, source-archives/sha256/}   ORGANISER-ONLY, gitignored
+data/cup20/{is/, sealed/, acquisition/}                  distinct manifests; only is/ is a team input
 src/crypto_trade/cup20/
   config.py universe.py snapshot.py engine.py risk_unit.py journal.py
   qualification.py scoring.py runner.py report.py paper.py

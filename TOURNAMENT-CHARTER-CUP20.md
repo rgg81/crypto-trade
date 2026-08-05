@@ -89,19 +89,22 @@ authoritative.
 | **Weekly, complete-180d volume, hysteresis 20/25** | **0.29** | **239 / 309** | **70** |
 
 The three rows above were measured at design time on a weekly-sampled proxy. The authoritative
-numbers are the built artifact's own: across its 311 reconstitutions the adopted rule delivers
-**0.26 changes per week, 241 of 310 weeks completely unchanged, and 79 distinct names** over six
-years, with exactly 20 members at every boundary and 63 distinct names inside the IS window. That
-confirms the design-time estimate's direction and magnitude while being measured on the real thing
-rather than a proxy.
+numbers are the built artifact's own, **stated over the in-sample window** — this document is
+team-visible, and how many names the universe holds after the cutoff is a fact about the holdout.
+Across the IS window's 207 reconstitutions the adopted rule delivers **0.29 changes per week, 159
+of 206 transitions completely unchanged, and 63 distinct names**, with exactly 20 members at every
+boundary. That confirms the design-time estimate's direction and magnitude while being measured on
+the real thing rather than a proxy. The organiser's full-window figures exist and are recorded in
+`tournament/cup20/private/universe-summary.json`, which is not team-visible.
 
 The ranking statistic is the **median** daily quote volume over the trailing window, not the mean.
 A coin's launch-week volume spike lifts a 180-day mean far more than a 180-day median, so ranking
-on the mean admits transient listings into a universe meant to be blue-chip. Measured on the built
-data, the mean gave 91 distinct names and 0.32 changes per week and put PIPPIN, RAVE, SIREN, ASTER,
-MYX, XPL, PENGU, NOT and 1000FLOKI into the index; the median replaces them with AAVE, FIL and LTC.
-The statistic is a validated field of the machine contract, so the config and the implementation
-cannot silently disagree about it.
+on the mean admits transient listings into a universe meant to be blue-chip. Re-measured on the
+built data over the same IS window, the mean gave 67 distinct names at 0.31 changes per week
+against the median's 63 at 0.29: it admitted COMP, ENS, LINA, MANA, OMG, TOMO and WAVES, and passed
+over BAND, NEO and SEI. The choice was fixed before any holdout number existed and is not
+conditioned on one. It is a validated field of the machine contract, so the config and the
+implementation cannot silently disagree about it.
 
 The adopted rule produces memberships that read as a blue-chip crypto index
 (BTC/ETH/BNB/XRP/SOL/DOGE/ADA/LINK/LTC/AVAX/DOT/…) and eliminates the transient hype names that
@@ -128,10 +131,23 @@ Owned entirely by the organiser. No team code touches any of it.
 
 ## 5. Blindness — four independent layers
 
-1. **Physical truncation.** Teams receive `data/cup20/is/`, containing bars, funding, membership,
-   contract metadata and exchange info **strictly before 2024-08-01**. Holdout rows live in
-   `data/cup20/sealed/` under a different manifest hash and are never opened by a team process.
-   Rows that are not on disk cannot leak.
+1. **Truncated data root.** Teams receive `data/cup20/is/`, containing bars, funding, membership,
+   contract metadata and exchange info **strictly before 2024-08-01**. Not one row at or after the
+   cutoff is in it, in any timestamp column of any dataset, and the contract metadata is censored so
+   that a symbol delisting after the cutoff is indistinguishable from one still trading. Holdout
+   rows live in `data/cup20/sealed/` under a different manifest hash.
+
+   What this layer does **not** claim: the holdout rows are not physically absent from the machine.
+   As deployed, `data/cup20/sealed/` sits on the same filesystem, under the same account, with the
+   same permissions as the in-sample snapshot, and so do the acquisition snapshot and the
+   organiser-only artifacts under `tournament/cup20/private/`. Nothing at the operating-system level
+   stops a team process from opening any of them. What is true is narrower and worth stating
+   precisely: those rows are **not in the team's data root**, so no ordinary path — a glob of the
+   data directory, a merge, a `read_parquet` of what was handed over — can reach them by accident.
+   Deliberate access is what layers 3 and 4 are for: the playbook prohibits every organiser-only
+   path by name, and the pre-flight source scan matches those paths against both the content and the
+   file names of the frozen archive before a single number is scored. Blindness therefore rests on
+   absence-from-the-data-root **plus** the prohibition **plus** the scan — not on absence alone.
 2. **Narrow protocol.** Teams implement
    `target_weights(context: DecisionContext, *, seed: int) -> Mapping[str, float] | None`.
    `DecisionContext` exposes only bars closing at or before the decision time, funding strictly
@@ -142,7 +158,10 @@ Owned entirely by the organiser. No team code touches any of it.
 3. **Namespace isolation.** A team may write and read only under
    `tournament/cup20/teams/team-NN/`. Reading another team's directory, any prior-tournament
    directory, or referencing any post-cutoff date literal is a pre-flight disqualification,
-   enforced by a source scan of the frozen archive.
+   enforced by a source scan of the frozen archive. The same applies to every organiser-only
+   surface, each of which is a pattern in `FORBIDDEN_PATTERNS` and a row in the playbook's
+   prohibited table: `data/cup20/sealed/`, `data/cup20/acquisition/`,
+   `tournament/cup20/private/` and the whole of `reports-cup20/`.
 4. **Future-corruption test.** The organiser corrupts every row strictly after each decision
    boundary and asserts byte-identical target weights. Failure is terminal.
 
@@ -278,7 +297,8 @@ lowered, never rounded into compliance, never averaged away. A missing or non-fi
 | Positive-quarter fraction | ≥ 0.50 |
 | Folds positive at 2× cost | ≥ 3 of 4 |
 | Worst-fold Sharpe at 2× cost | ≥ −0.25 |
-| Long gross PnL, short gross PnL | each > 0 (for a candidate claiming both roles) |
+| Long gross PnL, short gross PnL | each > 0, for every side the book actually traded |
+| Declared roles agree with the sides actually traded | **required** |
 | Annualised one-way turnover | ≤ 25× equity |
 | Gross edge per unit one-way turnover | ≥ 40 bps |
 | Base cost share of positive gross PnL | ≤ 30% |
@@ -288,6 +308,13 @@ lowered, never rounded into compliance, never averaged away. A missing or non-fi
 | Neighbourhood points with positive return **and** positive 2× Sharpe | ≥ 70% |
 | Trial-adjusted confidence | ≥ 0.90 |
 | Exact sign inversion clears the core floors | **disqualifying** |
+
+**Roles are observed, not declared.** A candidate's roles are derived from which sides its book
+actually traded — a side with non-zero gross PnL — and the roles declared in the research
+certificate are checked against that. Both floors then apply to the union. Otherwise a long/short
+book with a losing short sleeve could declare itself long-only and the short-PnL floor would never
+be evaluated, which is opting out of a hard floor by describing yourself differently. Declaring a
+sleeve that was never traded fails the same check, in the other direction.
 
 **Folds.** Four equal 12-month blocks anchored backward from the IS cutoff, so every fold carries
 the same noise floor:
@@ -458,9 +485,13 @@ tournament/cup20/
   teams/team-NN/{MANDATE.md, candidates/<id>/{strategy.py,risk_policy.json,README.md},
                  research/, RESEARCH-CERTIFICATE.md}
   certificates/
-  private/holdout/                   organiser-only outputs, pre-release
-reports-cup20/{is/, holdout/, source-archives/sha256/}
-data/cup20/{is/, sealed/}            physically separated snapshots, distinct manifests
+  universe-summary.json              team-visible; in-sample facts only
+  private/                           ORGANISER-ONLY, gitignored, prohibited to teams
+    holdout/                         holdout outputs, pre-release
+    universe-summary.json            full-window figures, incl. sealed-side composition
+    pure-crypto-audit.json           the universe attestation the activation record binds
+reports-cup20/{is/, holdout/, source-archives/sha256/}   ORGANISER-ONLY, gitignored
+data/cup20/{is/, sealed/, acquisition/}                  distinct manifests; only is/ is a team input
 src/crypto_trade/cup20/
   config.py universe.py snapshot.py engine.py risk_unit.py journal.py
   qualification.py scoring.py runner.py report.py paper.py
