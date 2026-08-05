@@ -35,12 +35,17 @@ def test_bootstrap_is_deterministic_for_a_fixed_seed():
 
 
 def test_different_seeds_are_permitted_to_differ():
+    # Strengthened in fix round 1: `len(values) >= 1` is vacuously true for
+    # any implementation that returns a float at all, including one that
+    # ignores `seed` entirely. `>= 2` is a real seed-sensitivity assertion --
+    # verified non-flaky for this exact fixture: seeds 1-5 give five
+    # distinct fractions (0.5935-0.6320), deterministically, every run.
     rng = np.random.default_rng(4)
     series = _daily(rng.normal(0.0002, 0.02, 500))
     values = {
         circular_block_bootstrap_positive_fraction(series, seed=seed) for seed in (1, 2, 3, 4, 5)
     }
-    assert len(values) >= 1
+    assert len(values) >= 2
 
 
 def test_short_series_is_rejected():
@@ -104,14 +109,14 @@ def test_negative_infinity_is_rejected():
         circular_block_bootstrap_positive_fraction(_daily(values))
 
 
-def test_nan_values_are_dropped_before_the_length_and_finiteness_checks():
-    # daily.dropna() runs first, so NaN observations are silently removed
-    # rather than tripping the non-finite rejection -- a real behavioural
-    # branch (not a raise path) worth pinning explicitly. The series is only
-    # long enough once the leading NaNs are dropped (400 remain of 500).
-    values = [np.nan] * 100 + [0.01] * 400
-    result = circular_block_bootstrap_positive_fraction(_daily(values))
-    assert result == 1.0
+def test_nan_values_are_rejected():
+    # Fix round 1, Finding 1: there is no .dropna() any more. A NaN-bearing
+    # series must raise the same "non-finite values" error as inf, not be
+    # silently trimmed to a shorter, temporally-spliced series.
+    values = [0.01] * 400
+    values[100] = float("nan")
+    with pytest.raises(ValueError):
+        circular_block_bootstrap_positive_fraction(_daily(values))
 
 
 def test_series_exactly_at_the_minimum_length_is_accepted():
@@ -127,13 +132,53 @@ def test_series_one_below_the_minimum_length_is_rejected():
         circular_block_bootstrap_positive_fraction(series, block_days=10)
 
 
-def test_block_days_not_a_divisor_of_series_length_still_returns_a_valid_fraction():
-    # length=23 is not a multiple of block_days=3 (blocks=ceil(23/3)=8,
-    # 8*3=24 != 23), exercising the reshape-then-truncate path that trims
-    # the one extra flattened observation back down to exactly `length`.
-    series = _daily([0.01] * 23)
-    result = circular_block_bootstrap_positive_fraction(series, block_days=3, samples=50)
-    assert result == 1.0
+def _reference_block_bootstrap_positive_fraction(values, samples, block_days, seed):
+    """Deliberately non-vectorized reimplementation of the same documented
+    contract as circular_block_bootstrap_positive_fraction (ceil block
+    count, each block wraps circularly modulo length, blocks concatenate
+    then truncate back to exactly `length` observations) -- via explicit
+    loops and a floor-division ceiling trick instead of the production
+    reshape/broadcast, so it is a structurally different code path, not a
+    copy. Used only to cross-check the production index arithmetic in
+    test_index_arithmetic_matches_an_independent_reference_implementation.
+    """
+    length = len(values)
+    blocks = -(-length // block_days)  # ceiling division without np.ceil
+    rng = np.random.default_rng(seed)
+    starts = rng.integers(0, length, size=(samples, blocks))
+    positive = 0
+    for sample_starts in starts:
+        drawn = [
+            values[(start + offset) % length]
+            for start in sample_starts
+            for offset in range(block_days)
+        ][:length]
+        assert len(drawn) == length, "reference must average exactly `length` observations"
+        if np.array(drawn).mean() > 0.0:
+            positive += 1
+    return positive / samples
+
+
+def test_index_arithmetic_matches_an_independent_reference_implementation():
+    # Fix round 1, Finding 3: the brief's all-0.01 fixture proved nothing
+    # about the reshape/truncate/wrap arithmetic, since any subset or
+    # superset of identical values averages the same. This fixture uses a
+    # non-constant, index-distinguishable series (alternating sign, distinct
+    # magnitude per index) so that a wrong block count, wrong truncation
+    # side, or a forgotten circular wrap selects genuinely different values
+    # and changes the result -- empirically confirmed against three
+    # plausible bugs (floor-instead-of-ceil block count: shape mismatch;
+    # truncate-from-the-end instead of the start: 0.695 vs 0.705;
+    # no modulo wrap: 0.48 vs 0.705) before this test was written.
+    length, block_days, samples, seed = 23, 4, 200, 2026
+    values = np.array([(-1.0) ** i * (i + 1) for i in range(length)])
+    series = _daily(values)
+
+    expected = _reference_block_bootstrap_positive_fraction(values, samples, block_days, seed)
+    result = circular_block_bootstrap_positive_fraction(
+        series, samples=samples, block_days=block_days, seed=seed
+    )
+    assert result == expected
 
 
 def test_bootstrap_is_deterministic_with_the_default_seed():
@@ -170,3 +215,23 @@ def test_trial_adjustment_rejects_a_negative_positive_fraction():
 def test_trial_adjustment_rejects_a_negative_trial_count():
     with pytest.raises(ValueError):
         trial_adjusted_confidence(0.9, -1)
+
+
+def test_trial_adjustment_rejects_a_nan_trial_count():
+    # Fix round 1, Finding 4: `trial_count < 1` did not reject NaN (`nan < 1`
+    # is False), so a garbage trial count used to propagate through to
+    # `min(1.0, nan) == 1.0` -- the *most* favourable confidence a module
+    # whose entire job is to penalise could return. The fixed check
+    # (`not trial_count >= 1`) closes this the same way positive_fraction's
+    # chained comparison already did.
+    with pytest.raises(ValueError):
+        trial_adjusted_confidence(0.9, float("nan"))
+
+
+def test_trial_adjustment_rejects_a_nan_positive_fraction():
+    # Regression pin for the accidental-but-correct half of the same bug
+    # class: `not 0.0 <= positive_fraction <= 1.0` already rejects NaN
+    # today (the chained comparison is False for NaN, so `not False` is
+    # True), but that was untested before this fix round.
+    with pytest.raises(ValueError):
+        trial_adjusted_confidence(float("nan"), 3)
