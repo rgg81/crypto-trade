@@ -6,21 +6,25 @@
 # decides which symbols get funding and mark prices at all: `build_snapshot` fetches those only for
 # its OWN membership, so a CUP-20 member outside it arrives with bars and nothing else.
 #
-# `size` is MEASURED, not argued, and it is boxed in from both sides.
+# `size` is MEASURED, not argued, and it is boxed in from both sides. The figures below are stated
+# over the IN-SAMPLE window only. The measurement itself necessarily ran over the whole acquisition,
+# but which names the universe holds after 2024-08-01, and how many there are, is a fact about the
+# holdout: this file is committed, so it says nothing the IS snapshot does not already say. The
+# organiser's own full-window figures live in tournament/cup20/private/universe-summary.json.
 #
 # LOWER BOUND 22. Containment is a symbol-set property -- `build_snapshot` fetches a member's whole
 # funding and mark history once it appears at ANY boundary -- so what matters is each member's BEST
-# rank. Across all 79 CUP-20 members that maximum is 22 (IOTAUSDT; next ONDOUSDT 19, ALGOUSDT and
-# HBARUSDT 18), with zero members unranked. It is that low because CUP-20 and the acquisition now
-# rank on the SAME statistic (`liquidity_measure` below, and
+# rank. Across the 63 CUP-20 members inside the IS window that maximum is 22 (IOTAUSDT; next
+# ALGOUSDT 18), with zero members unranked, and it does not rise on the sealed side. It is that low
+# because CUP-20 and the acquisition now rank on the SAME statistic (`liquidity_measure` below, and
 # `crypto_trade.cup20.universe.LIQUIDITY_MEASURE`), which makes the CUP-20 top-20 a genuine subset
 # bounded by the hysteresis exit rank of 25.
 #
 # That was not true when this file first shipped: `build_membership` ranked on the MEAN while both
 # configs declared the median, and under that mismatch the measured lower bound was 65 -- at 60 the
-# containment assertion in scripts/cup20_build_snapshot.py caught RAVEUSDT reaching the CUP-20
+# containment assertion in scripts/cup20_build_snapshot.py caught a symbol reaching the CUP-20
 # top-20 with 689 bars, zero funding rows and zero mark prices. Fixing the statistic removed the
-# divergence, and RAVEUSDT with it: on the median it is not a member at all.
+# divergence, and that symbol with it: on the median it is not a member at all.
 #
 # UPPER BOUND 71. BTCSTUSDT first appears at rank 72, and Binance has no public funding for it in
 # 2022-01 -- the REST endpoint returns `[]` and the monthly archive is a 404 -- so `build_snapshot`
@@ -51,9 +55,10 @@ mark_price_klines_url = "https://fapi.binance.com/fapi/v1/markPriceKlines"
 # `warmup_start`, so any date before the first archived day fails closed with "BTCUSDT does not
 # have exactly three canonical 8h bars per UTC day".
 #
-# 2020-01-01 is verified, not assumed: parsing every cached BTCUSDT 8h archive gives 7212 bars over
-# 2404 consecutive days, 2020-01-01 through 2026-07-31, with zero missing days and zero days short
-# of three bars.
+# 2020-01-01 is verified, not assumed: parsing the cached BTCUSDT 8h archives over the in-sample
+# window gives 5022 bars across 1674 consecutive days, 2020-01-01 through 2024-07-31, with zero
+# missing days and zero days short of three bars. Only the first archived day is load-bearing for
+# `warmup_start`, and no assertion here depends on any day after the cutoff.
 warmup_start = "2020-01-01"
 hard_end_exclusive = "2026-08-01"
 transaction_interval = "8h"

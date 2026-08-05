@@ -47,8 +47,11 @@ def build_membership(
     the mean. The difference is the whole point of a "deliberately stable" universe: a launch-week
     volume spike lifts a 180-day mean enormously and a 180-day median barely at all, so the mean
     admits transient listings that the median rejects in favour of established names. Measured
-    across all 311 reconstitutions of the built snapshot, the mean produced 91 distinct members at
-    0.32 changes/week and the median 79 at 0.26 -- better on every axis of the stated objective.
+    across the built snapshot's 207 in-sample reconstitutions, the mean produced 67 distinct members
+    at 0.31 changes/week and the median 63 at 0.29 -- better on every axis of the stated objective.
+    (In-sample figures only, deliberately: this file is readable alongside the charter, and the
+    universe's size and turnover after the cutoff are facts about the holdout. The full-window
+    measurement is in ``tournament/cup20/private/universe-summary.json``.)
     """
     if lookback_days < 1 or target_size < 1:
         raise ValueError("lookback_days and target_size must be positive")

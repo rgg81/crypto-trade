@@ -725,6 +725,107 @@ def test_is_snapshot_refuses_to_ship_an_archive_marker_it_cannot_normalise_away(
         )
 
 
+# --- Committed-surface composition leak ------------------------------------------------------
+#
+# The snapshot itself was clean; the leak was in the artifacts committed AROUND it.
+# `universe-summary.json` named all sixteen sealed-only members outright, `pure-crypto-audit.json`
+# repeated them and additionally identified the post-cutoff delistings, and the acquisition config
+# and design spec disclosed two of them with ranks in prose. Each was a separate edit by a separate
+# hand; what they had in common is that no check ever asked the obvious question.
+#
+# This asks it. The roster is read from the organiser-only summary -- never hardcoded here, since
+# this file is itself committed and team-readable, and writing the sixteen names into it would BE
+# the leak. On a machine without `tournament/cup20/private/` (a fresh clone; the directory is
+# gitignored) there is nothing to compare against and the test skips.
+
+_PRIVATE_SUMMARY = Path("tournament/cup20/private/universe-summary.json")
+
+# Scoped to the CUP-20 surface: the documents a team is told to read, plus the implementation,
+# tests, build scripts and design spec that sit beside them. Deliberately NOT the whole repository
+# -- other tournaments' committed artifacts legitimately contain these symbol names, and reading
+# any of those directories is already a disqualification under a different rule.
+_TEAM_VISIBLE_PREFIXES = (
+    "tournament/cup20/",
+    "src/crypto_trade/cup20/",
+    "tests/cup20/",
+    "scripts/cup20_",
+)
+_TEAM_VISIBLE_FILES = (
+    "TOURNAMENT-CHARTER-CUP20.md",
+    "docs/superpowers/specs/2026-08-04-cup20-tournament-design.md",
+    "docs/superpowers/plans/2026-08-04-cup20-tournament.md",
+)
+
+
+def _tracked_cup20_files() -> list[Path]:
+    import subprocess
+
+    listed = subprocess.run(
+        ["git", "ls-files", "-z"], capture_output=True, text=True, check=True
+    ).stdout.split("\0")
+    return [
+        Path(name)
+        for name in listed
+        if name
+        and (name.startswith(_TEAM_VISIBLE_PREFIXES) or name in _TEAM_VISIBLE_FILES)
+        and Path(name).is_file()
+    ]
+
+
+@pytest.mark.skipif(
+    not _PRIVATE_SUMMARY.is_file(),
+    reason="organiser-only universe summary absent; nothing to compare the committed surface to",
+)
+def test_no_committed_cup20_file_names_a_sealed_only_member():
+    import json
+
+    summary = json.loads(_PRIVATE_SUMMARY.read_text())
+    sealed_only = summary["sealed_only_members"]
+    assert sealed_only, "the organiser summary must actually list the sealed-only roster"
+
+    files = _tracked_cup20_files()
+    # Guard the guard: a wrong prefix or a broken `git ls-files` would make this vacuously green.
+    assert len(files) > 20, f"expected the CUP-20 committed surface, found {len(files)} files"
+    assert Path("TOURNAMENT-CHARTER-CUP20.md") in files
+
+    offenders = [
+        f"{path}: {name}"
+        for path in files
+        for name in sealed_only
+        if name in path.read_text(errors="replace")
+    ]
+    assert offenders == [], f"sealed-only members named in committed files: {offenders}"
+
+
+@pytest.mark.skipif(
+    not _PRIVATE_SUMMARY.is_file(),
+    reason="organiser-only universe summary absent; nothing to compare the committed surface to",
+)
+def test_team_visible_universe_summary_carries_no_sealed_side_field():
+    """The count is derivable even with the names gone: 79 total minus 63 in-sample is sixteen."""
+    import json
+
+    public = json.loads(Path("tournament/cup20/universe-summary.json").read_text())
+    private = json.loads(_PRIVATE_SUMMARY.read_text())
+    sealed_side_fields = {
+        "distinct_members",
+        "sealed_only_members",
+        "reconstitutions",
+        "sealed_end",
+        "sealed_manifest_sha256",
+    }
+    assert sealed_side_fields <= set(private), "the organiser's summary must keep the full picture"
+    assert sealed_side_fields.isdisjoint(public)
+    assert set(public) == {
+        "is_start",
+        "is_warmup_start",
+        "is_end",
+        "is_reconstitutions",
+        "distinct_is_members",
+        "is_manifest_sha256",
+    }
+
+
 # --- Public-surface completeness -----------------------------------------------------------
 #
 # The brief's own hardcoded __all__ list predates several functions added to cup20 modules during
