@@ -62,6 +62,12 @@ class WindowMetrics:
     max_drawdown: float
     calmar: float
     positive_quarter_fraction: float
+    # The COUNT behind the fraction, reported alongside it because charter section 8 states its
+    # holdout floor as "at least 5 of 8 quarters positive" -- a count, not a ratio. Deriving the
+    # count from the fraction would need the denominator, and the only honest denominator is the
+    # number of calendar quarters this book actually produced returns in. A caller assuming eight
+    # (the sealed window's nominal length) would silently mis-gate a book that traded in seven.
+    positive_quarter_count: int
     annualized_turnover: float
     gross_edge_bps_per_turnover: float
     cost_share_of_positive_gross: float
@@ -187,9 +193,8 @@ def window_metrics(result: EvaluationResult) -> WindowMetrics:
 
     naive_index = pd.DatetimeIndex(daily.index).tz_convert("UTC").tz_localize(None)
     quarters = (1.0 + daily).groupby(naive_index.to_period("Q")).prod() - 1.0
-    positive_quarter_fraction = (
-        float((quarters > 0.0).sum()) / len(quarters) if len(quarters) else 0.0
-    )
+    positive_quarters = int((quarters > 0.0).sum())
+    positive_quarter_fraction = positive_quarters / len(quarters) if len(quarters) else 0.0
 
     gross_bar = frame["price_pnl"].astype(float) + frame["funding_pnl"].astype(float)
     total_turnover = float(frame["turnover"].astype(float).sum())
@@ -224,6 +229,7 @@ def window_metrics(result: EvaluationResult) -> WindowMetrics:
         max_drawdown=drawdown,
         calmar=calmar,
         positive_quarter_fraction=positive_quarter_fraction,
+        positive_quarter_count=positive_quarters,
         annualized_turnover=total_turnover / years if years > 0 else 0.0,
         gross_edge_bps_per_turnover=(
             gross_total / total_turnover * 10_000.0 if total_turnover > 0 else 0.0

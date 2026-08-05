@@ -5,6 +5,7 @@ from crypto_trade.cup20.adjudication import (
     Adjudication,
     CandidateAdjudication,
     adjudicate_candidate,
+    adjudicate_holdout_candidate,
     adjudicate_population,
 )
 from crypto_trade.cup20.archive import (
@@ -49,11 +50,16 @@ from crypto_trade.cup20.neighbourhood import (
     median_metrics,
     positive_point_fraction,
 )
-from crypto_trade.cup20.qualification import GateVector, evaluate_floors
+from crypto_trade.cup20.qualification import (
+    GateVector,
+    evaluate_floors,
+    evaluate_holdout_eligibility,
+)
 from crypto_trade.cup20.report import atomic_release, build_packet, write_manifest
 from crypto_trade.cup20.risk_unit import apply_risk_scalars, common_risk_scalars
 from crypto_trade.cup20.runner import (
     CandidateRun,
+    apply_exposure_caps,
     decision_grid,
     evaluator_config,
     normalise_unit_gross,
@@ -65,6 +71,7 @@ from crypto_trade.cup20.scored_metrics import (
     DOUBLE_COST,
     DOUBLE_COST_RANKING_KEYS,
     FLOOR_METRIC_KEYS,
+    HOLDOUT_ONLY_KEYS,
     RANKING_METRIC_KEYS,
     RANKING_ONLY_KEYS,
     REQUIRED_COST_LEVELS,
@@ -101,6 +108,7 @@ __all__ = [
     "DOUBLE_COST",
     "DOUBLE_COST_RANKING_KEYS",
     "FLOOR_METRIC_KEYS",
+    "HOLDOUT_ONLY_KEYS",
     "GateVector",
     "IS_END",
     "LIQUIDITY_MEASURE",
@@ -119,8 +127,10 @@ __all__ = [
     "WindowMetrics",
     "accepted_trial_count",
     "adjudicate_candidate",
+    "adjudicate_holdout_candidate",
     "adjudicate_population",
     "append_record",
+    "apply_exposure_caps",
     "apply_risk_scalars",
     "archive_directory",
     "assemble_scored_metrics",
@@ -134,6 +144,7 @@ __all__ = [
     "daily_returns",
     "decision_grid",
     "evaluate_floors",
+    "evaluate_holdout_eligibility",
     "evaluator_config",
     "fold_positive_pnl_shares",
     "fold_sharpes",

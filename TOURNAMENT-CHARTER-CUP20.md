@@ -178,13 +178,18 @@ Owned entirely by the organiser. No team code touches any of it.
 Each strategy is normalised to a common ex-ante risk level so that drawdown comparisons measure
 **tail behaviour and regime timing** rather than who chose to trade smallest.
 
-Order of operations at each decision boundary `t`:
+Scoring one candidate is **two evaluator passes over the same targets**. The first produces a
+*reference book*, whose only purpose is to measure volatility and which is never itself scored.
+The second produces the *executed book*, on which every floor and every score is computed.
+
+**Pass 1 — the reference book.**
 
 1. Team returns raw target weights. The evaluator normalises them to unit gross
    (`Σ|w| = 1`), preserving relative sizing and net exposure.
-2. The team's own declared risk policy is applied (volatility target, drawdown brakes, position
-   stops, time stops, turnover limits, side scaling), producing the **unscaled book**.
-3. **Common risk unit.** Let `σ_t` be the annualised standard deviation of the unscaled book's
+2. The normalised targets are evaluated once, at base cost, with the team's own declared risk
+   policy applied (volatility target, drawdown brakes, position stops, time stops, turnover
+   limits, side scaling).
+3. **Common risk unit.** Let `σ_t` be the annualised standard deviation of the reference book's
    **gross** bar returns over the trailing 90 days, using rows strictly before `t`. Gross returns
    are used deliberately: it removes any circularity between the scalar and the costs it induces,
    and volatility is dominated by exposure, not by fees.
@@ -194,19 +199,51 @@ Order of operations at each decision boundary `t`:
    s_t = 1.0                                    otherwise
    ```
 
-4. Executed weights = `s_t × unscaled weights`, then gross, per-symbol and participation caps.
+**Pass 2 — the executed book.**
+
+4. Executed weights = `s_t × normalised weights`, then reduced by one uniform per-boundary scale
+   until the §4 gross, net and per-symbol caps hold. The caps *reduce*; they never reject a run
+   and never lever a book up. The participation cap is applied by the evaluator at fill time.
+5. The declared risk policy is applied again inside this pass, against **this** book's state, and
+   the result is scored at 1×, 2× and 3× cost. Each cost level is an independent replay, so a
+   declared brake responds to the deeper drawdown a cost shock actually produces.
+
+**The policy runs in the pass it governs.** A risk policy is not a scalar on weights, so it cannot
+be applied once and then multiplied through. Of the six declarable primitives, three —
+position stops, time stops and the turnover limit, together with the cooldown re-entry blocks the
+first two arm — are *order-level* decisions over carried quantities: a stop zeroes a position and
+vetoes the team's requested delta for that one symbol for N bars, and the turnover limit prorates
+partial fills against the distance from the current position. None of the three has any
+representation in target-weight space, and the protocol's rebalance instruction is a row-level
+Boolean, so there is no weight that means "hold this one symbol while retargeting the others".
+The effect is not marginal: on a sparse mandate that rebalances every sixth boundary, **98% of the
+policy's own fills land on boundaries that carry no target row at all**. Each pass therefore has
+exactly one equity path, one realised-return history and one set of entry prices and holding ages,
+and the policy fires off the pass it is in.
+
+**Two consequences, stated rather than hidden.** First, a declared drawdown brake watches the
+*executed* book, which the common risk unit has already resized; on a book the risk unit shrinks,
+the same declaration engages at materially fewer boundaries than it would on the reference book.
+Second, a team's own volatility target is largely inert on the executed book: a declared target may
+only reduce — the declared-policy schema caps its scale at 1.0 — and the common risk unit has
+already pulled the executed book toward 10% annualised, so any declared target above 10% never
+binds. Both follow from the common risk unit being the tournament's leveller: where a team's
+declaration and the common unit disagree about size, the common unit wins. Teams should read the
+risk policy as *shape* — which symbols, which side, when to stop out, how fast to turn over — and
+not as a claim on the book's overall scale.
 
 Both the **normalised** book (official, all floors and scores) and the **raw** book (diagnostic)
 are reported for every run.
 
 **Interaction with the unlevered gross cap.** Because gross is capped at 1.0× equity (§4), the
 scalar can always take a book *down* to the common target but cannot take a very-low-volatility
-book *up* past unit gross. Such a book would realise less than the 10% target and collect an
-unearned drawdown advantage in the one contest this tournament ranks on. Two things close that
-hole rather than one: realised annualised volatility is a **disclosed diagnostic on every run**,
-and a candidate whose neighbourhood-median realised volatility falls below **0.06** fails a hard
-floor (§7.3). A book that cannot reach 6% annualised volatility at full unlevered gross is not a
-deployable book, and it is disqualified rather than rewarded for being small.
+book *up* past unit gross — step 4's cap reduces it back to unit gross rather than failing the
+run, so such a book is scored and then judged. It would realise less than the 10% target and
+collect an unearned drawdown advantage in the one contest this tournament ranks on. Two things
+close that hole rather than one: realised annualised volatility is a **disclosed diagnostic on
+every run**, and a candidate whose neighbourhood-median realised volatility falls below **0.06**
+fails a hard floor (§7.3). A book that cannot reach 6% annualised volatility at full unlevered
+gross is not a deployable book, and it is disqualified rather than rewarded for being small.
 
 ## 7. Qualification
 
@@ -304,7 +341,8 @@ positive-quarter fraction and annualised turnover — are consumed by both, so t
 **twice, at two different cost levels**, and both values are carried through scoring. That
 duplication is deliberate and is not an inconsistency: the floors gate the realistic book, the
 ranking rewards the book that survives a cost shock. This rule governs every floor in this
-charter, including the holdout eligibility floors of §8.
+charter, including the holdout eligibility floors of §8, which carry their own cost-level column
+for the same reason this section does: so that no gate anywhere is decided by inference.
 
 **Performance floors:**
 
@@ -438,14 +476,28 @@ progress, error, timing or completion order is disclosed until every observation
 Interruption after the journaled start marker is a DNF and consumes the observation. There is no
 retry, repair, replacement or backfill.
 
-**Winner eligibility** (all must hold, neighbourhood median, common risk unit):
+**Winner eligibility** (all must hold, neighbourhood median, common risk unit). §7.3's ruling that
+cost levels are stated and never inferred governs here too, so every row names its multiplier and
+an otherwise-unqualified **floor** is **base (1×) cost**:
 
-- base and 2×-cost annualised return > 0;
-- 2×-cost Sharpe > 0;
-- maximum drawdown ≤ 0.25;
-- at least 5 of 8 quarters positive;
-- the nominated point itself has positive 2×-cost return (guards against a nominee that is an
-  outlier within its own plateau).
+| Condition | Cost level |
+|---|---|
+| annualised return > 0 | **1×** |
+| annualised return > 0 | **2×** |
+| Sharpe > 0 | **2×** |
+| maximum drawdown ≤ 0.25 | **1×** |
+| at least 5 of 8 quarters positive | **1×** |
+| the nominated point itself has positive return | **2×** |
+
+The last row guards against a nominee that is an outlier within its own plateau, and is the one
+input here that is a single point rather than a neighbourhood median.
+
+The two rows that were previously unqualified — maximum drawdown and the positive-quarter count —
+are base cost for the same reason §7.3 gives: they ask whether the **real** book survived the
+sealed window, which is a question about the real book, and §8 already stresses cost resilience
+separately through its 2× return and 2× Sharpe rows. The quarter condition is a **count**, not the
+ratio §7.3 floors, and is read as such: 5 of 8 is 0.625, so a book with exactly four positive
+quarters clears §7.3's 0.50 fraction and still fails here.
 
 **Winner** = the eligible candidate with the highest `G` recomputed on holdout metrics, with the
 drawdown term rebased to the 0.25 floor (`20 * C((0.25 - maxDD) / 0.20)`) and the fold terms
@@ -586,3 +638,9 @@ as a valid submission.
    accepted deliberately in exchange for universe stability and liquidity.
 5. The common risk unit makes drawdowns comparable but means the reported book is not the book a
    team would deploy at its own chosen risk level. Both normalised and raw are reported.
+6. Because the common risk unit resizes the book the declared risk policy then governs (§6), a
+   team's declared *sizes* — its volatility target, and the drawdown level at which its brake
+   engages — do not survive intact into the executed book. Its declared *shape* does. This is a
+   deliberate consequence of levelling risk before comparing drawdowns, and it is disclosed rather
+   than mitigated: a strategy whose edge depends on running at its own chosen scale is not one this
+   tournament can rank.

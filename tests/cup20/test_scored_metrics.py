@@ -34,13 +34,14 @@ from crypto_trade.cup20.metrics import (
     window_metrics,
 )
 from crypto_trade.cup20.neighbourhood import median_metrics, positive_point_fraction
-from crypto_trade.cup20.qualification import evaluate_floors
+from crypto_trade.cup20.qualification import evaluate_floors, evaluate_holdout_eligibility
 from crypto_trade.cup20.runner import CandidateRun
 from crypto_trade.cup20.scored_metrics import (
     ASSEMBLED_METRIC_KEYS,
     BASE_COST,
     DOUBLE_COST,
     FLOOR_METRIC_KEYS,
+    HOLDOUT_ONLY_KEYS,
     RANKING_METRIC_KEYS,
     TRIPLE_COST,
     assemble_scored_metrics,
@@ -303,6 +304,12 @@ _COST_LEVEL_CASES = [
         DOUBLE_METRICS.annualized_turnover,
         BASE_METRICS.annualized_turnover,
     ),
+    # section 8 holdout eligibility, which names no level either: base cost, per the same ruling
+    (
+        "positive_quarter_count",
+        float(BASE_METRICS.positive_quarter_count),
+        float(DOUBLE_METRICS.positive_quarter_count),
+    ),
 ]
 
 
@@ -371,6 +378,24 @@ def test_ranking_key_set_is_exactly_what_the_ranking_reads():
     assert _scored_subscripts(robustness_score) | _tie_break_fields(rank_entries) == (
         RANKING_METRIC_KEYS
     )
+
+
+def test_holdout_key_set_is_exactly_what_the_section_8_gate_subscripts():
+    # Same contract as the floors, for the section 8 conjunction: the assembly must produce every
+    # key that gate reads, and HOLDOUT_ONLY_KEYS must name exactly the ones nothing else already
+    # produced. A holdout row that starts reading a new metric cannot ship without the assembly.
+    subscripts = _scored_subscripts(evaluate_holdout_eligibility)
+    assert subscripts <= ASSEMBLED_METRIC_KEYS
+    assert subscripts - FLOOR_METRIC_KEYS - RANKING_METRIC_KEYS == HOLDOUT_ONLY_KEYS
+
+
+def test_the_holdout_gate_reads_the_base_cost_drawdown_not_the_two_x_twin():
+    # The section 8 ruling, asserted where it bites: an unqualified holdout floor is base cost, so
+    # `max_drawdown` (1x) and never `double_cost_max_drawdown` (2x). Mutation this catches: the
+    # gate subscripting the 2x twin, which on this fixture is a materially different number.
+    assert "max_drawdown" in _scored_subscripts(evaluate_holdout_eligibility)
+    assert "double_cost_max_drawdown" not in _scored_subscripts(evaluate_holdout_eligibility)
+    assert ASSEMBLED["max_drawdown"] != pytest.approx(ASSEMBLED["double_cost_max_drawdown"])
 
 
 def test_assembled_key_set_is_exactly_the_declared_contract():

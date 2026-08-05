@@ -117,11 +117,13 @@ none of it is yours to reimplement:
 - force exit at the last executable open on delisting, with no survivorship rescue;
 - per-symbol participation capped as a fraction of the bar's traded volume;
 - gross ≤ 1.0× equity (the book is unlevered by construction) and per-symbol |weight| ≤ 0.20;
-- the **common risk unit**: after your own declared risk policy produces the unscaled book, the
-  evaluator scales it by `clamp(0.10 / σ_t, 0.20, 3.0)`, where `σ_t` is the trailing-90-day
-  annualised volatility of the unscaled book's gross bar returns using rows strictly before `t`.
+- the **common risk unit**: your normalised targets are evaluated once with your declared risk
+  policy applied to produce a *reference book*; the evaluator then scales your normalised weights
+  by `clamp(0.10 / σ_t, 0.20, 3.0)`, where `σ_t` is the trailing-90-day annualised volatility of
+  the reference book's gross bar returns using rows strictly before `t`, caps the result, and
+  applies your risk policy again inside the pass it actually executes. See §6 of the charter.
 
-Two consequences of the risk unit worth internalising before you design anything:
+Three consequences of the risk unit worth internalising before you design anything:
 
 1. **Trading small buys you nothing.** The scalar removes your choice of absolute risk level.
    Drawdown comparisons are about tail behaviour and regime timing, not about who sized down.
@@ -130,6 +132,12 @@ Two consequences of the risk unit worth internalising before you design anything
    whose neighbourhood-median realised annualised volatility falls below **0.06** fails a hard
    floor. A book that cannot reach 6% volatility at full unlevered gross is disqualified, not
    rewarded.
+3. **Your risk policy declares shape, not scale.** It runs against the book the risk unit has
+   already resized, so the *level* at which your drawdown brake engages will not be the level you
+   would see on your own book, and a declared volatility target above 10% will never bind — the
+   common unit has already pulled the executed book toward 10%. What survives intact is everything
+   about shape: which symbols, which side, when to stop out, how fast to turn over. Charter §6
+   states this in full; §14.6 records it as a known limitation rather than a surprise.
 
 Any fitted state must be fitted from the past-only rows streamed through the context during the
 run. No pre-staged models, no pre-computed artefacts, no pickles. Machine learning is permitted in

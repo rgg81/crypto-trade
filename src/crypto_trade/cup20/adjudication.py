@@ -20,7 +20,11 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from crypto_trade.cup20.qualification import GateVector, evaluate_floors
+from crypto_trade.cup20.qualification import (
+    GateVector,
+    evaluate_floors,
+    evaluate_holdout_eligibility,
+)
 from crypto_trade.cup20.scored_metrics import ASSEMBLED_METRIC_KEYS, ranking_metrics
 from crypto_trade.cup20.scoring import (
     RankedEntry,
@@ -154,6 +158,65 @@ def adjudicate_candidate(
         ranking_inputs=inputs,
         gates=gates,
         score=robustness_score(inputs, drawdown_floor=drawdown_floor),
+    )
+
+
+def adjudicate_holdout_candidate(
+    scored: Mapping[str, float],
+    *,
+    team_id: str,
+    candidate_id: str,
+    holdout: Mapping[str, Any],
+    trial_adjusted_confidence: float,
+    nominated_point_double_cost_return: float,
+) -> CandidateAdjudication:
+    """Section 8's verdict for one finalist: eligibility first, then ``G`` on holdout metrics.
+
+    The same gate-then-score shape as :func:`adjudicate_candidate`, over section 8's own five
+    eligibility conditions rather than section 7.3's eighteen floors, and with the drawdown term
+    of ``G`` rebased to the section 8 floor. ``drawdown_floor`` is read from the ``[holdout]``
+    table here rather than being an argument the caller has to remember, because at this stage
+    there is exactly one right answer and section 8 states it.
+
+    ``scored`` must be assembled over the SEALED window with ``holdout_folds`` -- the fold terms
+    of ``G`` are "computed over four 6-month holdout blocks". ``assemble_scored_metrics`` enforces
+    that its folds tile the window it was handed, so a caller that passed in-sample fold bounds
+    raises there rather than silently scoring four empty folds.
+    """
+    missing = sorted(ASSEMBLED_METRIC_KEYS - set(scored))
+    if missing:
+        raise ValueError(
+            f"finalist {team_id}/{candidate_id}: the scored vector is missing {missing}; "
+            "it must be an assembled metric vector, whose cost levels are the frozen policy"
+        )
+    gates = evaluate_holdout_eligibility(
+        scored,
+        holdout=holdout,
+        nominated_point_double_cost_return=nominated_point_double_cost_return,
+    )
+    inputs = ranking_metrics(scored, trial_adjusted_confidence=trial_adjusted_confidence)
+    if not gates.passed:
+        return CandidateAdjudication(
+            team_id=team_id,
+            candidate_id=candidate_id,
+            scored=dict(scored),
+            ranking_inputs=inputs,
+            gates=gates,
+            score=None,
+        )
+    non_finite = sorted(key for key, value in inputs.items() if not math.isfinite(value))
+    if non_finite:
+        raise ValueError(
+            f"finalist {team_id}/{candidate_id} passed every eligibility condition but its "
+            f"ranking inputs are not finite: {non_finite}"
+        )
+    return CandidateAdjudication(
+        team_id=team_id,
+        candidate_id=candidate_id,
+        scored=dict(scored),
+        ranking_inputs=inputs,
+        gates=gates,
+        score=robustness_score(inputs, drawdown_floor=float(holdout["max_drawdown"])),
     )
 
 

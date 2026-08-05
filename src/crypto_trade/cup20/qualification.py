@@ -192,3 +192,46 @@ def evaluate_floors(
         if role in declared or role in observed:
             checks[f"role_{role}_gross_pnl"] = _positive(role_values[role])
     return GateVector(checks=checks)
+
+
+def evaluate_holdout_eligibility(
+    scored: Mapping[str, float],
+    *,
+    holdout: Mapping[str, Any],
+    nominated_point_double_cost_return: float,
+) -> GateVector:
+    """Charter section 8's winner eligibility, each row at the cost level section 8 names.
+
+    A separate, shorter conjunction than :func:`evaluate_floors` -- section 8 lists five
+    conditions, not the eighteen of section 7.3 -- so it gets its own function rather than a
+    reconfigured call into the in-sample one. Sharing the in-sample gate with an overridden floors
+    mapping would have quietly imported thirteen floors section 8 never states.
+
+    Cost levels, under section 7.3's ruling that an unqualified floor is base cost:
+
+    * ``annualized_return`` **1x** and ``double_cost_annualized_return`` **2x** -- section 8 says
+      "base and 2x-cost annualised return > 0" on its face;
+    * ``double_cost_sharpe`` **2x** -- "2x-cost Sharpe > 0" on its face;
+    * ``max_drawdown`` **1x** -- unqualified, so base: whether the real book was survivable is a
+      question about the real book;
+    * ``positive_quarter_count`` **1x** -- unqualified, so base;
+    * the nominated point's own **2x** return -- "the nominated point itself has positive 2x-cost
+      return", the one input that is not a neighbourhood median.
+
+    ``holdout`` is the config's ``[holdout]`` table: ``max_drawdown`` (0.25, the section 8 rebase
+    of the 0.20 in-sample floor) and ``minimum_positive_quarters`` (5). Both are read from it
+    rather than hard-coded, so the frozen contract governs, and both are subscripted rather than
+    ``.get``-ed so a missing key raises instead of defaulting into a weaker gate.
+    """
+    return GateVector(
+        checks={
+            "annualized_return": _positive(scored["annualized_return"]),
+            "double_cost_annualized_return": _positive(scored["double_cost_annualized_return"]),
+            "double_cost_sharpe": _positive(scored["double_cost_sharpe"]),
+            "max_drawdown": _at_most(scored["max_drawdown"], float(holdout["max_drawdown"])),
+            "positive_quarter_count": _at_least(
+                scored["positive_quarter_count"], float(holdout["minimum_positive_quarters"])
+            ),
+            "nominated_point_double_cost_return": _positive(nominated_point_double_cost_return),
+        }
+    )

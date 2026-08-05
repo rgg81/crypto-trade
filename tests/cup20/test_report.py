@@ -321,6 +321,7 @@ def test_packet_raises_rather_than_serialising_a_non_finite_metric(tmp_path, mon
         max_drawdown=0.1,
         calmar=1.0,
         positive_quarter_fraction=0.5,
+        positive_quarter_count=4,
         annualized_turnover=1.0,
         gross_edge_bps_per_turnover=1.0,
         cost_share_of_positive_gross=0.1,

@@ -13,7 +13,20 @@ protocol; it never sees fills, prices, costs, or PnL. Scoring a candidate then g
 4. Derive the common risk-unit scalars from pass 1's *gross* returns (``price_pnl + funding_pnl``,
    never ``net_return``): using net here would make the scalar a function of the very costs it
    goes on to scale, which is exactly the circularity Task 4's risk unit was built to avoid.
-5. Apply the scalars and re-evaluate at every requested cost multiplier (1, 2, 3 by default).
+5. Apply the scalars, then apply the section 4 exposure caps to the scaled weights
+   (:func:`apply_exposure_caps`), and re-evaluate at every requested cost multiplier (1, 2, 3).
+
+Where the declared risk policy sits in that order is charter section 6, and it is worth stating
+plainly because the two passes make it easy to misread. The policy runs INSIDE the evaluator, in
+BOTH passes, and in each pass it fires off THAT pass's own book: its equity path, its realised
+return history, its entry prices and its holding ages. Pass 1 is a reference book whose only job
+is to produce ``sigma_t``; pass 2 is the executed book. A policy is therefore evaluated against
+the book it actually governs, which is the only book whose drawdown, volatility and position ages
+exist. See section 6 for why this cannot be reorganised into "apply the policy once, then scale
+its output": three of the six declarable primitives (position stops, time stops and the turnover
+limit, plus the cooldown blocks the first two arm) are order-level vetoes and partial fills over
+carried quantities, not weights, and 98% of a sparse candidate's policy fills land on boundaries
+that have no target row at all.
 """
 
 from __future__ import annotations
@@ -22,6 +35,7 @@ import dataclasses
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from crypto_trade.cup20.risk_unit import apply_risk_scalars, common_risk_scalars
@@ -38,7 +52,12 @@ from crypto_trade.tournament.risk_policy import RiskPolicy
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class CandidateRun:
-    """Every artifact from one strategy's two-pass evaluation against one snapshot."""
+    """Every artifact from one strategy's two-pass evaluation against one snapshot.
+
+    ``targets`` are the unit-gross normalised weights (charter section 6 step 1) and
+    ``scaled_targets`` are the EXECUTED weights of section 6 step 4 -- ``s_t x targets`` with the
+    section 4 exposure caps already applied, which is what pass 2 is actually given.
+    """
 
     targets: pd.DataFrame
     scaled_targets: pd.DataFrame
@@ -74,6 +93,65 @@ def normalise_unit_gross(targets: pd.DataFrame) -> pd.DataFrame:
     gross = result[weight_columns].abs().sum(axis=1)
     divisor = gross.where(gross > 0.0, 1.0)
     result[weight_columns] = result[weight_columns].div(divisor, axis=0)
+    return result
+
+
+def apply_exposure_caps(targets: pd.DataFrame, config: EvaluatorConfig) -> pd.DataFrame:
+    """Scale each row down until it satisfies the section 4 gross, net and per-symbol caps.
+
+    Charter section 4 states the caps are "**Applied** after the common risk unit", and section 6
+    step 4 repeats it ("then gross, per-symbol and participation caps"). Nothing was applying them.
+    ``evaluate_targets`` does not cap a target row -- ``_validate_weight_limits`` REJECTS one --
+    so handing it ``s_t x`` a unit-gross book raised ``gross exposure ... exceeds cap`` at the
+    first boundary where ``s_t > 1``.
+
+    That is not an exotic path. ``s_t = clamp(0.10 / sigma_t, 0.20, 3.0)`` exceeds 1 for any book
+    whose trailing 90-day gross volatility sits under the 10% target, and the frozen risk unit
+    permits it up to 3.0; on a plain equal-weight long book over 400 days it exceeded 1 at 559 of
+    1199 boundaries and reached 2.11. Every such candidate crashed the runner. Section 6's own
+    low-volatility paragraph shows the crash was never intended: it reasons about what happens
+    when the scalar "cannot take a very-low-volatility book *up* past unit gross", and concludes
+    that the run is scored and then disqualified by the 0.06 realised-volatility floor -- which
+    requires the run to COMPLETE.
+
+    Applied to the scaled weights only, never to the unscaled reference book, because that is
+    where section 4 puts them. The distinction is deliberate rather than incidental: ``s_t`` is
+    the ORGANISER's multiplier, so the organiser caps its own output, while a team whose own
+    normalised weights breach the per-symbol cap has broken the execution contract and still gets
+    the evaluator's hard raise. (Pass 1's gross is exactly 1.0 by construction of
+    :func:`normalise_unit_gross`, so only the per-symbol cap can fire there.)
+
+    Reduces only, never raises exposure: a row already inside every cap is returned untouched.
+    """
+    result = targets.copy()
+    weight_columns = [c for c in result.columns if c != REBALANCE_INSTRUCTION_COLUMN]
+    if not weight_columns:
+        return result
+    weights = result[weight_columns]
+    values = weights.to_numpy(dtype=float)
+    # A non-finite weight has no defensible cap scale -- ``inf / inf`` is NaN and NaN compares
+    # False against every bound, so it would sail through the caps untouched and only surface as
+    # the evaluator's own non-finite-target raise, one pass later and without saying which row.
+    if not np.isfinite(values).all():
+        raise ValueError("target weights contain non-finite values; cannot apply exposure caps")
+
+    # ``weight_columns`` is non-empty here, so ``values`` always has at least one column and the
+    # row-wise max below is always defined (a zero-ROW frame is fine: every reduction is empty).
+    gross = np.abs(values).sum(axis=1)
+    net = np.abs(values.sum(axis=1))
+    largest = np.abs(values).max(axis=1)
+
+    scale = np.ones(len(values))
+    for magnitude, ceiling in (
+        (gross, config.max_gross_exposure),
+        (net, config.max_abs_net_exposure),
+        (largest, config.max_symbol_exposure),
+    ):
+        binding = magnitude > ceiling
+        if binding.any():
+            scale[binding] = np.minimum(scale[binding], ceiling / magnitude[binding])
+
+    result[weight_columns] = weights.mul(pd.Series(scale, index=weights.index), axis=0)
     return result
 
 
@@ -193,7 +271,9 @@ def run_candidate(
         minimum_scale=float(risk_unit.get("minimum_scale", 0.20)),
         maximum_scale=float(risk_unit.get("maximum_scale", 3.0)),
     )
-    scaled_targets = apply_risk_scalars(targets, scalars)
+    # Section 6 step 4: "Executed weights = s_t x unscaled weights, then gross, per-symbol and
+    # participation caps." The participation cap is the evaluator's; the exposure caps are these.
+    scaled_targets = apply_exposure_caps(apply_risk_scalars(targets, scalars), config)
 
     results = {
         int(multiplier): evaluate_targets(

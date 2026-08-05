@@ -16,6 +16,10 @@ Two rules, and they deliberately disagree with each other:
   stressed -- it does not need every other floor stressed a second time.
 * a RANKING input (section 7.4) is read at 2x cost, as that section states for all of its inputs,
   so the ranking rewards robustness under a cost shock.
+* a HOLDOUT eligibility floor (section 8) follows the floor rule, not the ranking rule: it is a
+  floor, so an unqualified one is base cost. Section 8's two unqualified rows -- ``maxDD <= 0.25``
+  and "at least 5 of 8 quarters positive" -- are therefore both 1x, and its 2x return and 2x
+  Sharpe rows say 2x on their face.
 
 Three metrics -- ``max_drawdown``, ``positive_quarter_fraction`` and ``annualized_turnover`` --
 are consumed by BOTH, so they are computed TWICE, at two different levels, and both values are
@@ -110,9 +114,15 @@ DOUBLE_COST_RANKING_KEYS: frozenset[str] = frozenset(
     }
 )
 
+# Exactly what ``qualification.evaluate_holdout_eligibility`` subscripts and no floor or ranking
+# input already carries. Section 8 states its quarter floor as a COUNT ("at least 5 of 8 quarters
+# positive"), which no section 7.3 floor needs -- that one reads the fraction. Asserted against the
+# parsed source the same way the other two key sets are.
+HOLDOUT_ONLY_KEYS: frozenset[str] = frozenset({"positive_quarter_count"})
+
 # Exactly what :func:`assemble_scored_metrics` returns.
 ASSEMBLED_METRIC_KEYS: frozenset[str] = (
-    FLOOR_METRIC_KEYS | RANKING_ONLY_KEYS | DOUBLE_COST_RANKING_KEYS
+    FLOOR_METRIC_KEYS | RANKING_ONLY_KEYS | DOUBLE_COST_RANKING_KEYS | HOLDOUT_ONLY_KEYS
 )
 
 
@@ -233,6 +243,11 @@ def assemble_scored_metrics(
         "trade_count": float(at_base_cost.trade_count),  # 1x
         "long_gross_pnl": float(at_base_cost.long_gross_pnl),  # 1x
         "short_gross_pnl": float(at_base_cost.short_gross_pnl),  # 1x
+        # --- section 8 holdout eligibility, which names no level either, so base cost -----------
+        # Same ruling, same reason: "maximum drawdown <= 0.25" and "at least 5 of 8 quarters
+        # positive" ask whether the REAL book survived the sealed window, and section 8 already
+        # gates cost resilience separately through its 2x return and 2x Sharpe rows.
+        "positive_quarter_count": float(at_base_cost.positive_quarter_count),  # 1x
         # --- section 7.4 ranking inputs, all at 2x ---------------------------------------------
         "median_fold_sharpe": float(statistics.median(double_cost_fold_sharpes)),  # 2x
         "calmar": float(at_double_cost.calmar),  # 2x: "calmar_2x", 2x return over 2x drawdown
