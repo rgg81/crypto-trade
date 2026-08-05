@@ -198,6 +198,7 @@ def build_universe(
         target_size=target_size,
         entry_rank=int(universe["entry_rank"]),
         exit_rank=int(universe["exit_rank"]),
+        minimum_scored_members=int(universe["minimum_scored_members"]),
     )
     return membership, resolve_is_start(membership, target_size=target_size)
 

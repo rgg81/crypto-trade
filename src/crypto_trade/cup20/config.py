@@ -41,6 +41,19 @@ _TOP_LEVEL_KEYS = frozenset(
     }
 )
 
+# EVERY numeric policy value in the machine contract, without exception. The charter says
+# "activation MUST fail on disagreement", and that promise is only worth what this table covers: a
+# value absent from here can be edited to anything at all and still load, validate, freeze and
+# verify cleanly. Eleven of the thirteen [floors] were absent, so a config declaring
+# `net_sharpe = 0.30` against a charter saying 0.80 would have activated without complaint -- and
+# the floors are the entire qualification gate. Both bootstrap parameters, the bootstrap seed,
+# `neighbourhood_positive_fraction`, `holdout.minimum_positive_quarters`, `reconstitution_weekday`,
+# `minimum_scored_members`, `initial_equity`, `max_abs_net_exposure`, `max_bar_participation` and
+# `neighbourhood_minimum_points` were absent for the same reason: the table grew by hand, one entry
+# at a time, alongside whichever task happened to read that key.
+#
+# The rule going forward is not "add what this task needed" but "every numeric value is here". A
+# test asserts exactly that, walking the config and requiring each number to appear.
 _FROZEN_SCALARS: dict[tuple[str, ...], object] = {
     ("schema_version",): 1,
     ("name",): "cup20",
@@ -51,6 +64,8 @@ _FROZEN_SCALARS: dict[tuple[str, ...], object] = {
     ("universe", "entry_rank"): 20,
     ("universe", "exit_rank"): 25,
     ("universe", "lookback_days"): 180,
+    ("universe", "reconstitution_weekday"): 0,
+    ("universe", "minimum_scored_members"): 8,
     # Imported from the implementation, not repeated as a literal: the config can only declare the
     # statistic `build_membership` actually computes. A config saying "median" while the code
     # ranked on the mean is precisely the drift that reached a frozen snapshot once, and it
@@ -58,21 +73,41 @@ _FROZEN_SCALARS: dict[tuple[str, ...], object] = {
     # that nothing validated.
     ("universe", "liquidity_measure"): LIQUIDITY_MEASURE,
     ("execution", "interval_hours"): 8,
+    ("execution", "initial_equity"): 100_000.0,
     ("execution", "taker_fee_bps_per_side"): 5.0,
     ("execution", "slippage_bps_per_side"): 2.5,
     ("execution", "max_gross_exposure"): 1.0,
+    ("execution", "max_abs_net_exposure"): 1.0,
     ("execution", "max_symbol_exposure"): 0.20,
+    ("execution", "max_bar_participation"): 0.001,
     ("risk_unit", "target_annualized_volatility"): 0.10,
     ("risk_unit", "lookback_days"): 90,
     ("risk_unit", "minimum_scale"): 0.20,
     ("risk_unit", "maximum_scale"): 3.0,
     ("research", "trial_budget"): 12,
     ("research", "minimum_trials_for_nomination"): 8,
+    ("research", "neighbourhood_minimum_points"): 7,
+    ("research", "neighbourhood_positive_fraction"): 0.70,
+    ("statistics", "bootstrap_samples"): 2000,
+    ("statistics", "bootstrap_block_days"): 10,
+    ("statistics", "bootstrap_seed"): 20260804,
     ("statistics", "minimum_trial_adjusted_confidence"): 0.90,
+    ("floors", "net_sharpe"): 0.80,
+    ("floors", "double_cost_sharpe"): 0.50,
     ("floors", "max_drawdown"): 0.20,
     ("floors", "minimum_realized_volatility"): 0.06,
+    ("floors", "positive_quarter_fraction"): 0.50,
+    ("floors", "minimum_positive_folds"): 3,
+    ("floors", "worst_fold_sharpe"): -0.25,
+    ("floors", "max_annualized_turnover"): 25.0,
+    ("floors", "min_gross_edge_bps_per_turnover"): 40.0,
+    ("floors", "max_cost_share_of_positive_gross"): 0.30,
+    ("floors", "max_top5_day_share"): 0.35,
+    ("floors", "max_fold_share_of_positive_pnl"): 0.60,
+    ("floors", "minimum_trades"): 500,
     ("selection", "advancing_slots"): 3,
     ("holdout", "max_drawdown"): 0.25,
+    ("holdout", "minimum_positive_quarters"): 5,
 }
 
 

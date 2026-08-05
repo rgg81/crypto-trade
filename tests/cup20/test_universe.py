@@ -236,3 +236,76 @@ def test_naive_timestamps_are_rejected():
             reconstitution_times=[pd.Timestamp("2020-06-29")],
             lookback_days=180,
         )
+
+
+# --- minimum_scored_members: the charter's "a boundary with fewer than 8 members is not scored"
+#
+# The config declared `universe.minimum_scored_members = 8` and NOTHING read it -- a policy value
+# that existed only as a number in a file. It is now enforced here, at the one place that decides
+# what a boundary's membership is, rather than deleted: the charter states the rule in section 3,
+# so the honest fix is to implement it. It is inert on the built snapshot by measurement (every
+# shipped boundary carries exactly 20 members), which is why enforcing it did not change a single
+# byte of the frozen data -- it is a guarantee against a future delisting wave, not a filter that
+# shaped this artifact.
+
+
+def _three_symbol_boundary(minimum):
+    volume, eligible = _frames(["AUSDT", "BUSDT", "CUSDT"], 200, [30.0, 20.0, 10.0])
+    return build_membership(
+        volume,
+        eligible=eligible,
+        reconstitution_times=[pd.Timestamp("2020-06-29T00:00:00Z")],
+        lookback_days=180,
+        target_size=20,
+        minimum_scored_members=minimum,
+    )
+
+
+def test_a_boundary_below_the_minimum_is_not_emitted():
+    assert _three_symbol_boundary(4).empty
+
+
+def test_a_boundary_exactly_at_the_minimum_is_emitted():
+    # Inclusive: "fewer than N" is dropped, N itself is kept.
+    assert len(_three_symbol_boundary(3)) == 3
+
+
+def test_the_default_minimum_changes_nothing():
+    assert len(_three_symbol_boundary(1)) == 3
+
+
+def test_only_the_thin_boundaries_are_dropped():
+    """A universe that thins out and recovers keeps the boundaries that are thick enough."""
+    volume, eligible = _frames(["AUSDT", "BUSDT", "CUSDT"], 400, [30.0, 20.0, 10.0])
+    thin = (volume.index >= "2020-08-01") & (volume.index < "2020-10-01")
+    eligible.loc[thin, ["BUSDT", "CUSDT"]] = False
+    boundaries = list(
+        weekly_reconstitution_times(
+            pd.Timestamp("2020-06-29T00:00:00Z"), pd.Timestamp("2020-12-01T00:00:00Z")
+        )
+    )
+    members = build_membership(
+        volume,
+        eligible=eligible,
+        reconstitution_times=boundaries,
+        lookback_days=180,
+        target_size=20,
+        minimum_scored_members=3,
+    )
+    kept = set(members["reconstitution_time"])
+    assert kept, "every boundary was dropped; the fixture proves nothing"
+    assert len(kept) < len(boundaries), "no boundary was dropped; the fixture proves nothing"
+    sizes = members.groupby("reconstitution_time").size()
+    assert (sizes >= 3).all()
+
+
+def test_minimum_scored_members_must_be_positive():
+    volume, eligible = _frames(["AUSDT"], 200, [10.0])
+    with pytest.raises(ValueError, match="minimum_scored_members"):
+        build_membership(
+            volume,
+            eligible=eligible,
+            reconstitution_times=[pd.Timestamp("2020-06-29T00:00:00Z")],
+            lookback_days=180,
+            minimum_scored_members=0,
+        )

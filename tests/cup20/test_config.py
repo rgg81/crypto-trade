@@ -5,7 +5,14 @@ from pathlib import Path
 
 import pytest
 
-from crypto_trade.cup20.config import IS_END, SEALED_END, SEALED_START, load_config, validate_config
+from crypto_trade.cup20.config import (
+    _FROZEN_SCALARS,
+    IS_END,
+    SEALED_END,
+    SEALED_START,
+    load_config,
+    validate_config,
+)
 from crypto_trade.cup20.universe import LIQUIDITY_MEASURE
 
 CONFIG_PATH = Path("tournament/cup20/config.toml")
@@ -121,4 +128,66 @@ def test_validate_config_rejects_missing_cost_multipliers():
     tampered = copy.deepcopy(loaded.raw)
     del tampered["execution"]["cost_multipliers"]
     with pytest.raises(ValueError):
+        validate_config(tampered)
+
+
+# --- the frozen table must cover EVERY number, not the ones some task happened to read ------
+#
+# The charter says "activation MUST fail on disagreement", and that promise is worth exactly what
+# _FROZEN_SCALARS covers. Eleven of the thirteen [floors] were absent from it, so a config declaring
+# `net_sharpe = 0.30` against a charter saying 0.80 would load, validate, freeze and verify without
+# a word -- and the floors ARE the qualification gate. The table had grown by hand alongside
+# whichever task read a given key, which is why the gap tracked no principle at all.
+#
+# These two tests replace "remember to add it" with a check. The first proves the table is complete
+# against the real config; the second proves each entry is load-bearing rather than decorative.
+
+_LISTS_VALIDATED_SEPARATELY = {
+    ("teams",),  # exact roster, checked against TEAM_IDS
+    ("execution", "cost_multipliers"),  # frozen at (1, 2, 3) by its own branch
+}
+
+
+def _numeric_paths(node, prefix=()):
+    """Every path in the config whose value is a number (bool excluded -- TOML has none here)."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            yield from _numeric_paths(value, (*prefix, key))
+    elif isinstance(node, list):
+        if prefix not in _LISTS_VALIDATED_SEPARATELY:
+            raise AssertionError(f"config list at {prefix} is validated by nothing")
+    elif isinstance(node, (int, float)) and not isinstance(node, bool):
+        yield prefix
+
+
+def test_every_numeric_policy_value_is_in_the_frozen_table():
+    raw = load_config(CONFIG_PATH).raw
+    numeric = set(_numeric_paths(raw))
+    assert numeric, "walked the config and found no numbers at all"
+    missing = sorted(".".join(path) for path in numeric - set(_FROZEN_SCALARS))
+    assert missing == [], f"numeric policy values outside the frozen contract: {missing}"
+
+
+def test_no_frozen_entry_is_stale():
+    """Every frozen path must still exist in the config, with the frozen value."""
+    raw = load_config(CONFIG_PATH).raw
+    for path, expected in _FROZEN_SCALARS.items():
+        node = raw
+        for component in path:
+            assert component in node, f"frozen path {'.'.join(path)} is not in the config"
+            node = node[component]
+        assert node == expected, f"frozen path {'.'.join(path)} disagrees with the config"
+
+
+@pytest.mark.parametrize("path", sorted(_FROZEN_SCALARS, key=lambda p: ".".join(p)))
+def test_each_frozen_scalar_is_individually_binding(path):
+    """Mutating any one frozen value must fail validation. Without this, an entry can be present in
+    the table and still be inert -- which is indistinguishable from being absent."""
+    tampered = copy.deepcopy(dict(load_config(CONFIG_PATH).raw))
+    node = tampered
+    for component in path[:-1]:
+        node = node[component]
+    current = node[path[-1]]
+    node[path[-1]] = "drift" if isinstance(current, str) else current + 1
+    with pytest.raises(ValueError, match=".".join(path)):
         validate_config(tampered)

@@ -35,6 +35,7 @@ def build_membership(
     target_size: int = 20,
     entry_rank: int = 20,
     exit_rank: int = 25,
+    minimum_scored_members: int = 1,
 ) -> pd.DataFrame:
     """Build point-in-time membership from daily quote volume.
 
@@ -52,11 +53,23 @@ def build_membership(
     (In-sample figures only, deliberately: this file is readable alongside the charter, and the
     universe's size and turnover after the cutoff are facts about the holdout. The full-window
     measurement is in ``tournament/cup20/private/universe-summary.json``.)
+
+    ``minimum_scored_members`` implements the charter's "a boundary with fewer than 8 members is not
+    scored": a boundary whose membership falls below it emits NO rows, so nothing downstream can
+    score a universe too thin to be one. It is a policy value in the machine contract
+    (``universe.minimum_scored_members``), threaded in explicitly by the build script -- it was
+    declared there and read by nothing at all until this became its reader. The default of 1 is the
+    honest identity for a caller with no such policy (a boundary with zero members already emits
+    nothing), not a disabled guard: production passes the contract's own 8. On the built snapshot
+    the rule is inert by measurement -- every shipped boundary carries exactly 20 members -- so it
+    is a guarantee against a future delisting wave, not a filter that shaped this artifact.
     """
     if lookback_days < 1 or target_size < 1:
         raise ValueError("lookback_days and target_size must be positive")
     if entry_rank < 1 or exit_rank < entry_rank:
         raise ValueError("exit_rank must be at least entry_rank")
+    if minimum_scored_members < 1:
+        raise ValueError("minimum_scored_members must be positive")
     volume = _require_utc_index(daily_quote_volume, "daily_quote_volume")
     eligibility = _require_utc_index(eligible, "eligible").astype(bool)
     window = pd.Timedelta(days=lookback_days)
@@ -78,6 +91,13 @@ def build_membership(
         entrants = [s for s in ordered.index if s not in previous and ranks[s] <= entry_rank]
         members = kept + [s for s in entrants if s not in kept]
         members = members[:target_size]
+        if len(members) < minimum_scored_members:
+            # Not scored, so not emitted. `previous` still advances to the members that WOULD have
+            # been held: hysteresis is a statement about what the index held at the last boundary,
+            # and a boundary being too thin to score does not make the prior boundary's incumbents
+            # stop being incumbents at the next one.
+            previous = tuple(members)
+            continue
 
         for symbol in members:
             rows.append(
