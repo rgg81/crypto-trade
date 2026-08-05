@@ -5,9 +5,12 @@ import pandas as pd
 import pytest
 
 from crypto_trade.cup20.metrics import (
+    UNDEFINED_CALMAR,
+    UNDEFINED_COST_SHARE,
     daily_returns,
     fold_positive_pnl_shares,
     fold_sharpes,
+    holdout_folds,
     is_folds,
     window_metrics,
 )
@@ -139,3 +142,113 @@ def test_fold_sharpes_and_shares_cover_every_named_fold():
     assert set(sharpes) == {"F1", "F2", "F3", "F4"}
     assert all(math.isfinite(value) for value in sharpes.values())
     assert sum(shares.values()) == pytest.approx(1.0)
+
+
+# --- Fix round 1 ---
+
+
+def test_calmar_uses_a_finite_sentinel_when_drawdown_is_zero_and_return_is_positive():
+    # Monotonically positive bars: equity only ever rises, so max_drawdown == 0.0 exactly while
+    # annualized_return > 0.0 -- the "undefined, unbounded" branch, not the "flat" branch.
+    metrics = window_metrics(_result([0.001] * 90))
+    assert metrics.max_drawdown == 0.0
+    assert metrics.calmar == UNDEFINED_CALMAR
+    assert math.isfinite(metrics.calmar)
+    # Task 10's Calmar term is 15 * clamp(calmar / 1.50); anything at or above 1.50 earns full
+    # credit, so the sentinel must clear that threshold rather than silently forfeiting it.
+    assert metrics.calmar > 1.50
+
+
+def test_cost_share_uses_a_finite_sentinel_when_there_is_no_positive_gross_pnl():
+    # All-flat bars: gross_bar is 0.0 on every row, so positive_gross == 0.0 exactly.
+    metrics = window_metrics(_result([0.0] * 90))
+    assert metrics.cost_share_of_positive_gross == UNDEFINED_COST_SHARE
+    assert math.isfinite(metrics.cost_share_of_positive_gross)
+    # max_cost_share_of_positive_gross in tournament/cup20/config.toml's [floors] table is 0.30;
+    # the sentinel must land on the failing side so a book with no positive gross disqualifies.
+    assert metrics.cost_share_of_positive_gross > 0.30
+
+
+def test_is_folds_raises_when_the_is_window_cannot_support_four_folds():
+    # A 2-year IS window: F1 and F2 would both collapse to zero width, permanently capping
+    # positive_fold_count at 2 -- below the >=3 hard floor -- regardless of strategy quality.
+    with pytest.raises(ValueError):
+        is_folds(pd.Timestamp("2022-08-01T00:00:00Z"), pd.Timestamp("2024-08-01T00:00:00Z"))
+
+
+def test_holdout_folds_raises_when_the_window_is_shorter_than_eighteen_months():
+    # 14 months between start and end: H4 = [start + 18mo, end) would invert (start after end).
+    with pytest.raises(ValueError):
+        holdout_folds(pd.Timestamp("2024-08-01T00:00:00Z"), pd.Timestamp("2025-10-01T00:00:00Z"))
+
+
+def test_annualized_return_and_volatility_match_a_known_daily_series():
+    # One nonzero bar per UTC day (the other two are 0.0), so each day's compounded return equals
+    # that single bar's value exactly: (1+x)*(1+0)*(1+0)-1 == x. The daily series is this list by
+    # construction, independent of daily_returns()'s own grouping logic.
+    day_returns = [0.05, -0.02, 0.03, 0.01, -0.015, 0.02, 0.04, 0.0, -0.01, 0.025]
+    bars: list[float] = []
+    for value in day_returns:
+        bars.extend([value, 0.0, 0.0])
+    metrics = window_metrics(_result(bars))
+
+    values = np.array(day_returns, dtype=float)
+    total_growth = float(np.prod(1.0 + values))
+    years = len(values) / 365.0
+    expected_return = total_growth ** (1.0 / years) - 1.0
+    expected_volatility = float(np.std(values, ddof=1)) * math.sqrt(365.0)
+
+    assert metrics.annualized_return == pytest.approx(expected_return)
+    assert metrics.annualized_volatility == pytest.approx(expected_volatility)
+
+
+def test_calmar_non_degenerate_branch_divides_return_by_drawdown():
+    # Same bars as test_max_drawdown_is_a_positive_magnitude, whose max_drawdown == 0.20 is
+    # asserted there; this test only adds the calmar = annualized_return / drawdown division.
+    bars = [0.10, 0.0, 0.0, -0.20, 0.0, 0.0, 0.05] + [0.0] * 83
+    metrics = window_metrics(_result(bars))
+
+    total_growth = 1.10 * 0.80 * 1.05
+    years = 30.0 / 365.0
+    expected_return = total_growth ** (1.0 / years) - 1.0
+
+    assert metrics.max_drawdown == pytest.approx(0.20)
+    assert metrics.calmar == pytest.approx(expected_return / 0.20)
+
+
+def test_annualized_turnover_matches_summed_turnover_over_the_window():
+    metrics = window_metrics(_result([0.0] * 90, turnover=0.02))
+    expected = (0.02 * 90) / (30.0 / 365.0)
+    assert metrics.annualized_turnover == pytest.approx(expected)
+
+
+def test_long_and_short_gross_pnl_are_independent_role_sums():
+    # Distinct, non-mirrored long and short legs -- _result() forces short_price_pnl to zero, so
+    # this builds the frame directly to prove the two roles are summed independently.
+    index = pd.date_range("2021-01-01T00:00:00Z", periods=6, freq="8h", name="timestamp")
+    long_price = np.array([0.01, 0.02, -0.005, 0.0, 0.03, -0.01])
+    long_funding = np.full(6, 0.001)
+    short_price = np.array([-0.02, 0.01, 0.0, -0.015, 0.02, -0.005])
+    short_funding = np.full(6, -0.0005)
+    returns = pd.DataFrame(
+        {
+            "net_return": long_price + short_price + long_funding + short_funding,
+            "price_pnl": long_price + short_price,
+            "long_price_pnl": long_price,
+            "short_price_pnl": short_price,
+            "funding_pnl": long_funding + short_funding,
+            "long_funding_pnl": long_funding,
+            "short_funding_pnl": short_funding,
+            "fees": np.zeros(6),
+            "slippage": np.zeros(6),
+            "turnover": np.zeros(6),
+        },
+        index=index,
+    )
+    result = EvaluationResult(
+        returns, pd.DataFrame(), pd.DataFrame({"event_type": [], "notional": []})
+    )
+    metrics = window_metrics(result)
+
+    assert metrics.long_gross_pnl == pytest.approx(float(long_price.sum() + long_funding.sum()))
+    assert metrics.short_gross_pnl == pytest.approx(float(short_price.sum() + short_funding.sum()))
