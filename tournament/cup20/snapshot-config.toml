@@ -6,30 +6,31 @@
 # decides which symbols get funding and mark prices at all: `build_snapshot` fetches those only for
 # its OWN membership, so a CUP-20 member outside it arrives with bars and nothing else.
 #
-# `size` is therefore MEASURED, not argued, and it is boxed in from both sides.
+# `size` is MEASURED, not argued, and it is boxed in from both sides.
 #
-# The plan's 60 rested on "anything ranked <= 25 by that measure is certainly ranked <= 60", which
-# is false twice over: the two rankings do not use the same measure (CUP-20's `build_membership`
-# ranks on the MEAN of daily quote volume, the acquisition's `point_in_time_top40` on the MEDIAN),
-# and the hysteresis exit rank is 25 rather than 20. At 60 the containment assertion in
-# scripts/cup20_build_snapshot.py caught a real casualty: RAVEUSDT reached the CUP-20 top-20 in
-# 2026 carrying 689 bars, zero funding rows and zero mark prices.
-#
-# LOWER BOUND 65. Containment is a symbol-set property -- `build_snapshot` fetches a member's whole
+# LOWER BOUND 22. Containment is a symbol-set property -- `build_snapshot` fetches a member's whole
 # funding and mark history once it appears at ANY boundary -- so what matters is each member's BEST
-# median rank. Across all 91 CUP-20 members that maximum is 65 (RAVEUSDT; next MYXUSDT 45,
-# SIRENUSDT and LINAUSDT 27), with zero members unranked.
+# rank. Across all 79 CUP-20 members that maximum is 22 (IOTAUSDT; next ONDOUSDT 19, ALGOUSDT and
+# HBARUSDT 18), with zero members unranked. It is that low because CUP-20 and the acquisition now
+# rank on the SAME statistic (`liquidity_measure` below, and
+# `crypto_trade.cup20.universe.LIQUIDITY_MEASURE`), which makes the CUP-20 top-20 a genuine subset
+# bounded by the hysteresis exit rank of 25.
 #
-# UPPER BOUND 71. BTCSTUSDT first appears at median rank 72, and Binance has no public funding for
-# it in 2022-01 -- the REST endpoint returns `[]` and the monthly archive is a 404 -- so
-# `build_snapshot` fails closed with "missing funding REST event coverage for BTCSTUSDT in 2022-01"
-# at any size >= 72. Verified directly against both sources. The 61..71 band is full of delisted
-# tokens of exactly that kind, so margin above the lower bound buys risk rather than robustness.
+# That was not true when this file first shipped: `build_membership` ranked on the MEAN while both
+# configs declared the median, and under that mismatch the measured lower bound was 65 -- at 60 the
+# containment assertion in scripts/cup20_build_snapshot.py caught RAVEUSDT reaching the CUP-20
+# top-20 with 689 bars, zero funding rows and zero mark prices. Fixing the statistic removed the
+# divergence, and RAVEUSDT with it: on the median it is not a member at all.
 #
-# 65 is therefore the exact measured minimum inside a window only seven ranks wide. It buys nothing
-# to widen: the ranks are computed from the same frozen bars the build itself uses, and the
-# containment assertion re-verifies the choice at build time, so a wrong one fails closed rather
-# than shipping a member with no funding.
+# UPPER BOUND 71. BTCSTUSDT first appears at rank 72, and Binance has no public funding for it in
+# 2022-01 -- the REST endpoint returns `[]` and the monthly archive is a 404 -- so `build_snapshot`
+# fails closed with "missing funding REST event coverage for BTCSTUSDT in 2022-01" at any size
+# >= 72. Verified directly against both sources.
+#
+# 65 is retained rather than lowered to the new minimum: it is what the published acquisition on
+# disk was actually built with, it sits comfortably inside 22..71, and re-acquiring to shrink a
+# superset would discard verified data to no purpose. The containment assertion re-verifies the
+# choice on every build, so a wrong one fails closed rather than shipping a member with no funding.
 #
 # This file is NOT the tournament machine contract -- tournament/cup20/config.toml is. This one
 # only governs how raw Binance USD-M data is downloaded and verified.
