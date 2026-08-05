@@ -41,15 +41,55 @@ def _positive(value: object) -> bool:
     return math.isfinite(number) and number > 0.0
 
 
-def _traded(value: object) -> bool:
-    """Whether a side was actually used, judged from its gross PnL rather than from a declaration.
+# A side counts as traded only when its gross PnL is at least this fraction of the book's TOTAL
+# gross activity (|long| + |short|). Relative, never absolute: the threshold has to mean the same
+# thing for a book earning 0.02 and one earning 20.
+#
+# The number is chosen to sit as far as possible from BOTH mistakes it can make, on a log scale:
+#
+#   ~1e-10 relative -- the largest magnitude dust can plausibly reach. Two sources, and they happen
+#   to agree: floating-point accumulation error over the ~3e5 bar-symbol terms summed across the
+#   in-sample window is about N * 2.2e-16 ~ 1e-10 of the running magnitude; and a single position
+#   at the smallest weight the evaluator treats as real (1e-12, its own tolerance) held for one bar
+#   through an ordinary move contributes about the same against a unit-gross book.
+#
+#   ~1e-2 relative -- the smallest sleeve that could change any reported number at the precision
+#   the charter states policy in. Every ratio floor is written to two decimals (0.80, 0.50, 0.20,
+#   0.30, 0.35, 0.60, 0.70, 0.90), so a sleeve below a percent of gross activity cannot move a
+#   verdict, and there is correspondingly nothing for a team to gain by hiding one.
+#
+# 1e-6 is the geometric midpoint: four orders of magnitude of headroom above anything numerical,
+# and four below anything a team could hide a real sleeve behind. A threshold with that much margin
+# on both sides is set by the physics of the two failure modes rather than by taste, which is the
+# property that matters -- this decides a HARD FLOOR, and a team disqualified by it on a rounding
+# artifact would have a fair grievance.
+_MATERIAL_SIDE_FRACTION = 1e-6
 
-    Anything other than exactly zero counts as traded, NaN included: a side whose PnL could not be
-    computed must be gated, never skipped. Exact zero is the only honest signal that a side was
-    never touched -- a book that took even one position on a side and closed it at a scratch would
-    have to land on 0.0 to the last bit across the whole window.
+
+def _material_sides(role_values: Mapping[str, object]) -> tuple[str, ...]:
+    """Which sides the book actually traded, judged from gross PnL rather than from a declaration.
+
+    Materiality, not mere non-zero-ness. Nothing upstream filters dust -- ``normalise_unit_gross``
+    only divides by gross, and the evaluator treats any target above 1e-12 as real -- so a long-only
+    book that emitted a single -1e-9 weight at one boundary in four years really does carry a
+    nanoscale short, with a real (and sign-random) PnL attached. Under a ``!= 0.0`` rule that book
+    collected TWO hard-floor failures: a coin-flip on ``role_short_gross_pnl``, and a
+    ``declared_roles_match_traded_sides`` mismatch that fired even when the dust sleeve happened to
+    be profitable, because the check compares sets rather than signs. That is a false accusation
+    manufactured out of a rounding artifact -- the same class closed twice in
+    ``verify_neighbourhood_coordinates``.
+
+    A non-finite side is ALWAYS material and can never be dismissed as dust: it cannot be shown
+    small, so it must be gated (where ``_positive`` then fails it). It is also excluded from the
+    total, so one unusable side cannot drag the other below the threshold.
     """
-    return float(value) != 0.0  # type: ignore[arg-type]
+    magnitudes = {role: abs(_finite(value)) for role, value in role_values.items()}
+    total = sum(value for value in magnitudes.values() if math.isfinite(value))
+    return tuple(
+        role
+        for role, magnitude in magnitudes.items()
+        if not math.isfinite(magnitude) or magnitude > _MATERIAL_SIDE_FRACTION * total
+    )
 
 
 def evaluate_floors(
@@ -130,7 +170,8 @@ def evaluate_floors(
     # sleeve lost money could declare ("long",) and the short-PnL floor would simply never be
     # evaluated -- opting out of a hard floor by describing itself differently. The roles are
     # therefore DERIVED from behaviour, using the long/short gross PnL `window_metrics` already
-    # reports, and the declaration is cross-checked against them.
+    # reports, and the declaration is cross-checked against them. "Traded" means MATERIALLY traded
+    # -- see `_material_sides`, which exists so that dust cannot manufacture a disqualification.
     #
     # Both halves are needed, and neither subsumes the other:
     #   - gating the UNION of declared and observed means an undeclared but traded side is still
@@ -145,7 +186,7 @@ def evaluate_floors(
     for role in declared:
         if role not in role_values:
             raise KeyError(f"unrecognised declared role: {role!r}")
-    observed = tuple(role for role, value in role_values.items() if _traded(value))
+    observed = _material_sides(role_values)
     checks["declared_roles_match_traded_sides"] = set(declared) == set(observed)
     for role in role_values:
         if role in declared or role in observed:

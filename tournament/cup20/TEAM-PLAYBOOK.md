@@ -34,7 +34,15 @@ is the same disqualification as opening the sealed snapshot itself:**
 | `tournament/cup20/private/` | organiser-only summaries and the full-universe pure-crypto audit, both of which name the holdout's members |
 | `reports-cup20/` | every derived organiser report, including a common BTC daily-return and regime-label series that runs to the end of the holdout |
 
-This list is enforced, not merely stated: each entry is a pattern in
+**The prohibition covers any earlier revision of those paths in version control, not only what they
+contain today.** Some of them held more than they do now: organiser artifacts describing the
+holdout were committed and later removed, and removing a file from a branch does not remove it from
+that branch's history. Retrieving any prior version of a prohibited path — by `git show`, `git log
+-p`, `git cat-file`, a checkout of an older commit, a reflog entry, or any other means — is the
+same disqualification as opening the file itself. This one is on your honour: the source scan reads
+your frozen archive, so it catches a committed command but not one you type into a shell.
+
+The rest of the list is enforced, not merely stated: each entry is a pattern in
 `crypto_trade.cup20.archive.FORBIDDEN_PATTERNS`, and the pre-flight source scan matches it against
 both the content of every file in your frozen archive and the archive's own path names.
 

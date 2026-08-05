@@ -143,6 +143,14 @@ Owned entirely by the organiser. No team code touches any of it.
    path by name, and the pre-flight source scan matches those paths against both the content and the
    file names of the frozen archive before a single number is scored. Blindness therefore rests on
    absence-from-the-data-root **plus** the prohibition **plus** the scan — not on absence alone.
+
+   The same is true of version control, and for the same reason it is stated rather than claimed
+   away: organiser artifacts that described the holdout were committed and later removed, and a
+   removal does not erase a branch's history. Rewriting shared history was judged more dangerous
+   than the residual exposure, so the prohibition is extended instead — it covers **any earlier
+   revision of a prohibited path**, retrieved by any means. The scan reads a team's frozen archive,
+   so it catches a committed command but not an interactive one; this layer is honour-bound, and
+   saying so is more useful than pretending the bytes are gone.
 2. **Narrow protocol.** Teams implement
    `target_weights(context: DecisionContext, *, seed: int) -> Mapping[str, float] | None`.
    `DecisionContext` exposes only bars closing at or before the decision time, funding strictly
@@ -305,11 +313,22 @@ lowered, never rounded into compliance, never averaged away. A missing or non-fi
 | Exact sign inversion clears the core floors | **disqualifying** |
 
 **Roles are observed, not declared.** A candidate's roles are derived from which sides its book
-actually traded — a side with non-zero gross PnL — and the roles declared in the research
-certificate are checked against that. Both floors then apply to the union. Otherwise a long/short
-book with a losing short sleeve could declare itself long-only and the short-PnL floor would never
-be evaluated, which is opting out of a hard floor by describing yourself differently. Declaring a
-sleeve that was never traded fails the same check, in the other direction.
+**materially** traded — a side whose gross PnL is more than 1e-6 of the book's total gross activity
+— and the roles declared in the research certificate are checked against that. Both floors then
+apply to the union. Otherwise a long/short book with a losing short sleeve could declare itself
+long-only and the short-PnL floor would never be evaluated, which is opting out of a hard floor by
+describing yourself differently. Declaring a sleeve that was never traded fails the same check, in
+the other direction.
+
+The materiality threshold is relative, not absolute, and it is deliberately far from both mistakes
+it could make. Nothing upstream filters dust, so a long-only book that emits one 1e-9 weight at a
+single boundary does carry a nanoscale short with a sign-random PnL; without a threshold it would
+be disqualified twice over on a rounding artifact. 1e-6 sits four orders of magnitude above the
+largest magnitude such dust can reach (floating-point accumulation error across the window, and the
+evaluator's own 1e-12 weight tolerance, both land near 1e-10 relative) and four orders below the
+smallest sleeve that could move any reported number at the two-decimal precision every ratio floor
+is stated in — so there is no real sleeve small enough to hide behind it and nothing to gain by
+trying. A non-finite side is always material and is gated, never dismissed as dust.
 
 **Folds.** Four equal 12-month blocks anchored backward from the IS cutoff, so every fold carries
 the same noise floor:

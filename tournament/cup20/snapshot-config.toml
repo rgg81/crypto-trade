@@ -15,7 +15,9 @@
 # LOWER BOUND 22. Containment is a symbol-set property -- `build_snapshot` fetches a member's whole
 # funding and mark history once it appears at ANY boundary -- so what matters is each member's BEST
 # rank. Across the 63 CUP-20 members inside the IS window that maximum is 22 (IOTAUSDT; next
-# ALGOUSDT 18), with zero members unranked, and it does not rise on the sealed side. It is that low
+# ALGOUSDT 18), with zero members unranked. Nothing here needs to speak for the sealed side: the
+# containment assertion in scripts/cup20_build_snapshot.py re-checks the WHOLE membership on every
+# build and fails closed, so the bound is verified rather than asserted. It is that low
 # because CUP-20 and the acquisition now rank on the SAME statistic (`liquidity_measure` below, and
 # `crypto_trade.cup20.universe.LIQUIDITY_MEASURE`), which makes the CUP-20 top-20 a genuine subset
 # bounded by the hysteresis exit rank of 25.

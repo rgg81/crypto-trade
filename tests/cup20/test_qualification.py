@@ -132,6 +132,83 @@ def test_short_only_book_with_a_losing_short_sleeve_fails():
     assert gate.failures == ("role_short_gross_pnl",)
 
 
+# --- a side counts only when it is MATERIAL ------------------------------------------------
+#
+# Nothing upstream filters dust: normalise_unit_gross only divides by gross, and the evaluator
+# treats any target above 1e-12 as real. So a long-only book that emitted a single -1e-9 weight at
+# one boundary in four years genuinely carries a nanoscale short with a sign-random PnL. Under a
+# `!= 0.0` rule that book collected TWO hard-floor failures -- a coin flip on the short floor, and a
+# roles mismatch that fired even when the dust sleeve happened to be PROFITABLE, since the check
+# compares sets rather than signs. The charter publishes this as a hard floor, so that would be a
+# disqualification on a rounding artifact.
+
+
+def test_a_genuinely_two_sided_book_still_gates_both_roles():
+    # A real but small short sleeve: 0.1% of gross activity, a thousand times the threshold. The
+    # dust guard must not become a hole a real sleeve fits through.
+    gate = _evaluate(declared_roles=("long", "short"), long_gross_pnl=1.0, short_gross_pnl=0.001)
+    assert gate.passed
+    assert gate.checks["role_short_gross_pnl"] is True
+    assert gate.checks["declared_roles_match_traded_sides"] is True
+
+    losing = _evaluate(declared_roles=("long",), long_gross_pnl=1.0, short_gross_pnl=-0.001)
+    assert not losing.passed
+    assert losing.checks["role_short_gross_pnl"] is False
+    assert losing.checks["declared_roles_match_traded_sides"] is False
+
+
+def test_a_long_only_book_with_a_dust_short_is_not_disqualified():
+    # One -1e-9 weight held for one bar through an ordinary move, against a book earning 0.22:
+    # ~1e-11 of PnL, five orders of magnitude below the 1e-6 relative threshold.
+    gate = _evaluate(declared_roles=("long",), long_gross_pnl=0.22, short_gross_pnl=-1e-11)
+    assert gate.passed
+    assert gate.checks["declared_roles_match_traded_sides"] is True
+    assert "role_short_gross_pnl" not in gate.checks
+
+    # Sign-independent: dust must be ignored whichever way it happened to land. Under the old rule
+    # this direction PASSED the coin flip and still failed the set comparison.
+    profitable_dust = _evaluate(
+        declared_roles=("long",), long_gross_pnl=0.22, short_gross_pnl=+1e-11
+    )
+    assert profitable_dust.passed
+
+
+# Declares ("long",) ONLY, so the short gate can appear for exactly one reason: materiality pulled
+# it into the union. Declaring both would put it there regardless and prove nothing about the
+# threshold. Each row makes |long| + |short| == 1.0, so short_pnl IS the relative magnitude.
+@pytest.mark.parametrize(
+    ("short_pnl", "is_material"),
+    [
+        (1e-6, False),  # exactly AT the threshold: strictly greater is required
+        (1e-5, True),  # an order of magnitude above it
+        (1e-7, False),  # an order of magnitude below it
+    ],
+)
+def test_the_materiality_threshold_is_relative_to_total_gross_activity(short_pnl, is_material):
+    gate = _evaluate(
+        declared_roles=("long",), long_gross_pnl=1.0 - short_pnl, short_gross_pnl=short_pnl
+    )
+    assert ("role_short_gross_pnl" in gate.checks) is is_material
+    # Same absolute PnL against a book a million times larger is dust, and against one a million
+    # times smaller is the whole book -- the threshold has to scale, not sit at a fixed number.
+    tiny_book = _evaluate(
+        declared_roles=("long",), long_gross_pnl=short_pnl * 10.0, short_gross_pnl=short_pnl
+    )
+    assert "role_short_gross_pnl" in tiny_book.checks
+    huge_book = _evaluate(
+        declared_roles=("long",), long_gross_pnl=short_pnl * 1e9, short_gross_pnl=short_pnl
+    )
+    assert "role_short_gross_pnl" not in huge_book.checks
+
+
+def test_a_non_finite_side_is_always_material_and_can_never_be_dismissed_as_dust():
+    # It cannot be shown small, so it must be gated -- where _positive then fails it. A book with a
+    # huge long could otherwise make a NaN short look immaterial by comparison.
+    gate = _evaluate(declared_roles=("long",), long_gross_pnl=1e9, short_gross_pnl=float("nan"))
+    assert gate.checks["role_short_gross_pnl"] is False
+    assert not gate.passed
+
+
 def test_zero_is_not_positive():
     assert not _evaluate(short_gross_pnl=0.0).passed
 
