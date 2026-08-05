@@ -1745,6 +1745,13 @@ from crypto_trade.tournament.engine_v2 import EvaluationResult
 DAYS_PER_YEAR = 365.0
 Fold = tuple[str, pd.Timestamp, pd.Timestamp]
 
+# Every metric this module reports MUST be finite. These values are ranked, compared against hard
+# floors, and serialised into a hash-chained release artifact, and none of those three consumers
+# handles an infinity correctly: the ranking clamp would score a perfect drawdown profile at zero,
+# and json.dumps would emit the non-standard "Infinity" token into a published, hashed packet.
+UNDEFINED_CALMAR = 1_000.0  # drawdown is zero and return positive: unbounded, reported as capped
+UNDEFINED_COST_SHARE = 1.0  # no positive gross PnL at all: reported as costs consuming everything
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class WindowMetrics:
@@ -2696,7 +2703,18 @@ from collections.abc import Mapping, Sequence
 
 
 def _clamp(value: float) -> float:
-    if not math.isfinite(value):
+    """Clamp a normalised score component to ``[0, 1]``.
+
+    Every component is oriented so that larger is better, so a positive infinity means "as good
+    as this term can be" and must earn full credit, not zero. NaN and negative infinity earn
+    nothing. Metrics are expected to be finite by the time they arrive here — this is
+    defence in depth, not a licence for upstream to emit infinities.
+    """
+    if math.isnan(value):
+        return 0.0
+    if value == math.inf:
+        return 1.0
+    if value == -math.inf:
         return 0.0
     return min(1.0, max(0.0, value))
 
@@ -3328,7 +3346,11 @@ def build_packet(
         },
         "artifact_sha256": artifacts,
     }
-    (directory / "summary.json").write_text(json.dumps(packet, indent=2, sort_keys=True) + "\n")
+    # allow_nan=False: a non-finite metric must fail loudly here rather than silently emitting
+    # the non-standard "Infinity" token into a hash-chained, publicly released artifact.
+    (directory / "summary.json").write_text(
+        json.dumps(packet, indent=2, sort_keys=True, allow_nan=False) + "\n"
+    )
     return packet
 
 
@@ -3336,7 +3358,7 @@ def write_manifest(packets: Sequence[Mapping[str, Any]], *, path: str | Path) ->
     """Write the release manifest and return its digest."""
     manifest_path = Path(path)
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    body = json.dumps(list(packets), indent=2, sort_keys=True) + "\n"
+    body = json.dumps(list(packets), indent=2, sort_keys=True, allow_nan=False) + "\n"
     manifest_path.write_text(body)
     return hashlib.sha256(body.encode("utf-8")).hexdigest()
 
