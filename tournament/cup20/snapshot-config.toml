@@ -19,13 +19,17 @@ archive_s3_url = "https://s3-ap-northeast-1.amazonaws.com/data.binance.vision"
 exchange_info_url = "https://fapi.binance.com/fapi/v1/exchangeInfo"
 funding_rate_url = "https://fapi.binance.com/fapi/v1/fundingRate"
 mark_price_klines_url = "https://fapi.binance.com/fapi/v1/markPriceKlines"
-# Binance USD-M launched 2019-09-08 and the charter defines warm-up as "symbol listing ->
-# IS_START", so this asks for everything from the venue's own beginning. Disclosed limitation:
-# data.binance.vision's monthly USD-M kline archives actually begin 2020-01, so the realised
-# warm-up starts there. The value is left at the venue's start rather than 2020-01 so the config
-# states the intent and picks up any earlier month Binance ever publishes; `in_sample_start` below
-# is set from the data that exists, not from this.
-warmup_start = "2019-09-01"
+# The charter defines warm-up as "symbol listing -> IS_START", and this is as close as the public
+# record allows. Binance USD-M launched 2019-09-08, but data.binance.vision's monthly USD-M kline
+# archives begin 2020-01 -- a disclosed limitation, not a choice. Nor is an earlier value merely
+# useless: `build_snapshot` requires BTCUSDT to have exactly three 8h bars on EVERY UTC day from
+# `warmup_start`, so any date before the first archived day fails closed with "BTCUSDT does not
+# have exactly three canonical 8h bars per UTC day".
+#
+# 2020-01-01 is verified, not assumed: parsing every cached BTCUSDT 8h archive gives 7212 bars over
+# 2404 consecutive days, 2020-01-01 through 2026-07-31, with zero missing days and zero days short
+# of three bars.
+warmup_start = "2020-01-01"
 hard_end_exclusive = "2026-08-01"
 transaction_interval = "8h"
 mark_price_interval = "1h"
