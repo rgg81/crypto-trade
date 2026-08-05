@@ -4301,6 +4301,14 @@ Each `tournament/cup20/teams/team-NN/MANDATE.md` states the lane from `[mandates
 sentences of mechanism intent, and the explicit note that shared causal transforms and shared risk
 controls are not a collision but copying another team's alpha is.
 
+- [ ] **Step 7b: Re-derive the charter from the amended spec**
+
+`docs/superpowers/specs/2026-08-04-cup20-tournament-design.md` was amended after Task 1 generated
+`TOURNAMENT-CHARTER-CUP20.md` (§4 caps, §6 risk-unit interaction, §7.2 neighbourhood validity,
+§7.3 floors). Re-derive the charter body so it is byte-identical to spec §1-§14 again, keeping
+Task 1's header block, and verify with a `diff`. The activation record hash-binds both, so a stale
+charter would freeze a contradiction.
+
 - [ ] **Step 8: Freeze activation**
 
 ```bash

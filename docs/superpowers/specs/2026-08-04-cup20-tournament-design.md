@@ -194,9 +194,18 @@ additional points such that:
 
 - the neighbourhood has at least `max(7, 2k + 1)` points, where `k` is the number of material
   parameters;
+- **every point is distinct** — no duplicates, and no point equal to the nominee. A neighbourhood
+  padded with repeated points is a handful of samples wearing a costume, and padding one side of
+  the nominee is a direct lever on the median;
 - for **every** declared coordinate there is at least one point strictly above and one strictly
-  below the nominated value;
-- every coordinate maps to an identically named numeric material parameter in the frozen source.
+  below the nominated value, and each of those variations is **material**: at least 5% of the
+  nominee's magnitude for that coordinate, or a strictly positive absolute change when the nominee
+  is zero. A variation of 1e-9 is not an exploration of the surface;
+- every coordinate maps to an identically named numeric material parameter in the frozen source,
+  **and the nominee's declared value equals the value in that frozen source**, so the nominated
+  point is what the frozen code actually does rather than a favourable point merely labelled as
+  the nominee. Verified by parsing the entrypoint, never by importing it — team code is untrusted
+  and is never executed during verification.
 
 **Every scored metric is the per-metric median across the neighbourhood's runs.** The nominated
 point's own coherent metric vector, and the coherent vector of the median-performing point, are
