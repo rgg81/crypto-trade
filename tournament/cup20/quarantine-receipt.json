@@ -1,0 +1,22 @@
+{
+  "activation_record_path": "tournament/cup20/activation-freeze.json",
+  "canary_file_sha256": "87b981be6ada71af4162a64f52598bf44497c23d452f78b3c55d6b2d1636fa18",
+  "canary_relative_path": "sealed/HOLDOUT-CANARY-DO-NOT-READ.txt",
+  "canary_token_sha256": "d8b8723bb28f505725702a2bd2a489a344bf1adee1024a2642e6b55e771ff1f5",
+  "quarantine_root": "/home/roberto/cup20-quarantine",
+  "quarantined_at_epoch": 1785972241.4130507,
+  "schema_version": "cup20-quarantine-receipt-v1",
+  "sealed_manifest_sha256": "22302522458907ad4b800a119ee49b3d12b8ba80ffd820d343079ff3e4725c9d",
+  "trees": {
+    "acquisition": {
+      "bundle_sha256": "aa284cb4be95d466622abe8635e7a3d20f3bc3ff8a9f60d1280bd3e2453d8f50",
+      "quarantine_path": "/home/roberto/cup20-quarantine/acquisition",
+      "working_path": "data/cup20/acquisition"
+    },
+    "sealed": {
+      "bundle_sha256": "66b683a41ced942125a14b2e3c7d944c7fc9768b1c9a5adbd42263781611a2e1",
+      "quarantine_path": "/home/roberto/cup20-quarantine/sealed",
+      "working_path": "data/cup20/sealed"
+    }
+  }
+}
