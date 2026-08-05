@@ -41,6 +41,17 @@ def _positive(value: object) -> bool:
     return math.isfinite(number) and number > 0.0
 
 
+def _traded(value: object) -> bool:
+    """Whether a side was actually used, judged from its gross PnL rather than from a declaration.
+
+    Anything other than exactly zero counts as traded, NaN included: a side whose PnL could not be
+    computed must be gated, never skipped. Exact zero is the only honest signal that a side was
+    never touched -- a book that took even one position on a side and closed it at a scratch would
+    have to land on 0.0 to the last bit across the whole window.
+    """
+    return float(value) != 0.0  # type: ignore[arg-type]
+
+
 def evaluate_floors(
     scored: Mapping[str, float],
     *,
@@ -52,7 +63,12 @@ def evaluate_floors(
     neighbourhood_positive_fraction: float,
     trial_adjusted_confidence: float,
 ) -> GateVector:
-    """Evaluate every hard floor. A missing key raises; a non-finite value fails."""
+    """Evaluate every hard floor. A missing key raises; a non-finite value fails.
+
+    ``declared_roles`` is treated as a claim to be checked, not as a fact: the gated roles are
+    derived from which sides the book actually traded (non-zero gross PnL), and a declaration that
+    disagrees fails its own gate. See the role block at the end of this function.
+    """
     checks: dict[str, bool] = {
         "net_sharpe": _at_least(scored["net_sharpe"], float(floors["net_sharpe"])),
         "double_cost_sharpe": _at_least(
@@ -104,11 +120,34 @@ def evaluate_floors(
         ),
         "sign_inversion_not_profitable": not sign_inversion_passes_core,
     }
-    # Touch every role metric so a missing key still raises, then gate only declared roles.
+    # Touch every role metric so a missing key still raises, whether or not its role is declared.
     role_values = {
         "long": scored["long_gross_pnl"],
         "short": scored["short_gross_pnl"],
     }
-    for role in declared_roles:
-        checks[f"role_{role}_gross_pnl"] = _positive(role_values[role])
+    # A declaration is a claim, and until now it was an unchecked one: `declared_roles` arrived as
+    # input and nothing bound it to what the book actually did. A long/short candidate whose short
+    # sleeve lost money could declare ("long",) and the short-PnL floor would simply never be
+    # evaluated -- opting out of a hard floor by describing itself differently. The roles are
+    # therefore DERIVED from behaviour, using the long/short gross PnL `window_metrics` already
+    # reports, and the declaration is cross-checked against them.
+    #
+    # Both halves are needed, and neither subsumes the other:
+    #   - gating the UNION of declared and observed means an undeclared but traded side is still
+    #     gated (closes the dodge), and a declared side that came out exactly zero is still gated
+    #     rather than silently dropped;
+    #   - the separate agreement check catches the mis-declaration itself, in either direction --
+    #     claiming a sleeve that was never traded is as much a false research certificate as hiding
+    #     one that was.
+    # A subscript, not `.get`, so an unrecognised role name still raises loudly rather than
+    # quietly never gating anything.
+    declared = tuple(dict.fromkeys(declared_roles))
+    for role in declared:
+        if role not in role_values:
+            raise KeyError(f"unrecognised declared role: {role!r}")
+    observed = tuple(role for role, value in role_values.items() if _traded(value))
+    checks["declared_roles_match_traded_sides"] = set(declared) == set(observed)
+    for role in role_values:
+        if role in declared or role in observed:
+            checks[f"role_{role}_gross_pnl"] = _positive(role_values[role])
     return GateVector(checks=checks)

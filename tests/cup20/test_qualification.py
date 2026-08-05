@@ -94,9 +94,42 @@ def test_each_floor_is_individually_binding(override, expected_failure):
     assert expected_failure in gate.failures
 
 
-def test_undeclared_role_is_not_checked():
+# CONTRACT CHANGE, disclosed explicitly rather than quietly changed. This test previously read
+# `test_undeclared_role_is_not_checked` and asserted `gate.passed` for exactly this input -- it
+# pinned the defect as the contract. A long/short book whose short sleeve LOST money could declare
+# ("long",) and the short-PnL floor would never be evaluated: opting out of a hard floor by
+# describing itself differently. Roles are now derived from which sides actually traded, so an
+# undeclared-but-traded side is gated AND the mis-declaration is its own failure.
+def test_undeclared_but_traded_role_is_still_gated():
     gate = _evaluate(declared_roles=("long",), short_gross_pnl=-5.0)
+    assert not gate.passed
+    assert gate.checks["role_short_gross_pnl"] is False
+    assert gate.checks["declared_roles_match_traded_sides"] is False
+
+
+def test_declaring_a_role_the_book_never_traded_also_fails():
+    # The other direction: a research certificate claiming a short sleeve that does not exist is
+    # as much a false statement as one hiding a sleeve that does.
+    gate = _evaluate(declared_roles=("long", "short"), short_gross_pnl=0.0)
+    assert not gate.passed
+    assert gate.checks["declared_roles_match_traded_sides"] is False
+
+
+def test_short_only_book_passes_on_its_own_terms():
+    # The short-only case deferred at Task 9: every single-role test there declared ("long",).
+    # A book that only ever shorts declares ("short",), is gated on the short floor alone, and the
+    # long floor is neither applied nor silently skipped -- it is absent because no long was traded.
+    gate = _evaluate(declared_roles=("short",), long_gross_pnl=0.0)
     assert gate.passed
+    assert gate.checks["role_short_gross_pnl"] is True
+    assert "role_long_gross_pnl" not in gate.checks
+    assert gate.checks["declared_roles_match_traded_sides"] is True
+
+
+def test_short_only_book_with_a_losing_short_sleeve_fails():
+    gate = _evaluate(declared_roles=("short",), long_gross_pnl=0.0, short_gross_pnl=-5.0)
+    assert not gate.passed
+    assert gate.failures == ("role_short_gross_pnl",)
 
 
 def test_zero_is_not_positive():
@@ -153,6 +186,7 @@ EXPECTED_TOP_LEVEL_GATE_NAMES = frozenset(
         "neighbourhood_positive_fraction",
         "trial_adjusted_confidence",
         "sign_inversion_not_profitable",
+        "declared_roles_match_traded_sides",
     }
 )
 
@@ -163,11 +197,19 @@ def test_gate_vector_has_exactly_the_expected_gate_names():
     assert set(gate.checks) == expected
 
 
-def test_gate_vector_only_includes_declared_role_names():
+# CONTRACT CHANGE, disclosed. Previously `test_gate_vector_only_includes_declared_role_names`,
+# asserting that a traded-but-undeclared side produced NO gate. That was the defect. The gate set
+# is now the union of declared and traded sides.
+def test_gate_vector_covers_every_side_the_book_actually_traded():
     gate = _evaluate(declared_roles=("long",), short_gross_pnl=-5.0)
-    expected = EXPECTED_TOP_LEVEL_GATE_NAMES | {"role_long_gross_pnl"}
+    expected = EXPECTED_TOP_LEVEL_GATE_NAMES | {"role_long_gross_pnl", "role_short_gross_pnl"}
     assert set(gate.checks) == expected
-    assert "role_short_gross_pnl" not in gate.checks
+
+
+def test_gate_vector_omits_a_side_that_was_neither_declared_nor_traded():
+    gate = _evaluate(declared_roles=("short",), long_gross_pnl=0.0)
+    expected = EXPECTED_TOP_LEVEL_GATE_NAMES | {"role_short_gross_pnl"}
+    assert set(gate.checks) == expected
 
 
 # --- additional coverage: exact inclusive boundary values -------------------

@@ -292,7 +292,8 @@ lowered, never rounded into compliance, never averaged away. A missing or non-fi
 | Positive-quarter fraction | ≥ 0.50 |
 | Folds positive at 2× cost | ≥ 3 of 4 |
 | Worst-fold Sharpe at 2× cost | ≥ −0.25 |
-| Long gross PnL, short gross PnL | each > 0 (for a candidate claiming both roles) |
+| Long gross PnL, short gross PnL | each > 0, for every side the book actually traded |
+| Declared roles agree with the sides actually traded | **required** |
 | Annualised one-way turnover | ≤ 25× equity |
 | Gross edge per unit one-way turnover | ≥ 40 bps |
 | Base cost share of positive gross PnL | ≤ 30% |
@@ -302,6 +303,13 @@ lowered, never rounded into compliance, never averaged away. A missing or non-fi
 | Neighbourhood points with positive return **and** positive 2× Sharpe | ≥ 70% |
 | Trial-adjusted confidence | ≥ 0.90 |
 | Exact sign inversion clears the core floors | **disqualifying** |
+
+**Roles are observed, not declared.** A candidate's roles are derived from which sides its book
+actually traded — a side with non-zero gross PnL — and the roles declared in the research
+certificate are checked against that. Both floors then apply to the union. Otherwise a long/short
+book with a losing short sleeve could declare itself long-only and the short-PnL floor would never
+be evaluated, which is opting out of a hard floor by describing yourself differently. Declaring a
+sleeve that was never traded fails the same check, in the other direction.
 
 **Folds.** Four equal 12-month blocks anchored backward from the IS cutoff, so every fold carries
 the same noise floor:
