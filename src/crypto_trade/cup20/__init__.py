@@ -58,6 +58,7 @@ from crypto_trade.cup20.qualification import (
     evaluate_holdout_eligibility,
 )
 from crypto_trade.cup20.quarantine import (
+    FAST_VERIFY_DISCLAIMER,
     arm_sealed_access_tripwire,
     canary_contents,
     load_receipt,
@@ -68,6 +69,7 @@ from crypto_trade.cup20.quarantine import (
     sealed_access_report,
     verify_quarantine_covered_research,
     verify_quarantine_in_effect,
+    verify_quarantine_integrity,
 )
 from crypto_trade.cup20.report import atomic_release, build_packet, write_manifest
 from crypto_trade.cup20.risk_unit import apply_risk_scalars, common_risk_scalars
@@ -134,6 +136,7 @@ __all__ = [
     "DOUBLE_COST",
     "DOUBLE_COST_RANKING_KEYS",
     "ExposureCapTrim",
+    "FAST_VERIFY_DISCLAIMER",
     "FLOOR_METRIC_KEYS",
     "GateVector",
     "HOLDOUT_ONLY_KEYS",
@@ -218,6 +221,7 @@ __all__ = [
     "verify_neighbourhood_coordinates",
     "verify_quarantine_covered_research",
     "verify_quarantine_in_effect",
+    "verify_quarantine_integrity",
     "weekly_reconstitution_times",
     "window_metrics",
     "write_manifest",

@@ -154,6 +154,17 @@ events are appended to the hash-chained journal, which is what makes the coverag
 `holdout_restored` above all of them, is evidence that no trial was accepted while the holdout was
 reachable — and re-ordering that to look otherwise breaks the chain.
 
+Custody is two claims, not one, and they are checked by different commands. *Absence* — the trees
+are not on any path a team can name — is what `verify_quarantine_in_effect` establishes, and it
+reads no bytes. *Integrity* — what is sitting in quarantine is still the holdout that left the tree
+— is what `verify_quarantine_integrity` establishes, by recomputing both whole-tree bundle digests
+against the receipt, re-verifying the whole activation record with the sealed root read at the
+quarantine location, and checking the canary token. The research phase runs for months, so the
+second is run **periodically during it**, not only at restore: `restore_holdout` performs the same
+comparisons, but it runs after the last team has finished, when corruption can only be answered by
+voiding the tournament. A check that reports on absence must never be described as reporting on
+integrity.
+
 1. **Truncated data root.** Teams receive `data/cup20/is/`, containing bars, funding, membership,
    contract metadata and exchange info **strictly before 2024-08-01**. Not one row at or after the
    cutoff is in it, in any timestamp column of any dataset, and the contract metadata is censored so
@@ -699,7 +710,7 @@ charter and config.
 | Phase | Content | Gate to exit |
 |---|---|---|
 | 0 | Charter, config, dual snapshot, universe, evaluator + risk unit, journal, qualification, scoring, tests | activation freeze recorded |
-| 0b | **Quarantine**: sealed + acquisition snapshots moved out of the working tree, canary planted, event journalled | receipt committed; `verify_quarantine_in_effect` passes |
+| 0b | **Quarantine**: sealed + acquisition snapshots moved out of the working tree, canary planted, event journalled | receipt committed; `verify_quarantine_integrity` passes (absence **and** the recorded digests, not absence alone), and is re-run periodically through phase 1 |
 | 1 | 12 teams research IS in parallel (QR + QE per team), ≥8 trials, certificate, nominate | nomination registry closed at one journal head |
 | 2 | Mechanical qualification, falsification DQs, `G` ranking | selection freeze: top-3 + ensemble weights |
 | 2b | **Restore**: quarantined trees verified against the activation-bound digests and moved back; access tripwire armed | digests match; restore stamp written |

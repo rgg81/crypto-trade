@@ -14,6 +14,14 @@ byte-for-byte what went out, measured against the digest the activation record b
 team started. A mismatch refuses the restore outright rather than reporting and continuing: a
 holdout that was modified while out of the tree is not a holdout, and the tournament has to stop.
 
+Restore is the wrong moment to learn that, though -- it runs after the last team has finished, so
+corruption discovered there is discovered too late for anything but voiding the tournament.
+:func:`verify_quarantine_integrity` runs the same digest comparisons at any point during the
+months-long research phase, while a re-freeze or a restart is still an option.
+:func:`verify_quarantine_in_effect` is its first layer and only its first layer: it establishes
+that the trees are GONE, never that they are UNCHANGED, and callers that conflate the two are
+claiming custody they have not checked.
+
 **Tripwire (phase 3).** Scoring the finalists requires the sealed data to be present and readable,
 so quarantine cannot cover that window. Two detectors do, and both are weaker than quarantine --
 stated here rather than discovered later:
@@ -85,6 +93,18 @@ TREE_NAMES: tuple[str, ...] = (SEALED_TREE, ACQUISITION_TREE)
 # How far back arming pushes ``atime``. Must exceed the kernel's 24-hour ``relatime`` threshold, or
 # arming would leave files whose next read the kernel declines to record.
 ARMED_ATIME_LAG_SECONDS = 48 * 3600
+
+# Printed by the ``--fast`` branch of ``scripts/cup20_quarantine.py``, immediately below its result.
+# It lives here rather than in the script so it is inside the activation-bound implementation root:
+# the sentence an organiser is shown about what a check did NOT do is part of the check.
+FAST_VERIFY_DISCLAIMER = (
+    "NOT CHECKED (--fast): the quarantined bytes themselves.\n"
+    "  This tested only that both trees are ABSENT from the working tree and PRESENT at the\n"
+    "  quarantine root. It did not read one byte of either tree, so it cannot see a modified,\n"
+    "  truncated, appended-to, added or deleted file, an activation record re-frozen against a\n"
+    "  different holdout, or an altered canary token. Re-run without --fast before recording this\n"
+    "  as evidence that the holdout is intact."
+)
 
 _TOKEN_PATTERN = re.compile(r"\A[0-9a-f]{32,128}\Z")
 
@@ -297,6 +317,20 @@ def verify_quarantine_in_effect(
 
     Raises rather than returning a verdict: an organiser calls this in the middle of the research
     phase precisely to be told loudly if the answer is no.
+
+    **This is an ABSENCE check and nothing more.** It reads directory existence -- not one byte of
+    either tree. A holdout that was modified, truncated, added to or emptied out while sitting in
+    quarantine passes this function without a word, because every path it looks at is still exactly
+    where the receipt says it should be. Callers that need to know the quarantined bytes are still
+    the bytes that went out must use :func:`verify_quarantine_integrity`, which starts by calling
+    this and then reads them.
+
+    It stays separate because two callers genuinely need only absence:
+    ``scripts/cup20_activate.py``, which must establish that nothing has been put at the contract
+    path before it re-freezes an amendment against the quarantined tree -- and cannot call the
+    integrity check, which verifies the very record being rewritten -- and the ``--fast`` branch of
+    ``scripts/cup20_quarantine.py``, which prints :data:`FAST_VERIFY_DISCLAIMER` alongside its
+    result so the gap above is stated rather than implied.
     """
     receipt = load_receipt(receipt_path)
     present = [
@@ -318,6 +352,85 @@ def verify_quarantine_in_effect(
             f"{receipt['quarantine_root']}"
         )
     return receipt
+
+
+def verify_quarantine_integrity(
+    *, receipt_path: str | Path = "tournament/cup20/quarantine-receipt.json"
+) -> dict[str, Any]:
+    """Assert that the quarantined holdout is byte-for-byte what left the working tree.
+
+    :func:`verify_quarantine_in_effect` answers "is it gone". This answers "is it intact", which is
+    the question the research phase actually depends on. The two are not the same question and a
+    check that answers the first while being described as answering the second is worse than no
+    check at all, because it stops the organiser looking.
+
+    Timing is the whole point of doing this now rather than at restore. ``restore_holdout`` already
+    refuses a tampered tree, but restore happens after the last team has finished: corruption found
+    there is corruption found too late to do anything but void the tournament. The research phase
+    runs for months, so this is the check that catches it while a re-freeze, a re-acquisition or a
+    re-start is still possible.
+
+    Four layers, in cost order, each of which can fail alone:
+
+    1. **absence** -- :func:`verify_quarantine_in_effect`, so a tree that came back into the working
+       tree is reported as that rather than as a digest match against a copy nobody is reading;
+    2. **whole-tree bundle digests**, one per tree, against the values the receipt recorded at
+       quarantine time. This is the only layer that sees the acquisition snapshot at all (it has no
+       manifest of its own) and the only one that sees a file ADDED to or REMOVED from either tree
+       -- a manifest digest over five named parquet files is blind to both;
+    3. **the full activation record**, with the sealed root read at the quarantine location. This
+       re-checks the sealed snapshot's own manifest against the digest bound before any team
+       started -- not against the receipt, which was written later -- and it is the only layer that
+       covers the seven authorities that are in neither tree (charter, config, implementation,
+       dependency lock, IS manifest, pure-crypto audit, test output);
+    4. **the canary token file**, which sits at the quarantine ROOT and is therefore inside neither
+       tree and covered by neither bundle digest. If it has drifted, check 4 of the integrity review
+       scans every team workspace for the wrong string and proves nothing while looking clean.
+
+    The canary file *inside* the sealed tree is deliberately not re-checked here: it is one of the
+    files layer 2 hashes, so a separate assertion over it could never fail on its own, and a check
+    that cannot fail independently is decoration.
+
+    Returns what it verified, so a caller can print evidence rather than a bare "OK".
+    """
+    receipt = verify_quarantine_in_effect(receipt_path=receipt_path)
+
+    observed: dict[str, str] = {}
+    for name, entry in sorted(receipt["trees"].items()):
+        source = Path(entry["quarantine_path"])
+        digest = bundle_digest(source)
+        if digest != entry["bundle_sha256"]:
+            raise ValueError(
+                f"QUARANTINE INTEGRITY FAILURE: the quarantined {name} tree at {source} does not "
+                f"match the digest recorded when it was quarantined (expected "
+                f"{entry['bundle_sha256']}, found {digest}). The holdout was modified while out of "
+                "the working tree. Stop: no result computed against it is valid, and restoring it "
+                "would put modified data back in every team's reach."
+            )
+        observed[name] = digest
+
+    activation_record = receipt["activation_record_path"]
+    record = verify_activation(
+        activation_record,
+        sealed_root_override=Path(receipt["trees"][SEALED_TREE]["quarantine_path"]),
+    )
+    if record["sealed_manifest_sha256"] != receipt["sealed_manifest_sha256"]:
+        raise ValueError(
+            f"QUARANTINE INTEGRITY FAILURE: the activation record {activation_record} binds sealed "
+            f"manifest {record['sealed_manifest_sha256']} but the quarantine receipt "
+            f"{receipt_path} was written against {receipt['sealed_manifest_sha256']}. The receipt "
+            "and the activation record describe two different holdouts."
+        )
+
+    token = read_canary_token(receipt_path=receipt_path)
+
+    return {
+        "quarantine_root": receipt["quarantine_root"],
+        "activation_record_path": activation_record,
+        "sealed_manifest_sha256": record["sealed_manifest_sha256"],
+        "bundle_sha256": observed,
+        "canary_token_length": len(token),
+    }
 
 
 def verify_quarantine_covered_research(

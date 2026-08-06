@@ -11,6 +11,7 @@ none of them can pass by accident on a scanner that is merely the old one under 
 import pytest
 
 from crypto_trade.cup20.archive import (
+    _MAX_CONTENT_SCAN_BYTES,
     scan_for_blindness_violations,
     scan_workspace_for_blindness_violations,
 )
@@ -210,3 +211,56 @@ def test_the_scan_reports_the_resolved_root_it_actually_walked(tmp_path):
     _workspace(tmp_path)
     scan = scan_workspace_for_blindness_violations(tmp_path, team_id="team-01")
     assert scan.root == str(tmp_path.resolve())
+
+
+# --- containment: what makes check 5 being weaker than check 4 acceptable -------------------------
+#
+# INTEGRITY-REVIEW.md check 5 runs `scan_for_blindness_violations` over each nominated candidate,
+# and that surface is weaker than check 4's in three specific ways: it never matches the canary
+# token by value, it stops reading a file's content at 256 KiB without saying which files it
+# skipped, and it excludes __pycache__. The review states those gaps and then argues they are
+# closed because every nominated candidate sits INSIDE the team directory check 4 walks. That
+# argument is load-bearing, so it is asserted here rather than left as prose: each test below plants
+# evidence inside `candidates/c1/`, shows the archive scan of that candidate reports nothing, and
+# shows the workspace scan of the team root reports it.
+
+
+def test_a_token_inside_a_nominated_candidate_is_invisible_to_the_archive_scan(tmp_path):
+    candidate = _workspace(tmp_path)
+    (candidate / "notes.md").write_text(f"cup20-holdout-canary:{TOKEN}\n")
+
+    # scan_for_blindness_violations takes no canary_tokens argument at all -- check 5 structurally
+    # cannot produce the strongest evidence the review has.
+    assert scan_for_blindness_violations(candidate, team_id="team-01") == ()
+
+    scan = scan_workspace_for_blindness_violations(
+        tmp_path, team_id="team-01", canary_tokens=(TOKEN,)
+    )
+    assert "candidates/c1/notes.md:1:sealed-canary-token" in scan.violations
+
+
+def test_content_past_the_archive_cap_inside_a_candidate_is_read_by_the_workspace_scan(tmp_path):
+    candidate = _workspace(tmp_path)
+    # Just past the archive scan's cap, which it skips silently -- there is no `unscanned` list on
+    # that surface, so nothing tells the reviewer the content went unread.
+    padded = candidate / "weights.json"
+    padded.write_text(" " * (_MAX_CONTENT_SCAN_BYTES + 1) + "\ndata/cup20/sealed\n")
+    assert padded.stat().st_size > _MAX_CONTENT_SCAN_BYTES
+    assert scan_for_blindness_violations(candidate, team_id="team-01") == ()
+
+    scan = scan_workspace_for_blindness_violations(tmp_path, team_id="team-01")
+    assert "candidates/c1/weights.json:2:data/cup20/sealed" in scan.violations
+    assert scan.unscanned == ()  # comfortably under the workspace scan's 8 MiB cap
+
+
+def test_pycache_inside_a_nominated_candidate_is_read_by_the_workspace_scan(tmp_path):
+    candidate = _workspace(tmp_path)
+    cache = candidate / "__pycache__"
+    cache.mkdir()
+    (cache / "strategy.cpython-313.pyc").write_bytes(
+        b"\x00\x0c\r\n\x00\x00data/cup20/acquisition\x00\xff"
+    )
+    assert scan_for_blindness_violations(candidate, team_id="team-01") == ()
+
+    scan = scan_workspace_for_blindness_violations(tmp_path, team_id="team-01")
+    assert any("data/cup20/acquisition" in violation for violation in scan.violations)

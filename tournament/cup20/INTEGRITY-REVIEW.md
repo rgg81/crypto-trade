@@ -24,10 +24,12 @@ You need two things that are not in the repository:
 | the quarantine root | wherever `quarantine-receipt.json` says, outside the repo | it holds the sealed bytes |
 | the canary token | `<quarantine-root>/canary-token.txt` | a token in the repo is a token a team can grep for and avoid |
 
-If you cannot reach the quarantine root, checks 3, 4 (token half) and 7 cannot be completed, and
-the review is **incomplete**, not passed.
+If you cannot reach the quarantine root, check 3a and the token half of check 4 cannot be
+completed, and the review is **incomplete**, not passed. (Checks 3 and 7 do not need it: check 3
+reads the journal and the committed receipt, and check 7 reads the restored sealed tree and the
+access baseline, both of which are in the working tree by the time it runs.)
 
-The whole review runs in one command:
+Checks 1–7 run in one command:
 
 ```
 uv run python scripts/cup20_integrity_review.py
@@ -36,6 +38,12 @@ uv run python scripts/cup20_integrity_review.py
 It prints `PASS` / `FAIL` / `SKIP` per check and exits `0` only when every check passed. `SKIP` is
 not a pass — it names an artifact that was missing. Run the individual checks below when you need
 to see why, or when you are auditing the driver itself rather than trusting it.
+
+**Check 3a is not in the driver and cannot be**: it verifies the holdout *while it is still in
+quarantine*, and by the time this review runs the holdout has been restored and the quarantine
+root is empty. It is a phase-1 check, run periodically during the research phase, and its results
+belong in the tournament record alongside this one. A review that never ran it has no evidence
+about the holdout's bytes for the whole research window — only about where they were.
 
 Before checks 4–6 it prints `4-6. there is something to scan`, with the team and nomination counts.
 Read that line. Checks 4–6 loop over teams and candidates, and an empty loop emits nothing at all —
@@ -53,9 +61,12 @@ r = verify_activation('tournament/cup20/activation-freeze.json')
 print(r['sealed_manifest_sha256'])"
 ```
 
-**Pass:** prints the digest and exits 0. That digest must equal `sealed_manifest_sha256` in
-`tournament/cup20/activation-freeze.json` as committed — read it out of git history, not out of the
-working file, if there is any doubt about the file itself:
+**Pass:** exits 0. *That* is the check — `verify_activation` recomputes all eight authorities from
+the files on disk and raises on the first that has moved. The printed digest is not evidence on its
+own: `verify_activation` returns the frozen record, so the value printed is read out of
+`activation-freeze.json`, not recomputed. What it is good for is the one comparison the function
+cannot make for you — against the record as **committed**, which is what catches a working file
+edited to match a tree that drifted:
 
 ```
 git show HEAD:tournament/cup20/activation-freeze.json | grep sealed_manifest
@@ -66,9 +77,17 @@ bound authorities moved. If the label is `sealed snapshot`, the holdout is not t
 tournament was activated against and **no result computed on it is valid**. Stop. Do not publish.
 
 **While the holdout is still quarantined** this check fails on a missing path rather than on drift,
-because the sealed root is not in the working tree. That is expected during phase 1; use
-`scripts/cup20_quarantine.py verify` instead (check 3), which verifies the same digest at the
-quarantine location.
+because the sealed root is not in the working tree. That is expected during phase 1. The stand-in
+for that window is
+
+```
+uv run python scripts/cup20_quarantine.py verify
+```
+
+which runs this same `verify_activation` over all eight authorities with the sealed root read at
+the quarantine location, and then adds the two whole-tree bundle digests the receipt recorded.
+See check 3. Note that it is the plain `verify` that does this; `verify --fast` is an absence test
+that reads no bytes at all and prints a paragraph saying so.
 
 ---
 
@@ -126,20 +145,60 @@ this true breaks check 2.
 | `holdout_restored is at sequence N, before the last accepted trial` | the holdout came back while research was still running |
 | `expected exactly one holdout_quarantined record, found 0` | quarantine was never journalled; custody is unproven even if it happened |
 | `expected exactly one holdout_quarantined record, found 2` | two custody episodes; the gap between them is unaccounted for |
+| `expected at most one holdout_restored record, found 2` | two restores; the holdout came back twice and the second episode is unaccounted for |
 | `records no trial_accepted events` | this is not the journal the review needs — you are pointed at the wrong file |
 | `different canary tokens` | the committed receipt and the journalled event describe two different quarantines |
 
 Any of these is a **finding about the tournament**, not about the tool. Record it and stop.
 
-Separately, while the research phase is still running, the live form of this check is:
+### 3a. The live form, run repeatedly while the research phase is still running
+
+The ordering check above answers "was the holdout out of the tree". This one answers "and is what
+is sitting in quarantine still the holdout". They are different questions, and the research phase
+is months long, so run this periodically rather than only at the end: a corruption first noticed at
+restore is noticed after every team has finished, when the only remaining option is to void the
+tournament.
 
 ```
 uv run python scripts/cup20_quarantine.py verify
 ```
 
-**Pass:** `quarantine IS in effect: neither tree is reachable from the working tree`.
-**Fail:** `quarantine is NOT in effect: ['sealed'] are present in the working tree at [...]` —
-someone put the holdout back. Find out who, and when, before any team continues.
+**Pass:** four things, printed in this order:
+
+```
+quarantine IS in effect: neither tree is reachable from the working tree
+  acquisition  <digest>  matches the receipt
+  sealed       <digest>  matches the receipt
+  sealed manifest <digest>  matches tournament/cup20/activation-freeze.json, read at the
+                            quarantine location
+  canary token matches the receipt, so the review scans for the right string
+
+quarantine VERIFIED: the quarantined bytes are the bytes that left the tree
+```
+
+Each line is a layer that fails on its own:
+
+| Layer | What only it can catch |
+|---|---|
+| absence | a tree back in the working tree, where a team process can name it |
+| the two bundle digests | any byte changed, any file added or removed, in **either** tree — this is the only layer that covers the acquisition snapshot at all, since it has no manifest of its own, and the only one that can see the canary being deleted |
+| the activation record, sealed root read from quarantine | the seven authorities that are in neither tree (charter, config, implementation, dependency lock, IS manifest, pure-crypto audit, test output), and the sealed manifest measured against what activation bound rather than against the receipt, which was written later |
+| the canary token | a token file that has drifted from the receipt — with which check 4 below would scan every workspace for a string that was never planted and report clean |
+
+**Fail:** any of
+
+| Message | Meaning |
+|---|---|
+| `quarantine is NOT in effect: ['sealed'] are present in the working tree at [...]` | someone put the holdout back. Find out who, and when, before any team continues |
+| `QUARANTINE INTEGRITY FAILURE: the quarantined <tree> ... does not match the digest recorded when it was quarantined` | the holdout was modified while out of the working tree. Stop; no result computed against it is valid, and restoring it would put modified data back in every team's reach |
+| `activation authority changed: <label>` | read as check 1 — the named authority drifted while the holdout was away |
+| `QUARANTINE INTEGRITY FAILURE: ... two different holdouts` | the receipt and the activation record no longer describe the same sealed snapshot |
+| `the token at ... does not match the receipt's canary_token_sha256` | the planted token cannot be used as evidence; check 4's token half is unavailable until this is explained |
+
+**`verify --fast`** exists for a scripted poll and is **not** this check. It tests only that the
+trees are absent from the working tree and present at the quarantine root, reads no bytes, and
+prints a `NOT CHECKED (--fast)` paragraph listing what it did not look at. Do not record a `--fast`
+run as evidence that the holdout is intact; it is not evidence about the holdout's bytes at all.
 
 ---
 
@@ -154,16 +213,23 @@ reads the **whole workspace**.
 uv run python -c "
 from pathlib import Path
 from crypto_trade.cup20.archive import scan_workspace_for_blindness_violations
-from crypto_trade.cup20.quarantine import read_canary_token
-token = read_canary_token(receipt_path='tournament/cup20/quarantine-receipt.json')
+from crypto_trade.cup20.quarantine import load_receipt, read_canary_token
+receipt = 'tournament/cup20/quarantine-receipt.json'
+token = read_canary_token(receipt_path=receipt)
+root = Path(load_receipt(receipt)['quarantine_root']).name
 for team in sorted(Path('tournament/cup20/teams').glob('team-*')):
     scan = scan_workspace_for_blindness_violations(
-        team, team_id=team.name, canary_tokens=(token,))
+        team, team_id=team.name, canary_tokens=(token,), extra_patterns=(root,))
     print(team.name, scan.files_scanned, 'files',
           len(scan.violations), 'violations', len(scan.unscanned), 'unread')
     for v in scan.violations: print('   ', v)
     for u in scan.unscanned: print('    UNREAD', u)"
 ```
+
+`extra_patterns` carries the quarantine root's directory name, which cannot be frozen into
+`FORBIDDEN_PATTERNS` because it is chosen when the tournament starts. The driver passes it; a
+manual run that omits it is strictly weaker than the driver and will not flag a team that named
+the quarantine path.
 
 **What is scanned:** every regular file under the team's directory. No extension allowlist, no
 directory exclusions — `__pycache__` and compiled `.pyc` files included, because a team can delete
@@ -202,8 +268,10 @@ research phase; this check covers everything after it.
 
 ## 5. Every nomination's frozen archive scans clean
 
-Narrower surface, same patterns — this is the gate the charter states in §5 layer 3, re-run as
-evidence rather than as a gate.
+This is the gate the charter states in §5 layer 3, re-run as evidence rather than as a gate. It is
+deliberately the *same function the gate runs*, so what it reports is what the gate would have
+reported — which also means it is **weaker than check 4 in three specific ways**, listed below
+rather than left to be discovered.
 
 ```
 uv run python -c "
@@ -216,8 +284,32 @@ for team in sorted(Path('tournament/cup20/teams').glob('team-*')):
 ```
 
 **Pass:** `clean` for every nominated candidate.
-**Fail:** any violation tuple. Same reading as check 4. A violation here is a **pre-flight
+**Fail:** any violation tuple, read as `path:line:what-matched`. A violation here is a **pre-flight
 disqualification** under charter §5 layer 3, not a discussion.
+
+**What this check does NOT do, though check 4 does:**
+
+- **It never matches the canary token.** `scan_for_blindness_violations` takes no `canary_tokens`
+  argument and cannot emit `sealed-canary-token` — the single strongest piece of evidence this
+  review can produce is structurally unavailable on this surface. The `HOLDOUT-CANARY-DO-NOT-READ`
+  filename pattern still matches, but a team that copied the token's *value* out of the canary
+  and left the filename behind is invisible here.
+- **It never matches the quarantine root's name**, which is only known at review time.
+- **It stops reading a file's content at 256 KiB and does not say which files it skipped.** There
+  is no `unscanned` list on this surface, so a large file's content going unread is silent. Check
+  4 has the same kind of cap at 8 MiB but reports every file it hit — that report is the only
+  place a too-large file is disclosed.
+
+Also unlike check 4, `__pycache__` is excluded here as derived output.
+
+**Why the review as a whole is still sound.** Every nominated candidate lives at
+`tournament/cup20/teams/team-NN/candidates/<name>/`, which is *inside* the directory check 4 scans.
+So every file this check reads, check 4 also reads — with the token matched by value, with the
+quarantine root's name added, with `__pycache__` included, with a 32× larger content cap, and with
+anything still too large named under `UNREAD`. Check 4's surface strictly contains this one; that
+containment is what closes the three gaps above, and it is asserted by
+`tests/cup20/test_workspace_scan.py`, not merely argued here. If check 4 is skipped or reports
+`UNREAD`, these gaps are open and this check does not close them.
 
 ---
 
@@ -273,6 +365,14 @@ scoring run touched. Note that scoring the finalists reads the sealed parquet fi
 phase-3 run leaves most of them in `accessed` — the informative case is `accessed` being non-empty
 *before* the organiser's scoring run, or the canary file appearing in it at any point.
 
+**The driver cannot make that judgement, and does not pretend to.** `PASS 7` from
+`cup20_integrity_review.py` means exactly three things: the mount records access times, no file
+appeared in the sealed tree, and none vanished. It prints the `accessed` list and passes whatever
+is in it, because deciding whether a given read was the organiser's own is not a decision a script
+can make. Read the list yourself; a `PASS` here with an unexplained name in `accessed` is a finding
+the driver has handed you, not one it has cleared. Note also that check 1 opens every sealed parquet
+file, so running this review at all puts them in `accessed`.
+
 **Fail:** `appeared` or `vanished` is non-empty. A file added to or removed from the sealed tree
 after arming is a more serious finding than a read; it means the tree's membership changed while it
 was back in the working tree.
@@ -317,6 +417,9 @@ Write the result into the tournament record with the same honesty the charter us
 - which checks passed, with the numbers they printed;
 - which were skipped and why;
 - anything that failed, verbatim;
+- **when check 3a was last run before restore, and what it printed.** It is the only evidence that
+  the quarantined bytes were still the holdout's bytes during the research phase; the checks above
+  run after restore and cannot recover it. If it was never run, say that instead of implying it;
 - the sentence that bounds the claim: **custody is demonstrated for the research phase; phase 3
   rests on detection, and the residual in charter §14.8 is not closed by any check above.**
 

@@ -325,6 +325,261 @@ def test_verify_quarantine_in_effect_raises_when_the_quarantined_tree_vanished(t
         q.verify_quarantine_in_effect(receipt_path=tree.receipt)
 
 
+# --- verify_quarantine_integrity ------------------------------------------------------------------
+#
+# The defect this section exists for: the integrity review told the organiser that the live
+# quarantine check "verifies the same digest at the quarantine location". It did not -- it checked
+# only that the trees were absent from the working tree, so a byte appended to a quarantined file
+# passed silently. Every case below therefore pairs the tamper with an assertion about which layer
+# catches it, and the first one asserts explicitly that the absence-only check does NOT.
+
+
+def _tampered_sealed_bar(tree) -> Path:
+    """Append one null byte to a quarantined sealed file -- the reported failure, verbatim."""
+    target = tree.quarantine / "sealed" / "bars.parquet"
+    target.write_bytes(target.read_bytes() + b"\x00")
+    return target
+
+
+def test_integrity_verify_passes_on_an_untouched_quarantine(tree):
+    # Paired with every tamper case below; on its own an exit-0 proves nothing at all.
+    receipt = tree.quarantine_now()
+    report = q.verify_quarantine_integrity(receipt_path=tree.receipt)
+    assert report["bundle_sha256"] == {
+        name: entry["bundle_sha256"] for name, entry in receipt["trees"].items()
+    }
+    assert report["sealed_manifest_sha256"] == tree.record["sealed_manifest_sha256"]
+    assert report["canary_token_length"] == len(_TOKEN)
+
+
+def test_integrity_verify_catches_a_byte_appended_to_a_quarantined_sealed_file(tree):
+    # The mutation: a `verify` that tests absence and calls it integrity. The absence-only check is
+    # asserted to pass here, so this test fails the moment the two are conflated again.
+    tree.quarantine_now()
+    _tampered_sealed_bar(tree)
+
+    assert q.verify_quarantine_in_effect(receipt_path=tree.receipt)["quarantine_root"]
+
+    with pytest.raises(ValueError, match="QUARANTINE INTEGRITY FAILURE: the quarantined sealed"):
+        q.verify_quarantine_integrity(receipt_path=tree.receipt)
+
+
+def test_integrity_verify_catches_a_modified_acquisition_file(tree):
+    # The mutation: checking the sealed snapshot's manifest and stopping there. The acquisition
+    # tree has no manifest at all, so only the receipt's bundle digest can see this.
+    tree.quarantine_now()
+    (tree.quarantine / "acquisition" / "coverage.json").write_text('{"symbols": 3}\n')
+    with pytest.raises(
+        ValueError, match="QUARANTINE INTEGRITY FAILURE: the quarantined acquisition"
+    ):
+        q.verify_quarantine_integrity(receipt_path=tree.receipt)
+
+
+def test_integrity_verify_catches_a_file_added_to_the_quarantined_sealed_tree(tree):
+    # The mutation: verifying load_snapshot's manifest digest instead of the whole-tree bundle. The
+    # manifest covers five named parquet files and is blind to a sixth.
+    tree.quarantine_now()
+    (tree.quarantine / "sealed" / "extra.parquet").write_bytes(b"\x00\x01")
+    assert (
+        load_snapshot(tree.quarantine / "sealed").manifest_sha256
+        == tree.record["sealed_manifest_sha256"]
+    )
+    with pytest.raises(ValueError, match="QUARANTINE INTEGRITY FAILURE"):
+        q.verify_quarantine_integrity(receipt_path=tree.receipt)
+
+
+def test_integrity_verify_catches_the_canary_deleted_from_the_quarantined_sealed_tree(tree):
+    # Same mutation, removal direction -- and the load_snapshot assertion proves the manifest layer
+    # genuinely cannot see it, so this case is carried by the bundle digest alone.
+    tree.quarantine_now()
+    (tree.quarantine / "sealed" / q.CANARY_FILENAME).unlink()
+    assert (
+        load_snapshot(tree.quarantine / "sealed").manifest_sha256
+        == tree.record["sealed_manifest_sha256"]
+    )
+    with pytest.raises(ValueError, match="QUARANTINE INTEGRITY FAILURE"):
+        q.verify_quarantine_integrity(receipt_path=tree.receipt)
+
+
+def test_integrity_verify_catches_a_tree_that_came_back_into_the_working_tree(tree):
+    # The mutation: dropping the absence layer once the digest layers were added. A pristine copy in
+    # quarantine hashes clean while a second copy sits back in every team's reach.
+    tree.quarantine_now()
+    shutil.copytree(tree.quarantine / "sealed", tree.sealed_root)
+    with pytest.raises(ValueError, match="quarantine is NOT in effect"):
+        q.verify_quarantine_integrity(receipt_path=tree.receipt)
+
+
+def test_integrity_verify_catches_a_quarantined_tree_that_vanished(tree):
+    # The mutation: treating a missing tree as nothing to compare and passing -- a fail-open that
+    # would report the strongest possible verdict over an empty directory.
+    tree.quarantine_now()
+    shutil.rmtree(tree.quarantine / "acquisition")
+    with pytest.raises(ValueError, match="not verifiable"):
+        q.verify_quarantine_integrity(receipt_path=tree.receipt)
+
+
+def test_integrity_verify_catches_an_emptied_quarantined_tree(tree):
+    # A directory that still exists but holds nothing: the absence layer is satisfied, so only the
+    # bundle digest stands between an empty tree and a clean verdict.
+    tree.quarantine_now()
+    for path in (tree.quarantine / "acquisition").iterdir():
+        path.unlink()
+    with pytest.raises(ValueError, match="QUARANTINE INTEGRITY FAILURE"):
+        q.verify_quarantine_integrity(receipt_path=tree.receipt)
+
+
+def test_integrity_verify_catches_an_authority_that_drifted_while_the_holdout_was_away(tree):
+    # The mutation: comparing bundle digests only. The charter is in NEITHER tree, so no digest in
+    # the receipt covers it -- only re-verifying the whole activation record does.
+    tree.quarantine_now()
+    tree.charter.write_text("# rewritten while the holdout was away\n")
+    with pytest.raises(ValueError, match="activation authority changed: charter"):
+        q.verify_quarantine_integrity(receipt_path=tree.receipt)
+
+
+def test_integrity_verify_catches_a_swapped_sealed_snapshot_at_the_quarantine_location(tree):
+    # The layer the review's check 1 provides and the receipt cannot: the sealed manifest is
+    # compared against the value activation bound before any team started. Rewriting the receipt to
+    # match a swapped tree does not help, because the record is the authority here.
+    tree.quarantine_now()
+    target = tree.quarantine / "sealed" / "bars.parquet"
+    target.write_bytes(target.read_bytes() + b"\x00")
+    payload = json.loads(tree.receipt.read_text())
+    payload["trees"]["sealed"]["bundle_sha256"] = bundle_digest(tree.quarantine / "sealed")
+    tree.receipt.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    with pytest.raises(ValueError, match="sealed snapshot at .* does not match its own manifest"):
+        q.verify_quarantine_integrity(receipt_path=tree.receipt)
+
+
+def test_integrity_verify_catches_a_receipt_that_names_a_different_sealed_manifest(tree):
+    # The mutation: trusting the receipt's own claim about which holdout it describes. Both bundle
+    # digests still match and the activation record still verifies, so only the cross-comparison
+    # between the two artifacts can fire.
+    tree.quarantine_now()
+    payload = json.loads(tree.receipt.read_text())
+    payload["sealed_manifest_sha256"] = "0" * 64
+    tree.receipt.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    with pytest.raises(ValueError, match="two different holdouts"):
+        q.verify_quarantine_integrity(receipt_path=tree.receipt)
+
+
+def test_integrity_verify_catches_an_edited_canary_token_file(tree):
+    # The mutation: relying on the two bundle digests. The token file sits at the quarantine ROOT,
+    # inside neither tree, so both digests still match -- asserted here -- while the review would go
+    # on to scan every team workspace for a string that was never planted.
+    receipt = tree.quarantine_now()
+    (tree.quarantine / q.CANARY_TOKEN_FILENAME).write_text("b" * 64 + "\n")
+    for name, entry in receipt["trees"].items():
+        assert bundle_digest(entry["quarantine_path"]) == entry["bundle_sha256"], name
+    with pytest.raises(ValueError, match="does not match the receipt"):
+        q.verify_quarantine_integrity(receipt_path=tree.receipt)
+
+
+def test_integrity_verify_catches_a_deleted_canary_token_file(tree):
+    tree.quarantine_now()
+    (tree.quarantine / q.CANARY_TOKEN_FILENAME).unlink()
+    with pytest.raises(FileNotFoundError):
+        q.verify_quarantine_integrity(receipt_path=tree.receipt)
+
+
+def test_integrity_verify_reads_but_never_writes(tree):
+    # The mutation: an implementation that "repairs" a mismatch, or that moves a tree while
+    # checking it. Both the clean and the failing path must leave every byte and every path alone.
+    receipt = tree.quarantine_now()
+    before = {name: bundle_digest(e["quarantine_path"]) for name, e in receipt["trees"].items()}
+    q.verify_quarantine_integrity(receipt_path=tree.receipt)
+    _tampered_sealed_bar(tree)
+    tampered = bundle_digest(tree.quarantine / "sealed")
+    with pytest.raises(ValueError, match="QUARANTINE INTEGRITY FAILURE"):
+        q.verify_quarantine_integrity(receipt_path=tree.receipt)
+    assert bundle_digest(tree.quarantine / "acquisition") == before["acquisition"]
+    assert bundle_digest(tree.quarantine / "sealed") == tampered
+    assert not tree.sealed_root.exists()
+    assert not tree.acquisition_root.exists()
+
+
+def test_the_fast_disclaimer_names_what_the_absence_check_cannot_see():
+    # Not a wording test: the --fast branch is the one path that still reports a clean quarantine
+    # without reading a byte, and the sentence shown next to that result is the only thing standing
+    # between it and the exact misreading this section was written to fix.
+    text = q.FAST_VERIFY_DISCLAIMER.lower()
+    assert "not checked" in text
+    assert "--fast" in text
+    for missed in ("modified", "deleted", "canary token"):
+        assert missed in text, missed
+
+
+# --- the command an organiser actually types ------------------------------------------------------
+#
+# The library function being right is not the fix. The integrity review names a COMMAND, and the
+# defect was that the command ran the weaker function. These drive scripts/cup20_quarantine.py so a
+# future change of default is caught here rather than by someone reading the runbook in month four.
+
+
+def _cli():
+    import importlib.util
+
+    path = REPO_ROOT / "scripts" / "cup20_quarantine.py"
+    spec = importlib.util.spec_from_file_location("cup20_quarantine_cli", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _run_cli(module, tree, monkeypatch, *argv):
+    monkeypatch.setattr(
+        module,
+        "_paths",
+        lambda: {
+            "activation": str(tree.activation),
+            "journal": str(tree.journal),
+            "selection_freeze": str(tree.freeze),
+            "sealed_root": str(tree.sealed_root),
+            "receipt": str(tree.receipt),
+            "restore_stamp": str(tree.stamp),
+            "baseline": str(tree.baseline),
+        },
+    )
+    monkeypatch.setattr("sys.argv", ["cup20_quarantine.py", *argv])
+    module.main()
+
+
+def test_the_verify_command_reads_the_quarantined_bytes_by_default(tree, monkeypatch, capsys):
+    receipt = tree.quarantine_now()
+    _run_cli(_cli(), tree, monkeypatch, "verify")
+    out = capsys.readouterr().out
+    assert "quarantine VERIFIED" in out
+    for entry in receipt["trees"].values():
+        assert entry["bundle_sha256"] in out
+    assert tree.record["sealed_manifest_sha256"] in out
+
+
+def test_the_verify_command_fails_loudly_on_a_tampered_quarantine(tree, monkeypatch):
+    # The exact reported failure, driven through the command the runbook names: one null byte
+    # appended to a quarantined sealed file used to leave `verify` printing success and exiting 0.
+    tree.quarantine_now()
+    _tampered_sealed_bar(tree)
+    with pytest.raises(ValueError, match="QUARANTINE INTEGRITY FAILURE"):
+        _run_cli(_cli(), tree, monkeypatch, "verify")
+
+
+def test_the_fast_flag_passes_on_a_tampered_quarantine_and_says_it_did_not_look(
+    tree, monkeypatch, capsys
+):
+    # --fast keeps the old behaviour on purpose, so this asserts the honest half: it still reports
+    # the tampered quarantine as "in effect", and the disclaimer that this proves nothing about the
+    # bytes is printed with it. Remove the disclaimer and this test fails.
+    tree.quarantine_now()
+    _tampered_sealed_bar(tree)
+    _run_cli(_cli(), tree, monkeypatch, "verify", "--fast")
+    out = capsys.readouterr().out
+    assert "quarantine IS in effect" in out
+    assert q.FAST_VERIFY_DISCLAIMER in out
+    assert "VERIFIED" not in out
+
+
 # --- the receipt's own shape --------------------------------------------------------------------
 
 
