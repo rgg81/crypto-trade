@@ -26,11 +26,35 @@ from crypto_trade.cup20.metrics import (
     window_metrics,
 )
 from crypto_trade.cup20.report import atomic_release, build_packet, write_manifest
-from crypto_trade.cup20.runner import CandidateRun
-from crypto_trade.tournament.engine_v2 import EvaluationResult
+from crypto_trade.cup20.runner import (
+    STAGE_EXECUTED,
+    STAGE_REQUESTED,
+    CandidateRun,
+    exposure_cap_trim,
+)
+from crypto_trade.tournament.engine_v2 import EvaluationResult, EvaluatorConfig
+from crypto_trade.tournament.protocol import REBALANCE_INSTRUCTION_COLUMN
 
 IS_START = pd.Timestamp("2020-08-01T00:00:00Z")
 IS_END = pd.Timestamp("2024-08-01T00:00:00Z")
+
+# The packet discloses what the section 4 caps did, so these fixtures carry a real trim rather
+# than an empty one: ``_REQUESTED`` asks for 0.60/-0.10 against a 0.20 per-symbol cap at its first
+# boundary and sits inside every cap at its second, so the summary that reaches ``summary.json``
+# has both a trimmed and an untrimmed boundary to count.
+_CAP_CONFIG = EvaluatorConfig(
+    max_gross_exposure=1.0, max_abs_net_exposure=1.0, max_symbol_exposure=0.20
+)
+_REQUESTED = pd.DataFrame(
+    {
+        "AUSDT": [0.60, 0.10],
+        "BUSDT": [-0.10, -0.10],
+        REBALANCE_INSTRUCTION_COLUMN: [True, True],
+    },
+    index=pd.date_range("2020-08-01T00:00:00Z", periods=2, freq="8h"),
+)
+_REQUESTED_TRIM = exposure_cap_trim(_REQUESTED, _CAP_CONFIG, stage=STAGE_REQUESTED)
+_EXECUTED_TRIM = exposure_cap_trim(_REQUESTED, _CAP_CONFIG, stage=STAGE_EXECUTED)
 
 
 def _run():
@@ -55,8 +79,11 @@ def _run():
     events = pd.DataFrame({"event_type": ["trade"] * 600, "notional": [10.0] * 600})
     result = EvaluationResult(frame, pd.DataFrame(), events)
     return CandidateRun(
+        requested_targets=_REQUESTED,
         targets=pd.DataFrame(),
         scaled_targets=pd.DataFrame(),
+        requested_trim=_REQUESTED_TRIM,
+        executed_trim=_EXECUTED_TRIM,
         risk_scalars=pd.Series(dtype=float),
         unscaled=result,
         results={1: result, 2: result, 3: result},
@@ -95,8 +122,11 @@ def _result(net, *, turnover=0.01, events=None):
 def _candidate_run(results, *, risk_scalars=None):
     any_result = results[next(iter(results))] if results else _result([0.001] * 10)
     return CandidateRun(
+        requested_targets=_REQUESTED,
         targets=pd.DataFrame(),
         scaled_targets=pd.DataFrame(),
+        requested_trim=_REQUESTED_TRIM,
+        executed_trim=_EXECUTED_TRIM,
         risk_scalars=pd.Series(dtype=float) if risk_scalars is None else risk_scalars,
         unscaled=any_result,
         results=results,
@@ -268,6 +298,37 @@ def test_packet_risk_scalar_summary_matches_independent_computation(tmp_path):
         "minimum": 0.2,
         "maximum": 3.0,
     }
+
+
+def test_packet_discloses_what_the_exposure_caps_did_to_the_book(tmp_path):
+    """Charter section 4's caps reduce rather than reject, so a candidate can be executed at
+    weights it did not ask for. The packet is where a team finds that out.
+
+    Mutation this catches: dropping the ``exposure_caps`` block, or reporting only one of the two
+    applications (the requested book and the executed book are trimmed at different points and can
+    differ, so a single number would hide half of it).
+    """
+    run = _run()
+    folds = is_folds(IS_START, IS_END)
+    packet = build_packet(
+        run, team_id="team-01", candidate_id="c1", folds=folds, identity={}, output_dir=tmp_path
+    )
+    assert set(packet["exposure_caps"]) == {"requested", "executed"}
+    requested = packet["exposure_caps"]["requested"]
+    assert requested["stage"] == STAGE_REQUESTED
+    assert packet["exposure_caps"]["executed"]["stage"] == STAGE_EXECUTED
+    # The fixture asks 0.60 on one name against a 0.20 cap at its first boundary and sits inside
+    # every cap at its second, so this is a real count and not a constant.
+    assert requested["boundaries"] == 2
+    assert requested["trimmed_boundaries"] == 1
+    assert requested["trimmed_fraction"] == pytest.approx(0.5)
+    assert requested["minimum_scale"] == pytest.approx(0.20 / 0.60)
+    assert requested["binding_cap_counts"] == {"gross": 0, "net": 0, "symbol": 1}
+    # And it survives the round trip through ``allow_nan=False`` serialisation.
+    assert (
+        json.loads((tmp_path / "summary.json").read_text())["exposure_caps"]
+        == (packet["exposure_caps"])
+    )
 
 
 def test_summary_json_on_disk_matches_the_returned_packet_exactly(tmp_path):

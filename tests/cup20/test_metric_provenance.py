@@ -22,7 +22,12 @@ import pytest
 from crypto_trade.cup20.adjudication import adjudicate_candidate, adjudicate_holdout_candidate
 from crypto_trade.cup20.config import IS_END, SEALED_END, SEALED_START, load_config
 from crypto_trade.cup20.metrics import holdout_folds, is_folds
-from crypto_trade.cup20.runner import CandidateRun
+from crypto_trade.cup20.runner import (
+    STAGE_EXECUTED,
+    STAGE_REQUESTED,
+    CandidateRun,
+    ExposureCapTrim,
+)
 from crypto_trade.cup20.scored_metrics import (
     ASSEMBLED_METRIC_KEYS,
     STAGE_HOLDOUT,
@@ -63,11 +68,28 @@ def _result(index: pd.DatetimeIndex, *, drift: float, seed: int) -> EvaluationRe
     return EvaluationResult(returns=returns, positions=pd.DataFrame(), events=events)
 
 
+def _empty_trim(stage: str) -> ExposureCapTrim:
+    """A no-targets trim, for fixtures that build ``CandidateRun`` from returns alone.
+
+    These fixtures never had a targets frame, so there is nothing for the section 4 caps to have
+    reduced. The real trims are exercised in ``test_runner.py`` and ``test_report.py``.
+    """
+    return ExposureCapTrim(
+        stage=stage,
+        scale=pd.Series(dtype=float),
+        binding_cap=pd.Series(dtype=object),
+        rebalance=pd.Series(dtype=bool),
+    )
+
+
 def _run(start: pd.Timestamp, end: pd.Timestamp, *, seed: int = 7) -> CandidateRun:
     index = pd.date_range(start, end, freq="8h", inclusive="left", name="timestamp")
     return CandidateRun(
+        requested_targets=pd.DataFrame(),
         targets=pd.DataFrame(),
         scaled_targets=pd.DataFrame(),
+        requested_trim=_empty_trim(STAGE_REQUESTED),
+        executed_trim=_empty_trim(STAGE_EXECUTED),
         risk_scalars=pd.Series(dtype=float),
         unscaled=_result(index, drift=0.0004, seed=seed),
         results={

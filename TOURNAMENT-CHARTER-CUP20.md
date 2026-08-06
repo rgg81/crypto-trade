@@ -126,7 +126,15 @@ Owned entirely by the organiser. No team code touches any of it.
 - **Participation:** per-symbol executed notional capped as a fraction of the bar's traded volume.
 - **Caps:** gross ≤ 1.0× equity — the evaluator is unlevered by construction, which is also the
   honest setting for a book headed to a real paper desk; per-symbol |weight| ≤ 0.20 of equity.
-  Applied after the common risk unit.
+  **Applied by reduction, never by rejection**, at **both** ends of the common risk unit: to the
+  team's own normalised book before the reference pass, and again to the executed weights after the
+  scalar. Once is not enough in either direction — the reference pass evaluates the team's own book
+  and would reject a concentrated one before any scalar exists, and the scalar reaches 3.0, so a
+  book capped only before it is over the caps again after it. Each application is **one uniform
+  per-boundary scale**, so it never redistributes the trimmed weight and never raises exposure:
+  four equal names run at 0.20 each and 0.80 gross rather than being renormalised back to 1.0, and
+  a book asking 0.90 of one name still executes at 0.20. Every reduction is disclosed per run
+  (§6).
 - **Solvency:** equity must remain finite and strictly positive; a breach is terminal for the run.
 
 ## 5. Blindness — physical custody first, then four checked layers
@@ -236,10 +244,10 @@ The second produces the *executed book*, on which every floor and every score is
 **Pass 1 — the reference book.**
 
 1. Team returns raw target weights. The evaluator normalises them to unit gross
-   (`Σ|w| = 1`), preserving relative sizing and net exposure.
-2. The normalised targets are evaluated once, at base cost, with the team's own declared risk
-   policy applied (volatility target, drawdown brakes, position stops, time stops, turnover
-   limits, side scaling).
+   (`Σ|w| = 1`), preserving relative sizing and net exposure. This is the **requested** book.
+2. The requested book is reduced by one uniform per-boundary scale until the §4 caps hold, and the
+   result is evaluated once, at base cost, with the team's own declared risk policy applied
+   (volatility target, drawdown brakes, position stops, time stops, turnover limits, side scaling).
 3. **Common risk unit.** Let `σ_t` be the annualised standard deviation of the reference book's
    **gross** bar returns over the trailing 90 days, using rows strictly before `t`. Gross returns
    are used deliberately: it removes any circularity between the scalar and the costs it induces,
@@ -252,7 +260,7 @@ The second produces the *executed book*, on which every floor and every score is
 
 **Pass 2 — the executed book.**
 
-4. Executed weights = `s_t × normalised weights`, then reduced by one uniform per-boundary scale
+4. Executed weights = `s_t × reference weights`, then reduced by one uniform per-boundary scale
    until the §4 gross, net and per-symbol caps hold. The caps *reduce*; they never reject a run
    and never lever a book up. The participation cap is applied by the evaluator at fill time.
 5. The declared risk policy is applied again inside this pass, against **this** book's state, and
@@ -283,13 +291,43 @@ declaration and the common unit disagree about size, the common unit wins. Teams
 risk policy as *shape* — which symbols, which side, when to stop out, how fast to turn over — and
 not as a claim on the book's overall scale.
 
+**Why the caps run at both ends, and why they never redistribute.** Step 2 caps the team's own book
+and step 4 caps the organiser's. Neither alone is enough: the reference pass evaluates the
+requested weights, so a book concentrated in fewer than five names would be rejected there before
+`s_t` existed, and `s_t` reaches 3.0, so a book capped only before the scalar is over the caps
+again after it. Capping the reference book does not tilt the risk unit, because the risk unit is
+scale-invariant — a uniform trim `c` scales the reference book's gross returns by `c`, so `σ_t`
+scales by `c` and `s_t = 0.10 / σ_t` by `1/c`. What the cap changes is the *shape* the caps allow,
+which is the point of having them.
+
+The trimmed weight is never pushed onto the other names. A four-name equal-weight book runs at 0.20
+each and **0.80 gross**, not renormalised back to 1.0: which names a book is in and in what
+proportion is the strategy's expressed intent, and scale is not something a team controls in this
+tournament anyway — the common risk unit sets it. Redistribution would also be an evasion surface
+rather than a courtesy, because it can *raise* a weight above what the team asked for and so let a
+team reach a shape it was not allowed to request. One uniform scale cannot: the executed book is
+always a positive multiple of the requested one, every pairwise ratio survives, and a book asking
+0.90 of a single name still executes at 0.20.
+
+**Trimming is disclosed, not silent.** Every run's packet carries an `exposure_caps` block with one
+entry per application (`requested`, `executed`), each recording how many boundaries carried a
+target, how many were reduced, the smallest and median reduction, and which of the three caps bound
+at each. A team can therefore tell that its intended weights were not its executed ones and by how
+much, and the organiser can see how far a candidate was reduced before comparing it with one that
+was not. A reduction below roughly 0.5 at the requested stage means the book is being executed at
+less than half the concentration it asked for; that is legal, and it is visible.
+
 Both the **normalised** book (official, all floors and scores) and the **raw** book (diagnostic)
 are reported for every run.
 
 **Interaction with the unlevered gross cap.** Because gross is capped at 1.0× equity (§4), the
 scalar can always take a book *down* to the common target but cannot take a very-low-volatility
 book *up* past unit gross — step 4's cap reduces it back to unit gross rather than failing the
-run, so such a book is scored and then judged. It would realise less than the 10% target and
+run, so such a book is scored and then judged. The same is true, and more sharply, for a
+concentrated book: reduction-only caps mean a four-name book is executed at 0.80 gross and a
+single-name book at 0.20, so the risk unit has that much less room to reach the 10% target before
+the cap stops it. Such a book is scored and then met by exactly the same 0.06 realised-volatility
+floor below — it is not rejected for being concentrated, and it is not excused from being small. It would realise less than the 10% target and
 collect an unearned drawdown advantage in the one contest this tournament ranks on. Two things
 close that hole rather than one: realised annualised volatility is a **disclosed diagnostic on
 every run**, and a candidate whose neighbourhood-median realised volatility falls below **0.06**
@@ -707,7 +745,19 @@ as a valid submission.
    deliberate consequence of levelling risk before comparing drawdowns, and it is disclosed rather
    than mitigated: a strategy whose edge depends on running at its own chosen scale is not one this
    tournament can rank.
-7. Blindness is enforced by the operating system only during quarantine (§5, layer 0). Phase 3
+7. A concentrated book is evaluated, but it is not evaluated on equal terms, and the reason is
+   arithmetic rather than a judgement about concentration. The §4 caps reduce and never
+   redistribute, so a four-name equal-weight book executes at 0.80 gross and a single-name book at
+   0.20. The common risk unit can lever back up to `s_t = 3.0` and no further, so a concentrated
+   book has correspondingly less room to reach the 10% annualised target before the gross cap stops
+   it, and a very concentrated one may fail the 0.06 realised-volatility floor (§7.3) on size alone
+   while a diversified book with the same per-name conviction clears it. The alternatives were
+   worse: rejecting such a book forbids a whole shape of strategy, and redistributing the trimmed
+   weight rewrites the strategy and hands teams a way to reach shapes they could not request.
+   Disclosed rather than mitigated — the `exposure_caps` block (§6) says exactly how far each
+   candidate was reduced, so a floor failure driven by trimming is visible as such and not
+   mistaken for a weak signal.
+8. Blindness is enforced by the operating system only during quarantine (§5, layer 0). Phase 3
    needs the sealed data readable, and every agent runs as one account, so during that window the
    controls are detection rather than prevention. The residual, precisely: a phase-3 process that
    reads one sealed parquet file directly, keeps nothing, and writes down only a conclusion leaves

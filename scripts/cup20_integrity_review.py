@@ -10,7 +10,7 @@ check FAILED. A SKIP is never silent and never counts as a pass: it names the ar
 missing, and the review document says which skips are legitimate at which phase.
 
 Nothing here is a substitute for reading the output. A clean run means the mechanical checks found
-nothing, which is a different claim from "nobody cheated" -- see charter section 14.7.
+nothing, which is a different claim from "nobody cheated" -- see charter section 14.8.
 """
 
 from __future__ import annotations

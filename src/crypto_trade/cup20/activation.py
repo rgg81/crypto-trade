@@ -115,15 +115,28 @@ def build_activation_record(
     # members: an attestation over 63 of 79 members would no longer be the attestation the charter
     # claims, and would not close the leak anyway, since the post-cutoff delisters are IS members.
     pure_crypto_audit: str | Path = "tournament/cup20/private/pure-crypto-audit.json",
+    *,
+    sealed_root_override: str | Path | None = None,
 ) -> dict[str, str]:
     """Hash-bind charter, config, implementation, data authorities, audit, lock and test output.
 
     ``config_path`` is loaded through ``load_config``, not merely hashed: an authority that fails
     its own validation is drift already, and freezing its digest would notarise the drift instead
     of catching it.
+
+    ``sealed_root_override`` changes only WHERE the sealed snapshot is read from; the record still
+    carries ``sealed_root`` as the path the contract names. It exists for the same window as
+    :func:`verify_activation`'s override -- once ``crypto_trade.cup20.quarantine`` has moved the
+    sealed tree out of the working tree, an amendment that has to be re-frozen cannot read it at
+    the contract path, and the alternative (recording the quarantine path) would write a location
+    into the record that stops existing the moment the holdout comes back. It cannot weaken the
+    freeze: the digest is still whatever the tree it points at actually hashes to, and
+    ``quarantine.verify_quarantine_in_effect`` is what establishes that nothing is sitting at the
+    contract path in its place.
     """
     is_manifest = _snapshot_digest(Path(is_root), "IS snapshot")
-    sealed_manifest = _snapshot_digest(Path(sealed_root), "sealed snapshot")
+    sealed_digest_root = Path(sealed_root if sealed_root_override is None else sealed_root_override)
+    sealed_manifest = _snapshot_digest(sealed_digest_root, "sealed snapshot")
     if is_manifest == sealed_manifest:
         # Two roots resolving to one snapshot means either the teams were handed the sealed window
         # or the holdout was handed the in-sample one. Refuse to notarise it.
@@ -192,11 +205,12 @@ def verify_activation(
         record["config_path"],
         record["charter_path"],
         record["is_root"],
-        record["sealed_root"] if sealed_root_override is None else sealed_root_override,
+        record["sealed_root"],
         record["test_output_path"],
         record["dependency_lock_path"],
         record["implementation_root"],
         record["pure_crypto_audit_path"],
+        sealed_root_override=sealed_root_override,
     )
     for key, label in _AUTHORITIES:
         if current[key] != record[key]:

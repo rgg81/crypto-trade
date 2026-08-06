@@ -128,15 +128,36 @@ none of it is yours to reimplement:
 - force exit at the last executable open on delisting, with no survivorship rescue;
 - per-symbol participation capped as a fraction of the bar's traded volume;
 - gross ≤ 1.0× equity (the book is unlevered by construction) and per-symbol |weight| ≤ 0.20.
-  These are applied *after* the common risk unit, by reduction. Your own normalised weights are a
-  different matter: a target row that breaches the per-symbol cap on its own is a breach of this
-  contract and **fails the run outright** rather than being trimmed, so a book concentrated in
-  fewer than five names will not evaluate at all;
+  These are applied **by reduction, never by rejection**, and applied twice: to your own normalised
+  book before the reference pass, and again to the executed weights after the common risk unit.
+  **Your weights may therefore be trimmed, and the trim is disclosed** — see the note below;
 - the **common risk unit**: your normalised targets are evaluated once with your declared risk
   policy applied to produce a *reference book*; the evaluator then scales your normalised weights
   by `clamp(0.10 / σ_t, 0.20, 3.0)`, where `σ_t` is the trailing-90-day annualised volatility of
   the reference book's gross bar returns using rows strictly before `t`, caps the result, and
   applies your risk policy again inside the pass it actually executes. See §6 of the charter.
+
+**Your intended weights may not be your executed weights, and you can check.** A book that
+concentrates is legal — plenty of mandates produce one, and a cross-sectional book on a 20-name
+universe concentrates whenever its filter is selective. It is not rejected; it is *reduced* until
+the caps hold, by one uniform per-boundary scale. Two things follow, and neither is hidden from
+you:
+
+- **The reduction is not redistributed.** Four equal names at unit gross is 0.25 each, so the book
+  executes at 0.20 each and **0.80 gross** — not renormalised back to 1.0. The trimmed 0.05 is not
+  pushed onto the other names, because which names you are in and in what proportion is your
+  strategy, not the organiser's to rewrite. Every pairwise ratio in your book survives exactly. A
+  book asking 0.90 of one name executes at 0.20 of it: the cap binds, it just binds by reduction.
+- **Every run's packet says how far you were trimmed.** `summary.json` carries an `exposure_caps`
+  block with one entry per application (`requested`, for your own book; `executed`, for after the
+  risk unit), each recording how many boundaries carried a target, how many were reduced, the
+  smallest and median reduction, and which cap bound. If `requested.minimum_scale` is 0.22, your
+  book ran at roughly a fifth of the concentration you asked for, and the number to reason about is
+  that one — not the weights you returned.
+
+Being trimmed is not a penalty in itself, but it is not free either: less gross means less realised
+volatility, and the 0.06 volatility floor below applies to a concentrated book exactly as it does
+to a diversified one. Charter §14.7 records that as a known limitation rather than a surprise.
 
 Three consequences of the risk unit worth internalising before you design anything:
 

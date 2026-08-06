@@ -57,6 +57,14 @@ def build_packet(
             "minimum": float(run.risk_scalars.min()) if run.risk_scalars.size else 0.0,
             "maximum": float(run.risk_scalars.max()) if run.risk_scalars.size else 0.0,
         },
+        # Charter section 4: the caps reduce rather than reject, so a book can be executed at
+        # weights it did not ask for. Trimming it and saying nothing would be its own dishonesty,
+        # so both applications are disclosed here -- ``requested`` is what the caps did to the
+        # team's own normalised book, ``executed`` what they did after the common risk unit.
+        "exposure_caps": {
+            "requested": run.requested_trim.summary(),
+            "executed": run.executed_trim.summary(),
+        },
         "artifact_sha256": artifacts,
     }
     # allow_nan=False: a non-finite metric must fail loudly here rather than silently emitting

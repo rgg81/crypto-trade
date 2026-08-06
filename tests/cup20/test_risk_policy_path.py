@@ -411,15 +411,18 @@ def test_a_frame_with_no_weight_columns_is_returned_unchanged():
     pd.testing.assert_frame_equal(apply_exposure_caps(targets, CONFIG), targets)
 
 
-def test_the_unscaled_reference_book_is_deliberately_not_capped():
-    """The asymmetry is the point, not an oversight.
+def test_the_reference_book_is_capped_too_so_a_breaching_team_book_still_runs():
+    """The asymmetry that used to be here is gone, and this is the test that used to pin it.
 
-    Section 4 puts the caps "after the common risk unit", so they belong to the executed weights.
-    ``s_t`` is the ORGANISER's multiplier and the organiser caps its own output; a team whose own
-    normalised weights breach the per-symbol cap has broken the execution contract and still gets
-    the evaluator's hard raise rather than a silent trim. Mutation this catches: applying the caps
-    to ``targets`` as well, which would convert that contract breach into a quiet rescale -- and
-    which this test detects because the run must still RAISE.
+    It previously asserted that a team whose own normalised weights breach the per-symbol cap gets
+    the evaluator's hard raise -- on the reasoning that ``s_t`` is the organiser's multiplier, so
+    the organiser caps only its own output. The organiser has ruled that wrong: section 4's caps
+    are execution policy that is APPLIED, and rejecting a legitimately concentrated book makes the
+    tournament silently forbid a whole shape of strategy. So the same fixture that had to raise now
+    has to run, at weights this test names.
+
+    Mutation this catches: reverting ``run_candidate`` to cap only after the common risk unit,
+    which puts ``_validate_weight_limits``' raise back in front of pass 1.
     """
     # The premise: the normalised weights this fixture produces really do breach the cap used here.
     normalised = normalise_unit_gross(
@@ -432,16 +435,24 @@ def test_the_unscaled_reference_book_is_deliberately_not_capped():
     assert normalised["AUSDT"].iloc[0] == pytest.approx(1.0 / len(SYMBOLS))
     assert normalised["AUSDT"].iloc[0] > too_tight.max_symbol_exposure
 
-    with pytest.raises(ValueError, match="symbol exposure"):
-        run_candidate(
-            ConstantLong(),
-            DRAWDOWN_SNAPSHOT,
-            decision_times=GRID,
-            seed=1,
-            config=too_tight,
-            risk_unit=RISK_UNIT,
-            risk_policy=BRAKE_POLICY,
-        )
+    run = run_candidate(
+        ConstantLong(),
+        DRAWDOWN_SNAPSHOT,
+        decision_times=GRID,
+        seed=1,
+        config=too_tight,
+        risk_unit=RISK_UNIT,
+        risk_policy=BRAKE_POLICY,
+    )
+    assert sorted(run.results) == [1, 2, 3]
+    # Reduced to the cap, uniformly, and reported as such -- not renormalised back to unit gross.
+    reference = run.targets.loc[GRID[0], WEIGHTS].astype(float)
+    assert list(reference) == pytest.approx([too_tight.max_symbol_exposure] * len(SYMBOLS))
+    assert reference.abs().sum() == pytest.approx(len(SYMBOLS) * too_tight.max_symbol_exposure)
+    assert run.requested_trim.summary()["trimmed_boundaries"] == len(GRID)
+    assert run.requested_trim.summary()["minimum_scale"] == pytest.approx(
+        too_tight.max_symbol_exposure * len(SYMBOLS)
+    )
 
 
 # --- where the declared policy actually bit ----------------------------------------------------

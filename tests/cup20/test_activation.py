@@ -368,3 +368,73 @@ def test_verify_activation_rejects_a_non_string_field(tmp_path):
     path.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
     with pytest.raises(ValueError, match="charter_sha256"):
         verify_activation(path)
+
+
+# --- freezing while the holdout is quarantined -------------------------------------------------
+#
+# An amendment can land after ``quarantine.quarantine_holdout`` has moved the sealed tree out of
+# the working tree, and re-freezing then must neither restore the holdout nor write the quarantine
+# location into the record. ``build_activation_record``'s ``sealed_root_override`` is the third
+# option: hash the tree where it is, record the path the contract names.
+
+
+def _quarantine(tmp_path: Path) -> Path:
+    """Move the fixture's sealed tree aside, the way ``quarantine_holdout`` does for real."""
+    moved = tmp_path / "quarantined-sealed"
+    shutil.move(str(tmp_path / "sealed"), str(moved))
+    return moved
+
+
+def test_build_activation_record_can_hash_a_quarantined_sealed_tree(tmp_path):
+    """The override changes WHERE the tree is read from, never what it hashes to, and never the
+    path the record carries.
+
+    Mutation this catches: passing the quarantine path as ``sealed_root`` instead of as the
+    override. That produces the same digest, so only the recorded path tells the two apart -- and a
+    record naming the quarantine root stops verifying the moment the holdout is restored.
+    """
+    authorities = _fixture(tmp_path)
+    in_place = build_activation_record(*authorities)
+    moved = _quarantine(tmp_path)
+
+    overridden = build_activation_record(*authorities, sealed_root_override=moved)
+    assert overridden == in_place
+    assert overridden["sealed_root"] == str(authorities[3])
+    assert str(moved) not in json.dumps(overridden)
+
+
+def test_build_activation_record_without_the_override_fails_on_a_quarantined_tree(tmp_path):
+    """The negative control for the override: it must be doing real work.
+
+    Without it the build cannot read the sealed snapshot at all, so a passing override test could
+    not be explained by the tree still being reachable at the contract path.
+    """
+    authorities = _fixture(tmp_path)
+    _quarantine(tmp_path)
+    with pytest.raises((FileNotFoundError, ValueError)):
+        build_activation_record(*authorities)
+
+
+def test_the_override_still_fails_on_a_tampered_quarantined_tree(tmp_path):
+    """It cannot weaken the freeze. A sealed tree altered while out of the working tree must fail
+    verification just as loudly as one altered in place.
+
+    Mutation this catches: an override that skips the sealed digest entirely (for example copying
+    the frozen value through when the tree is absent), which would notarise anything.
+    """
+    record, path = _freeze(tmp_path)
+    moved = _quarantine(tmp_path)
+    assert verify_activation(path, sealed_root_override=moved) == record
+
+    _reissue_snapshot(moved, seed=79)
+    with pytest.raises(ValueError, match="sealed snapshot"):
+        verify_activation(path, sealed_root_override=moved)
+
+
+def test_verify_activation_without_the_override_cannot_read_a_quarantined_tree(tmp_path):
+    """Pairs with the test above: the override is the only thing that makes the check available
+    during the research phase, which is exactly when the organiser most needs to run it."""
+    _, path = _freeze(tmp_path)
+    _quarantine(tmp_path)
+    with pytest.raises((FileNotFoundError, ValueError)):
+        verify_activation(path)

@@ -11,7 +11,7 @@ system account. During phase 1 the holdout is physically out of the working tree
 that window is a fact and this review can demonstrate it. During phase 3 the sealed data has to be
 readable in order to be scored, so for that window these checks are *detection*, not prevention.
 A clean review means the mechanical checks found no evidence of a read. It does not mean no read
-occurred. Charter §5 and §14.7 state the residual; do not overclaim past them when reporting.
+occurred. Charter §5 and §14.8 state the residual; do not overclaim past them when reporting.
 
 ---
 
@@ -306,7 +306,7 @@ sudo chown -R organiser:organiser data/cup20/sealed && sudo chmod 700 data/cup20
 ```
 
 Neither is in place in this deployment: `auditctl` needs root, and every agent here runs as one
-account. Charter §14.7 records that as the residual. If you can close it, do, and say so.
+account. Charter §14.8 records that as the residual. If you can close it, do, and say so.
 
 ---
 
@@ -318,7 +318,7 @@ Write the result into the tournament record with the same honesty the charter us
 - which were skipped and why;
 - anything that failed, verbatim;
 - the sentence that bounds the claim: **custody is demonstrated for the research phase; phase 3
-  rests on detection, and the residual in charter §14.7 is not closed by any check above.**
+  rests on detection, and the residual in charter §14.8 is not closed by any check above.**
 
 If any check failed, no team advances and the paper desk does not open until the failure is
 explained in the tournament record. Charter §1.1 already accepts "no winner" as a legitimate
