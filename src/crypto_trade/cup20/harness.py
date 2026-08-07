@@ -13,11 +13,11 @@ part of the material tuple, so a short-window run is a *different material trial
 the same one-twelfth of the budget and produce a number comparable to nothing -- not to the team's
 other runs, not to the floors, not to another team. Offering it would create a second, cheaper
 currency of evidence, and the cheaper currency is the one that ends up driving decisions. What that
-costs is real and is paid deliberately: an evaluation measured 489.7 s on the real snapshot, and
-there is no quick look. What it does *not* cost is a trial spent on a typo, because :func:`check_candidate` exists --
-it loads the entrypoint, builds the strategy, parses the risk policy and runs the blindness scan
-without opening a single row of market data, so it produces no metric, is not an evaluation, and
-consumes nothing.
+costs is real and is paid deliberately: one evaluation measured 489.7 s on the real snapshot, and
+there is no quick look. What it does *not* cost is a trial spent on a typo, because
+:func:`check_candidate` exists -- it loads the entrypoint, builds the strategy, parses the risk
+policy and runs the blindness scan without opening a single row of market data, so it produces no
+metric, is not an evaluation, and consumes nothing.
 
 **What a team is shown about its own failure: everything measured.** Every floor and every
 threshold is already public in charter section 7.3 and in the playbook, and a team holds its own
