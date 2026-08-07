@@ -13,8 +13,8 @@ part of the material tuple, so a short-window run is a *different material trial
 the same one-twelfth of the budget and produce a number comparable to nothing -- not to the team's
 other runs, not to the floors, not to another team. Offering it would create a second, cheaper
 currency of evidence, and the cheaper currency is the one that ends up driving decisions. What that
-costs is real and is paid deliberately: an evaluation is about seven minutes, and there is no quick
-look. What it does *not* cost is a trial spent on a typo, because :func:`check_candidate` exists --
+costs is real and is paid deliberately: an evaluation measured 489.7 s on the real snapshot, and
+there is no quick look. What it does *not* cost is a trial spent on a typo, because :func:`check_candidate` exists --
 it loads the entrypoint, builds the strategy, parses the risk policy and runs the blindness scan
 without opening a single row of market data, so it produces no metric, is not an evaluation, and
 consumes nothing.
@@ -42,6 +42,7 @@ import math
 import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 import numpy as np
@@ -81,6 +82,7 @@ from crypto_trade.cup20.scored_metrics import (
 )
 from crypto_trade.cup20.snapshot import Snapshot
 from crypto_trade.cup20.trials import ENTRYPOINT, RISK_POLICY_FILENAME
+from crypto_trade.cup20.variants import dry_run_materialisation
 from crypto_trade.tournament.protocol import DecisionContext, TargetStrategy
 from crypto_trade.tournament.risk_policy import RiskPolicy, load_risk_policy
 
@@ -180,8 +182,8 @@ class CandidateLoadError(RuntimeError):
     """The team's entrypoint could not be turned into a usable strategy."""
 
 
-def load_team_strategy(candidate_root: str | Path) -> TargetStrategy:
-    """Import ``strategy.py`` and call its ``build_strategy()``.
+def load_team_module(candidate_root: str | Path) -> ModuleType:
+    """Import ``strategy.py`` and hand back the executed module itself.
 
     Team code IS executed here, unavoidably -- it is the thing being evaluated. What that requires
     of the caller is that the blindness scan has already run (see :func:`evaluate_point`, which
@@ -199,6 +201,11 @@ def load_team_strategy(candidate_root: str | Path) -> TargetStrategy:
     code. That is not theoretical: it is what this loader did before, and it is the one failure
     that cannot be detected downstream, because the source digest would correctly report the new
     bytes while the evaluator ran the old ones.
+
+    The executed module is returned rather than only the strategy it builds because the
+    neighbourhood sweep has to read the module's namespace back: a materialised point is only
+    genuinely a different point if the constant it substituted is the constant the imported module
+    actually bound (see :func:`crypto_trade.cup20.sweep.evaluate_materialised_point`).
     """
     root = Path(candidate_root)
     entry = root / ENTRYPOINT
@@ -217,6 +224,11 @@ def load_team_strategy(candidate_root: str | Path) -> TargetStrategy:
     except BaseException as error:
         sys.modules.pop(module_name, None)
         raise CandidateLoadError(f"{entry} raised on import: {error!r}") from error
+    return module
+
+
+def strategy_from_module(module: ModuleType, *, entry: str | Path) -> TargetStrategy:
+    """Call ``build_strategy()`` on an already-executed candidate module."""
     factory = getattr(module, "build_strategy", None)
     if not callable(factory):
         raise CandidateLoadError(f"{entry} defines no callable build_strategy()")
@@ -226,6 +238,12 @@ def load_team_strategy(candidate_root: str | Path) -> TargetStrategy:
             f"{entry}: build_strategy() returned {strategy!r}, which has no target_weights()"
         )
     return strategy
+
+
+def load_team_strategy(candidate_root: str | Path) -> TargetStrategy:
+    """Import ``strategy.py`` and call its ``build_strategy()``."""
+    entry = Path(candidate_root) / ENTRYPOINT
+    return strategy_from_module(load_team_module(candidate_root), entry=entry)
 
 
 def load_candidate_risk_policy(candidate_root: str | Path) -> RiskPolicy:
@@ -359,6 +377,12 @@ def gate_details(
             )
             continue
         if name == "neighbourhood_positive_fraction":
+            # The note tracks whether the value was MEASURED. A single point supplies this gate at
+            # an assumed 1.0 and must say so; a neighbourhood sweep computes it across the declared
+            # points and must NOT, because "assumed" attached to a real 0.00 tells a team the floor
+            # it is failing was invented by the harness. Same defect class as the sign-inversion
+            # note in the other direction: an assumption rendered as a finding, and a finding
+            # rendered as an assumption, are both the packet lying about what it knows.
             details.append(
                 GateDetail(
                     name=name,
@@ -367,7 +391,9 @@ def gate_details(
                     comparison=">=",
                     floor=float(research_config["neighbourhood_positive_fraction"]),
                     measured=measured,
-                    note="assumed; a single point cannot measure a neighbourhood",
+                    note=(
+                        "" if measured else "assumed; a single point cannot measure a neighbourhood"
+                    ),
                 )
             )
             continue
@@ -438,26 +464,35 @@ def _observed_sides(scored: Mapping[str, float]) -> tuple[str, ...]:
     return _material_sides({"long": scored["long_gross_pnl"], "short": scored["short_gross_pnl"]})
 
 
-def _confidence(run: CandidateRun, raw: Mapping[str, Any], trial_count: int) -> tuple[float, float]:
-    """The bootstrap positive fraction ``B`` and the trial-adjusted confidence, or a failing pair.
+def bootstrap_positive_fraction(run: CandidateRun, raw: Mapping[str, Any]) -> float:
+    """``B``: the circular-block bootstrap positive fraction of the 1x daily returns, or ``NaN``.
 
     Fails CLOSED. The bootstrap raises on a series that is too short or carries a non-finite
-    observation, and both are real outcomes for a book that barely traded. Turning that into
-    ``B = NaN`` and ``confidence = 0.0`` makes the floor fail -- which is the direction a hard floor
-    must fail in -- instead of either crashing the packet or, far worse, letting ``NaN`` reach
-    ``min(1.0, nan)``, which CPython evaluates to ``1.0``: the most favourable possible confidence
-    out of the one term whose job is to penalise.
+    observation, and both are real outcomes for a book that barely traded; ``NaN`` is what the
+    callers turn into a failing confidence rather than a crash.
     """
     statistics_config = raw["statistics"]
-    daily = daily_returns(run.results[BASE_COST])
     try:
-        positive_fraction = circular_block_bootstrap_positive_fraction(
-            daily,
+        return circular_block_bootstrap_positive_fraction(
+            daily_returns(run.results[BASE_COST]),
             samples=int(statistics_config["bootstrap_samples"]),
             block_days=int(statistics_config["bootstrap_block_days"]),
             seed=int(statistics_config["bootstrap_seed"]),
         )
     except ValueError:
+        return math.nan
+
+
+def _confidence(run: CandidateRun, raw: Mapping[str, Any], trial_count: int) -> tuple[float, float]:
+    """The bootstrap positive fraction ``B`` and the trial-adjusted confidence, or a failing pair.
+
+    Fails CLOSED. A ``NaN`` ``B`` becomes ``confidence = 0.0``, which fails the 0.90 floor -- the
+    direction a hard floor must fail in -- instead of either crashing the packet or, far worse,
+    letting ``NaN`` reach ``min(1.0, nan)``, which CPython evaluates to ``1.0``: the most
+    favourable possible confidence out of the one term whose job is to penalise.
+    """
+    positive_fraction = bootstrap_positive_fraction(run, raw)
+    if not math.isfinite(positive_fraction):
         return math.nan, 0.0
     return positive_fraction, trial_adjusted_confidence(positive_fraction, trial_count)
 
@@ -1059,11 +1094,16 @@ class CandidateCheck:
     risk_policy_id: str
     neighbourhood_points: int | None
     coordinate_violations: tuple[str, ...]
+    substitution_violations: tuple[str, ...]
     workspace: WorkspaceScan
 
     @property
     def ok(self) -> bool:
-        return self.strategy_built and not self.coordinate_violations
+        return (
+            self.strategy_built
+            and not self.coordinate_violations
+            and not self.substitution_violations
+        )
 
     def render(self) -> str:
         rule = "-" * 78
@@ -1087,6 +1127,14 @@ class CandidateCheck:
             lines += [f"    {entry}" for entry in self.coordinate_violations]
         elif self.neighbourhood_points is not None:
             lines.append("  coordinate rule        ok")
+        if self.substitution_violations:
+            lines.append("  sweep materialisation  VIOLATIONS:")
+            lines += [f"    {entry}" for entry in self.substitution_violations]
+        elif self.neighbourhood_points is not None and not self.coordinate_violations:
+            lines.append(
+                f"  sweep materialisation  ok -- all {self.neighbourhood_points} points rewrite "
+                "cleanly out of the frozen source"
+            )
         lines += [
             "",
             "  No market data was opened and no metric was produced, so this consumed no trial.",
@@ -1112,9 +1160,14 @@ def check_candidate(
 
     Exists so the twelve-trial budget is never spent on a typo. It reads the workspace, imports the
     entrypoint, builds the strategy, parses the risk policy and -- if a neighbourhood has been
-    declared -- checks the coordinate rule against the frozen source. It opens no bars, no funding
-    and no marks, produces no metric and journals nothing, so it is not an evaluation under section
-    7.1 and costs no trial.
+    declared -- checks the coordinate rule against the frozen source and dry-runs the sweep's own
+    substitution for every declared point. It opens no bars, no funding and no marks, produces no
+    metric and journals nothing, so it is not an evaluation under section 7.1 and costs no trial.
+
+    The substitution dry run matters because the two checks fail on different things. A coordinate
+    can satisfy the coordinate rule -- one module-level numeric value, matching the nominee -- and
+    still be unrewritable, for instance if its literal is split across lines. Without this, that
+    would surface only after the neighbourhood trial had been spent.
     """
     workspace = scan_workspace_or_refuse(workspace_root, team_id=team_id)
     load_team_strategy(candidate_root)
@@ -1122,10 +1175,13 @@ def check_candidate(
     declaration_path = Path(candidate_root) / "neighbourhood.json"
     points: int | None = None
     violations: tuple[str, ...] = ()
+    substitutions: tuple[str, ...] = ()
     if declaration_path.is_file():
         declaration = load_declaration(declaration_path)
         points = len(declaration.all_points())
         violations = verify_neighbourhood_coordinates(candidate_root, declaration)
+        if not violations:
+            substitutions = dry_run_materialisation(candidate_root, declaration)
     return CandidateCheck(
         team_id=team_id,
         candidate_id=candidate_id,
@@ -1134,5 +1190,6 @@ def check_candidate(
         risk_policy_id=policy.policy_id,
         neighbourhood_points=points,
         coordinate_violations=violations,
+        substitution_violations=substitutions,
         workspace=workspace,
     )

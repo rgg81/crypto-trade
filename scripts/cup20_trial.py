@@ -12,6 +12,11 @@ journal is organiser-owned and append-only; this command is the append. Teams ne
 It prints the sequence number the record was given. That number is what your research certificate
 cites, and it is what ``scripts/cup20_evaluate.py`` looks for before it will run anything.
 
+``--kind neighbourhood`` additionally validates ``neighbourhood.json`` in full -- every section 6
+rule and the section 6.1 coordinate rule against the frozen source -- **before** appending. A trial
+is spent at acceptance and never refunded, so a declaration that could not be swept has to be
+refused at the append or it costs a trial to discover.
+
 Exit codes: 0 recorded, 2 refused (budget exhausted, or a bad declaration), 1 anything else.
 """
 
@@ -25,6 +30,7 @@ from typing import Any
 
 from crypto_trade.cup20.config import IS_END, load_config
 from crypto_trade.cup20.snapshot import load_snapshot, resolve_is_start
+from crypto_trade.cup20.sweep import load_neighbourhood
 from crypto_trade.cup20.trials import (
     TRIAL_KINDS,
     MaterialTrial,
@@ -33,6 +39,10 @@ from crypto_trade.cup20.trials import (
     cost_model,
     record_trial,
     risk_policy_digest,
+)
+from crypto_trade.cup20.variants import (
+    CoordinateSubstitutionError,
+    VariantIntegrityError,
 )
 
 CONFIG_PATH = Path("tournament/cup20/config.toml")
@@ -68,6 +78,14 @@ def build_trial(arguments: argparse.Namespace) -> tuple[MaterialTrial, dict[str,
     config = load_config(arguments.config)
     raw = config.raw
     candidate_root = Path(arguments.team_root) / arguments.team / "candidates" / arguments.candidate
+    # A neighbourhood trial is a claim about a declared neighbourhood, so it is checked BEFORE the
+    # append rather than by the runner afterwards. Charter section 7.1 spends the trial at
+    # acceptance and never refunds it, so a declaration that cannot be swept -- too few points, a
+    # duplicate, no material variation, a coordinate that is not a module-level constant, a nominee
+    # that disagrees with the frozen source, a literal the sweep cannot rewrite -- has to cost
+    # nothing, and the only place it can cost nothing is here.
+    if arguments.kind == "neighbourhood":
+        load_neighbourhood(candidate_root)
     snapshot = load_snapshot(raw["data"]["is_root"])
     is_start = resolve_is_start(
         snapshot.membership, target_size=int(raw["universe"]["target_size"])
@@ -132,8 +150,14 @@ def main() -> None:
 
     try:
         trial, raw = build_trial(arguments)
-    except (ValueError, FileNotFoundError) as failure:
+    except (
+        ValueError,
+        FileNotFoundError,
+        CoordinateSubstitutionError,
+        VariantIntegrityError,
+    ) as failure:
         print(f"REFUSED: {failure}", file=sys.stderr)
+        print("Nothing was journaled.", file=sys.stderr)
         raise SystemExit(2) from failure
 
     journal_path = arguments.journal or raw["paths"]["research_journal"]

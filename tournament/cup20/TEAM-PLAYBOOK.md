@@ -192,11 +192,19 @@ seed, parameters, window, cost model, risk policy) differs from an earlier one.
 
 - **You have twelve.**
 - **You need at least eight accepted trials to nominate.** Fewer is not a nomination.
-- **The declared neighbourhood sweep is one trial**, however many points it contains.
+- **The declared neighbourhood sweep is one trial**, however many points it contains. Run it with
+  `cup20_evaluate.py --neighbourhood` (§5.3), which runs every point for you under that one trial.
+  Evaluating your points one at a time as ordinary candidates spends one trial *each*, and there is
+  no rule that would give them back.
 - **The falsification battery is one trial** (exact sign inversion + gross-edge placebo).
 
 Both batteries are one trial each *because they are declared in full before they run*. That
 concession is what makes the certificate affordable, and it stays honest only under the next rule.
+
+**Budget the wall clock too, not only the count.** Measured on the real snapshot: a point is
+**490 s**, a seven-point sweep at the default four workers is **1223 s**, and the falsification
+battery is about forty minutes. Ten points plus both batteries is most of a working day of compute;
+a plan that discovers that on its last afternoon is a plan that nominates nothing.
 
 ---
 
@@ -236,6 +244,11 @@ equal are one trial; any difference is a new one.
 - **`--kind`** defaults to `point`. Use `neighbourhood` for the declared sweep and `falsification`
   for the battery; each is one trial, and each kind is its own material trial, so a `point` trial
   does not licence a battery.
+- **`--kind neighbourhood` validates your `neighbourhood.json` before it appends anything** — every
+  §6 rule and the §6.1 coordinate rule against your frozen source, plus a dry run of the
+  substitution the sweep will perform on every point. A declaration that could not be swept is
+  refused at the append and **costs you nothing**. A trial is spent at acceptance and never
+  refunded, so this is the only place it could cost nothing.
 - **The thirteenth is refused**, by name and count. There is no override and no extension.
 
 ### 5.2 `cup20_evaluate.py` — evaluate a candidate
@@ -244,8 +257,11 @@ equal are one trial; any difference is a new one.
 # no market data, no metric, NO TRIAL — run this as often as you like
 uv run python scripts/cup20_evaluate.py --team team-NN --candidate <id> --check
 
-# the scored evaluation: full in-sample window, 1x / 2x / 3x cost. About seven minutes.
+# the scored evaluation of ONE point: full in-sample window, 1x / 2x / 3x cost. About eight minutes.
 uv run python scripts/cup20_evaluate.py --team team-NN --candidate <id>
+
+# the declared neighbourhood sweep — YOUR ACTUAL SCORE. About twenty-five minutes for seven points.
+uv run python scripts/cup20_evaluate.py --team team-NN --candidate <id> --neighbourhood
 
 # the falsification battery: exact sign inversion + gross-edge placebo. About forty minutes.
 uv run python scripts/cup20_evaluate.py --team team-NN --candidate <id> --falsification
@@ -256,10 +272,11 @@ Before it evaluates anything it does two things, in this order, and refuses on e
 1. **the blindness scan**, over your *entire* workspace — notes, notebooks, logs, `__pycache__`,
    symlinks and their targets — for every prohibited path, every post-cutoff date literal and every
    other team's directory. Catching that now costs you an edit. Catching it at nomination costs you
-   the tournament.
+   the tournament. It runs **before any of your code is imported**, in every mode.
 2. **the accepted trial**, for *exactly* this candidate state. If your source digest does not match
    the digest recorded in the trial, that is a new material trial and the command says which field
-   moved. Journal it and run again.
+   moved. Journal it and run again. The digest covers your whole candidate directory, so editing
+   `neighbourhood.json` after journaling is a new material trial too.
 
 Then it loads `build_strategy()` out of your `strategy.py`, runs the **full in-sample window** with
 the frozen `[execution]` and `[risk_unit]` config and your declared `risk_policy.json`, and prints a
@@ -294,7 +311,73 @@ schedule exactly and randomise only *which* eligible symbol receives which weigh
 edge. You cannot accidentally skip a mandatory falsifier, and you cannot implement it differently
 from anyone else.
 
-### 5.3 `risk_policy.json` is required
+### 5.3 `--neighbourhood` — the sweep, and the only number that is your score
+
+```
+uv run python scripts/cup20_evaluate.py --team team-NN --candidate <id> --neighbourhood
+```
+
+**This is one trial, however many points your neighbourhood contains** (§4). Journal it as
+`--kind neighbourhood` first; the evaluator refuses without it, exactly as it does for a point.
+
+It runs **every declared point including the nominee**, over the full in-sample window, through the
+identical pipeline a single-point evaluation uses, and reports the **per-metric median across the
+points**. That median is your score. Your nominee's own vector is printed underneath it, beside the
+median for every metric, and labelled `DIAGNOSTIC ONLY — This is NOT your score`. Read the median.
+
+What the packet adds that a single point cannot have:
+
+- **`positive_point_fraction`** against the 70% floor — the fraction of points with positive 1×
+  annualised return *and* positive 2× Sharpe. `--neighbourhood` is the only mode that can measure
+  this gate; a single-point packet shows it as `----`.
+- **`B` as the per-point median** of the bootstrap positive fraction, so the trial-adjusted
+  confidence is a property of the plateau rather than of the spike.
+- **one `strategy.py` digest per point**, so what actually executed is on the record. `--keep-variants`
+  keeps the materialised directories if you want to read them.
+
+It still **never prints QUALIFIED**: the sign-inversion falsifier is a separate trial
+(`--falsification`), so that one gate stays `----`.
+
+**How a point is made.** Each point is materialised as a **real file**: your frozen `strategy.py`
+with exactly the declared coordinate literals rewritten, and everything else — every other
+constant, every comment, every line position — byte for byte identical. That is checked, not
+assumed, three ways, and any of the three refuses:
+
+1. both files' coordinate literals are blanked out and the remainders must be **byte-identical**;
+2. the variant's parsed constant table must equal your source's at every other name;
+3. the imported module must have **bound** the point's value — read back out of the executed
+   module's namespace before the run starts.
+
+**Your nominee is not rewritten at all.** Its directory is copied verbatim and the copy's digest is
+required to equal your candidate's, so the nominee point runs your frozen bytes.
+
+This is why §6.1's coordinate rule exists, and it is now load-bearing rather than advisory: a
+coordinate that is not a single-valued module-level numeric literal cannot be rewritten, and the
+sweep refuses. Run `--check` — it dry-runs the substitution for every point, free, and tells you
+before you spend the trial.
+
+**Every point runs in its own freshly spawned interpreter**, so no point can leave state behind for
+the next. `--workers N` (default `min(4, points)`) only changes the wall clock; the answer is
+identical at one worker and at four.
+
+**What it costs.** Measured on the real snapshot with a real seven-point neighbourhood, not
+estimated:
+
+| | |
+|---|---|
+| `--check` (free, no trial, no market data) | **0.4 s** |
+| one point on its own (`cup20_evaluate.py`, no flag) | **489.7 s** — about 8 minutes |
+| `--neighbourhood`, 7 points, default 4 workers | **1222.8 s** — about 20 minutes |
+| `--neighbourhood`, 7 points, `--workers 1` | ≈ 7 × 490 s — about 57 minutes |
+
+Four workers is 2.8× faster than serial, not 4×: the points are memory-bandwidth bound as well as
+CPU-bound, so a point that takes 490 s alone takes about 695 s with three others beside it. Raising
+`--workers` past 4 buys less than it looks like it should, and on a shared machine it costs the
+other eleven teams.
+
+Budget for it. It is one trial, and it is the trial that produces your score.
+
+### 5.4 `risk_policy.json` is required
 
 Your declared risk policy is part of the material tuple, so every candidate carries one from its
 first trial. Declaring nothing is a legitimate declaration — write it out explicitly:
@@ -319,31 +402,36 @@ first trial. Declaring nothing is a legitimate declaration — write it out expl
 Remember §3: the policy declares **shape, not scale**. It runs inside a book the common risk unit
 has already resized.
 
-### 5.4 The order, every time
+### 5.5 The order, every time
 
 ```
 1.  write / edit  strategy.py, risk_policy.json
 2.  cup20_evaluate.py --check          (free, seconds — do this until it is clean)
 3.  cup20_trial.py    ...              (costs one of your twelve; returns a sequence number)
-4.  cup20_evaluate.py                  (about seven minutes; prints the coaching packet)
+4.  cup20_evaluate.py                  (490 s measured; prints the coaching packet)
 5.  read the packet, decide, and write down what you learned — including if it failed
 ```
 
-Repeat. Then, once your nominee is fixed and your neighbourhood is declared:
+Repeat. Then, once your nominee is **fixed** (§6) and your `neighbourhood.json` is written:
 
 ```
-6.  cup20_trial.py --kind neighbourhood ...      (one trial for the whole declared sweep)
-7.  cup20_trial.py --kind falsification ...      (one trial for the whole battery)
-8.  cup20_evaluate.py --falsification            (about forty minutes)
+6.  cup20_evaluate.py --check                    (free — confirms every point can be materialised)
+7.  cup20_trial.py --kind neighbourhood ...      (one trial for the whole declared sweep)
+8.  cup20_evaluate.py --neighbourhood            (1223 s measured; prints YOUR SCORE)
+9.  cup20_trial.py --kind falsification ...      (one trial for the whole battery)
+10. cup20_evaluate.py --falsification            (about forty minutes)
 ```
 
-**Step 3 before step 4 is not a convention, it is enforced.** The evaluator refuses to run without
-an accepted trial for exactly the candidate state on disk, which is what makes "journaled before you
-look at any number" a fact rather than an aspiration.
+That is **two** trials for steps 7–10 in total, and about an hour of wall clock. Plan for it.
 
-One thing this harness does **not** yet do: run the declared neighbourhood sweep for you. Journal it
-as one trial when you declare it; the organiser publishes the sweep runner before nomination opens,
-and it will be the same pipeline these two commands use.
+**Step 3 before step 4 is not a convention, it is enforced**, and so is step 7 before step 8. The
+evaluator refuses to run without an accepted trial of the right kind for exactly the candidate state
+on disk, which is what makes "journaled before you look at any number" a fact rather than an
+aspiration.
+
+**Step 6 before step 7 is free and you should not skip it.** A neighbourhood that fails validation
+is refused at the append and costs nothing — but only if you find out at the append. Once a trial is
+accepted it is spent, and there is no refund for a declaration you then fixed.
 
 ---
 
@@ -386,7 +474,14 @@ It must satisfy all of:
 - for **every** coordinate, at least one point strictly above and one strictly below the nominated
   value, and each of those variations **material**: at least 5% of the nominee's magnitude for that
   coordinate, or any strictly positive absolute change when the nominee is zero. A variation of
-  1e-9 is not an exploration of the surface.
+  1e-9 is not an exploration of the surface;
+- every coordinate value **finite**. `NaN` slips past every comparison above — every IEEE-754
+  comparison with `NaN` is false, so it is neither a duplicate nor a variation — and there is no
+  numeric literal to write it into your source as.
+
+Every one of these is checked when you journal the `--kind neighbourhood` trial, and a failure
+refuses the append, so an invalid neighbourhood costs you nothing. `--check` checks them for free
+as often as you like.
 
 ### 6.1 The coordinate rule — read this before you write `strategy.py`
 
@@ -395,8 +490,10 @@ It must satisfy all of:
 that constant.**
 
 This exists so the nominated point is provably what the frozen code actually does, rather than a
-favourable point merely labelled as the nominee. It is stated here, up front, so an honest
-submission is never surprised by it.
+favourable point merely labelled as the nominee — and it is also **what makes the sweep possible at
+all**. §5.3 materialises each point by rewriting exactly those literals in your frozen source. A
+coordinate that is not one cannot be rewritten, and the sweep refuses rather than guessing. It is
+stated here, up front, so an honest submission is never surprised by it.
 
 - **Module-level** means the top level of the module — including inside a module-level `if` or
   `try`. A value assigned inside a function body or a class body **does not count** and will be
@@ -406,19 +503,38 @@ submission is never surprised by it.
   `try` — the submission is **rejected as ambiguous**. Verification parses your code and never runs
   it, so it cannot know which branch would execute; a name whose value depends on a branch is
   therefore not a frozen parameter.
+- The value must be a **plain numeric literal on one line**, optionally negated. Not an expression,
+  not a computation, not a literal split across lines with a `\` continuation. `LOOKBACK = 30` and
+  `SKEW = -1.5` are fine; `LOOKBACK = 15 * 2` is not a literal, and `SKEW = -\`↵`  1.5` cannot be
+  rewritten without touching two lines.
+- The name must still be **bound after import**. The sweep reads each coordinate back out of the
+  imported module before it runs anything, and refuses if the module bound something else or
+  nothing at all. A constant assigned only in a module-level branch that did not run is not a
+  parameter the frozen code is governed by.
 
 Write it plainly:
 
 ```python
-FORMATION_BARS = 30        # good: module level, one value
+FORMATION_BARS = 30        # good: module level, one value, one line
 ENTRY_THRESHOLD = 0.50     # good
+SKEW = -1.5                # good: a negated literal is still a literal
 
 class Strategy:
     FORMATION_BARS = 30    # NOT counted: class body
 
 if USE_FAST:
     FORMATION_BARS = 10    # rejected: second module-scope value for the same name
+
+WINDOW = 15 * 2            # rejected: an expression, not a literal — the sweep cannot rewrite it
 ```
+
+**Read the constant, do not re-derive it.** The sweep changes the module-level constant and nothing
+else, so anything downstream that reads it — a default argument, a class attribute set from it, a
+table computed at import — moves with it. Anything that hard-codes the same number somewhere else
+does not, and that copy would stay at the nominee's value at every point of your sweep.
+
+`--check` dry-runs the rewrite for every declared point and tells you, free, before you spend the
+trial.
 
 ---
 

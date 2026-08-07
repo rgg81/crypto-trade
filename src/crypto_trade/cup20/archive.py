@@ -163,13 +163,14 @@ def _numeric(node: ast.AST, depth: int = 0) -> float | None:
 
 
 def _record_numeric_target(
-    target: ast.expr, value: ast.expr, found: dict[str, set[float]], depth: int = 0
+    target: ast.expr, value: ast.expr, found: dict[str, list[ast.expr]], depth: int = 0
 ) -> None:
     """Record ``target <- value`` for a plain ``Name`` target with a numeric-literal value, or,
     for a ``Tuple`` target paired with a same-length ``Tuple`` value, recurse elementwise (this
     also naturally covers a nested tuple pattern, since each element pairing is the same rule
-    applied again). Adds the value to the name's set of distinct values seen -- see
-    ``_collect_from_statements`` for why a set, not a single overwritten value.
+    applied again). Appends the value NODE to the list of sites seen for that name -- see
+    ``module_level_numeric_assignments`` for why the node and not just its value, and
+    ``_collect_from_statements`` for why every site is kept rather than one overwritten value.
 
     ``depth`` guards the ``Tuple`` recursion against adversarial nesting (thousands of
     single-element nested tuples), the same concern and the same bound as ``_numeric``'s own
@@ -183,9 +184,8 @@ def _record_numeric_target(
     if depth > _MAX_EXPRESSION_DEPTH:
         return
     if isinstance(target, ast.Name):
-        number = _numeric(value)
-        if number is not None:
-            found.setdefault(target.id, set()).add(number)
+        if _numeric(value) is not None:
+            found.setdefault(target.id, []).append(value)
     elif (
         isinstance(target, ast.Tuple)
         and isinstance(value, ast.Tuple)
@@ -195,7 +195,9 @@ def _record_numeric_target(
             _record_numeric_target(element_target, element_value, found, depth + 1)
 
 
-def _record_numeric_assign(node: ast.Assign | ast.AnnAssign, found: dict[str, set[float]]) -> None:
+def _record_numeric_assign(
+    node: ast.Assign | ast.AnnAssign, found: dict[str, list[ast.expr]]
+) -> None:
     """Record a module-level plain or annotated assignment's target(s), including tuple/multiple-
     target unpacking."""
     if isinstance(node, ast.AnnAssign):
@@ -224,7 +226,38 @@ def _ordered_children(statement: ast.stmt) -> list[ast.stmt]:
     return []
 
 
-def _collect_from_statements(statements: list[ast.stmt]) -> dict[str, set[float]]:
+def module_level_numeric_assignments(
+    statements: Sequence[ast.stmt],
+) -> dict[str, list[ast.expr]]:
+    """Every module-level numeric-literal assignment SITE, as ``name -> [value nodes]``.
+
+    This is the single traversal the coordinate rule is defined by. Two callers read it and they
+    must never disagree: :func:`verify_neighbourhood_coordinates` decides whether a coordinate is a
+    module-level numeric constant with exactly one value, and
+    :mod:`crypto_trade.cup20.variants` rewrites those same literals to materialise a neighbourhood
+    point. If the verifier and the rewriter each walked the tree their own way, the sweep could
+    substitute somewhere the verifier never looked (a point that silently is not the point it
+    claims to be) or fail to substitute somewhere it did (a point that silently is the nominee).
+    Returning the value NODES rather than their values is what lets the rewriter edit exactly the
+    byte spans the verifier read, so the two are the same set by construction rather than by
+    agreement.
+
+    Which sites count is documented on :func:`_collect_from_statements`: module-level control flow
+    is descended into, function and class bodies never are. Order is source order within each name,
+    which is what makes a substitution plan reproducible.
+    """
+    found: dict[str, list[ast.expr]] = {}
+    stack: list[ast.stmt] = list(reversed(list(statements)))
+    while stack:
+        statement = stack.pop()
+        if isinstance(statement, (ast.Assign, ast.AnnAssign)):
+            _record_numeric_assign(statement, found)
+        else:
+            stack.extend(reversed(_ordered_children(statement)))
+    return found
+
+
+def _collect_from_statements(statements: Sequence[ast.stmt]) -> dict[str, set[float]]:
     """Collect every DISTINCT numeric value assigned to each module-level name.
 
     Recurses through module-level control flow -- ``if``/``for``/``while``/``with``/``try`` and
@@ -258,16 +291,16 @@ def _collect_from_statements(statements: list[ast.stmt]) -> dict[str, set[float]
     preserves the same left-to-right, depth-first order plain recursion would visit statements in
     (each container's children are pushed, reversed, onto the top of the stack, so they are
     processed immediately -- before whatever sibling statements were already queued below).
+
+    Derived from :func:`module_level_numeric_assignments` rather than walking the tree a second
+    time, so "the sites the verifier reads" and "the sites the sweep rewrites" cannot drift apart.
+    ``_numeric`` is guaranteed non-``None`` on every recorded node -- that is the filter under
+    which the node was recorded at all.
     """
-    found: dict[str, set[float]] = {}
-    stack: list[ast.stmt] = list(reversed(statements))
-    while stack:
-        statement = stack.pop()
-        if isinstance(statement, (ast.Assign, ast.AnnAssign)):
-            _record_numeric_assign(statement, found)
-        else:
-            stack.extend(reversed(_ordered_children(statement)))
-    return found
+    return {
+        name: {value for value in (_numeric(node) for node in nodes) if value is not None}
+        for name, nodes in module_level_numeric_assignments(statements).items()
+    }
 
 
 def _frozen_numeric_parameters(path: Path) -> dict[str, set[float]]:

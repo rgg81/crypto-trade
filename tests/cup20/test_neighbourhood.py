@@ -246,13 +246,24 @@ def test_positive_point_fraction_requires_at_least_one_point():
 # current, correct behaviour so a refactor toward that rewrite is caught.
 # Same reasoning for positive_point_fraction: `value > 0.0` is False for
 # NaN, so a NaN metric is correctly excluded, not counted as passing.
+#
+# The two tests below were originally phrased against the direction checks
+# (a NaN must not manufacture upward or downward evidence). `validate()` now
+# refuses a non-finite coordinate OUTRIGHT, before the direction checks are
+# reached, which is strictly stronger: the earlier phrasing relied on a NaN
+# failing every strict comparison, whereas this rejects the declaration.
+# The De Morgan tripwire the original comment describes is moot once no NaN
+# can reach the comparison at all -- `any(value > centre)` and
+# `not all(value <= centre)` differ only on NaN. What still has to be pinned,
+# and is, is that the refusal happens rather than the point being silently
+# ignored: a neighbourhood one point short of its declared count is a
+# neighbourhood that padded the median.
 
 
-def test_upward_check_ignores_a_nan_coordinate_value():
+def test_a_nan_coordinate_is_refused_outright_rather_than_silently_ignored():
     # Every real "lookback" value is below the nominee (60); the one point
-    # that could otherwise supply upward evidence is NaN instead of a real
-    # number above 60. If NaN were (wrongly) treated as satisfying the
-    # upward comparison, this would pass; it must still raise.
+    # that could otherwise supply upward evidence is NaN. Ignoring it would
+    # leave six declared points of which only five are points.
     points = [
         {"lookback": 40.0, "threshold": 0.8},
         {"lookback": 45.0, "threshold": 1.2},
@@ -261,23 +272,30 @@ def test_upward_check_ignores_a_nan_coordinate_value():
         {"lookback": 58.0, "threshold": 0.85},
         {"lookback": float("nan"), "threshold": 1.15},
     ]
-    with pytest.raises(ValueError, match="no material upward variation"):
+    with pytest.raises(ValueError, match="non-finite value"):
         _declaration(points=points).validate()
 
 
-def test_downward_check_ignores_a_nan_coordinate_value():
-    # Mirror of the above: every real "lookback" value is above the nominee,
-    # and the only point that could supply downward evidence is NaN.
+def test_an_infinite_coordinate_is_refused_the_same_way():
+    # Mirror of the above with the other non-finite value, and in the other
+    # direction: `inf > centre` IS True, so an infinity would sail through the
+    # upward check as "evidence" while being a point on no surface at all.
     points = [
         {"lookback": 62.0, "threshold": 0.8},
         {"lookback": 65.0, "threshold": 1.2},
         {"lookback": 70.0, "threshold": 0.9},
         {"lookback": 75.0, "threshold": 1.1},
         {"lookback": 80.0, "threshold": 0.85},
-        {"lookback": float("nan"), "threshold": 1.15},
+        {"lookback": float("inf"), "threshold": 1.15},
     ]
-    with pytest.raises(ValueError, match="no material downward variation"):
+    with pytest.raises(ValueError, match="non-finite value"):
         _declaration(points=points).validate()
+
+
+def test_a_non_finite_nominee_coordinate_is_refused_too():
+    """The nominee is a point like any other, and it is checked like one."""
+    with pytest.raises(ValueError, match="non-finite value"):
+        _declaration(nominee={"lookback": float("nan"), "threshold": 1.0}).validate()
 
 
 def test_positive_point_fraction_excludes_nan_annualized_return():

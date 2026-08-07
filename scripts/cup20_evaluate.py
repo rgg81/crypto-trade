@@ -2,16 +2,23 @@
 
     uv run python scripts/cup20_evaluate.py --team team-01 --candidate baseline
 
-Three modes, and only one of them costs anything:
+Four modes, and only one of them costs nothing:
 
 * ``--check``            no market data, no metric, **no trial**. Runs the blindness scan, imports
                          ``strategy.py``, calls ``build_strategy()``, parses ``risk_policy.json``
                          and -- if you have declared one -- checks your neighbourhood coordinates
-                         against the frozen source. Seconds. Run it as often as you like.
-* (no flag)              the scored evaluation. Requires an accepted trial of kind ``point`` for
-                         exactly this candidate state. Runs the FULL in-sample window at the frozen
-                         ``[execution]`` and ``[risk_unit]`` config, at 1x, 2x and 3x cost. About
-                         seven minutes.
+                         against the frozen source and dry-runs the sweep's substitution for every
+                         declared point. Seconds. Run it as often as you like.
+* (no flag)              the scored evaluation of ONE point. Requires an accepted trial of kind
+                         ``point`` for exactly this candidate state. Runs the FULL in-sample window
+                         at the frozen ``[execution]`` and ``[risk_unit]`` config, at 1x, 2x and 3x
+                         cost. About eight minutes.
+* ``--neighbourhood``    the section 7.2 declared sweep: every point in ``neighbourhood.json``
+                         including the nominee, each materialised as its own file and evaluated in
+                         its own interpreter, scored by per-metric MEDIAN. Requires an accepted
+                         trial of kind ``neighbourhood``. **One trial however many points it
+                         contains.** Measured at 1222.8 s for seven points at the default four
+                         workers; about 57 minutes at ``--workers 1``.
 * ``--falsification``    the section 7.1 battery: exact sign inversion + gross-edge placebo.
                          Requires an accepted trial of kind ``falsification``. One trial for both
                          halves. Roughly forty minutes at the default eight placebo permutations.
@@ -29,7 +36,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -43,12 +52,17 @@ from crypto_trade.cup20.harness import (
 )
 from crypto_trade.cup20.journal import accepted_trial_count
 from crypto_trade.cup20.snapshot import load_snapshot, resolve_is_start
+from crypto_trade.cup20.sweep import SweepError, run_neighbourhood_sweep
 from crypto_trade.cup20.trials import (
     TrialNotAcceptedError,
     candidate_source_digest,
     cost_model,
     resolve_accepted_trial,
     risk_policy_digest,
+)
+from crypto_trade.cup20.variants import (
+    CoordinateSubstitutionError,
+    VariantIntegrityError,
 )
 
 CONFIG_PATH = Path("tournament/cup20/config.toml")
@@ -69,6 +83,12 @@ def main() -> None:
         help="verify the candidate loads without evaluating it; costs no trial",
     )
     mode.add_argument(
+        "--neighbourhood",
+        action="store_true",
+        help="run the section 7.2 declared sweep and score it by per-metric median; "
+        "one trial however many points the neighbourhood contains",
+    )
+    mode.add_argument(
         "--falsification",
         action="store_true",
         help="run the section 7.1 battery: exact sign inversion + gross-edge placebo",
@@ -78,6 +98,18 @@ def main() -> None:
         type=int,
         default=8,
         help="placebo books in the falsification battery (default 8)",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="neighbourhood points to evaluate at once (default: min(4, points)). Every point "
+        "runs in its own fresh interpreter either way, so this changes only the wall clock",
+    )
+    parser.add_argument(
+        "--keep-variants",
+        action="store_true",
+        help="keep the materialised neighbourhood point directories instead of deleting them",
     )
     parser.add_argument(
         "--trial",
@@ -129,6 +161,7 @@ def main() -> None:
                         "risk_policy_id": report.risk_policy_id,
                         "neighbourhood_points": report.neighbourhood_points,
                         "coordinate_violations": list(report.coordinate_violations),
+                        "substitution_violations": list(report.substitution_violations),
                         "ok": report.ok,
                     },
                     indent=2,
@@ -142,7 +175,12 @@ def main() -> None:
     is_start = resolve_is_start(
         snapshot.membership, target_size=int(raw["universe"]["target_size"])
     )
-    kind = "falsification" if arguments.falsification else "point"
+    if arguments.falsification:
+        kind = "falsification"
+    elif arguments.neighbourhood:
+        kind = "neighbourhood"
+    else:
+        kind = "point"
     try:
         recomputed = {
             "kind": kind,
@@ -179,6 +217,7 @@ def main() -> None:
         flush=True,
     )
 
+    sweep_root: Path | None = None
     try:
         if arguments.falsification:
             report = run_falsification_battery(
@@ -193,6 +232,43 @@ def main() -> None:
                 is_start=is_start,
                 placebo_permutations=arguments.placebo_permutations,
             )
+        elif arguments.neighbourhood:
+            # Outside the team workspace on purpose: the variants are organiser-materialised
+            # derivatives, not team artifacts, and writing seven copies of the candidate into the
+            # tree the blindness scan reads would make the scan slower and the workspace untidy for
+            # no gain. Each variant's strategy.py digest travels in the packet, so the evidence of
+            # what ran survives the directory being removed.
+            sweep_root = Path(tempfile.mkdtemp(prefix=f"cup20-sweep-{arguments.team}-"))
+            try:
+                report = run_neighbourhood_sweep(
+                    raw=raw,
+                    config_path=arguments.config,
+                    snapshot_root=raw["data"]["is_root"],
+                    snapshot_sha256=snapshot.manifest_sha256,
+                    candidate_root=candidate_root,
+                    workspace_root=workspace_root,
+                    sweep_root=sweep_root,
+                    team_id=arguments.team,
+                    candidate_id=arguments.candidate,
+                    seed=resolution.trial.seed,
+                    declared_roles=resolution.trial.declared_roles,
+                    trial_sequence=resolution.sequence,
+                    accepted_trials=spent,
+                    source_sha256=source_sha256,
+                    is_start=is_start,
+                    workers=arguments.workers,
+                )
+            # Only this module's own types, never bare ValueError: a team's malformed
+            # declaration is re-raised as VariantIntegrityError by load_neighbourhood, so catching
+            # ValueError here would additionally swallow an organiser-side fault from inside the
+            # scoring stack and report it to a team as if the team had done something wrong.
+            except (
+                CoordinateSubstitutionError,
+                VariantIntegrityError,
+                SweepError,
+            ) as failure:
+                print(f"REFUSED: {failure}", file=sys.stderr)
+                raise SystemExit(2) from failure
         else:
             report = evaluate_point(
                 snapshot=snapshot,
@@ -211,6 +287,12 @@ def main() -> None:
     except (BlindnessViolationError, CandidateLoadError) as failure:
         print(f"REFUSED: {failure}", file=sys.stderr)
         raise SystemExit(2) from failure
+    finally:
+        if sweep_root is not None and sweep_root.exists():
+            if arguments.keep_variants:
+                print(f"\nmaterialised neighbourhood points kept at {sweep_root}")
+            else:
+                shutil.rmtree(sweep_root, ignore_errors=True)
 
     print(report.render())
     if arguments.output:

@@ -429,7 +429,26 @@ additional points such that:
 
 **Every scored metric is the per-metric median across the neighbourhood's runs.** The nominated
 point's own coherent metric vector, and the coherent vector of the median-performing point, are
-both reported as diagnostics but neither is the score.
+both reported as diagnostics but neither is the score. The trial-adjusted confidence's bootstrap
+term `B` takes the same per-metric median across the points, because it is a property of a run's
+own return stream exactly like the metrics beside it; a non-finite value at any point medians to
+non-finite, which fails the floor rather than being sorted around.
+
+**The sweep is run by the organiser's own runner** (`scripts/cup20_evaluate.py --neighbourhood`),
+against an accepted trial of kind `neighbourhood`, and never by a team's own script. Each point is
+materialised as a real file — the frozen entrypoint with exactly the declared coordinate literals
+rewritten by byte span, located through the same single AST traversal the coordinate rule above is
+verified by — and each is then evaluated in its own freshly spawned interpreter, so no point can
+leave process state behind for the next. Three checks stand between a declared point and a scored
+one, and each refuses rather than warns: the two files must be byte-identical once their coordinate
+literals are blanked out; the variant's parsed constant table must equal the frozen source's at
+every non-coordinate name; and the imported module must be observed to have BOUND the point's value
+before the run begins. The nominee is not rewritten at all — its directory is copied verbatim and
+required to hash to the frozen candidate's — so the nominated point provably runs the frozen bytes.
+
+A declaration that fails any rule in this section is refused **at the journal append**, so a
+neighbourhood that could not be swept costs no trial. §7.1 spends a trial at acceptance and never
+refunds one, so the append is the only place it can cost nothing.
 
 Rationale: nominating a best point is nominating the maximum of a noisy surface, which is
 upward-biased by construction. A median over a pre-declared plateau is not. This is also applied on
@@ -739,8 +758,11 @@ src/crypto_trade/cup20/
   qualification.py scoring.py scored_metrics.py adjudication.py runner.py report.py paper.py
   trials.py                          the material tuple, the budget, the organiser-owned append
   harness.py                         the ONE scorer teams run; also the falsification battery
+  variants.py                        materialise one neighbourhood point out of the frozen source
+  sweep.py                           the declared neighbourhood sweep and its per-metric median
 scripts/cup20_trial.py               TEAM-FACING: record a material trial before evaluating
-scripts/cup20_evaluate.py            TEAM-FACING: evaluate a candidate, print the coaching packet
+scripts/cup20_evaluate.py            TEAM-FACING: evaluate one point, the declared neighbourhood
+                                     (--neighbourhood), or the falsification battery
 scripts/cup20_readiness.py           reference strategy end to end, before any team is dispatched
 scripts/cup20_quarantine.py          quarantine / restore / verify, from the command line
 scripts/cup20_integrity_review.py    runs every check in INTEGRITY-REVIEW.md and prints a verdict

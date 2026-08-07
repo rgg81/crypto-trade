@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import math
 import statistics
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -40,6 +41,19 @@ class NeighbourhoodDeclaration:
             missing = set(self.coordinates) - set(point)
             if missing:
                 raise ValueError(f"neighbourhood point omits coordinates: {sorted(missing)}")
+            # A non-finite coordinate would slip past every check below, because every one of them
+            # is a comparison and every IEEE-754 comparison with NaN is False: `vector ==
+            # nominee_vector` is False so it is never a duplicate, and `value > centre` is False so
+            # it never counts as a variation -- it simply is not seen. It would then reach the
+            # sweep, which cannot rewrite `nan` into the frozen source as a numeric literal, and
+            # `json.loads` accepts the bare `NaN` and `Infinity` tokens by default, so this is
+            # reachable from a hand-written declaration rather than hypothetical.
+            for coordinate, value in point.items():
+                if not math.isfinite(float(value)):
+                    raise ValueError(
+                        f"neighbourhood coordinate {coordinate} has the non-finite value "
+                        f"{value!r}; a point on a surface has a number for every coordinate"
+                    )
         # Every point must be a genuinely new sample, not padding: compared on the FULL
         # coordinate vector (not any single coordinate), so a point that only repeats one
         # coordinate while varying another still counts as distinct. Without this, a team can
