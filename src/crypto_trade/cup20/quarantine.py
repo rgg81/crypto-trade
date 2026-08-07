@@ -58,7 +58,7 @@ import re
 import secrets
 import shutil
 import time
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -81,7 +81,15 @@ CANARY_TOKEN_PREFIX = "cup20-holdout-canary:"
 
 QUARANTINE_EVENT = "holdout_quarantined"
 RESTORE_EVENT = "holdout_restored"
+REBUILD_EVENT = "holdout_released_for_rebuild"
 TRIAL_EVENT = "trial_accepted"
+
+# The two ways a custody episode can end, and they are deliberately different events. A restore is
+# the phase-3 move: the field is closed, the finalists are frozen, and the holdout comes back to be
+# scored. A rebuild release is a phase-0 move: the snapshot itself was wrong, no team has started,
+# and the holdout that comes back is about to be replaced by a different one. Recording both as
+# "restored" would make the journal say the tournament reached scoring when it had not.
+CUSTODY_CLOSE_EVENTS: tuple[str, ...] = (RESTORE_EVENT, REBUILD_EVENT)
 
 # The two trees that leave the working tree, keyed by the receipt name used for each. The sealed
 # snapshot is the holdout itself; the acquisition snapshot is its un-truncated superset and leaks
@@ -433,6 +441,46 @@ def verify_quarantine_integrity(
     }
 
 
+def _custody_episodes(records: Sequence[Mapping[str, Any]], journal_path: object) -> list[dict]:
+    """The ``[opened, closed)`` sequence intervals during which the holdout was out of the tree.
+
+    Custody is not necessarily one episode. A snapshot defect found before the first team starts
+    has to be fixed with the data back in the working tree, which ends one episode and begins
+    another (:func:`release_for_rebuild`). What must hold is not "exactly one quarantine" -- that
+    was an accidental restriction of the single-episode case -- but that the opens and closes
+    strictly alternate starting with an open, so that "inside custody" is well defined at every
+    sequence number.
+    """
+    episodes: list[dict] = []
+    for record in records:
+        event = record.get("event_type")
+        sequence = int(record["sequence"])
+        if event == QUARANTINE_EVENT:
+            if episodes and episodes[-1]["closed"] is None:
+                raise ValueError(
+                    f"{journal_path} has a second {QUARANTINE_EVENT} at sequence {sequence} while "
+                    f"the episode opened at {episodes[-1]['opened']} was never closed; custody "
+                    "cannot be established twice over"
+                )
+            episodes.append(
+                {"opened": sequence, "closed": None, "closed_by": None, "record": record}
+            )
+        elif event in CUSTODY_CLOSE_EVENTS:
+            if not episodes or episodes[-1]["closed"] is not None:
+                raise ValueError(
+                    f"{journal_path} has a {event} at sequence {sequence} with no open custody "
+                    "episode before it; the holdout came back without having left"
+                )
+            episodes[-1]["closed"] = sequence
+            episodes[-1]["closed_by"] = event
+    if not episodes:
+        raise ValueError(
+            f"expected at least one {QUARANTINE_EVENT} record in {journal_path}, found none; "
+            "custody is unproven even if it happened"
+        )
+    return episodes
+
+
 def verify_quarantine_covered_research(
     *,
     journal_path: str | Path,
@@ -441,11 +489,20 @@ def verify_quarantine_covered_research(
     """Prove from the hash chain that quarantine bracketed every accepted trial.
 
     A wall-clock timestamp in the receipt proves nothing on its own -- it is a number someone
-    typed. The journal is append-only and hash-chained, so the ORDER of records is evidence: if
-    ``holdout_quarantined`` sits at a lower sequence number than every ``trial_accepted``, then no
-    trial was accepted while the holdout was in the working tree, and re-ordering that to look
-    otherwise breaks the chain. If a ``holdout_restored`` record exists, it must sit above every
-    trial for the same reason.
+    typed. The journal is append-only and hash-chained, so the ORDER of records is evidence: every
+    ``trial_accepted`` must sit strictly inside a custody episode -- after a ``holdout_quarantined``
+    and before whichever event closed it -- and re-ordering that to look otherwise breaks the
+    chain.
+
+    Custody may be more than one episode, and the check says so rather than assuming otherwise. A
+    snapshot defect found before the first team starts is fixed with the data back in the working
+    tree, which closes one episode (``holdout_released_for_rebuild``) and opens the next. What is
+    load-bearing is coverage of every trial, not the episode count: :func:`release_for_rebuild`
+    separately refuses to run once any trial exists, so a rebuild episode can only ever precede the
+    research phase, and a gap between episodes with a trial in it fails here regardless.
+
+    ``holdout_restored`` remains once-only. It is the phase-3 move, and two of them would mean the
+    holdout came back twice after the field closed.
 
     Fails closed on a journal with no accepted trials: this check certifies coverage of the
     research phase, and a journal that records no research is a sign the review is pointed at the
@@ -454,49 +511,176 @@ def verify_quarantine_covered_research(
     verify_chain(journal_path)
     receipt = load_receipt(receipt_path)
     records = read_records(journal_path)
-    quarantines = [r for r in records if r.get("event_type") == QUARANTINE_EVENT]
     restores = [r for r in records if r.get("event_type") == RESTORE_EVENT]
     trials = [r for r in records if r.get("event_type") == TRIAL_EVENT]
-    if len(quarantines) != 1:
-        raise ValueError(
-            f"expected exactly one {QUARANTINE_EVENT} record in {journal_path}, "
-            f"found {len(quarantines)}"
-        )
     if len(restores) > 1:
         raise ValueError(
             f"expected at most one {RESTORE_EVENT} record in {journal_path}, found {len(restores)}"
         )
+    episodes = _custody_episodes(records, journal_path)
     if not trials:
         raise ValueError(
             f"{journal_path} records no {TRIAL_EVENT} events; there is no research phase for "
             "quarantine to have covered, so this journal is not the one the review needs"
         )
-    quarantine_sequence = int(quarantines[0]["sequence"])
-    trial_sequences = [int(record["sequence"]) for record in trials]
-    if quarantine_sequence > min(trial_sequences):
-        raise ValueError(
-            f"{QUARANTINE_EVENT} is at sequence {quarantine_sequence}, after the first accepted "
-            f"trial at sequence {min(trial_sequences)}: the holdout was in the working tree while "
-            "research was already running"
-        )
-    restore_sequence = int(restores[0]["sequence"]) if restores else None
-    if restore_sequence is not None and restore_sequence < max(trial_sequences):
-        raise ValueError(
-            f"{RESTORE_EVENT} is at sequence {restore_sequence}, before the last accepted trial "
-            f"at sequence {max(trial_sequences)}: the holdout was back in the working tree while "
-            "research was still running"
-        )
-    if quarantines[0]["payload"].get("canary_token_sha256") != receipt["canary_token_sha256"]:
+    trial_sequences = sorted(int(record["sequence"]) for record in trials)
+    covering: dict[int, dict] = {}
+    for sequence in trial_sequences:
+        inside = [
+            episode
+            for episode in episodes
+            if episode["opened"] < sequence
+            and (episode["closed"] is None or sequence < episode["closed"])
+        ]
+        if not inside:
+            raise ValueError(
+                f"the trial accepted at sequence {sequence} in {journal_path} sits outside every "
+                f"custody episode {[(e['opened'], e['closed']) for e in episodes]}: the holdout "
+                "was in the working tree while research was running"
+            )
+        covering[sequence] = inside[0]
+    # The receipt describes the episode that is in force NOW, which is the last one opened.
+    if (
+        episodes[-1]["record"]["payload"].get("canary_token_sha256")
+        != receipt["canary_token_sha256"]
+    ):
         raise ValueError(
             "the journalled quarantine event and the receipt describe different canary tokens"
         )
+    covering_episode = covering[trial_sequences[0]]
     return {
-        "quarantine_sequence": quarantine_sequence,
-        "restore_sequence": restore_sequence,
-        "first_trial_sequence": min(trial_sequences),
-        "last_trial_sequence": max(trial_sequences),
+        "quarantine_sequence": covering_episode["opened"],
+        "restore_sequence": int(restores[0]["sequence"]) if restores else None,
+        "first_trial_sequence": trial_sequences[0],
+        "last_trial_sequence": trial_sequences[-1],
         "trials_covered": len(trial_sequences),
+        "custody_episodes": [(e["opened"], e["closed"], e["closed_by"]) for e in episodes],
     }
+
+
+def release_for_rebuild(
+    *,
+    receipt_path: str | Path = "tournament/cup20/quarantine-receipt.json",
+    journal_path: str | Path | None = None,
+    now: float | None = None,
+) -> dict[str, Any]:
+    """End the custody episode so the holdout can be REBUILT. Phase 0 only, before any team starts.
+
+    :func:`restore_holdout` is the wrong tool for this and using it would be a lie in the record:
+    it requires the selection freeze, arms the phase-3 access tripwire, and writes a restore stamp
+    that the real restore would then refuse to write. All three describe a tournament that reached
+    scoring. A snapshot defect found before the first team starts is a different event, so it gets
+    a different one: the trees come back, the canary and the receipt (which describe an episode
+    that is over, and a holdout that is about to be replaced) are removed, and the journal records
+    ``holdout_released_for_rebuild``.
+
+    **Refuses once any trial has been accepted.** A rebuild after research has begun changes the
+    data every accepted trial was measured against, which invalidates the research rather than
+    fixing the data; that is a decision to take in the open, not one for this function to make
+    silently. The journal is the authority, so the refusal is evidence-based rather than a promise.
+
+    **What it verifies, and the one layer it deliberately drops.** Absence, both whole-tree bundle
+    digests against the receipt, the sealed snapshot's own manifest against BOTH the receipt and
+    the activation record's bound value, and the canary token -- everything
+    :func:`verify_quarantine_integrity` checks about the holdout's BYTES. What it does not re-check
+    is the other seven activation authorities (charter, config, implementation, dependency lock, IS
+    manifest, pure-crypto audit, test output), because a rebuild exists precisely to change them:
+    requiring them to be unmoved would make the operation impossible by construction. Run
+    ``scripts/cup20_quarantine.py verify`` BEFORE touching any of them -- that is the run which
+    establishes the tournament was intact when the rebuild started, and it cannot be recovered
+    afterwards.
+    """
+    receipt = verify_quarantine_in_effect(receipt_path=receipt_path)
+    if journal_path is not None and Path(journal_path).exists():
+        accepted = [r for r in read_records(journal_path) if r.get("event_type") == TRIAL_EVENT]
+        if accepted:
+            raise ValueError(
+                f"refusing to release the holdout for a rebuild: {journal_path} already records "
+                f"{len(accepted)} accepted trial(s), the first at sequence "
+                f"{min(int(r['sequence']) for r in accepted)}. Rebuilding the snapshot now would "
+                "change the data those trials were measured against."
+            )
+
+    # `verify_quarantine_in_effect` above has already established that no working path exists and
+    # both quarantine paths do, so this loop only has to answer the question it cannot: are the
+    # bytes still the bytes. Repeating its existence tests here would be an unreachable branch
+    # dressed up as a safeguard.
+    for name, entry in sorted(receipt["trees"].items()):
+        source = Path(entry["quarantine_path"])
+        observed = bundle_digest(source)
+        if observed != entry["bundle_sha256"]:
+            raise ValueError(
+                f"REFUSING TO RELEASE: the quarantined {name} tree at {source} does not match the "
+                f"digest recorded when it was quarantined (expected {entry['bundle_sha256']}, "
+                f"found {observed}). The holdout was modified while out of the working tree. "
+                "Nothing has been moved."
+            )
+
+    quarantined_sealed = Path(receipt["trees"][SEALED_TREE]["quarantine_path"])
+    sealed_manifest = load_snapshot(quarantined_sealed).manifest_sha256
+    bound = json.loads(Path(receipt["activation_record_path"]).read_text())
+    for label, expected in (
+        ("the quarantine receipt", receipt["sealed_manifest_sha256"]),
+        (
+            f"the activation record {receipt['activation_record_path']}",
+            bound["sealed_manifest_sha256"],
+        ),
+    ):
+        if sealed_manifest != expected:
+            raise ValueError(
+                f"REFUSING TO RELEASE: the quarantined sealed snapshot's manifest digest "
+                f"{sealed_manifest} does not match {label} ({expected}); the holdout on disk is "
+                "not the one this tournament was activated against"
+            )
+    token = read_canary_token(receipt_path=receipt_path)
+
+    moved: dict[str, str] = {}
+    for name, entry in sorted(receipt["trees"].items()):
+        source = Path(entry["quarantine_path"])
+        target = Path(entry["working_path"])
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(source), str(target))
+        landed = bundle_digest(target)
+        if landed != entry["bundle_sha256"]:
+            raise ValueError(
+                f"the {name} tree changed while being released to {target} "
+                f"(expected {entry['bundle_sha256']}, found {landed})"
+            )
+        moved[name] = str(target)
+
+    # The canary and the token belong to the episode that just ended. Leaving the canary behind
+    # would also block the next quarantine outright ("a canary is already planted"), and leaving
+    # the token would leave a live secret pointing at a holdout that no longer exists.
+    canary_file = Path(receipt["trees"][SEALED_TREE]["working_path"]) / CANARY_FILENAME
+    if canary_file.is_file():
+        canary_file.unlink()
+    quarantine_root = Path(receipt["quarantine_root"])
+    token_file = quarantine_root / CANARY_TOKEN_FILENAME
+    if token_file.is_file():
+        token_file.unlink()
+    if quarantine_root.is_dir() and not any(quarantine_root.iterdir()):
+        quarantine_root.rmdir()
+    Path(receipt_path).unlink()
+
+    payload: dict[str, Any] = {
+        "schema_version": RECEIPT_SCHEMA_VERSION,
+        "released_at_epoch": float(time.time() if now is None else now),
+        "released_trees": moved,
+        "sealed_manifest_sha256": sealed_manifest,
+        "canary_token_sha256": _digest_bytes(token.encode("utf-8")),
+        "receipt_removed": str(receipt_path),
+    }
+    if journal_path is not None:
+        append_record(
+            journal_path,
+            REBUILD_EVENT,
+            {
+                "sealed_manifest_sha256": sealed_manifest,
+                "canary_token_sha256": payload["canary_token_sha256"],
+                "released_trees": moved,
+            },
+        )
+    return payload
 
 
 def restore_holdout(

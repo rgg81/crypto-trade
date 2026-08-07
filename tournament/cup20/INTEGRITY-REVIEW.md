@@ -15,6 +15,50 @@ occurred. Charter §5 and §14.8 state the residual; do not overclaim past them 
 
 ---
 
+## 0a. Pre-start readiness — run this BEFORE dispatching any team
+
+Everything below this section audits a tournament that has already run. This one check runs at the
+other end, and it is the only one whose failure is cheap: it establishes that a candidate can be
+scored **at all** on the shipped snapshot.
+
+```
+uv run python scripts/cup20_readiness.py
+```
+
+It runs one reference strategy over the full in-sample window through the real pipeline —
+`run_candidate` → `assemble_scored_metrics` → `adjudicate_candidate` — and fails if any stage
+raises. Run it before the first team is dispatched, and again after **any** change to the snapshot,
+the universe rules, the evaluator or the scoring stack.
+
+**Why it is not covered by the test suite.** Every unit test builds its own fixture, and a fixture
+is exactly where a *data* defect cannot live. 862 of them passed while the built snapshot held 21
+decision boundaries at which the evaluator raised `missing current mark for eligible symbols` on a
+member whose mark history began a week after it entered the universe. That raise fires on the
+eligible symbol set before any strategy code runs, so it would have crashed all twelve teams, on
+every candidate, at the first backtest. This script is what reaches it.
+
+**Pass:** every stage prints `ok`, followed by the reference strategy's full metric vector, the
+hard-floor table, and `READINESS PASSED`. Read the metric vector — a Sharpe of 40, a drawdown of
+0.0 or a trade count of 3 means the pipeline is broken even though nothing raised.
+
+**A `NOT QUALIFIED` verdict for the reference book is not a failure.** The reference strategy is a
+load, not a benchmark: a weekly cross-sectional reversal book chosen because it trades both sides,
+turns over, and exercises the caps and the risk unit. Only a raise — or the mark-coverage check
+below — fails this gate.
+
+**Fail:** the failing stage is named, with the exception. The one failure mode with its own message
+is `READINESS FAILED: the snapshot holds N (boundary, symbol) pairs the evaluator cannot mark`,
+which names the symbols and the first offending boundary. That is a defect in the built universe,
+not in a team's code: rebuild with `scripts/cup20_build_snapshot.py --skip-acquire` and do not
+dispatch teams until it is clean.
+
+**Cost:** it reads only `data/cup20/is`, so it runs with the holdout still quarantined, and it
+reports its own wall-clock time on the last line. The mark-coverage check is the first stage and
+finishes in under a second, so a snapshot with this defect is rejected immediately rather than
+after the full evaluation.
+
+---
+
 ## 0. Before you start
 
 You need two things that are not in the repository:
@@ -126,7 +170,7 @@ import json; print(json.dumps(verify_quarantine_covered_research(
     receipt_path='tournament/cup20/quarantine-receipt.json'), indent=2))"
 ```
 
-**Pass:** prints five numbers, and
+**Pass:** prints six fields, and
 
 - `quarantine_sequence` is **lower** than `first_trial_sequence`, and
 - `restore_sequence` is **higher** than `last_trial_sequence` (or `null`, if the holdout has not
@@ -137,17 +181,31 @@ Read that as: the holdout left the working tree before the first accepted trial 
 back until after the last one. Because the journal is hash-chained, moving either event to make
 this true breaks check 2.
 
+`custody_episodes` lists every `(opened, closed, closed_by)` interval the holdout spent outside the
+working tree. **More than one episode is legitimate only in one shape**, and the list is where you
+check which shape you have:
+
+| `closed_by` | Meaning |
+|---|---|
+| `null` (open) | the current episode; expected while the tournament is running |
+| `holdout_released_for_rebuild` | a **pre-start** rebuild: the snapshot was found to be wrong before any team began, so the holdout came back, was rebuilt and was re-quarantined. `release_for_rebuild` refuses to run once any trial exists, so such an episode can only precede the research phase |
+| `holdout_restored` | the phase-3 restore. There is at most one, and everything after it is scoring |
+
+Every accepted trial must sit **strictly inside** one episode; a trial in the gap between two is a
+failure, not a technicality. Read the whole list — a rebuild episode is a statement that the
+tournament's data was replaced, and belongs in the record alongside the reason.
+
 **Fail modes and what each means:**
 
 | Message | Meaning |
 |---|---|
-| `holdout_quarantined is at sequence N, after the first accepted trial` | research ran while the holdout was reachable |
-| `holdout_restored is at sequence N, before the last accepted trial` | the holdout came back while research was still running |
-| `expected exactly one holdout_quarantined record, found 0` | quarantine was never journalled; custody is unproven even if it happened |
-| `expected exactly one holdout_quarantined record, found 2` | two custody episodes; the gap between them is unaccounted for |
-| `expected at most one holdout_restored record, found 2` | two restores; the holdout came back twice and the second episode is unaccounted for |
+| `the trial accepted at sequence N sits outside every custody episode` | research ran while the holdout was reachable — either before the first quarantine, or in a gap between episodes, or after a restore |
+| `expected at least one holdout_quarantined record, found none` | quarantine was never journalled; custody is unproven even if it happened |
+| `has a second holdout_quarantined at sequence N while the episode opened at M was never closed` | the journal claims the holdout left the tree while it had never come back |
+| `a <event> at sequence N with no open custody episode before it` | the holdout came back without having left |
+| `expected at most one holdout_restored record, found 2` | two restores; the holdout came back twice after the field closed and the second episode is unaccounted for |
 | `records no trial_accepted events` | this is not the journal the review needs — you are pointed at the wrong file |
-| `different canary tokens` | the committed receipt and the journalled event describe two different quarantines |
+| `different canary tokens` | the committed receipt and the **most recent** journalled quarantine describe two different quarantines |
 
 Any of these is a **finding about the tournament**, not about the tool. Record it and stop.
 

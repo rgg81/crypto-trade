@@ -105,11 +105,17 @@ def main() -> None:
         report = verify_quarantine_covered_research(
             journal_path=paths["research_journal"], receipt_path=receipt_path
         )
+        # The episode list is printed, not summarised away: more than one episode is legitimate
+        # only when the extra ones are pre-start rebuilds, and that is a judgement for the reader.
+        episodes = ", ".join(
+            f"[{opened}, {closed if closed is not None else 'open'}{f' {by}' if by else ''}]"
+            for opened, closed, by in report["custody_episodes"]
+        )
         return (
             f"quarantine at seq {report['quarantine_sequence']}, "
             f"{report['trials_covered']} trials in "
             f"[{report['first_trial_sequence']}, {report['last_trial_sequence']}], "
-            f"restore at seq {report['restore_sequence']}"
+            f"restore at seq {report['restore_sequence']}; custody episodes {episodes}"
         )
 
     review.check("3. quarantine covered every accepted trial", _custody)

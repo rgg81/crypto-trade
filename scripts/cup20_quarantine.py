@@ -32,6 +32,7 @@ from crypto_trade.cup20.config import load_config
 from crypto_trade.cup20.quarantine import (
     FAST_VERIFY_DISCLAIMER,
     quarantine_holdout,
+    release_for_rebuild,
     restore_holdout,
     sealed_access_report,
     verify_quarantine_in_effect,
@@ -79,6 +80,10 @@ def main() -> None:
         help="absence only: does not read the quarantined bytes, and says so in its output",
     )
     sub.add_parser("restore", help="verify then bring both trees back (needs the selection freeze)")
+    sub.add_parser(
+        "release-for-rebuild",
+        help="phase 0 only: end custody to rebuild (refuses once a trial exists)",
+    )
     sub.add_parser("access-report", help="which sealed files have been read since arming")
 
     arguments = parser.parse_args()
@@ -112,6 +117,19 @@ def main() -> None:
         )
         print("  canary token matches the receipt, so the review scans for the right string")
         print("\nquarantine VERIFIED: the quarantined bytes are the bytes that left the tree")
+        return
+
+    if arguments.command == "release-for-rebuild":
+        payload = release_for_rebuild(
+            receipt_path=paths["receipt"],
+            journal_path=paths["journal"],
+        )
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        print(
+            "\nreleased for rebuild. The receipt and canary are gone with the episode they "
+            "described.\nRebuild, re-freeze activation, then run `quarantine` again to open the "
+            "next episode."
+        )
         return
 
     if arguments.command == "restore":

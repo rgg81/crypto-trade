@@ -825,7 +825,7 @@ def test_a_restore_that_never_happened_is_allowed_mid_tournament(tree):
 
 def test_quarantine_after_the_first_trial_is_caught(tree):
     _journal(tree, quarantine_first=False)
-    with pytest.raises(ValueError, match="after the first accepted trial"):
+    with pytest.raises(ValueError, match="sits outside every custody episode"):
         q.verify_quarantine_covered_research(journal_path=tree.journal, receipt_path=tree.receipt)
 
 
@@ -835,21 +835,27 @@ def test_a_restore_before_the_last_trial_is_caught(tree):
     tree.close_the_field()
     tree.restore_now(journal_path=tree.journal)
     append_record(tree.journal, "trial_accepted", {"team_id": "team-02"})
-    with pytest.raises(ValueError, match="before the last accepted trial"):
+    with pytest.raises(ValueError, match="sits outside every custody episode"):
         q.verify_quarantine_covered_research(journal_path=tree.journal, receipt_path=tree.receipt)
 
 
 def test_a_journal_with_no_quarantine_event_is_caught(tree):
     tree.quarantine_now()
     append_record(tree.journal, "trial_accepted", {"team_id": "team-01"})
-    with pytest.raises(ValueError, match="exactly one holdout_quarantined"):
+    with pytest.raises(ValueError, match="at least one holdout_quarantined"):
         q.verify_quarantine_covered_research(journal_path=tree.journal, receipt_path=tree.receipt)
 
 
-def test_two_quarantine_events_are_caught(tree):
+def test_a_second_quarantine_while_one_is_open_is_caught(tree):
+    """Two opens with no close between them is incoherent, and stays a failure.
+
+    This is what the old "exactly one holdout_quarantined" rule was really protecting: not the
+    COUNT of episodes -- a pre-start rebuild legitimately produces two -- but the claim that the
+    holdout left the working tree while it had never come back.
+    """
     _journal(tree, restore=False)
     append_record(tree.journal, q.QUARANTINE_EVENT, {"canary_token_sha256": "x"})
-    with pytest.raises(ValueError, match="exactly one holdout_quarantined"):
+    with pytest.raises(ValueError, match="was never closed"):
         q.verify_quarantine_covered_research(journal_path=tree.journal, receipt_path=tree.receipt)
 
 
@@ -1006,3 +1012,162 @@ def test_the_access_report_refuses_a_baseline_with_no_armed_timestamp(tree, tmp_
 def test_arming_refuses_a_sealed_root_that_is_not_there(tmp_path):
     with pytest.raises(FileNotFoundError, match="sealed root"):
         q.arm_sealed_access_tripwire(tmp_path / "absent", baseline_path=tmp_path / "b.json")
+
+
+# --- release_for_rebuild: ending a custody episode so the SNAPSHOT can be replaced
+#
+# The mutation this whole block exists to kill is reaching for `restore_holdout` instead. That
+# function is the phase-3 move: it demands the selection freeze, arms the access tripwire and
+# writes a restore stamp the real restore would then refuse to write a second time. Using it for a
+# phase-0 data fix would put three false statements about the tournament's phase into the record
+# and disable the genuine restore. Everything below asserts the two are not interchangeable.
+
+
+def _rebuild_ready(tree):
+    tree.quarantine_now(journal_path=tree.journal)
+    return q.load_receipt(tree.receipt)
+
+
+def test_release_for_rebuild_brings_both_trees_back(tree):
+    receipt = _rebuild_ready(tree)
+    payload = q.release_for_rebuild(receipt_path=tree.receipt, journal_path=tree.journal)
+    assert tree.sealed_root.is_dir() and tree.acquisition_root.is_dir()
+    assert bundle_digest(tree.acquisition_root) == receipt["trees"]["acquisition"]["bundle_sha256"]
+    assert payload["sealed_manifest_sha256"] == tree.record["sealed_manifest_sha256"]
+
+
+def test_release_for_rebuild_ends_the_episode_it_closed(tree):
+    """The receipt, the canary and the token all describe a holdout that is about to be replaced.
+
+    Kills the mutation: leaving them behind. A stale receipt makes `verify` report on a quarantine
+    that is over; a surviving canary blocks the next `quarantine_holdout` outright; and a live
+    token file points at a holdout that no longer exists, which is worse than none at all.
+    """
+    _rebuild_ready(tree)
+    q.release_for_rebuild(receipt_path=tree.receipt, journal_path=tree.journal)
+    assert not tree.receipt.exists()
+    assert not (tree.sealed_root / q.CANARY_FILENAME).exists()
+    assert not (tree.quarantine / q.CANARY_TOKEN_FILENAME).exists()
+    assert not tree.quarantine.exists()
+
+
+def test_the_next_quarantine_opens_a_second_episode_the_review_accepts(tree):
+    """The end-to-end shape of a pre-start rebuild, checked against the review's own check 3."""
+    _rebuild_ready(tree)
+    q.release_for_rebuild(receipt_path=tree.receipt, journal_path=tree.journal)
+    tree.quarantine_now(journal_path=tree.journal, token="b" * 64)
+    append_record(tree.journal, "trial_accepted", {"team_id": "team-01"})
+    report = q.verify_quarantine_covered_research(
+        journal_path=tree.journal, receipt_path=tree.receipt
+    )
+    assert report["custody_episodes"] == [(1, 2, q.REBUILD_EVENT), (3, None, None)]
+    assert report["quarantine_sequence"] == 3, "the covering episode is the one the trial sits in"
+    assert report["first_trial_sequence"] == 4
+    assert report["trials_covered"] == 1
+
+
+def test_a_trial_in_the_gap_between_two_episodes_is_caught(tree):
+    """Kills the mutation: accepting multiple episodes without checking what happened between them.
+
+    A rebuild release followed by research and only THEN a re-quarantine is the case a naive
+    "episodes are allowed now" relaxation would wave through.
+    """
+    _rebuild_ready(tree)
+    q.release_for_rebuild(receipt_path=tree.receipt, journal_path=tree.journal)
+    append_record(tree.journal, "trial_accepted", {"team_id": "team-01"})
+    tree.quarantine_now(journal_path=tree.journal, token="b" * 64)
+    with pytest.raises(ValueError, match="sits outside every custody episode"):
+        q.verify_quarantine_covered_research(journal_path=tree.journal, receipt_path=tree.receipt)
+
+
+def test_a_close_with_no_open_before_it_is_caught(tree):
+    tree.quarantine_now()
+    append_record(tree.journal, q.REBUILD_EVENT, {})
+    append_record(tree.journal, "trial_accepted", {"team_id": "team-01"})
+    with pytest.raises(ValueError, match="no open custody episode before it"):
+        q.verify_quarantine_covered_research(journal_path=tree.journal, receipt_path=tree.receipt)
+
+
+def test_release_for_rebuild_refuses_once_a_trial_has_been_accepted(tree):
+    """The one thing that makes a second custody episode safe: it can only precede the research.
+
+    Kills the mutation: allowing a rebuild mid-tournament, which would replace the data every
+    accepted trial was measured against while leaving those trials in the ledger.
+    """
+    _rebuild_ready(tree)
+    append_record(tree.journal, "trial_accepted", {"team_id": "team-01"})
+    with pytest.raises(ValueError, match="already records 1 accepted trial"):
+        q.release_for_rebuild(receipt_path=tree.receipt, journal_path=tree.journal)
+    assert not tree.sealed_root.exists(), "nothing may move when the release is refused"
+    assert tree.receipt.is_file()
+
+
+def test_release_for_rebuild_refuses_a_modified_sealed_tree(tree):
+    _rebuild_ready(tree)
+    target = tree.quarantine / "sealed" / "bars.parquet"
+    target.write_bytes(target.read_bytes() + b"\x00")
+    with pytest.raises(ValueError, match="REFUSING TO RELEASE"):
+        q.release_for_rebuild(receipt_path=tree.receipt, journal_path=tree.journal)
+    assert not tree.sealed_root.exists()
+    assert tree.receipt.is_file()
+
+
+def test_release_for_rebuild_refuses_a_modified_acquisition_tree(tree):
+    # The acquisition snapshot has no manifest of its own, so only the bundle digest sees this.
+    _rebuild_ready(tree)
+    (tree.quarantine / "acquisition" / "coverage.json").write_text('{"symbols": 3}\n')
+    with pytest.raises(ValueError, match="REFUSING TO RELEASE"):
+        q.release_for_rebuild(receipt_path=tree.receipt, journal_path=tree.journal)
+    assert not tree.acquisition_root.exists()
+
+
+def test_release_for_rebuild_refuses_a_sealed_manifest_the_record_does_not_bind(tree):
+    """Kills the mutation: checking the receipt only.
+
+    The receipt was written at quarantine time; the activation record was written before any team
+    started. A holdout swapped for a different one, with a receipt rewritten to match, passes the
+    receipt comparison and fails this one.
+    """
+    _rebuild_ready(tree)
+    record = json.loads(tree.activation.read_text())
+    record["sealed_manifest_sha256"] = "f" * 64
+    tree.activation.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
+    with pytest.raises(ValueError, match="not the one this tournament was activated against"):
+        q.release_for_rebuild(receipt_path=tree.receipt, journal_path=tree.journal)
+    assert not tree.sealed_root.exists()
+
+
+def test_release_for_rebuild_refuses_a_drifted_canary_token(tree):
+    _rebuild_ready(tree)
+    (tree.quarantine / q.CANARY_TOKEN_FILENAME).write_text("c" * 64 + "\n")
+    with pytest.raises(ValueError, match="does not match the receipt"):
+        q.release_for_rebuild(receipt_path=tree.receipt, journal_path=tree.journal)
+    assert not tree.sealed_root.exists()
+
+
+def test_release_for_rebuild_refuses_when_the_tree_is_already_back(tree):
+    """A working path that already exists means custody has ALREADY ended, however it ended.
+
+    Reported as that -- `quarantine is NOT in effect` -- rather than as an overwrite risk, because
+    the interesting fact is that someone put the holdout back outside this code path, not that the
+    move would clobber a directory.
+    """
+    _rebuild_ready(tree)
+    tree.sealed_root.mkdir(parents=True)
+    with pytest.raises(ValueError, match="quarantine is NOT in effect"):
+        q.release_for_rebuild(receipt_path=tree.receipt, journal_path=tree.journal)
+    assert tree.receipt.is_file()
+
+
+def test_release_for_rebuild_does_not_arm_the_tripwire_or_stamp_a_restore(tree):
+    """The three phase-3 side effects `restore_holdout` has and this must not.
+
+    A restore stamp written here would make the genuine phase-3 restore refuse ("the holdout has
+    already been restored"), and an access baseline armed here would date the tripwire from before
+    the rebuild.
+    """
+    _rebuild_ready(tree)
+    q.release_for_rebuild(receipt_path=tree.receipt, journal_path=tree.journal)
+    assert not tree.stamp.exists()
+    assert not tree.baseline.exists()
+    assert not tree.freeze.exists(), "and it required no selection freeze to get here"

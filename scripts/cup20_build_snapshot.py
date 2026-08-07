@@ -10,7 +10,11 @@ import pandas as pd
 
 from crypto_trade.cup20.config import IS_END, SEALED_END, load_config
 from crypto_trade.cup20.snapshot import resolve_is_start, write_split_snapshots
-from crypto_trade.cup20.universe import build_membership, weekly_reconstitution_times
+from crypto_trade.cup20.universe import (
+    build_membership,
+    unmarkable_member_boundaries,
+    weekly_reconstitution_times,
+)
 from crypto_trade.tournament.pure_crypto_universe_v6 import (
     REVIEWED_ARCHIVE_ONLY_CRYPTO,
     current_contract_violations,
@@ -73,6 +77,28 @@ def daily_quote_volume(bars: pd.DataFrame) -> pd.DataFrame:
     pivot = frame.pivot_table(index="day", columns="symbol", values="quote_volume", aggfunc="sum")
     full_days = pd.date_range(pivot.index.min(), pivot.index.max(), freq="D", tz="UTC")
     return pivot.reindex(full_days)
+
+
+def decision_coverage(bars: pd.DataFrame, marks: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """``(fillable, markable)`` on the evaluator's own 8h decision grid.
+
+    ``fillable`` is where a symbol has an executable bar open; ``markable`` is where it has a mark
+    price. Together they are the two halves of the evaluator's ``missing current mark for eligible
+    symbols`` test, reproduced here so ``build_membership`` can refuse to admit a symbol it would
+    fire on. The grid is the BAR grid, deliberately: ``evaluate_targets`` looks a mark up at a bar
+    open timestamp and never anywhere else, so a mark published off that grid is one no evaluation
+    can ever consult and is dropped rather than counted as coverage. A symbol with no mark rows at
+    all reindexes to all-False, which is the fail-closed reading.
+
+    ``pivot``, never ``pivot_table``: a duplicate ``(time, symbol)`` row means the acquisition is
+    wrong, and aggregating it away would hide that behind a silently averaged coverage flag.
+    """
+    frame = bars.assign(open_time=pd.to_datetime(bars["open_time"], utc=True))
+    opens = frame.pivot(index="open_time", columns="symbol", values="open").sort_index()
+    mark_frame = marks.assign(mark_time=pd.to_datetime(marks["mark_time"], utc=True))
+    published = mark_frame.pivot(index="mark_time", columns="symbol", values="mark_price")
+    aligned = published.reindex(index=opens.index, columns=opens.columns)
+    return opens.notna(), aligned.notna()
 
 
 def eligibility(volume: pd.DataFrame, metadata: pd.DataFrame) -> pd.DataFrame:
@@ -178,13 +204,17 @@ def pure_crypto_audit(
 
 
 def build_universe(
-    bars: pd.DataFrame, metadata: pd.DataFrame, universe: dict[str, object]
+    bars: pd.DataFrame,
+    marks: pd.DataFrame,
+    metadata: pd.DataFrame,
+    universe: dict[str, object],
 ) -> tuple[pd.DataFrame, pd.Timestamp]:
     """Derive point-in-time CUP-20 membership and the first boundary that reaches target size."""
     lookback_days = int(universe["lookback_days"])
     target_size = int(universe["target_size"])
     volume = daily_quote_volume(bars)
     eligible = eligibility(volume, metadata)
+    fillable, markable = decision_coverage(bars, marks)
     boundaries = weekly_reconstitution_times(
         pd.Timestamp(volume.index.min()) + pd.Timedelta(days=lookback_days),
         SEALED_END,
@@ -193,6 +223,8 @@ def build_universe(
     membership = build_membership(
         volume,
         eligible=eligible,
+        fillable=fillable,
+        markable=markable,
         reconstitution_times=boundaries,
         lookback_days=lookback_days,
         target_size=target_size,
@@ -227,10 +259,26 @@ def main() -> None:
     exchange_info = json.loads((ACQUISITION_DIR / "exchange_info.json").read_text())
 
     config = dict(load_config(TOURNAMENT_CONFIG).raw["universe"])
-    membership, is_start = build_universe(bars, metadata, config)
+    membership, is_start = build_universe(bars, marks, metadata, config)
     membership = membership.loc[membership["reconstitution_time"] >= is_start].reset_index(
         drop=True
     )
+
+    # The guarantee, re-derived on the SHIPPED membership rather than trusted from the criterion
+    # that produced it. `evaluate_targets` raises `missing current mark for eligible symbols` on
+    # the eligible set, before any strategy code runs, so one unmarkable member crashes every
+    # candidate in the tournament -- which is how this shipped once: 21 boundaries of SUIUSDT,
+    # member from 2023-10-30 with bars from 2023-05-03 and marks only from 2023-11-06. Two things
+    # reach here that `build_membership`'s own criterion cannot see: a boundary that emitted
+    # nothing leaves the previous members in force past the period their coverage was checked
+    # over, and the IS_START filter above rewrites the frame after the fact.
+    fillable, markable = decision_coverage(bars, marks)
+    unmarkable = unmarkable_member_boundaries(membership, fillable=fillable, markable=markable)
+    if unmarkable:
+        raise SystemExit(
+            f"CUP-20 membership holds {len(unmarkable)} (boundary, symbol) pairs the evaluator "
+            f"cannot mark, e.g. {unmarkable[:5]}; every candidate would raise on them"
+        )
 
     # Containment: every CUP-20 member must exist in the audited acquisition universe. Checked on
     # the SHIPPED membership, after the IS_START filter: the CUP-20 grid begins as soon as any

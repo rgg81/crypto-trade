@@ -63,9 +63,21 @@ not by good intentions:
 **Rule.** At each weekly reconstitution boundary:
 
 1. **Eligibility.** A symbol is eligible only if it is a USDT-quoted, USDT-margined `PERPETUAL`
-   contract, passes the fail-closed pure-crypto policy, is not delisted at the boundary, and has a
-   **complete 180-day trailing history**. The completeness requirement doubles as the minimum
-   listing age and is the single rule that removes launch-hype listings.
+   contract, passes the fail-closed pure-crypto policy, is not delisted at the boundary, has a
+   **complete 180-day trailing history**, and **has a mark price at every decision boundary of the
+   membership period it is being admitted to** (see below). The completeness requirement doubles as
+   the minimum listing age and is the single rule that removes launch-hype listings.
+
+   The mark-coverage half is not bookkeeping. The evaluator prices every position at the boundary
+   mark and refuses to run a boundary at which a member has an executable bar open and no mark, so
+   an unmarkable member crashes **every** candidate in the field before any strategy code runs —
+   which is what a member with 21 such boundaries did before this clause existed. A symbol the
+   evaluator cannot mark is not tradeable, so it is not eligible. The window checked is the
+   membership period `[t_i, t_{i+1})` the admission commits to: not the boundary alone (which says
+   nothing about the twenty intra-week decisions that follow), and not the 180-day lookback (mark
+   history is an archive property, not a listing age — Binance's mark archive begins on one date
+   for every symbol at once, so a trailing-mark rule would admit nobody for six months after it and
+   move `IS_START`).
 2. **Ranking.** Rank eligible symbols by trailing **180-day USDT quote volume**, descending.
 3. **Hysteresis.** Incumbents survive while rank ≤ 25. New entrants require rank ≤ 20.
    Deterministic construction: keep incumbents with rank ≤ 25 in rank order, truncated to 20; fill
@@ -91,18 +103,23 @@ authoritative.
 The three rows above were measured at design time on a weekly-sampled proxy. The authoritative
 numbers are the built artifact's own, **stated over the in-sample window** — this document is
 team-visible, and how many names the universe holds after the cutoff is a fact about the holdout.
-Across the IS window's 207 reconstitutions the adopted rule delivers **0.29 changes per week, 159
-of 206 transitions completely unchanged, and 63 distinct names**, with exactly 20 members at every
+Across the IS window's 207 reconstitutions the adopted rule delivers **0.28 changes per week, 159
+of 206 transitions completely unchanged, and 62 distinct names**, with exactly 20 members at every
 boundary. That confirms the design-time estimate's direction and magnitude while being measured on
 the real thing rather than a proxy. The organiser's full-window figures exist and are recorded in
 `tournament/cup20/private/universe-summary.json`, which is not team-visible.
 
+(These are the figures **after** the mark-coverage clause of rule 1. Before it the same rule gave
+0.29 changes per week and 63 distinct names, over the same 207 reconstitutions and the same
+`IS_START`; adding mark coverage moved 28 membership rows and removed exactly one name, IOTAUSDT,
+whose mark history begins after it first qualified.)
+
 The ranking statistic is the **median** daily quote volume over the trailing window, not the mean.
 A coin's launch-week volume spike lifts a 180-day mean far more than a 180-day median, so ranking
 on the mean admits transient listings into a universe meant to be blue-chip. Re-measured on the
-built data over the same IS window, the mean gave 67 distinct names at 0.31 changes per week
-against the median's 63 at 0.29: it admitted COMP, ENS, LINA, MANA, OMG, TOMO and WAVES, and passed
-over BAND, NEO and SEI. The choice was fixed before any holdout number existed and is not
+built data over the same IS window, the mean gave 66 distinct names at 0.30 changes per week
+against the median's 62 at 0.28: it admitted COMP, ENS, LINA, MANA, OMG, TOMO and WAVES, and passed
+over BAND, MKR and SEI. The choice was fixed before any holdout number existed and is not
 conditioned on one. It is a validated field of the machine contract, so the config and the
 implementation cannot silently disagree about it.
 
