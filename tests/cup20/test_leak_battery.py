@@ -915,6 +915,13 @@ _INTENTIONALLY_UNEXPORTED: dict[str, frozenset[str]] = {
     # The two stage names ARE exported (a caller of assemble_scored_metrics needs them); the tuple
     # of both is an internal validation table.
     "scored_metrics.py": frozenset({"STAGES"}),
+    # Two filenames the trial ledger and the harness have to agree on, and one validation table.
+    # Same category as quarantine.py's set: importable by the module that needs them (harness.py
+    # imports both filenames so the digest and the loader can never disagree about which file the
+    # entrypoint is), but not part of the package's public API. RECOGNISED_ROLES exists only so a
+    # mistyped role fails at journal time instead of as a bare KeyError from inside the floors --
+    # the roles a candidate may declare are stated by the charter, not by this constant.
+    "trials.py": frozenset({"ENTRYPOINT", "RISK_POLICY_FILENAME", "RECOGNISED_ROLES"}),
 }
 
 

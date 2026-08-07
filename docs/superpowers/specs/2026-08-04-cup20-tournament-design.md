@@ -365,7 +365,11 @@ it invites reliance the mechanism cannot carry. A material trial is any evaluati
 seed, parameters, window, cost model, risk policy) differs from an earlier one.
 
 **Budget: 12 material trials per team. Nomination requires ≥ 8 accepted trials.** No team may
-nominate merely because its budget or wall-clock is exhausted.
+nominate merely because its budget or wall-clock is exhausted. The append is made by
+`scripts/cup20_trial.py`, which is the organiser-owned path teams request through; the budget is
+enforced at that append rather than at nomination, so the thirteenth is refused by name and count
+before any work is done against it, and `scripts/cup20_evaluate.py` refuses to score a candidate
+state no accepted trial describes.
 
 **Preregistered batteries count as one trial each** — an improvement over prior seasons, which
 charged each neighbourhood point separately and made the certificate unaffordable:
@@ -512,6 +516,29 @@ neighbourhood) is run; if it clears the core performance floors, the candidate i
 the apparent edge is a construction artifact rather than a mechanism. Separately, a shuffled-signal
 placebo is scored on **gross** edge, never on net: a net-of-cost placebo null is structurally broken
 because any costed random book centres at −cost rather than at zero.
+
+**The core performance floors** are the eight above that are properties of a single run's own
+return stream, and therefore mean the same thing for an inverted book as for the book it inverts:
+net Sharpe at 1×, 2× and 3×, annualised return at 1× and 2×, maximum drawdown, realised
+annualised volatility, and executed trades. Named explicitly because "core" was previously
+undefined and the verdict it decides is disqualifying. The remaining floors are excluded, each for
+its own reason: the two research-process terms (neighbourhood positivity, trial-adjusted
+confidence) are not properties of the run at all; the sign-inversion row itself is the verdict
+being computed; the role rows invert by construction, so a long-only candidate's inversion is
+short-only and would fail them for a reason that says nothing about artifacts; and the shape rows
+(turnover, gross edge per turnover, cost share, five-largest-day share, fold PnL concentration,
+fold and quarter positivity) are close to sign-symmetric, so including them would let a candidate
+be disqualified because its inversion had the same turnover. The choice is not delicate: an exactly
+inverted book carries the negative of the original's gross return, so `annualised return > 0` alone
+fails almost every inversion, and what survives the eight is a book whose apparent edge came from
+cost, funding or cap asymmetry rather than from direction.
+
+**Both halves are run by the organiser's harness, not self-reported.** The inversion is
+mechanically exact — every emitted weight negated, `None` (hold) and `{}` (flat) untouched, since
+neither carries a direction — and the placebo preserves the candidate's weight multiset and
+rebalance schedule exactly while randomising which eligible symbol receives which weight. A team
+implementing either privately could get it wrong in ways nobody can audit, and could skip a
+mandatory falsifier by accident; a disqualifying verdict cannot rest on a self-report.
 
 **Metric definitions.** `calmar_2x` = annualised 2×-cost return ÷ the **2×-cost** maximum drawdown
 magnitude. `worst_fold_sharpe_2x` / `median_fold_sharpe_2x` = the minimum and median of the four
@@ -688,6 +715,11 @@ data/cup20/{is/, sealed/, acquisition/}                  distinct manifests; onl
 src/crypto_trade/cup20/
   config.py universe.py snapshot.py engine.py risk_unit.py journal.py quarantine.py
   qualification.py scoring.py scored_metrics.py adjudication.py runner.py report.py paper.py
+  trials.py                          the material tuple, the budget, the organiser-owned append
+  harness.py                         the ONE scorer teams run; also the falsification battery
+scripts/cup20_trial.py               TEAM-FACING: record a material trial before evaluating
+scripts/cup20_evaluate.py            TEAM-FACING: evaluate a candidate, print the coaching packet
+scripts/cup20_readiness.py           reference strategy end to end, before any team is dispatched
 scripts/cup20_quarantine.py          quarantine / restore / verify, from the command line
 scripts/cup20_integrity_review.py    runs every check in INTEGRITY-REVIEW.md and prints a verdict
 tests/cup20/

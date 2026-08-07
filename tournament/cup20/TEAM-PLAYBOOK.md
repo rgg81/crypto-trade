@@ -200,7 +200,154 @@ concession is what makes the certificate affordable, and it stays honest only un
 
 ---
 
-## 5. Fix the nominee before you declare the neighbourhood
+## 5. The two commands
+
+**You never write your own scorer and you never write to the journal.** Two organiser-owned
+commands do both, and every number you are entitled to act on comes out of them. Run them from the
+repository root.
+
+If twelve teams each built a private scorer, twelve teams would disagree about which cost level
+each floor reads, where the fold boundaries fall, and whether the risk unit runs before or after
+the exposure caps — and none of those twelve would be the one the organiser scores nominations
+with. These two are.
+
+### 5.1 `cup20_trial.py` — record a material trial
+
+```
+uv run python scripts/cup20_trial.py \
+  --team team-NN --candidate <candidate-id> \
+  --purpose "the question this trial answers, in one sentence" \
+  --seed <int> --roles long,short \
+  [--kind point|neighbourhood|falsification] \
+  [--parameter formation_bars=30 --parameter entry_threshold=0.5]
+```
+
+It appends one `trial_accepted` record to the hash-chained journal and prints the **sequence
+number** — the number your research certificate cites, and the number the evaluator looks for.
+
+What it records is the material tuple: your candidate directory's source digest, the config
+digest, your `risk_policy.json` digest, the IS snapshot digest, the seed, the window, the cost
+model, your declared parameters, your declared roles and the trial kind. Two runs whose tuples are
+equal are one trial; any difference is a new one.
+
+- **`--roles` is a claim you make before the numbers exist.** It is checked against the sides your
+  book actually traded (charter §7.3, "roles are observed, not declared"), and you cannot re-declare
+  after seeing which sleeve paid — re-declaring is a new material trial.
+- **`--kind`** defaults to `point`. Use `neighbourhood` for the declared sweep and `falsification`
+  for the battery; each is one trial, and each kind is its own material trial, so a `point` trial
+  does not licence a battery.
+- **The thirteenth is refused**, by name and count. There is no override and no extension.
+
+### 5.2 `cup20_evaluate.py` — evaluate a candidate
+
+```
+# no market data, no metric, NO TRIAL — run this as often as you like
+uv run python scripts/cup20_evaluate.py --team team-NN --candidate <id> --check
+
+# the scored evaluation: full in-sample window, 1x / 2x / 3x cost. About seven minutes.
+uv run python scripts/cup20_evaluate.py --team team-NN --candidate <id>
+
+# the falsification battery: exact sign inversion + gross-edge placebo. About forty minutes.
+uv run python scripts/cup20_evaluate.py --team team-NN --candidate <id> --falsification
+```
+
+Before it evaluates anything it does two things, in this order, and refuses on either:
+
+1. **the blindness scan**, over your *entire* workspace — notes, notebooks, logs, `__pycache__`,
+   symlinks and their targets — for every prohibited path, every post-cutoff date literal and every
+   other team's directory. Catching that now costs you an edit. Catching it at nomination costs you
+   the tournament.
+2. **the accepted trial**, for *exactly* this candidate state. If your source digest does not match
+   the digest recorded in the trial, that is a new material trial and the command says which field
+   moved. Journal it and run again.
+
+Then it loads `build_strategy()` out of your `strategy.py`, runs the **full in-sample window** with
+the frozen `[execution]` and `[risk_unit]` config and your declared `risk_policy.json`, and prints a
+coaching packet:
+
+- the **metric vector at 1×, 2× and 3× cost** — every metric, at every level;
+- the **four fold Sharpes** at 2×, the level §7.3 floors them at;
+- the **gate vector**, one line per hard floor, with the value you achieved, the floor you needed
+  and which comparison it was. You are told what you failed *by*, not merely that you failed;
+- the **`exposure_caps` trim block**, both applications, so you can see how far your book was
+  reduced and which cap bound (charter §4);
+- the trial-adjusted confidence, with `B` and `T` shown separately, so the price of another trial
+  is visible before you spend it;
+- the **indicative ranking score `G`**.
+
+Two things it will never print. It never prints `QUALIFIED` — two gates
+(`neighbourhood_positive_fraction` and `sign_inversion_not_profitable`) cannot be decided from a
+single point, and they are shown as `----`, not as passes. And the packet is **your nominated
+point's own vector, not your score**: §6 scores the per-metric median across your declared
+neighbourhood, which is always below the maximum of a noisy surface.
+
+**There is no short-window mode, on purpose.** The window is part of the material tuple, so a
+shorter window is a different trial whose number is comparable to nothing — not to your other runs,
+not to the floors, not to another team. `--check` is what exists instead, so you never spend a trial
+discovering a typo.
+
+**The battery is run by the harness, not by you.** `--falsification` negates every emitted weight
+(leaving `None` and `{}` alone, because neither carries a direction) and scores the inversion
+through the identical pipeline against the core floors; an inversion that clears them is
+disqualifying. It then runs eight placebo books that keep your weight multiset and rebalance
+schedule exactly and randomise only *which* eligible symbol receives which weight, scored on **gross**
+edge. You cannot accidentally skip a mandatory falsifier, and you cannot implement it differently
+from anyone else.
+
+### 5.3 `risk_policy.json` is required
+
+Your declared risk policy is part of the material tuple, so every candidate carries one from its
+first trial. Declaring nothing is a legitimate declaration — write it out explicitly:
+
+```json
+{
+  "schema_version": 1,
+  "policy_id": "team-nn-flat",
+  "same_boundary_reentry": true,
+  "volatility_target": {
+    "enabled": false, "lookback_days": 30, "annualized_target": 0.10,
+    "minimum_scale": 0.5, "maximum_scale": 1.0
+  },
+  "drawdown_brakes": [],
+  "position_stop": {"enabled": false, "loss_fraction": 0.5, "cooldown_bars": 0},
+  "time_stop": {"enabled": false, "maximum_holding_bars": 10, "cooldown_bars": 0},
+  "turnover_limit": {"enabled": false, "maximum_one_way_turnover": 1.0},
+  "side_scaling": {"long_scale": 1.0, "short_scale": 1.0}
+}
+```
+
+Remember §3: the policy declares **shape, not scale**. It runs inside a book the common risk unit
+has already resized.
+
+### 5.4 The order, every time
+
+```
+1.  write / edit  strategy.py, risk_policy.json
+2.  cup20_evaluate.py --check          (free, seconds — do this until it is clean)
+3.  cup20_trial.py    ...              (costs one of your twelve; returns a sequence number)
+4.  cup20_evaluate.py                  (about seven minutes; prints the coaching packet)
+5.  read the packet, decide, and write down what you learned — including if it failed
+```
+
+Repeat. Then, once your nominee is fixed and your neighbourhood is declared:
+
+```
+6.  cup20_trial.py --kind neighbourhood ...      (one trial for the whole declared sweep)
+7.  cup20_trial.py --kind falsification ...      (one trial for the whole battery)
+8.  cup20_evaluate.py --falsification            (about forty minutes)
+```
+
+**Step 3 before step 4 is not a convention, it is enforced.** The evaluator refuses to run without
+an accepted trial for exactly the candidate state on disk, which is what makes "journaled before you
+look at any number" a fact rather than an aspiration.
+
+One thing this harness does **not** yet do: run the declared neighbourhood sweep for you. Journal it
+as one trial when you declare it; the organiser publishes the sweep runner before nomination opens,
+and it will be the same pipeline these two commands use.
+
+---
+
+## 6. Fix the nominee before you declare the neighbourhood
 
 **You fix your nominee first. Then you declare the neighbourhood. Moving the nominee afterwards
 voids the sweep** and costs you another trial for a fresh declared sweep.
@@ -241,7 +388,7 @@ It must satisfy all of:
   coordinate, or any strictly positive absolute change when the nominee is zero. A variation of
   1e-9 is not an exploration of the surface.
 
-### 5.1 The coordinate rule — read this before you write `strategy.py`
+### 6.1 The coordinate rule — read this before you write `strategy.py`
 
 **Every neighbourhood coordinate must be a module-level numeric constant in your frozen
 `strategy.py`, named identically to the coordinate, and your nominee's declared value must equal
@@ -275,7 +422,7 @@ if USE_FAST:
 
 ---
 
-## 6. Your research certificate
+## 7. Your research certificate
 
 `RESEARCH-CERTIFICATE.md` must cover, with journal sequence numbers throughout:
 
@@ -294,7 +441,7 @@ not.
 
 ---
 
-## 7. Nomination discipline
+## 8. Nomination discipline
 
 - **A negative candidate is evidence, not a submission.** Do not nominate because your budget ran
   out or your wall-clock ran down. "No nomination, here is why" is a legitimate and respectable
@@ -318,7 +465,7 @@ not.
 
 ---
 
-## 8. Stop conditions
+## 9. Stop conditions
 
 You are done when you have either:
 
