@@ -358,7 +358,7 @@ before you spend the trial.
 
 **Every point runs in its own freshly spawned interpreter**, so no point can leave state behind for
 the next. `--workers N` (default `min(4, points)`) only changes the wall clock; the answer is
-identical at one worker and at four.
+identical at every worker count.
 
 **What it costs.** Measured on the real snapshot with a real seven-point neighbourhood, not
 estimated:
