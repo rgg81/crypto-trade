@@ -1,0 +1,90 @@
+  annualized_return                               0.187479
+  annualized_turnover                            18.169286
+  annualized_volatility                           0.132477
+  calmar                                          0.920407
+  cost_share_of_positive_gross                    0.008921
+  double_cost_annualized_return                   0.170395
+  double_cost_annualized_turnover                18.173445
+  double_cost_max_drawdown                        0.179161
+  double_cost_positive_quarter_fraction           0.705882
+  double_cost_sharpe                              1.256814
+  gross_edge_bps_per_turnover                   101.307156
+  long_gross_pnl                                  0.606222
+  max_drawdown                                    0.171896
+  max_fold_positive_pnl_share                     0.316575
+  median_fold_sharpe                              1.247734
+  net_sharpe                                      1.352782
+  positive_fold_count                             4.000000
+  positive_quarter_count                         12.000000
+  positive_quarter_fraction                       0.705882
+  short_gross_pnl                                 0.188614
+  top5_day_share                                  0.027675
+  trade_count                                  1910.000000
+  triple_cost_sharpe                              1.148436
+  worst_fold_sharpe                               0.730344
+
+  positive_point_fraction   1.0000  required >= 0.7  (7 of 7 points have positive 1x return AND positive 2x Sharpe)
+  trial-adjusted confidence B=0.9955 (median across points), T=7, confidence=0.9685
+
+hard floors (charter 7.3), on the MEDIAN. '----' is a gate a sweep cannot decide.
+------------------------------------------------------------------------------
+  PASS  net_sharpe                                   1.352782  required >= 0.8
+  PASS  double_cost_sharpe                           1.256814  required >= 0.5
+  PASS  triple_cost_sharpe                           1.148436  required > 0
+  PASS  annualized_return                            0.187479  required > 0
+  PASS  double_cost_annualized_return                0.170395  required > 0
+  PASS  max_drawdown                                 0.171896  required <= 0.2
+  PASS  annualized_volatility                        0.132477  required >= 0.06
+  PASS  positive_quarter_fraction                    0.705882  required >= 0.5
+  PASS  positive_fold_count                          4.000000  required >= 3
+  PASS  worst_fold_sharpe                            0.730344  required >= -0.25
+  PASS  annualized_turnover                         18.169286  required <= 25
+  PASS  gross_edge_bps_per_turnover                101.307156  required >= 40
+  PASS  cost_share_of_positive_gross                 0.008921  required <= 0.3
+  PASS  top5_day_share                               0.027675  required <= 0.35
+  PASS  max_fold_positive_pnl_share                  0.316575  required <= 0.6
+  PASS  trade_count                               1910.000000  required >= 500
+  PASS  neighbourhood_positive_fraction              1.000000  required >= 0.7
+  PASS  trial_adjusted_confidence                    0.968500  required >= 0.9
+  ----  sign_inversion_not_profitable          not measured here; run --falsification, which is its own material trial
+  PASS  declared_roles_match_traded_sides      declared ['long', 'short'], traded ['long', 'short']
+  PASS  role_long_gross_pnl                          0.606222  required > 0
+  PASS  role_short_gross_pnl                         0.188614  required > 0
+
+------------------------------------------------------------------------------
+  verdict: NO MEASURED FAILURE -- 1 gate(s) cannot be decided by a neighbourhood sweep
+  indicative ranking score G: 70.580
+------------------------------------------------------------------------------
+
+DIAGNOSTIC ONLY -- your NOMINATED POINT's own vector. This is NOT your score.
+------------------------------------------------------------------------------
+  annualized_return                               0.156679   (median       0.187479)
+  annualized_turnover                            18.177776   (median      18.169286)
+  annualized_volatility                           0.134442   (median       0.132477)
+  calmar                                          0.603863   (median       0.920407)
+  cost_share_of_positive_gross                    0.009146   (median       0.008921)
+  double_cost_annualized_return                   0.141033   (median       0.170395)
+  double_cost_annualized_turnover                18.183355   (median      18.173445)
+  double_cost_max_drawdown                        0.233551   (median       0.179161)
+  double_cost_positive_quarter_fraction           0.529412   (median       0.705882)
+  double_cost_sharpe                              1.048087   (median       1.256814)
+  gross_edge_bps_per_turnover                    92.037548   (median     101.307156)
+  long_gross_pnl                                  0.527828   (median       0.606222)
+  max_drawdown                                    0.228250   (median       0.171896)
+  max_fold_positive_pnl_share                     0.321603   (median       0.316575)
+  median_fold_sharpe                              1.007180   (median       1.247734)
+  net_sharpe                                      1.150064   (median       1.352782)
+  positive_fold_count                             4.000000   (median       4.000000)
+  positive_quarter_count                         10.000000   (median      12.000000)
+  positive_quarter_fraction                       0.588235   (median       0.705882)
+  short_gross_pnl                                 0.134511   (median       0.188614)
+  top5_day_share                                  0.026352   (median       0.027675)
+  trade_count                                  1886.000000   (median    1910.000000)
+  triple_cost_sharpe                              0.945969   (median       1.148436)
+  worst_fold_sharpe                               0.730344   (median       0.730344)
+
+  Section 7.2 scores the median, not this. Where the two disagree, the median is the
+  number you are ranked on -- a nominated point is the max of a noisy surface.
+------------------------------------------------------------------------------
+
+completed in 1052.7s

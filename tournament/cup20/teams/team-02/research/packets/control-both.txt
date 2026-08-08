@@ -1,0 +1,76 @@
+------------------------------------------------------------------------------
+CUP-20 coaching packet -- team-02 / control-both
+------------------------------------------------------------------------------
+  trial            #18  (6 of 12 accepted trials spent)
+  source           b68041c6b2172204cc65e9bd077d7e804fee75263564c88b2eeedb61199cf465
+  snapshot         ceeedfcd7117a16a58d2bb9bbf9716356c9473098fe8512703d1656834746d48
+
+metric vector, at every cost level
+------------------------------------------------------------------------------
+  metric                                            1x              2x              3x
+  annualized_return                           0.104511        0.085371        0.066543
+  annualized_turnover                        23.388732       23.396634       23.404667
+  annualized_volatility                       0.129960        0.130099        0.130288
+  calmar                                      0.738408        0.567147        0.417378
+  cost_share_of_positive_gross                0.012025        0.024049        0.036074
+  gross_edge_bps_per_turnover                53.452585       53.473749       53.494851
+  long_gross_pnl                              0.296858        0.297043        0.297226
+  max_drawdown                                0.141535        0.150527        0.159431
+  net_sharpe                                  0.830210        0.695071        0.559912
+  positive_quarter_count                     12.000000       10.000000       10.000000
+  positive_quarter_fraction                   0.705882        0.588235        0.588235
+  short_gross_pnl                             0.198080        0.198258        0.198440
+  top5_day_share                              0.032311        0.032260        0.032191
+  trade_count                              1985.000000     1986.000000     1991.000000
+
+fold Sharpes (2x cost, the level section 7.3 floors them at)
+------------------------------------------------------------------------------
+  F1                                          0.534905
+  F2                                          0.173699
+  F3                                          1.138285
+  F4                                          1.077740
+
+trial-adjusted confidence: B=0.9595, T=6, confidence=0.7570
+
+hard floors (charter 7.3). '----' is a gate a single point cannot decide.
+------------------------------------------------------------------------------
+  PASS  net_sharpe                                   0.830210  required >= 0.8
+  PASS  double_cost_sharpe                           0.695071  required >= 0.5
+  PASS  triple_cost_sharpe                           0.559912  required > 0
+  PASS  annualized_return                            0.104511  required > 0
+  PASS  double_cost_annualized_return                0.085371  required > 0
+  PASS  max_drawdown                                 0.141535  required <= 0.2
+  PASS  annualized_volatility                        0.129960  required >= 0.06
+  PASS  positive_quarter_fraction                    0.705882  required >= 0.5
+  PASS  positive_fold_count                          4.000000  required >= 3
+  PASS  worst_fold_sharpe                            0.173699  required >= -0.25
+  PASS  annualized_turnover                         23.388732  required <= 25
+  PASS  gross_edge_bps_per_turnover                 53.452585  required >= 40
+  PASS  cost_share_of_positive_gross                 0.012025  required <= 0.3
+  PASS  top5_day_share                               0.032311  required <= 0.35
+  PASS  max_fold_positive_pnl_share                  0.317536  required <= 0.6
+  PASS  trade_count                               1985.000000  required >= 500
+  ----  neighbourhood_positive_fraction              1.000000  required >= 0.7  (assumed; a single point cannot measure a neighbourhood)
+  FAIL  trial_adjusted_confidence                    0.757000  required >= 0.9
+  ----  sign_inversion_not_profitable          not measured here; run --falsification, which is its own material trial
+  PASS  declared_roles_match_traded_sides      declared ['long', 'short'], traded ['long', 'short']
+  PASS  role_long_gross_pnl                          0.296858  required > 0
+  PASS  role_short_gross_pnl                         0.198080  required > 0
+
+exposure caps -- how far your book was reduced (charter 4)
+------------------------------------------------------------------------------
+  executed     0/207 boundaries reduced, minimum scale 1.0000, median 1.0000, binding {'gross': 0, 'net': 0, 'symbol': 0}
+  requested    0/207 boundaries reduced, minimum scale 1.0000, median 1.0000, binding {'gross': 0, 'net': 0, 'symbol': 0}
+
+  risk-unit scalar   median 0.4064  min 0.2000  max 1.0000
+
+------------------------------------------------------------------------------
+  verdict: FAILS 1 measured floor(s)
+  indicative ranking score G: n/a
+
+  This is your NOMINATED POINT's own vector. It is not your score. Section 7.2
+  scores the per-metric MEDIAN across your declared neighbourhood, which is always
+  below the maximum of a noisy surface and is what the organiser will rank you on.
+------------------------------------------------------------------------------
+
+completed in 526.2s

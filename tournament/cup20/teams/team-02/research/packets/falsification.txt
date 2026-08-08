@@ -1,0 +1,24 @@
+------------------------------------------------------------------------------
+CUP-20 falsification battery -- team-02 / channel-position-ls  (trial #20)
+------------------------------------------------------------------------------
+exact sign inversion, scored on the core floors (charter 7.3)
+------------------------------------------------------------------------------
+  fails   net_sharpe                                 -1.367394
+  fails   double_cost_sharpe                         -1.468583
+  fails   triple_cost_sharpe                         -1.569340
+  fails   annualized_return                          -0.176110
+  fails   double_cost_annualized_return              -0.187408
+  fails   max_drawdown                                0.580739
+  CLEARS  annualized_volatility                       0.134975
+  CLEARS  trade_count                              1923.000000
+
+  The inversion does not clear the core floors. The falsifier is satisfied.
+
+gross-edge placebo -- same weights, randomly attributed across eligible symbols
+------------------------------------------------------------------------------
+  candidate gross edge             92.0375 bps per unit one-way turnover
+  placebo books (8)          min -31.2437  median 1.8297  max 17.2242
+  placebo exceedance        0.0000  (fraction of placebos reaching the candidate)
+------------------------------------------------------------------------------
+
+completed in 2658.7s
