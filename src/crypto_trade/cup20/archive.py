@@ -39,8 +39,34 @@ FORBIDDEN_PATTERNS: tuple[str, ...] = (
     r"reports-top40",
     r"tournament/crypto/results",
     r"diary-portfolio-mn",
-    # Any calendar date on or after the IS cutoff of 2024-08-01.
-    r"(?<!\d)2024-(?:0[89]|1[0-2])-\d{2}",
+    # Any calendar date STRICTLY AFTER the IS cutoff -- 2024-08-02 onward.
+    #
+    # The cutoff instant itself is 2024-08-01T00:00:00Z, and the IS window is the half-open
+    # [IS_START, 2024-08-01): the cutoff is the first EXCLUDED instant, so the literal `2024-08-01`
+    # describes only where the visible data stops. It reveals nothing about the holdout, and it is
+    # universally disclosed -- the charter's window table, `config.toml`'s `is_end` AND
+    # `sealed_start`, and the playbook all print it. Decisively, the organiser's own harness prints
+    # it into every packet it writes into a team's workspace: `CoachingPacket.render` emits
+    # `window [<is_start>, 2024-08-01 00:00:00+00:00)` and a fold line ending `F4 [.., 2024-08-01)`,
+    # and `as_dict` carries both as JSON. Matching it made the organiser hand each team a file that
+    # tripped the team's own blindness scan, so `2024-08-01` is permitted and 2024-08-02 onward is
+    # not. `SEALED_START` is the same instant as `IS_END` and is therefore permitted in that guise
+    # too; `SEALED_END` (2026-08-01) is genuinely post-cutoff and stays caught by the pattern below.
+    #
+    # `08-(?!01(?!\d))` is what carves the single day out: it permits `01` only when no digit
+    # follows, so every suffixed form of the boundary that is really a date -- `2024-08-01Z`,
+    # `2024-08-01T00:00:00Z`, `2024-08-01 00:00:00+00:00` -- is permitted, while a digit-extended
+    # `2024-08-012` is still refused rather than being read as the permitted day plus noise.
+    #
+    # Scope, stated so it is not quietly widened later: this rule matches hyphenated ISO-8601
+    # calendar dates and nothing else, exactly as it did before. Compact `20240801` forms and epoch
+    # millisecond literals were never matched and still are not -- the `(?<!\d)` guard exists
+    # precisely to keep the scan out of long digit runs. Adding compact 8-digit dates would be a
+    # different control with its own false positives: `config.toml` already carries
+    # `bootstrap_seed = 20260804`, a legitimate public scalar that such a pattern would accuse.
+    # Blindness is enforced primarily by absence (the sealed rows are simply not in a team's data
+    # directory); this scan is a disclosed-imperfect second layer, not the guarantee.
+    r"(?<!\d)2024-(?:08-(?!01(?!\d))|(?:09|1[0-2])-)\d{2}",
     r"(?<!\d)20(?:2[5-9]|[3-9]\d)-\d{2}-\d{2}",
 )
 _COMPILED = tuple((pattern, re.compile(pattern)) for pattern in FORBIDDEN_PATTERNS)

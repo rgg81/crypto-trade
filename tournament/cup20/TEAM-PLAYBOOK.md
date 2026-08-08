@@ -76,6 +76,16 @@ or writing anywhere outside your own tree is a pre-flight disqualification. So i
 date literal anywhere in your source: the organiser runs a source scan of your frozen archive
 before a single number of yours is scored, and it does not need to prove intent.
 
+**"Post-cutoff" means strictly after the cutoff — `2024-08-02` onward.** The cutoff instant itself,
+`2024-08-01T00:00:00Z`, is *not* a post-cutoff date and does not trip the scan. It is the first
+instant your data excludes, so writing it down says only where your window stops; it is printed in
+the charter's window table, in `config.toml` twice over (as `is_end` and as `sealed_start`), and in
+section 1 above. The harness also writes it into every packet it hands you — the `window` and
+`folds` banner lines of a coaching packet or a sweep report both end at it. **You never need to
+redact, strip or work around organiser output to keep your workspace scanning clean.** If a scan
+ever flags something the organiser itself wrote into your tree, that is an organiser defect: say so
+and stop, rather than editing the evidence.
+
 Layout:
 
 ```
