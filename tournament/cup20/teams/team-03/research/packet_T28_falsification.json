@@ -1,0 +1,48 @@
+{
+  "candidate_gross_edge_bps_per_turnover": 67.51318155070332,
+  "candidate_id": "run-gated-trend-slow",
+  "inverted_core_gates": {
+    "annualized_return": false,
+    "annualized_volatility": true,
+    "double_cost_annualized_return": false,
+    "double_cost_sharpe": false,
+    "max_drawdown": false,
+    "net_sharpe": false,
+    "trade_count": true,
+    "triple_cost_sharpe": false
+  },
+  "inverted_metrics": {
+    "annualized_return": -0.1854585199575497,
+    "annualized_volatility": 0.1303985985606324,
+    "double_cost_annualized_return": -0.20029940865296092,
+    "double_cost_sharpe": -1.645538678639998,
+    "max_drawdown": 0.5690863324062545,
+    "net_sharpe": -1.5068056431372987,
+    "trade_count": 10884.0,
+    "triple_cost_sharpe": -1.783693692862686
+  },
+  "placebo_exceedance": 0.0,
+  "placebo_gross_edge_bps_per_turnover": [
+    4.865540381552171,
+    0.28329248745105323,
+    0.1189105616463952,
+    6.692447045236459,
+    -0.601533480080943,
+    13.955979255488867,
+    8.14074389280737,
+    6.503885163725646
+  ],
+  "placebo_seeds": [
+    20240716,
+    20240717,
+    20240718,
+    20240719,
+    20240720,
+    20240721,
+    20240722,
+    20240723
+  ],
+  "sign_inversion_passes_core": false,
+  "team_id": "team-03",
+  "trial_sequence": 28
+}
