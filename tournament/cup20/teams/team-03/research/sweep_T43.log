@@ -1,0 +1,133 @@
+running under accepted trial #43 (10 of 12 trials spent); window [2020-08-17 00:00:00+00:00, 2024-08-01 00:00:00+00:00) -- this takes minutes, not seconds
+------------------------------------------------------------------------------
+CUP-20 neighbourhood sweep -- team-03 / run-gated-trend
+------------------------------------------------------------------------------
+  trial            #43  (10 of 12 accepted trials spent)
+  source           785f29b705ec9c2b463fd41567f1a4ee9c5461ac74828da5721ee56f2068aa45
+  snapshot         ceeedfcd7117a16a58d2bb9bbf9716356c9473098fe8512703d1656834746d48
+  window           [2020-08-17 00:00:00+00:00, 2024-08-01 00:00:00+00:00)   seed 20240715
+  folds            F1 [2020-08-17, 2021-08-01), F2 [2021-08-01, 2022-08-01), F3 [2022-08-01, 2023-08-01), F4 [2023-08-01, 2024-08-01)
+  coordinates      FORMATION_BARS, PERSISTENCE_Z_FLOOR, SMOOTH_BARS, NET_EXPOSURE_DAMPING, REBALANCE_EVERY, REBALANCE_PHASE
+  points           13 including the nominee, 4 worker(s), 2841.3s wall clock
+
+the points, each a separately materialised and separately executed file
+------------------------------------------------------------------------------
+  point                               net_sharpe   2x_sharpe  ann_return    max_dd   trades
+  nominee  FORMATION_BARS=15 NET_EXPOSURE_DAMPING=0.45 PERSISTENCE_Z_FLOOR=1.1 REBALANCE_EVERY=3 REBALANCE_PHASE=1 SMOOTH_BARS=33      1.0180      0.8504      0.1311    0.1204    29978
+  point-1  FORMATION_BARS=12 NET_EXPOSURE_DAMPING=0.45 PERSISTENCE_Z_FLOOR=1.1 REBALANCE_EVERY=3 REBALANCE_PHASE=1 SMOOTH_BARS=33      1.0200      0.8346      0.1282    0.1128    31936
+  point-2  FORMATION_BARS=18 NET_EXPOSURE_DAMPING=0.45 PERSISTENCE_Z_FLOOR=1.1 REBALANCE_EVERY=3 REBALANCE_PHASE=1 SMOOTH_BARS=33      0.7932      0.6436      0.1016    0.1184    26170
+  point-3  FORMATION_BARS=15 NET_EXPOSURE_DAMPING=0.45 PERSISTENCE_Z_FLOOR=0.7 REBALANCE_EVERY=3 REBALANCE_PHASE=1 SMOOTH_BARS=33      0.9798      0.8080      0.1219    0.0983    32360
+  point-4  FORMATION_BARS=15 NET_EXPOSURE_DAMPING=0.45 PERSISTENCE_Z_FLOOR=1.4 REBALANCE_EVERY=3 REBALANCE_PHASE=1 SMOOTH_BARS=33      0.7609      0.6096      0.0951    0.1435    19518
+  point-5  FORMATION_BARS=15 NET_EXPOSURE_DAMPING=0.45 PERSISTENCE_Z_FLOOR=1.1 REBALANCE_EVERY=3 REBALANCE_PHASE=1 SMOOTH_BARS=27      0.5871      0.4052      0.0702    0.1809    28844
+  point-6  FORMATION_BARS=15 NET_EXPOSURE_DAMPING=0.45 PERSISTENCE_Z_FLOOR=1.1 REBALANCE_EVERY=3 REBALANCE_PHASE=1 SMOOTH_BARS=39      1.0303      0.8776      0.1348    0.1431    30570
+  point-7  FORMATION_BARS=15 NET_EXPOSURE_DAMPING=0.35 PERSISTENCE_Z_FLOOR=1.1 REBALANCE_EVERY=3 REBALANCE_PHASE=1 SMOOTH_BARS=33      0.9479      0.7934      0.1224    0.1371    29981
+  point-8  FORMATION_BARS=15 NET_EXPOSURE_DAMPING=0.55 PERSISTENCE_Z_FLOOR=1.1 REBALANCE_EVERY=3 REBALANCE_PHASE=1 SMOOTH_BARS=33      1.0904      0.9077      0.1412    0.1030    29956
+  point-9  FORMATION_BARS=15 NET_EXPOSURE_DAMPING=0.45 PERSISTENCE_Z_FLOOR=1.1 REBALANCE_EVERY=2 REBALANCE_PHASE=1 SMOOTH_BARS=33      0.9224      0.7418      0.1138    0.1133    43794
+  point-10  FORMATION_BARS=15 NET_EXPOSURE_DAMPING=0.45 PERSISTENCE_Z_FLOOR=1.1 REBALANCE_EVERY=4 REBALANCE_PHASE=1 SMOOTH_BARS=33      1.0618      0.9008      0.1372    0.0952    23045
+  point-11  FORMATION_BARS=15 NET_EXPOSURE_DAMPING=0.45 PERSISTENCE_Z_FLOOR=1.1 REBALANCE_EVERY=3 REBALANCE_PHASE=0 SMOOTH_BARS=33      0.9276      0.7599      0.1173    0.1139    29995
+  point-12  FORMATION_BARS=15 NET_EXPOSURE_DAMPING=0.45 PERSISTENCE_Z_FLOOR=1.1 REBALANCE_EVERY=3 REBALANCE_PHASE=2 SMOOTH_BARS=33      1.0840      0.9131      0.1368    0.0885    29883
+    nominee  FORMATION_BARS=15 NET_EXPOSURE_DAMPING=0.45 PERSISTENCE_Z_FLOOR=1.1 REBALANCE_EVERY=3 REBALANCE_PHASE=1 SMOOTH_BARS=33  ->  strategy.py 5a4461b6903774463943dca02ad95a0f53d7d1a81905ee2d3b2343eb14db2b87
+    point-1  FORMATION_BARS=12 NET_EXPOSURE_DAMPING=0.45 PERSISTENCE_Z_FLOOR=1.1 REBALANCE_EVERY=3 REBALANCE_PHASE=1 SMOOTH_BARS=33  ->  strategy.py c1cb6596c07f7be9603ba8ad74678f693830f88ae9fb7997a22fa7c5c20ef3ef
+    point-2  FORMATION_BARS=18 NET_EXPOSURE_DAMPING=0.45 PERSISTENCE_Z_FLOOR=1.1 REBALANCE_EVERY=3 REBALANCE_PHASE=1 SMOOTH_BARS=33  ->  strategy.py 853e445fbc2df1d16a9e522dde2730884256ec3c7d88b33720ddb76d739d02ae
+    point-3  FORMATION_BARS=15 NET_EXPOSURE_DAMPING=0.45 PERSISTENCE_Z_FLOOR=0.7 REBALANCE_EVERY=3 REBALANCE_PHASE=1 SMOOTH_BARS=33  ->  strategy.py b8d843744bfe3da703dbc573ff98c500f10be38adcb7add2a0f7e3a04c4e17f2
+    point-4  FORMATION_BARS=15 NET_EXPOSURE_DAMPING=0.45 PERSISTENCE_Z_FLOOR=1.4 REBALANCE_EVERY=3 REBALANCE_PHASE=1 SMOOTH_BARS=33  ->  strategy.py 4c1bf75927a3b0b17e8b56656c142ba0f96dd8fbf15fad9bf3623234df156197
+    point-5  FORMATION_BARS=15 NET_EXPOSURE_DAMPING=0.45 PERSISTENCE_Z_FLOOR=1.1 REBALANCE_EVERY=3 REBALANCE_PHASE=1 SMOOTH_BARS=27  ->  strategy.py 4a8577c926b3770d1c879505c18f91d3d1445f77391ab27eee7045edb9db8531
+    point-6  FORMATION_BARS=15 NET_EXPOSURE_DAMPING=0.45 PERSISTENCE_Z_FLOOR=1.1 REBALANCE_EVERY=3 REBALANCE_PHASE=1 SMOOTH_BARS=39  ->  strategy.py 59f4f44b2ccce62ccdbde197970f56477ea6b5bb0d5830e9ac0bb6ff8cd564c5
+    point-7  FORMATION_BARS=15 NET_EXPOSURE_DAMPING=0.35 PERSISTENCE_Z_FLOOR=1.1 REBALANCE_EVERY=3 REBALANCE_PHASE=1 SMOOTH_BARS=33  ->  strategy.py 2813071aa000d5bed9344fb9ba6875c8b22c8b73280f0b647f1114da778d5323
+    point-8  FORMATION_BARS=15 NET_EXPOSURE_DAMPING=0.55 PERSISTENCE_Z_FLOOR=1.1 REBALANCE_EVERY=3 REBALANCE_PHASE=1 SMOOTH_BARS=33  ->  strategy.py e3c346f73a2073d8a3b39d17c7fb8d06466456b7c3b711b845b6675fd4e61fae
+    point-9  FORMATION_BARS=15 NET_EXPOSURE_DAMPING=0.45 PERSISTENCE_Z_FLOOR=1.1 REBALANCE_EVERY=2 REBALANCE_PHASE=1 SMOOTH_BARS=33  ->  strategy.py 03f7a03eb46dd536d2f09b883d5460c056dfc8afb34077205e26120029ab7587
+    point-10  FORMATION_BARS=15 NET_EXPOSURE_DAMPING=0.45 PERSISTENCE_Z_FLOOR=1.1 REBALANCE_EVERY=4 REBALANCE_PHASE=1 SMOOTH_BARS=33  ->  strategy.py e3849acc40338c9507edaa4d935d1f4ea6d9b8325acf3df14e0d3c3bd2bbfeba
+    point-11  FORMATION_BARS=15 NET_EXPOSURE_DAMPING=0.45 PERSISTENCE_Z_FLOOR=1.1 REBALANCE_EVERY=3 REBALANCE_PHASE=0 SMOOTH_BARS=33  ->  strategy.py 2a5f9c786452ea14ab081bc7b7350db0e02ba5e5f7a469bf8e895aacb0ae43b8
+    point-12  FORMATION_BARS=15 NET_EXPOSURE_DAMPING=0.45 PERSISTENCE_Z_FLOOR=1.1 REBALANCE_EVERY=3 REBALANCE_PHASE=2 SMOOTH_BARS=33  ->  strategy.py c3ae13595ddbb3211f7ba30de6d85ee013efa7c6459533c30c168cb3bdfdeca4
+
+YOUR SCORE -- the per-metric MEDIAN across the declared neighbourhood (section 7.2)
+------------------------------------------------------------------------------
+  annualized_return                               0.122374
+  annualized_turnover                            28.602825
+  annualized_volatility                           0.128831
+  calmar                                          0.749146
+  cost_share_of_positive_gross                    0.016155
+  double_cost_annualized_return                   0.099981
+  double_cost_annualized_turnover                28.607258
+  double_cost_max_drawdown                        0.124863
+  double_cost_positive_quarter_fraction           0.588235
+  double_cost_sharpe                              0.807987
+  gross_edge_bps_per_turnover                    50.235499
+  long_gross_pnl                                  0.528717
+  max_drawdown                                    0.113921
+  max_fold_positive_pnl_share                     0.346129
+  median_fold_sharpe                              0.659535
+  net_sharpe                                      0.979817
+  positive_fold_count                             4.000000
+  positive_quarter_count                         10.000000
+  positive_quarter_fraction                       0.588235
+  short_gross_pnl                                 0.045513
+  top5_day_share                                  0.040677
+  trade_count                                 29978.000000
+  triple_cost_sharpe                              0.639005
+  worst_fold_sharpe                               0.091002
+
+  positive_point_fraction   1.0000  required >= 0.7  (13 of 13 points have positive 1x return AND positive 2x Sharpe)
+  trial-adjusted confidence B=0.9665 (median across points), T=10, confidence=0.6650
+
+hard floors (charter 7.3), on the MEDIAN. '----' is a gate a sweep cannot decide.
+------------------------------------------------------------------------------
+  PASS  net_sharpe                                   0.979817  required >= 0.8
+  PASS  double_cost_sharpe                           0.807987  required >= 0.5
+  PASS  triple_cost_sharpe                           0.639005  required > 0
+  PASS  annualized_return                            0.122374  required > 0
+  PASS  double_cost_annualized_return                0.099981  required > 0
+  PASS  max_drawdown                                 0.113921  required <= 0.2
+  PASS  annualized_volatility                        0.128831  required >= 0.06
+  PASS  positive_quarter_fraction                    0.588235  required >= 0.5
+  PASS  positive_fold_count                          4.000000  required >= 3
+  PASS  worst_fold_sharpe                            0.091002  required >= -0.25
+  FAIL  annualized_turnover                         28.602825  required <= 25
+  PASS  gross_edge_bps_per_turnover                 50.235499  required >= 40
+  PASS  cost_share_of_positive_gross                 0.016155  required <= 0.3
+  PASS  top5_day_share                               0.040677  required <= 0.35
+  PASS  max_fold_positive_pnl_share                  0.346129  required <= 0.6
+  PASS  trade_count                              29978.000000  required >= 500
+  PASS  neighbourhood_positive_fraction              1.000000  required >= 0.7
+  FAIL  trial_adjusted_confidence                    0.665000  required >= 0.9
+  PASS  declared_roles_match_traded_sides      declared ['long', 'short'], traded ['long', 'short']
+  PASS  role_long_gross_pnl                          0.528717  required > 0
+  PASS  role_short_gross_pnl                         0.045513  required > 0
+
+------------------------------------------------------------------------------
+  verdict: FAILS 2 measured floor(s)
+  indicative ranking score G: 35.238
+------------------------------------------------------------------------------
+
+DIAGNOSTIC ONLY -- your NOMINATED POINT's own vector. This is NOT your score.
+------------------------------------------------------------------------------
+  annualized_return                               0.131144   (median       0.122374)
+  annualized_turnover                            28.755917   (median      28.602825)
+  annualized_volatility                           0.129206   (median       0.128831)
+  calmar                                          0.814374   (median       0.749146)
+  cost_share_of_positive_gross                    0.016258   (median       0.016155)
+  double_cost_annualized_return                   0.106978   (median       0.099981)
+  double_cost_annualized_turnover                28.760481   (median      28.607258)
+  double_cost_max_drawdown                        0.131362   (median       0.124863)
+  double_cost_positive_quarter_fraction           0.588235   (median       0.588235)
+  double_cost_sharpe                              0.850447   (median       0.807987)
+  gross_edge_bps_per_turnover                    52.958340   (median      50.235499)
+  long_gross_pnl                                  0.556035   (median       0.528717)
+  max_drawdown                                    0.120445   (median       0.113921)
+  max_fold_positive_pnl_share                     0.344835   (median       0.346129)
+  median_fold_sharpe                              0.781996   (median       0.659535)
+  net_sharpe                                      1.017976   (median       0.979817)
+  positive_fold_count                             4.000000   (median       4.000000)
+  positive_quarter_count                         10.000000   (median      10.000000)
+  positive_quarter_fraction                       0.588235   (median       0.588235)
+  short_gross_pnl                                 0.046853   (median       0.045513)
+  top5_day_share                                  0.041302   (median       0.040677)
+  trade_count                                 29978.000000   (median   29978.000000)
+  triple_cost_sharpe                              0.682992   (median       0.639005)
+  worst_fold_sharpe                               0.124200   (median       0.091002)
+
+  Section 7.2 scores the median, not this. Where the two disagree, the median is the
+  number you are ranked on -- a nominated point is the max of a noisy surface.
+------------------------------------------------------------------------------
+
+completed in 2841.4s

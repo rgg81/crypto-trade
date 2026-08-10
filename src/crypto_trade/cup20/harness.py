@@ -247,13 +247,32 @@ def load_team_strategy(candidate_root: str | Path) -> TargetStrategy:
 
 
 def load_candidate_risk_policy(candidate_root: str | Path) -> RiskPolicy:
-    """Parse the declared risk policy. Required; see ``trials.risk_policy_digest``."""
+    """Parse the declared risk policy. Required; see ``trials.risk_policy_digest``.
+
+    A declared volatility target is refused outright (charter §6, amendment A3). §6 gives teams the
+    *shape* of the book and reserves *scale* to the organiser's common risk unit, and a declared
+    target is scale wearing a risk-control label. It is also self-referential in a way that makes it
+    a floor exploit rather than a risk control: the policy measures the volatility of the book it
+    has already scaled, so realised gross and turnover settle at a fractional power of the declared
+    target instead of being pinned to it. A team short of the turnover floor could therefore clear
+    it by declaring a smaller number rather than by trading less. Refusing the field is the only fix
+    that does not depend on the organiser judging intent.
+    """
     path = Path(candidate_root) / RISK_POLICY_FILENAME
     if not path.is_file():
         raise CandidateLoadError(
             f"{path} does not exist; every candidate declares a risk policy (charter section 11)"
         )
-    return load_risk_policy(path)
+    policy = load_risk_policy(path)
+    if policy.volatility_target.enabled:
+        raise CandidateLoadError(
+            f"{path} declares volatility_target.enabled = true, which charter §6 forbids "
+            "(amendment A3). Scale belongs to the organiser's common risk unit; a declared target "
+            "is scale by paperwork, and because the policy reads the volatility of the book it has "
+            "already scaled it moves turnover without trading differently. Set enabled = false. "
+            "Shape the book through the signal instead."
+        )
+    return policy
 
 
 def run_full_window(
@@ -360,6 +379,13 @@ def gate_details(
     ``evaluate_floors`` produces, so the drift is caught at the moment the floor is added.
     """
     unmeasured_names = set(unmeasured)
+    # A gate the evaluator could not decide is now OMITTED from the gate vector rather than supplied
+    # at an assumed value -- asserting a falsification nobody ran is exactly the fail-open that
+    # marking gates unmeasured exists to prevent (amendment A5). The packet must still SAY so,
+    # though: dropping the row entirely would leave a team with no indication the battery is
+    # outstanding, which is the opposite failure. So the reporting loop walks the union, and an
+    # omitted gate arrives here as unmeasured with no claim attached.
+    gates = {**dict.fromkeys(sorted(unmeasured_names), True), **dict(gates)}
     details: list[GateDetail] = []
     for name, passed in gates.items():
         measured = name not in unmeasured_names
@@ -815,7 +841,7 @@ def evaluate_point(
         statistics_config=raw["statistics"],
         research_config=raw["research"],
         declared_roles=tuple(declared_roles),
-        sign_inversion_passes_core=False,
+        sign_inversion_passes_core=None,  # not measured here; its own trial
         neighbourhood_positive_fraction=assumed_neighbourhood_fraction,
         trial_adjusted_confidence=confidence,
         drawdown_floor=float(raw["floors"]["max_drawdown"]),
@@ -1030,7 +1056,7 @@ def run_falsification_battery(
         statistics_config=raw["statistics"],
         research_config=raw["research"],
         declared_roles=_observed_sides(inverted_scored),
-        sign_inversion_passes_core=False,
+        sign_inversion_passes_core=None,  # not measured here; its own trial
         neighbourhood_positive_fraction=1.0,
         trial_adjusted_confidence=1.0,
     )

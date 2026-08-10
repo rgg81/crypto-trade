@@ -36,20 +36,49 @@ class RankedEntry:
     scored: Mapping[str, float]
 
 
+def _decaying(normalised: float) -> float:
+    """``_clamp`` for a term that must keep ordering books after it stops earning credit.
+
+    ``_clamp`` floors at zero, which makes the term blind past its own threshold: a book at 21%
+    drawdown and one at 95% both scored exactly 41.789, and a worst fold of -0.26 scored the same
+    as -40.0. A ranking that cannot order two books is not ranking them -- it hands the decision to
+    whatever tie-break happens to run next, and only when the other terms happen to agree exactly.
+
+    Above the threshold the value is unchanged, so every score measured under the earlier formula
+    for a compliant book still stands. Below it the term decays hyperbolically into ``(-1, 0)``:
+    strictly decreasing forever, never reaching -1, so an arbitrarily bad book always ranks below a
+    merely bad one and no single term can swamp the other five.
+    """
+    if math.isnan(normalised):
+        return 0.0
+    if normalised == math.inf:
+        return 1.0
+    if normalised >= 0.0:
+        return min(1.0, normalised)
+    if normalised == -math.inf:
+        return -1.0
+    shortfall = -normalised
+    return -shortfall / (shortfall + 1.0)
+
+
 def robustness_score(scored: Mapping[str, float], *, drawdown_floor: float) -> float:
-    """Compute ``G`` in ``[0, 100]`` from the neighbourhood-median metric vector."""
+    """Compute ``G`` from the neighbourhood-median metric vector.
+
+    Bounded above by 100 and, since amendment A5's decaying tails, unbounded below by a finite
+    limit of -100 -- a book worse than every threshold on every term. Only the ordering matters.
+    """
     if drawdown_floor <= 0:
         raise ValueError("drawdown_floor must be positive")
     drawdown_span = drawdown_floor - 0.05
     if drawdown_span <= 0:
         raise ValueError("drawdown_floor must exceed the 0.05 full-credit level")
     return (
-        30.0 * _clamp((float(scored["worst_fold_sharpe"]) + 0.25) / 1.00)
-        + 20.0 * _clamp((float(scored["median_fold_sharpe"]) - 0.25) / 0.75)
-        + 20.0 * _clamp((drawdown_floor - float(scored["max_drawdown"])) / drawdown_span)
-        + 15.0 * _clamp(float(scored["calmar"]) / 1.50)
-        + 8.0 * _clamp((float(scored["positive_quarter_fraction"]) - 0.50) / 0.375)
-        + 7.0 * _clamp((float(scored["trial_adjusted_confidence"]) - 0.90) / 0.10)
+        30.0 * _decaying((float(scored["worst_fold_sharpe"]) + 0.25) / 1.00)
+        + 20.0 * _decaying((float(scored["median_fold_sharpe"]) - 0.25) / 0.75)
+        + 20.0 * _decaying((drawdown_floor - float(scored["max_drawdown"])) / drawdown_span)
+        + 15.0 * _decaying(float(scored["calmar"]) / 1.50)
+        + 8.0 * _decaying((float(scored["positive_quarter_fraction"]) - 0.50) / 0.375)
+        + 7.0 * _decaying((float(scored["trial_adjusted_confidence"]) - 0.90) / 0.10)
     )
 
 

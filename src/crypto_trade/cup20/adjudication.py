@@ -22,6 +22,7 @@ from typing import Any
 
 from crypto_trade.cup20.qualification import (
     GateVector,
+    compliance_factor,
     evaluate_floors,
     evaluate_holdout_eligibility,
 )
@@ -50,27 +51,47 @@ class CandidateAdjudication:
     ranking_inputs: Mapping[str, float]
     gates: GateVector
     score: float | None
+    stage: str = "in_sample"
 
     @property
     def qualified(self) -> bool:
+        """Every floor met, conjunctively. What the holdout stage decides on."""
         return self.gates.passed
+
+    @property
+    def admissible(self) -> bool:
+        """Eligible to be ranked -- and STAGE-AWARE, which is not a nicety.
+
+        A4 is an in-sample ruling. The holdout gate vector contains neither integrity key nor
+        either substance key, so asking ``GateVector.admissible`` about it returns False for a
+        flawless finalist: it would drop every holdout candidate from the population and report a
+        perfect book as an integrity failure. The two stages ask different questions and must
+        consult different gates.
+        """
+        if self.stage == "holdout":
+            return self.gates.passed
+        if self.stage != "in_sample":
+            raise ValueError(f"unknown adjudication stage: {self.stage!r}")
+        return self.gates.admissible
 
     @property
     def failures(self) -> tuple[str, ...]:
         return self.gates.failures
 
     def as_ranked_entry(self) -> RankedEntry:
-        """The ranking view of this candidate. Only a floor-passer has one.
+        """The ranking view of this candidate. Only an admissible candidate has one.
 
         ``RankedEntry.scored`` carries the 2x ranking inputs rather than the assembled vector,
         because ``rank_entries`` reads its tie-breaks off that mapping and section 7.4 puts every
         one of them at 2x cost. Handing it the assembled vector would tie-break on the 1x
         drawdown while ``G`` scored the 2x one.
         """
-        if self.score is None:
+        if self.score is None or not self.admissible:
             raise ValueError(
-                f"candidate {self.team_id}/{self.candidate_id} failed "
-                f"{list(self.failures)}; only floor-passers are ranked"
+                f"candidate {self.team_id}/{self.candidate_id} is not admissible: "
+                f"failed {list(self.gates.admission_failures)}, "
+                f"unmeasured {list(self.gates.unmeasured_admission_gates)}; "
+                "only admissible candidates are ranked"
             )
         return RankedEntry(
             team_id=self.team_id,
@@ -90,7 +111,14 @@ class Adjudication:
 
     @property
     def rejected(self) -> tuple[CandidateAdjudication, ...]:
-        return tuple(candidate for candidate in self.candidates if not candidate.qualified)
+        """Candidates outside the ranking entirely -- an integrity failure, never a weak result.
+
+        Keyed on ``admissible`` rather than ``qualified`` since A4: a candidate that missed a
+        performance floor is ranked, so calling it "rejected" would put the same team in both
+        ``ranked`` and ``rejected`` at once. ``admissible`` is stage-aware, so this stays correct
+        for a holdout population too.
+        """
+        return tuple(candidate for candidate in self.candidates if not candidate.admissible)
 
 
 def _require_assembled_vector(
@@ -171,7 +199,19 @@ def adjudicate_candidate(
         trial_adjusted_confidence=trial_adjusted_confidence,
     )
     inputs = ranking_metrics(scored, trial_adjusted_confidence=trial_adjusted_confidence)
-    if not gates.passed:
+    # Amendment A4: a missed performance floor costs points, not the tournament. Only an integrity
+    # failure -- a result the falsifier reproduces, or a certificate that misdescribes what the book
+    # traded -- leaves a candidate unranked, because those say the evidence is not what it claims
+    # and no ranking can repair that. The holdout stage below is deliberately NOT changed: it asks
+    # whether a book is good enough to deploy, not which book is best, and section 1.1 keeps "no
+    # winner" as a permitted outcome there.
+    # Only a MEASURED admission failure withholds the score. An unmeasured one -- a sweep cannot
+    # decide sign inversion, which is its own material trial -- still gets its indicative G, because
+    # that number is what a team reads off its own sweep, and refusing it would make the whole
+    # sweep report useless while the falsification trial is still outstanding. It is not rankable
+    # either way: `admissible` requires every admission gate measured AND met, and
+    # `as_ranked_entry` refuses on that, not on the score.
+    if gates.refuted:
         return CandidateAdjudication(
             team_id=team_id,
             candidate_id=candidate_id,
@@ -190,7 +230,7 @@ def adjudicate_candidate(
     non_finite = sorted(key for key, value in inputs.items() if not math.isfinite(value))
     if non_finite:
         raise ValueError(
-            f"candidate {team_id}/{candidate_id} passed every floor but its ranking inputs "
+            f"candidate {team_id}/{candidate_id} is not refuted but its ranking inputs "
             f"are not finite: {non_finite}"
         )
     return CandidateAdjudication(
@@ -199,7 +239,13 @@ def adjudicate_candidate(
         scored=scored,
         ranking_inputs=inputs,
         gates=gates,
-        score=robustness_score(inputs, drawdown_floor=drawdown_floor),
+        # Amendment A5. The floors robustness_score has no term for used to cost nothing at all, so
+        # "a miss costs points" was true for six of them and false for thirteen. The factor prices
+        # the rest without touching the frozen 58/35/7 weights: a fully compliant book multiplies by
+        # 1.0 and is unchanged. Read at BASE cost, per section 7.3's ruling that an unqualified
+        # floor is a 1x floor -- the ranking inputs are 2x and these are not ranking inputs.
+        score=robustness_score(inputs, drawdown_floor=drawdown_floor)
+        * compliance_factor(scored, floors=floors),
     )
 
 
@@ -252,6 +298,7 @@ def adjudicate_holdout_candidate(
             ranking_inputs=inputs,
             gates=gates,
             score=None,
+            stage="holdout",
         )
     non_finite = sorted(key for key, value in inputs.items() if not math.isfinite(value))
     if non_finite:
@@ -266,13 +313,19 @@ def adjudicate_holdout_candidate(
         ranking_inputs=inputs,
         gates=gates,
         score=robustness_score(inputs, drawdown_floor=float(holdout["max_drawdown"])),
+        stage="holdout",
     )
 
 
 def adjudicate_population(
     candidates: Sequence[CandidateAdjudication], *, slots: int
 ) -> Adjudication:
-    """Rank the floor-passers and take the top ``slots``. A failed candidate is never ranked.
+    """Rank the admissible candidates and take the top ``slots`` (amendment A4).
+
+    A missed performance floor costs points and is reported; it no longer removes a candidate from
+    the field. Only an integrity failure does. A twenty-two-floor conjunction meant one miss out of
+    twenty-two discarded a book entirely -- which is how a candidate positive in all four folds,
+    positive on both sleeves and inside every risk limit came to score nothing at all.
 
     Duplicate team ids are rejected. Section 7.5 gives each team exactly one nominated identity,
     and section 7.4's final tie-break is the team id -- with two entries sharing one, the
@@ -288,7 +341,7 @@ def adjudicate_population(
         raise ValueError(
             f"each team nominates exactly one identity; these appear more than once: {duplicates}"
         )
-    passers = {(c.team_id, c.candidate_id): c for c in ordered if c.qualified}
+    passers = {(c.team_id, c.candidate_id): c for c in ordered if c.admissible}
     entries = rank_entries([candidate.as_ranked_entry() for candidate in passers.values()])
     advancing = select_advancing(entries, slots=slots)
     return Adjudication(

@@ -1,0 +1,124 @@
+running under accepted trial #36 (7 of 12 trials spent); window [2020-08-17 00:00:00+00:00, 2024-08-01 00:00:00+00:00) -- this takes minutes, not seconds
+------------------------------------------------------------------------------
+CUP-20 neighbourhood sweep -- team-04 / resid-composite
+------------------------------------------------------------------------------
+  trial            #36  (7 of 12 accepted trials spent)
+  source           8de7c9e3637450fd227a717c33d285b07040fcfba922d72aac6012ccb4fca95f
+  snapshot         ceeedfcd7117a16a58d2bb9bbf9716356c9473098fe8512703d1656834746d48
+  window           [2020-08-17 00:00:00+00:00, 2024-08-01 00:00:00+00:00)   seed 4
+  folds            F1 [2020-08-17, 2021-08-01), F2 [2021-08-01, 2022-08-01), F3 [2022-08-01, 2023-08-01), F4 [2023-08-01, 2024-08-01)
+  coordinates      FORMATION_BARS, REBALANCE_BARS, REBALANCE_PHASE
+  points           7 including the nominee, 4 worker(s), 1080.3s wall clock
+
+the points, each a separately materialised and separately executed file
+------------------------------------------------------------------------------
+  point                               net_sharpe   2x_sharpe  ann_return    max_dd   trades
+  nominee  FORMATION_BARS=63 REBALANCE_BARS=21 REBALANCE_PHASE=10      1.1381      1.0170      0.1544    0.1236     3670
+  point-1  FORMATION_BARS=57 REBALANCE_BARS=21 REBALANCE_PHASE=10      0.9987      0.8708      0.1322    0.1365     3712
+  point-2  FORMATION_BARS=69 REBALANCE_BARS=21 REBALANCE_PHASE=10      0.9503      0.8323      0.1208    0.1176     3577
+  point-3  FORMATION_BARS=63 REBALANCE_BARS=19 REBALANCE_PHASE=10      0.8662      0.7343      0.1086    0.1780     3860
+  point-4  FORMATION_BARS=63 REBALANCE_BARS=23 REBALANCE_PHASE=10      0.8777      0.7611      0.1131    0.1534     3304
+  point-5  FORMATION_BARS=63 REBALANCE_BARS=21 REBALANCE_PHASE=4      1.3901      1.2583      0.1834    0.1172     3488
+  point-6  FORMATION_BARS=63 REBALANCE_BARS=21 REBALANCE_PHASE=16      1.2021      1.0717      0.1565    0.1236     3574
+    nominee  FORMATION_BARS=63 REBALANCE_BARS=21 REBALANCE_PHASE=10  ->  strategy.py 331e5529c41ae005641fe16d744cd2cf08791dd72e0884b89e83b4c8f68a5932
+    point-1  FORMATION_BARS=57 REBALANCE_BARS=21 REBALANCE_PHASE=10  ->  strategy.py 46f8476e42911ce53ca61bb43b9d16a5953a3b77ba153fdea417ab6921bc111a
+    point-2  FORMATION_BARS=69 REBALANCE_BARS=21 REBALANCE_PHASE=10  ->  strategy.py 86d25084be12abae887ca65a06c227ea95f884da01220302d167525b13a24eb5
+    point-3  FORMATION_BARS=63 REBALANCE_BARS=19 REBALANCE_PHASE=10  ->  strategy.py 298acefed0509e7b66c428c789847451048f4532dc5a7e6d8a8c954bd0a55325
+    point-4  FORMATION_BARS=63 REBALANCE_BARS=23 REBALANCE_PHASE=10  ->  strategy.py 10764f9176422aa3b15aef5f421e266b2ff9e94588e535ffab6c49a3e798df7e
+    point-5  FORMATION_BARS=63 REBALANCE_BARS=21 REBALANCE_PHASE=4  ->  strategy.py 5cfaa923dd95cc820b7e773c9b718048b04c26e1b96f13fd29b9300e4c1a0440
+    point-6  FORMATION_BARS=63 REBALANCE_BARS=21 REBALANCE_PHASE=16  ->  strategy.py 470546669e74d378995eaadbc2f156d28a31e4fc13e79b1cfff62def58a31f8a
+
+YOUR SCORE -- the per-metric MEDIAN across the declared neighbourhood (section 7.2)
+------------------------------------------------------------------------------
+  annualized_return                               0.132227
+  annualized_turnover                            21.914616
+  annualized_volatility                           0.128827
+  calmar                                          0.876945
+  cost_share_of_positive_gross                    0.011374
+  double_cost_annualized_return                   0.113166
+  double_cost_annualized_turnover                21.919502
+  double_cost_max_drawdown                        0.126783
+  double_cost_positive_quarter_fraction           0.647059
+  double_cost_sharpe                              0.870834
+  gross_edge_bps_per_turnover                    67.638075
+  long_gross_pnl                                  0.556831
+  max_drawdown                                    0.123573
+  max_fold_positive_pnl_share                     0.314737
+  median_fold_sharpe                              0.870354
+  net_sharpe                                      0.998692
+  positive_fold_count                             4.000000
+  positive_quarter_count                         11.000000
+  positive_quarter_fraction                       0.647059
+  short_gross_pnl                                 0.070743
+  top5_day_share                                  0.031004
+  trade_count                                  3577.000000
+  triple_cost_sharpe                              0.742819
+  worst_fold_sharpe                               0.195359
+
+  positive_point_fraction   1.0000  required >= 0.7  (7 of 7 points have positive 1x return AND positive 2x Sharpe)
+  trial-adjusted confidence B=0.9770 (median across points), T=7, confidence=0.8390
+
+hard floors (charter 7.3), on the MEDIAN. '----' is a gate a sweep cannot decide.
+------------------------------------------------------------------------------
+  PASS  net_sharpe                                   0.998692  required >= 0.8
+  PASS  double_cost_sharpe                           0.870834  required >= 0.5
+  PASS  triple_cost_sharpe                           0.742819  required > 0
+  PASS  annualized_return                            0.132227  required > 0
+  PASS  double_cost_annualized_return                0.113166  required > 0
+  PASS  max_drawdown                                 0.123573  required <= 0.2
+  PASS  annualized_volatility                        0.128827  required >= 0.06
+  PASS  positive_quarter_fraction                    0.647059  required >= 0.5
+  PASS  positive_fold_count                          4.000000  required >= 3
+  PASS  worst_fold_sharpe                            0.195359  required >= -0.25
+  PASS  annualized_turnover                         21.914616  required <= 25
+  PASS  gross_edge_bps_per_turnover                 67.638075  required >= 40
+  PASS  cost_share_of_positive_gross                 0.011374  required <= 0.3
+  PASS  top5_day_share                               0.031004  required <= 0.35
+  PASS  max_fold_positive_pnl_share                  0.314737  required <= 0.6
+  PASS  trade_count                               3577.000000  required >= 500
+  PASS  neighbourhood_positive_fraction              1.000000  required >= 0.7
+  FAIL  trial_adjusted_confidence                    0.839000  required >= 0.9
+  ----  sign_inversion_not_profitable          not measured here; run --falsification, which is its own material trial
+  PASS  declared_roles_match_traded_sides      declared ['long', 'short'], traded ['long', 'short']
+  PASS  role_long_gross_pnl                          0.556831  required > 0
+  PASS  role_short_gross_pnl                         0.070743  required > 0
+
+------------------------------------------------------------------------------
+  verdict: FAILS 1 measured floor(s)
+  indicative ranking score G: n/a
+------------------------------------------------------------------------------
+
+DIAGNOSTIC ONLY -- your NOMINATED POINT's own vector. This is NOT your score.
+------------------------------------------------------------------------------
+  annualized_return                               0.154398   (median       0.132227)
+  annualized_turnover                            21.542397   (median      21.914616)
+  annualized_volatility                           0.134127   (median       0.128827)
+  calmar                                          1.091331   (median       0.876945)
+  cost_share_of_positive_gross                    0.011281   (median       0.011374)
+  double_cost_annualized_return                   0.135853   (median       0.113166)
+  double_cost_annualized_turnover                21.548259   (median      21.919502)
+  double_cost_max_drawdown                        0.124484   (median       0.126783)
+  double_cost_positive_quarter_fraction           0.647059   (median       0.647059)
+  double_cost_sharpe                              1.017032   (median       0.870834)
+  gross_edge_bps_per_turnover                    77.822686   (median      67.638075)
+  long_gross_pnl                                  0.570995   (median       0.556831)
+  max_drawdown                                    0.123573   (median       0.123573)
+  max_fold_positive_pnl_share                     0.304590   (median       0.314737)
+  median_fold_sharpe                              1.023189   (median       0.870354)
+  net_sharpe                                      1.138072   (median       0.998692)
+  positive_fold_count                             4.000000   (median       4.000000)
+  positive_quarter_count                         11.000000   (median      11.000000)
+  positive_quarter_fraction                       0.647059   (median       0.647059)
+  short_gross_pnl                                 0.092710   (median       0.070743)
+  top5_day_share                                  0.034981   (median       0.031004)
+  trade_count                                  3670.000000   (median    3577.000000)
+  triple_cost_sharpe                              0.895727   (median       0.742819)
+  worst_fold_sharpe                               0.195359   (median       0.195359)
+
+  Section 7.2 scores the median, not this. Where the two disagree, the median is the
+  number you are ranked on -- a nominated point is the max of a noisy surface.
+------------------------------------------------------------------------------
+
+packet written to tournament/cup20/teams/team-04/research/packets/t36-sweep.json
+
+completed in 1080.4s

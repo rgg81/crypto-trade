@@ -26,6 +26,7 @@ from crypto_trade.cup20.adjudication import (
 )
 from crypto_trade.cup20.config import IS_END, SEALED_END, SEALED_START, load_config
 from crypto_trade.cup20.metrics import holdout_folds, is_folds
+from crypto_trade.cup20.qualification import GateVector
 from crypto_trade.cup20.scored_metrics import (
     ASSEMBLED_METRIC_KEYS,
     STAGE_HOLDOUT,
@@ -143,24 +144,32 @@ def test_a_passing_candidate_carries_the_gate_vector_and_a_score():
     )
 
 
-@pytest.mark.parametrize(
-    ("override", "expected_failure"),
-    [
-        ({"net_sharpe": 0.79}, "net_sharpe"),
-        ({"max_drawdown": 0.21}, "max_drawdown"),
-        ({"trade_count": 499.0}, "trade_count"),
-        ({"sign_inversion_passes_core": True}, "sign_inversion_not_profitable"),
-        ({"neighbourhood_positive_fraction": 0.69}, "neighbourhood_positive_fraction"),
-        ({"trial_adjusted_confidence": 0.89}, "trial_adjusted_confidence"),
-    ],
-)
+_NAMED_FAILURE_CASES = [
+    ({"net_sharpe": 0.79}, "net_sharpe"),
+    ({"max_drawdown": 0.21}, "max_drawdown"),
+    ({"neighbourhood_positive_fraction": 0.69}, "neighbourhood_positive_fraction"),
+    ({"trial_adjusted_confidence": 0.89}, "trial_adjusted_confidence"),
+]
+
+
+@pytest.mark.parametrize(("override", "expected_failure"), _NAMED_FAILURE_CASES)
 def test_a_failing_candidate_names_its_failure_and_gets_no_score(override, expected_failure):
     verdict = _adjudicate(**override)
     assert not verdict.qualified
     assert expected_failure in verdict.failures
-    # None, not 0.0: section 7.4's G is a ranking score, and attaching a number to a
-    # disqualified candidate invites the comparison the floors exist to forbid.
-    assert verdict.score is None
+    # A4: the floor is still measured and still named -- it now costs points rather than the
+    # tournament, so the candidate keeps a score and stays in the field.
+    assert expected_failure in verdict.gates.performance_failures
+    assert verdict.admissible
+    assert verdict.score is not None
+
+
+def test_the_parametrised_cases_are_all_performance_floors():
+    """Guards the list above: an integrity gate slipped into it would assert the opposite rule."""
+    from crypto_trade.cup20.qualification import INTEGRITY_GATES
+
+    cases = {expected for _, expected in _NAMED_FAILURE_CASES}
+    assert not cases & INTEGRITY_GATES
 
 
 def test_a_non_finite_floor_metric_fails_closed_rather_than_passing():
@@ -169,7 +178,9 @@ def test_a_non_finite_floor_metric_fails_closed_rather_than_passing():
     verdict = _adjudicate(max_drawdown=math.nan)
     assert not verdict.qualified
     assert "max_drawdown" in verdict.failures
-    assert verdict.score is None
+    # Fail-closed survives A4 unchanged: NaN must never read as "floor met". What changes is the
+    # consequence -- the miss is priced, not fatal.
+    assert verdict.admissible
 
 
 def test_a_failing_candidate_still_carries_its_scored_vector_for_diagnosis():
@@ -237,13 +248,15 @@ def _population(*specs):
     ]
 
 
-def test_only_floor_passers_are_ranked():
+def test_only_admissible_candidates_are_ranked():
+    """A4: a weak book is ranked low; a falsifiable one is not ranked at all."""
     passer = _adjudicate(team_id="team-01")
-    failer = _adjudicate(team_id="team-02", net_sharpe=0.10)
-    result = adjudicate_population([passer, failer], slots=3)
-    assert [c.team_id for c in result.ranked] == ["team-01"]
-    assert [c.team_id for c in result.rejected] == ["team-02"]
-    assert [c.team_id for c in result.candidates] == ["team-01", "team-02"]
+    weak = _adjudicate(team_id="team-02", net_sharpe=0.10)
+    falsified = _adjudicate(team_id="team-03", sign_inversion_passes_core=True)
+    result = adjudicate_population([passer, weak, falsified], slots=3)
+    assert [c.team_id for c in result.ranked] == ["team-01", "team-02"]
+    assert [c.team_id for c in result.rejected] == ["team-03"]
+    assert [c.team_id for c in result.candidates] == ["team-01", "team-02", "team-03"]
 
 
 def test_ranking_is_by_descending_score():
@@ -288,23 +301,29 @@ def test_advancing_is_capped_at_the_slot_count():
     assert len(result.ranked) == 4
 
 
-def test_an_empty_slot_is_never_backfilled_by_a_floor_failer():
+def test_an_empty_slot_is_never_backfilled_by_an_integrity_failer():
+    """A4 moves the line: floor missers DO fill slots, and a falsifiable result never does."""
     result = adjudicate_population(
         [
             _adjudicate(team_id="team-01"),
             _adjudicate(team_id="team-02", net_sharpe=0.10),
-            _adjudicate(team_id="team-03", trade_count=10.0),
+            _adjudicate(team_id="team-03", sign_inversion_passes_core=True),
+            _adjudicate(team_id="team-04", declared_roles=("long",)),
         ],
         slots=3,
     )
-    assert [c.team_id for c in result.advancing] == ["team-01"]
+    assert [c.team_id for c in result.advancing] == ["team-01", "team-02"]
 
 
-def test_a_population_with_no_qualifiers_advances_nobody():
+def test_a_population_with_nobody_admissible_advances_nobody():
+    """Section 1.1 keeps 'no winner' reachable. A4 narrows what empties the field, not that it can.
+
+    An empty field is still a permitted outcome; it now takes an integrity failure to produce one.
+    """
     result = adjudicate_population(
         [
-            _adjudicate(team_id="team-01", net_sharpe=0.10),
-            _adjudicate(team_id="team-02", max_drawdown=0.90),
+            _adjudicate(team_id="team-01", sign_inversion_passes_core=True),
+            _adjudicate(team_id="team-02", declared_roles=("long",)),
         ],
         slots=3,
     )
@@ -325,13 +344,13 @@ def test_adjudicating_an_incomplete_metric_vector_raises():
 def test_a_floor_passer_with_a_non_finite_ranking_input_raises():
     # `double_cost_max_drawdown` is gated by NO floor, so a NaN there survives qualification and
     # would otherwise blow up inside the population sort, unattributed.
-    with pytest.raises(ValueError, match="team-01/c1 passed every floor"):
+    with pytest.raises(ValueError, match="team-01/c1 is not refuted"):
         _adjudicate(double_cost_max_drawdown=math.nan)
 
 
-def test_a_failing_candidate_cannot_be_turned_into_a_ranked_entry():
-    verdict = _adjudicate(net_sharpe=0.10)
-    with pytest.raises(ValueError, match="only floor-passers are ranked"):
+def test_an_integrity_failer_cannot_be_turned_into_a_ranked_entry():
+    verdict = _adjudicate(sign_inversion_passes_core=True)
+    with pytest.raises(ValueError, match="only admissible candidates are ranked"):
         verdict.as_ranked_entry()
 
 
@@ -540,3 +559,170 @@ def test_a_failing_finalist_still_carries_its_scored_vector_and_gate_vector():
         "positive_quarter_count",
         "nominated_point_double_cost_return",
     }
+
+
+# --- Amendment A4: performance floors cost points; only integrity failures disqualify -----------
+
+
+def test_a_missed_performance_floor_is_still_ranked():
+    """A4's whole point: one miss out of twenty-two no longer discards a book.
+
+    Team 04's residual cross-section was positive in all four folds, positive on both sleeves and
+    inside every risk limit, and scored nothing because trial-adjusted confidence came in at 0.839.
+    Under A4 that costs it the seven multiplicity points and nothing else.
+    """
+    verdict = _adjudicate(trial_adjusted_confidence=0.839)
+    assert not verdict.qualified
+    assert verdict.gates.performance_failures == ("trial_adjusted_confidence",)
+    assert verdict.admissible
+    assert verdict.score is not None
+    assert verdict.as_ranked_entry().score == verdict.score
+
+
+def test_a_falsifiable_result_is_not_ranked_at_all():
+    """Integrity, not performance: the falsifier reproduced the book, so nothing is left to rank."""
+    verdict = _adjudicate(sign_inversion_passes_core=True)
+    assert not verdict.admissible
+    assert verdict.gates.integrity_failures == ("sign_inversion_not_profitable",)
+    assert verdict.score is None
+    with pytest.raises(ValueError, match="only admissible candidates are ranked"):
+        verdict.as_ranked_entry()
+
+
+def test_a_misdeclared_sleeve_is_not_ranked_at_all():
+    """Claiming a sleeve the book never traded is a false certificate, not a weak result."""
+    verdict = _adjudicate(declared_roles=("long",))
+    assert not verdict.admissible
+    assert "declared_roles_match_traded_sides" in verdict.gates.integrity_failures
+    assert verdict.score is None
+
+
+def test_an_unmeasured_integrity_check_is_not_treated_as_passed():
+    """Kills the mutation: ``checks.get(name, True)``.
+
+    A sweep cannot decide sign inversion -- it is its own material trial -- so the key can be
+    absent. Reading absence as a pass is how a falsification requirement silently stops binding.
+    """
+    from crypto_trade.cup20.qualification import ADMISSION_GATES, GateVector
+
+    complete = GateVector(checks=dict.fromkeys(ADMISSION_GATES, True))
+    assert complete.admissible
+    assert complete.integrity_verdict == "passed"
+
+    without = GateVector(
+        checks={k: True for k in ADMISSION_GATES if k != "sign_inversion_not_profitable"}
+    )
+    assert not without.admissible
+    assert without.integrity_verdict == "unmeasured"
+    # Crucially NOT reported as a failure: nobody ran the battery, so accusing the team of failing
+    # it would be a false accusation. Unmeasured and refuted are different states.
+    assert without.integrity_failures == ()
+    assert not without.refuted
+    assert without.unmeasured_admission_gates == ("sign_inversion_not_profitable",)
+
+
+def test_the_population_ranks_floor_missers_and_drops_only_integrity_failures():
+    """The composition A4 actually changes: who is in the field at all."""
+    ranked_low = _adjudicate(trial_adjusted_confidence=0.839, team_id="team-04", candidate_id="r")
+    clean = _adjudicate(team_id="team-02", candidate_id="c")
+    falsified = _adjudicate(sign_inversion_passes_core=True, team_id="team-09", candidate_id="f")
+
+    result = adjudicate_population([clean, ranked_low, falsified], slots=3)
+    assert [entry.team_id for entry in result.ranked] == ["team-02", "team-04"]
+    assert "team-09" not in [entry.team_id for entry in result.ranked]
+    assert clean.score > ranked_low.score  # the seven multiplicity points, and only those
+
+
+def test_a_flawless_finalist_is_admissible_at_the_holdout_stage():
+    """Regression: A4 leaking into the holdout via the shared class.
+
+    The holdout gate vector carries neither integrity key nor either substance key, so asking the
+    in-sample question of it answered "inadmissible" for a PERFECT finalist -- dropping every
+    finalist from the population and reporting a flawless book as an integrity failure. The two
+    stages ask different questions; ``admissible`` has to know which one it is being asked.
+    """
+    holdout_gates = GateVector(checks={"net_sharpe": True, "max_drawdown": True})
+    finalist = CandidateAdjudication(
+        team_id="team-02",
+        candidate_id="c",
+        scored={},
+        ranking_inputs={},
+        gates=holdout_gates,
+        score=53.5,
+        stage="holdout",
+    )
+    assert finalist.admissible
+    assert finalist.qualified
+
+    failing = dataclasses.replace(
+        finalist, gates=GateVector(checks={"net_sharpe": True, "max_drawdown": False})
+    )
+    assert not failing.admissible  # conjunctive at the holdout, exactly as before A4
+
+    same_vector_in_sample = dataclasses.replace(finalist, stage="in_sample")
+    assert not same_vector_in_sample.admissible  # and the IS question still fails closed
+
+
+def test_an_unknown_stage_is_refused_rather_than_guessed():
+    verdict = CandidateAdjudication(
+        team_id="t",
+        candidate_id="c",
+        scored={},
+        ranking_inputs={},
+        gates=GateVector(checks={}),
+        score=1.0,
+        stage="typo",
+    )
+    with pytest.raises(ValueError, match="unknown adjudication stage"):
+        verdict.admissible
+
+
+def test_an_under_risked_non_trading_book_is_not_ranked():
+    """Regression: the defect that inverted the tournament.
+
+    A book that grinds up on a whisper of volatility takes a near-zero drawdown and an
+    undefined-Calmar sentinel to a PERFECT ranking score -- measured at G = 100.00, against 70.58
+    for the strongest real submission in the field. The volatility floor existed to stop precisely
+    this and A4 had removed its teeth while keeping its 35 points of reward. Refusing a book that
+    does not trade is not blocking a team; it is declining to rank a non-entry.
+    """
+    grinder = _adjudicate(annualized_volatility=0.004, trade_count=12.0)
+    assert not grinder.admissible
+    assert set(grinder.gates.admission_failures) == {"annualized_volatility", "trade_count"}
+    assert grinder.score is None
+    with pytest.raises(ValueError, match="not admissible"):
+        grinder.as_ranked_entry()
+
+    result = adjudicate_population([_adjudicate(team_id="team-02"), grinder], slots=3)
+    assert [c.team_id for c in result.ranked] == ["team-02"]
+
+
+def test_an_unrun_falsification_scores_but_does_not_rank():
+    """A sweep cannot decide sign inversion, and the two wrong answers are opposite mistakes.
+
+    Asserting it passed retires the falsification requirement; withholding the score makes every
+    sweep report useless while the battery is outstanding. The candidate gets its indicative G and
+    is not rankable until the trial exists.
+    """
+    verdict = _adjudicate(sign_inversion_passes_core=None)
+    assert verdict.score is not None  # a team still reads its own G off the sweep
+    assert not verdict.gates.refuted
+    assert not verdict.admissible
+    assert verdict.gates.integrity_verdict == "unmeasured"
+    with pytest.raises(ValueError, match="unmeasured"):
+        verdict.as_ranked_entry()
+
+
+def test_ranked_and_rejected_partition_the_population_exactly():
+    population = [
+        _adjudicate(team_id="team-01"),
+        _adjudicate(team_id="team-02", net_sharpe=0.10),
+        _adjudicate(team_id="team-03", sign_inversion_passes_core=True),
+        _adjudicate(team_id="team-04", annualized_volatility=0.004),
+        _adjudicate(team_id="team-05", sign_inversion_passes_core=None),
+    ]
+    result = adjudicate_population(population, slots=3)
+    ranked = {c.team_id for c in result.ranked}
+    rejected = {c.team_id for c in result.rejected}
+    assert ranked & rejected == set()
+    assert ranked | rejected == {c.team_id for c in result.candidates}

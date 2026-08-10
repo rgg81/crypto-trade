@@ -1,0 +1,356 @@
+{
+  "accepted_trials": 1,
+  "bootstrap_positive_fraction": 0.9485,
+  "candidate_id": "baseline-thirds",
+  "cost_levels": {
+    "1x": {
+      "annualized_return": 0.10225963247265568,
+      "annualized_turnover": 24.891000396744996,
+      "annualized_volatility": 0.1285410639981489,
+      "calmar": 0.7356476064525305,
+      "cost_share_of_positive_gross": 0.013401997419487105,
+      "gross_edge_bps_per_turnover": 49.49198434595778,
+      "long_gross_pnl": 0.5329807641613291,
+      "max_drawdown": 0.13900627362301388,
+      "net_sharpe": 0.8219303785131522,
+      "positive_quarter_count": 9,
+      "positive_quarter_fraction": 0.5294117647058824,
+      "short_gross_pnl": -0.04528138666080961,
+      "top5_day_share": 0.030005338755944872,
+      "trade_count": 5023
+    },
+    "2x": {
+      "annualized_return": 0.08191043005582577,
+      "annualized_turnover": 24.897847491680537,
+      "annualized_volatility": 0.12857729955446207,
+      "calmar": 0.49947486741650315,
+      "cost_share_of_positive_gross": 0.02680377139487513,
+      "gross_edge_bps_per_turnover": 49.501979305711565,
+      "long_gross_pnl": 0.533262928377962,
+      "max_drawdown": 0.16399309634837367,
+      "net_sharpe": 0.676782542485065,
+      "positive_quarter_count": 8,
+      "positive_quarter_fraction": 0.47058823529411764,
+      "short_gross_pnl": -0.04533087448372847,
+      "top5_day_share": 0.03010458358980768,
+      "trade_count": 5030
+    },
+    "3x": {
+      "annualized_return": 0.06191810650906038,
+      "annualized_turnover": 24.904800524150584,
+      "annualized_volatility": 0.1286653540415356,
+      "calmar": 0.31572850469207064,
+      "cost_share_of_positive_gross": 0.04020559877278851,
+      "gross_edge_bps_per_turnover": 49.51189875266972,
+      "long_gross_pnl": 0.5335585354590945,
+      "max_drawdown": 0.1961118669644636,
+      "net_sharpe": 0.5314239530147002,
+      "positive_quarter_count": 8,
+      "positive_quarter_fraction": 0.47058823529411764,
+      "short_gross_pnl": -0.04539241899323862,
+      "top5_day_share": 0.03019090232433911,
+      "trade_count": 5054
+    }
+  },
+  "declared_roles": [
+    "long",
+    "short"
+  ],
+  "exposure_caps": {
+    "executed": {
+      "binding_cap_counts": {
+        "gross": 3,
+        "net": 0,
+        "symbol": 0
+      },
+      "boundaries": 206,
+      "median_scale": 0.9790325600971824,
+      "minimum_scale": 0.9570267565796674,
+      "stage": "executed",
+      "trimmed_boundaries": 3,
+      "trimmed_fraction": 0.014563106796116505
+    },
+    "requested": {
+      "binding_cap_counts": {
+        "gross": 0,
+        "net": 0,
+        "symbol": 0
+      },
+      "boundaries": 206,
+      "median_scale": 1.0,
+      "minimum_scale": 1.0,
+      "stage": "requested",
+      "trimmed_boundaries": 0,
+      "trimmed_fraction": 0.0
+    }
+  },
+  "fold_sharpes": {
+    "F1": 1.6362676009156745,
+    "F2": 0.1647633686650026,
+    "F3": -1.0721772980391924,
+    "F4": 1.521460544283753
+  },
+  "folds": [
+    {
+      "end": "2021-08-01 00:00:00+00:00",
+      "name": "F1",
+      "start": "2020-08-17 00:00:00+00:00"
+    },
+    {
+      "end": "2022-08-01 00:00:00+00:00",
+      "name": "F2",
+      "start": "2021-08-01 00:00:00+00:00"
+    },
+    {
+      "end": "2023-08-01 00:00:00+00:00",
+      "name": "F3",
+      "start": "2022-08-01 00:00:00+00:00"
+    },
+    {
+      "end": "2024-08-01 00:00:00+00:00",
+      "name": "F4",
+      "start": "2023-08-01 00:00:00+00:00"
+    }
+  ],
+  "gates": {
+    "annualized_return": {
+      "comparison": ">",
+      "floor": null,
+      "measured": true,
+      "note": "",
+      "observed": 0.10225963247265568,
+      "passed": true
+    },
+    "annualized_turnover": {
+      "comparison": "<=",
+      "floor": 25.0,
+      "measured": true,
+      "note": "",
+      "observed": 24.891000396744996,
+      "passed": true
+    },
+    "annualized_volatility": {
+      "comparison": ">=",
+      "floor": 0.06,
+      "measured": true,
+      "note": "",
+      "observed": 0.1285410639981489,
+      "passed": true
+    },
+    "cost_share_of_positive_gross": {
+      "comparison": "<=",
+      "floor": 0.3,
+      "measured": true,
+      "note": "",
+      "observed": 0.013401997419487105,
+      "passed": true
+    },
+    "declared_roles_match_traded_sides": {
+      "comparison": "",
+      "floor": null,
+      "measured": true,
+      "note": "declared ['long', 'short'], traded ['long', 'short']",
+      "observed": null,
+      "passed": true
+    },
+    "double_cost_annualized_return": {
+      "comparison": ">",
+      "floor": null,
+      "measured": true,
+      "note": "",
+      "observed": 0.08191043005582577,
+      "passed": true
+    },
+    "double_cost_sharpe": {
+      "comparison": ">=",
+      "floor": 0.5,
+      "measured": true,
+      "note": "",
+      "observed": 0.676782542485065,
+      "passed": true
+    },
+    "gross_edge_bps_per_turnover": {
+      "comparison": ">=",
+      "floor": 40.0,
+      "measured": true,
+      "note": "",
+      "observed": 49.49198434595778,
+      "passed": true
+    },
+    "max_drawdown": {
+      "comparison": "<=",
+      "floor": 0.2,
+      "measured": true,
+      "note": "",
+      "observed": 0.13900627362301388,
+      "passed": true
+    },
+    "max_fold_positive_pnl_share": {
+      "comparison": "<=",
+      "floor": 0.6,
+      "measured": true,
+      "note": "",
+      "observed": 0.3197481179029825,
+      "passed": true
+    },
+    "neighbourhood_positive_fraction": {
+      "comparison": ">=",
+      "floor": 0.7,
+      "measured": false,
+      "note": "assumed; a single point cannot measure a neighbourhood",
+      "observed": 1.0,
+      "passed": true
+    },
+    "net_sharpe": {
+      "comparison": ">=",
+      "floor": 0.8,
+      "measured": true,
+      "note": "",
+      "observed": 0.8219303785131522,
+      "passed": true
+    },
+    "positive_fold_count": {
+      "comparison": ">=",
+      "floor": 3.0,
+      "measured": true,
+      "note": "",
+      "observed": 3.0,
+      "passed": true
+    },
+    "positive_quarter_fraction": {
+      "comparison": ">=",
+      "floor": 0.5,
+      "measured": true,
+      "note": "",
+      "observed": 0.5294117647058824,
+      "passed": true
+    },
+    "role_long_gross_pnl": {
+      "comparison": ">",
+      "floor": null,
+      "measured": true,
+      "note": "",
+      "observed": 0.5329807641613291,
+      "passed": true
+    },
+    "role_short_gross_pnl": {
+      "comparison": ">",
+      "floor": null,
+      "measured": true,
+      "note": "",
+      "observed": -0.04528138666080961,
+      "passed": false
+    },
+    "sign_inversion_not_profitable": {
+      "comparison": "",
+      "floor": null,
+      "measured": false,
+      "note": "not measured here; run --falsification, which is its own material trial",
+      "observed": null,
+      "passed": true
+    },
+    "top5_day_share": {
+      "comparison": "<=",
+      "floor": 0.35,
+      "measured": true,
+      "note": "",
+      "observed": 0.030005338755944872,
+      "passed": true
+    },
+    "trade_count": {
+      "comparison": ">=",
+      "floor": 500.0,
+      "measured": true,
+      "note": "",
+      "observed": 5023.0,
+      "passed": true
+    },
+    "trial_adjusted_confidence": {
+      "comparison": ">=",
+      "floor": 0.9,
+      "measured": true,
+      "note": "",
+      "observed": 0.9485,
+      "passed": true
+    },
+    "triple_cost_sharpe": {
+      "comparison": ">",
+      "floor": null,
+      "measured": true,
+      "note": "",
+      "observed": 0.5314239530147002,
+      "passed": true
+    },
+    "worst_fold_sharpe": {
+      "comparison": ">=",
+      "floor": -0.25,
+      "measured": true,
+      "note": "",
+      "observed": -1.0721772980391924,
+      "passed": false
+    }
+  },
+  "measured_failures": [
+    "worst_fold_sharpe",
+    "role_short_gross_pnl"
+  ],
+  "observed_roles": [
+    "long",
+    "short"
+  ],
+  "ranking_score": null,
+  "risk_scalars": {
+    "count": 4335.0,
+    "maximum": 1.0502063929896723,
+    "median": 0.528097488508119,
+    "minimum": 0.25404591796898196
+  },
+  "scored": {
+    "annualized_return": 0.10225963247265568,
+    "annualized_turnover": 24.891000396744996,
+    "annualized_volatility": 0.1285410639981489,
+    "calmar": 0.49947486741650315,
+    "cost_share_of_positive_gross": 0.013401997419487105,
+    "double_cost_annualized_return": 0.08191043005582577,
+    "double_cost_annualized_turnover": 24.897847491680537,
+    "double_cost_max_drawdown": 0.16399309634837367,
+    "double_cost_positive_quarter_fraction": 0.47058823529411764,
+    "double_cost_sharpe": 0.676782542485065,
+    "gross_edge_bps_per_turnover": 49.49198434595778,
+    "long_gross_pnl": 0.5329807641613291,
+    "max_drawdown": 0.13900627362301388,
+    "max_fold_positive_pnl_share": 0.3197481179029825,
+    "median_fold_sharpe": 0.8431119564743778,
+    "net_sharpe": 0.8219303785131522,
+    "positive_fold_count": 3.0,
+    "positive_quarter_count": 9.0,
+    "positive_quarter_fraction": 0.5294117647058824,
+    "short_gross_pnl": -0.04528138666080961,
+    "top5_day_share": 0.030005338755944872,
+    "trade_count": 5023.0,
+    "triple_cost_sharpe": 0.5314239530147002,
+    "worst_fold_sharpe": -1.0721772980391924
+  },
+  "seed": 4,
+  "snapshot_sha256": "ceeedfcd7117a16a58d2bb9bbf9716356c9473098fe8512703d1656834746d48",
+  "source_sha256": "9178b95fc9e5eaf9dc98c8363a80a2abc068b4b5f4d7379419735054d86fa712",
+  "team_id": "team-04",
+  "trial_adjusted_confidence": 0.9485,
+  "trial_budget": 12,
+  "trial_sequence": 30,
+  "unmeasured_gates": [
+    "neighbourhood_positive_fraction",
+    "sign_inversion_not_profitable"
+  ],
+  "verdict": "FAILS 2 measured floor(s)",
+  "window": {
+    "end": "2024-08-01 00:00:00+00:00",
+    "start": "2020-08-17 00:00:00+00:00"
+  },
+  "workspace": {
+    "files_scanned": 20,
+    "root": "/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind-top20-low-dd/tournament/cup20/teams/team-04",
+    "unscanned": [],
+    "violations": []
+  }
+}

@@ -533,3 +533,63 @@ def test_conjunctive_gate_rejects_a_candidate_failing_only_one_floor(override, e
     gate = _evaluate_excelling(**override)
     assert not gate.passed
     assert gate.failures == (expected_failure,)
+
+
+# --- amendment A5: the graded credits must never disagree with the boolean floors ---------------
+
+
+def test_a_full_credit_agrees_with_the_boolean_floor_for_every_unpriced_gate():
+    """The anti-drift guard. Two copies of a threshold that disagree is this build's recurring bug.
+
+    ``UNPRICED_FLOOR_SPECS`` restates thresholds ``evaluate_floors`` also reads. This walks every
+    one of them across its boundary and asserts the two agree at each step: credit 1.0 exactly when
+    the boolean gate is True, credit < 1.0 exactly when it is False. A typo'd comparison or a
+    mis-keyed threshold fails here rather than mis-scoring a team in silence.
+    """
+    from crypto_trade.cup20.qualification import UNPRICED_FLOOR_SPECS, floor_credits
+
+    floors = CONFIG["floors"]
+    for gate, (metric, comparison, floor_key) in UNPRICED_FLOOR_SPECS.items():
+        threshold = 0.0 if floor_key is None else float(floors[floor_key])
+        step = abs(threshold) * 0.10 if threshold else 0.5
+        for value in (threshold - step, threshold, threshold + step):
+            gates = _evaluate(**{metric: value})
+            scored = dict(PASSING, **{metric: value})
+            credit = floor_credits(scored, floors=floors)[gate]
+            assert (credit == 1.0) == gates.checks[gate], (
+                f"{gate}: value={value} credit={credit} boolean={gates.checks[gate]}"
+            )
+
+
+def test_the_unpriced_specs_never_overlap_what_the_score_already_prices():
+    """A floor charged twice -- once in G, once in the factor -- is a floor weighted arbitrarily."""
+    from crypto_trade.cup20.qualification import (
+        ADMISSION_GATES,
+        UNPRICED_FLOOR_SPECS,
+    )
+
+    priced_by_g = {
+        "worst_fold_sharpe",
+        "median_fold_sharpe",
+        "max_drawdown",
+        "calmar",
+        "positive_quarter_fraction",
+        "trial_adjusted_confidence",
+        "neighbourhood_positive_fraction",
+    }
+    assert not set(UNPRICED_FLOOR_SPECS) & priced_by_g
+    assert not set(UNPRICED_FLOOR_SPECS) & ADMISSION_GATES
+
+
+def test_a_fully_compliant_book_is_left_alone_by_the_factor():
+    """The factor must not silently re-rank books that met every floor it prices."""
+    from crypto_trade.cup20.qualification import compliance_factor
+
+    assert compliance_factor(PASSING, floors=CONFIG["floors"]) == 1.0
+
+
+def test_missing_an_unpriced_floor_costs_something_rather_than_nothing():
+    from crypto_trade.cup20.qualification import compliance_factor
+
+    churny = dict(PASSING, annualized_turnover=45.8)
+    assert compliance_factor(churny, floors=CONFIG["floors"]) < 1.0

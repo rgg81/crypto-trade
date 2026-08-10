@@ -39,6 +39,7 @@ from crypto_trade.cup20.sweep import (
     _bound_coordinate_values,
     default_workers,
     evaluate_materialised_point,
+    inert_points,
     load_neighbourhood,
     materialise_neighbourhood,
     median_bootstrap_fraction,
@@ -684,6 +685,78 @@ def test_one_unusable_point_makes_the_neighbourhood_bootstrap_nan(bad):
 def test_the_median_bootstrap_fraction_requires_a_point():
     with pytest.raises(ValueError, match="at least one point"):
         median_bootstrap_fraction([])
+
+
+def _scored_outcome(label: str, sharpe: float, drawdown: float, *, nominee: bool = False):
+    """A point carrying a real metric vector, so inertness is decidable from it."""
+    return PointOutcome(
+        label=label,
+        is_nominee=nominee,
+        coordinates={},
+        entrypoint_sha256="a" * 64,
+        bound_constants={},
+        scored={"net_sharpe": sharpe, "max_drawdown": drawdown},  # type: ignore[arg-type]
+        bootstrap_positive_fraction=0.99,
+        cost_levels={},
+        fold_sharpes={},
+        exposure_caps={},
+        risk_scalars={},
+        observed_roles=(),
+        seconds=0.0,
+    )
+
+
+def test_a_point_reproducing_the_nominee_exactly_is_inert():
+    """The quantised-coordinate exploit: a declared variation that lands in the same cell.
+
+    ``round(n * fraction)`` over twenty names moves the *coordinate* by the required 5% and the
+    *book* not at all, so the point sits on the nominee and drags the median onto the peak.
+    """
+    outcomes = [
+        _scored_outcome("nominee", 1.10, 0.12, nominee=True),
+        _scored_outcome("SLEEVE_FRACTION=0.27", 1.10, 0.12),
+        _scored_outcome("SLEEVE_FRACTION=0.33", 0.94, 0.15),
+    ]
+    assert inert_points(outcomes) == ("SLEEVE_FRACTION=0.27",)
+
+
+def test_a_point_differing_in_any_single_metric_is_not_inert():
+    """Kills the mutation: comparing one headline metric instead of the whole vector.
+
+    A coordinate can leave Sharpe untouched to the last bit and still change the drawdown -- that
+    is a book that moved, and the point is a real observation.
+    """
+    outcomes = [
+        _scored_outcome("nominee", 1.10, 0.12, nominee=True),
+        _scored_outcome("moved_drawdown_only", 1.10, 0.13),
+    ]
+    assert inert_points(outcomes) == ()
+
+
+def test_two_nan_metrics_count_as_the_same_measurement():
+    """Kills the mutation: bare ``==`` on a vector carrying NaN.
+
+    ``nan != nan``, so a naive comparison calls two identical unusable runs *different* and lets
+    the most degenerate neighbourhood of all -- every point unusable -- pass as exploration.
+    """
+    outcomes = [
+        _scored_outcome("nominee", math.nan, 0.12, nominee=True),
+        _scored_outcome("also_nan", math.nan, 0.12),
+    ]
+    assert inert_points(outcomes) == ("also_nan",)
+
+
+def test_inertness_is_never_concluded_from_an_absence_of_metrics():
+    """An empty vector holds every dimension constant, which is not the same as measuring no change.
+
+    ``all()`` over no keys is True. Since this verdict voids a team's sweep, it must never rest on
+    a comparison that did not happen.
+    """
+    assert inert_points([_outcome(0.99), _outcome(0.99)]) == ()
+
+
+def test_the_nominee_is_never_its_own_inert_point():
+    assert inert_points([_scored_outcome("nominee", 1.10, 0.12, nominee=True)]) == ()
 
 
 def _outcome(bootstrap: float) -> PointOutcome:

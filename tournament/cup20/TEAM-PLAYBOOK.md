@@ -180,10 +180,20 @@ Three consequences of the risk unit worth internalising before you design anythi
    rewarded.
 3. **Your risk policy declares shape, not scale.** It runs against the book the risk unit has
    already resized, so the *level* at which your drawdown brake engages will not be the level you
-   would see on your own book, and a declared volatility target above 10% will never bind — the
-   common unit has already pulled the executed book toward 10%. What survives intact is everything
-   about shape: which symbols, which side, when to stop out, how fast to turn over. Charter §6
-   states this in full; §14.6 records it as a known limitation rather than a surprise.
+   would see on your own book. What survives intact is everything about shape: which symbols, which
+   side, when to stop out, how fast to turn over. Charter §6 states this in full; §14.6 records it
+   as a known limitation rather than a surprise.
+
+   **`volatility_target.enabled` must be `false` (charter §6, amendment A3).** Declaring `true` is
+   refused by `--check`, which is free, so it can never cost you a trial — but it is a hard refusal,
+   not a warning. The field is banned because it is self-referential: the policy measures the
+   volatility of the book it has already scaled, so realised gross and turnover settle at a
+   fractional power of the number you declare rather than being pinned to it. A team short of the
+   turnover floor could therefore clear it by declaring a smaller target rather than by trading
+   less, which is a floor passed by paperwork. **If you are over the turnover floor, fix it in the
+   signal** — trade a slower formation, hold longer, rebalance less often, or soften the weights.
+   Two teams before you found this interaction; both declined to use it and said so in their
+   certificates.
 
 Any fitted state must be fitted from the past-only rows streamed through the context during the
 run. No pre-staged models, no pre-computed artefacts, no pickles. Machine learning is permitted in
@@ -342,6 +352,14 @@ What the packet adds that a single point cannot have:
   this gate; a single-point packet shows it as `----`.
 - **`B` as the per-point median** of the bootstrap positive fraction, so the trial-adjusted
   confidence is a property of the plateau rather than of the spike.
+- **an inertness check on the results** (charter §7.2, amendment A1). No point may reproduce your
+  nominee's scored metric vector *exactly*. Declaring a coordinate that varies by the required 5%
+  but that your strategy quantises — a fraction you `round()` into a name count is the usual case —
+  produces a byte-identical book, and an inert point sitting on the nominee drags the median onto
+  the peak the sweep exists to discount. A sweep containing one is **void and costs the trial**, so
+  choose coordinates your strategy visibly responds to. This is the one validity check that cannot
+  run before the sweep does, because inertness is only knowable from the results. If it fires, the
+  error names the offending points.
 - **one `strategy.py` digest per point**, so what actually executed is on the record. `--keep-variants`
   keeps the materialised directories if you want to read them.
 

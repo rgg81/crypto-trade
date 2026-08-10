@@ -36,7 +36,29 @@ of a trend rather than of a random walk that happened to end up somewhere.
 | `SMOOTH_BARS` | 33 | overlapping tranches / holding horizon (11 days) — neighbourhood coordinate |
 | `NET_EXPOSURE_DAMPING` | 0.45 | net-exposure control — neighbourhood coordinate |
 | `REBALANCE_PHASE` | 1 | phase offset of the cadence — neighbourhood coordinate |
-| `REBALANCE_EVERY` | 3 | rebalance cadence (24h); the three phase offsets are exhaustive |
+| `REBALANCE_EVERY` | 3 | rebalance cadence (24h) — neighbourhood coordinate |
+
+## The declared neighbourhood
+
+`neighbourhood.json` declares all six material parameters as coordinates and a **one-at-a-time
+star**: the nominee plus exactly one point above and one point below on each coordinate, 13 points
+in total, which is the `max(7, 2k+1)` minimum for `k = 6` on the nose. Every point differs from the
+nominee in exactly one coordinate, so no side of any axis is padded and no corner is chosen — the
+design has no free parameter left to lean on the median with.
+
+Two of the six need a word about why their variations are the size they are.
+
+`PERSISTENCE_Z_FLOOR` is compared against a **quantised** statistic. With `FORMATION_BARS = 15` the
+agreeing-bar count is an integer, so `z` can only take the values `(2k - 15)/sqrt(15)`: 0.775 at
+k = 9, 1.291 at k = 10, 1.807 at k = 11. Every threshold in `(0.775, 1.291]` therefore selects the
+identical set of bars and produces a **byte-identical book**. The nominee's 1.10 sits in that cell,
+and so would the 5%-material variations 1.045 and 1.155 — both of which would be inert points under
+charter §7.2 as amended, voiding the sweep. The declared variations are 0.70 (admits k ≥ 9) and 1.40
+(admits k ≥ 11): each lands in a different quantisation cell from the nominee and from each other.
+
+`REBALANCE_PHASE` is declared at 0 and 2, which with `REBALANCE_EVERY = 3` is the **exhaustive** set
+of phase offsets. Charter §9.1 requires the phase swept for any cadence longer than one bar, and at
+this cadence the sweep is complete rather than sampled.
 
 ## Roles
 

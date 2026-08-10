@@ -311,13 +311,19 @@ and the policy fires off the pass it is in.
 **Two consequences, stated rather than hidden.** First, a declared drawdown brake watches the
 *executed* book, which the common risk unit has already resized; on a book the risk unit shrinks,
 the same declaration engages at materially fewer boundaries than it would on the reference book.
-Second, a team's own volatility target is largely inert on the executed book: a declared target may
-only reduce — the declared-policy schema caps its scale at 1.0 — and the common risk unit has
-already pulled the executed book toward 10% annualised, so any declared target above 10% never
-binds. Both follow from the common risk unit being the tournament's leveller: where a team's
-declaration and the common unit disagree about size, the common unit wins. Teams should read the
-risk policy as *shape* — which symbols, which side, when to stop out, how fast to turn over — and
-not as a claim on the book's overall scale.
+Second, a team's own volatility target is **forbidden outright** (amendment A3):
+`volatility_target.enabled` must be `false`, and a candidate declaring `true` is refused by the free
+`--check` before it can cost a trial. The field was originally allowed on the reasoning that it was
+largely inert — a declared target may only reduce, and the common risk unit has already pulled the
+executed book toward 10% annualised. That reasoning was wrong in the direction that matters. The
+policy measures the volatility of the book **it has already scaled**, so the loop settles with
+realised gross and turnover at a fractional power of the declared target rather than pinned to it,
+and a team short of the turnover floor can clear it by declaring a smaller number instead of by
+trading less. That is a floor passed by paperwork. Refusing the field is the only remedy that does
+not require the organiser to judge intent, and it is what §6's division already implied: teams
+own *shape* — which symbols, which side, when to stop out, how fast to turn over — and the common
+risk unit owns *scale*. Both consequences follow from the common risk unit being the tournament's
+leveller: where a team's declaration and the common unit disagree about size, the common unit wins.
 
 **Why the caps run at both ends, and why they never redistribute.** Step 2 caps the team's own book
 and step 4 caps the organiser's. Neither alone is enough: the reference pass evaluates the
@@ -427,6 +433,20 @@ additional points such that:
   the nominee. Verified by parsing the entrypoint, never by importing it — team code is untrusted
   and is never executed during verification.
 
+The four rules above police the **declaration**, from numbers written down before anything runs.
+They are necessary and not sufficient, so one rule polices the **effect**, decided from measurement
+after the points have run — the only moment it is knowable:
+
+- **no point may reproduce the nominee's scored metric vector exactly.** A coordinate the strategy
+  consumes through a quantiser — `round(n × fraction)` over a twenty-name universe is the case a
+  team found and reported rather than used — can satisfy the 5% materiality rule and still produce
+  a byte-identical book, because both variations land inside the same quantisation cell. Such an
+  axis is worse than uninformative: an inert point sits exactly on the nominee, dragging the
+  per-metric median toward the nominee's own value, which is precisely the peak this section exists
+  to discount. Three inert coordinates would convert the anti-peak-picking rule into a rubber stamp
+  for the peak. A sweep containing an inert point is void; the team re-declares and sweeps again,
+  at the cost of another trial, and keeps the diagnostic naming which points were inert.
+
 **Every scored metric is the per-metric median across the neighbourhood's runs.** The nominated
 point's own coherent metric vector, and the coherent vector of the median-performing point, are
 both reported as diagnostics but neither is the score. The trial-adjusted confidence's bootstrap
@@ -454,10 +474,33 @@ Rationale: nominating a best point is nominating the maximum of a noisy surface,
 upward-biased by construction. A median over a pre-declared plateau is not. This is also applied on
 the holdout (§8), so the final ranking is a plateau estimate rather than a spike.
 
-### 7.3 Hard floors
+### 7.3 Floors
 
-Conjunctive. Evaluated on the neighbourhood-median record, common risk unit. Never waived, never
-lowered, never rounded into compliance, never averaged away. A missing or non-finite value fails.
+Evaluated on the neighbourhood-median record, common risk unit. Never waived, never lowered, never
+rounded into compliance, never averaged away. A missing or non-finite value fails its floor.
+
+**Amendment A4 changed what a failure costs.** Every floor below was conjunctive and hard, so one
+miss out of twenty-two discarded a candidate entirely — which is how a book positive in all four
+folds, positive on both sleeves and inside every risk limit came to be ranked nowhere at all. The
+floors are all still measured and still reported; what they no longer do is veto. In-sample
+advancement is decided by the ranking score of §7.4 over every **admissible** candidate.
+
+Two of the checks are exempt from A4 and still disqualify outright, because they are not claims
+about how good a book is but about whether its evidence means what the certificate says:
+
+| Integrity check | Why no score can repair it |
+|---|---|
+| `sign_inversion_not_profitable` | the falsifier reproduces the book, so the result is an artifact of the harness rather than of the stated mechanism — there is nothing here to rank |
+| `declared_roles_match_traded_sides` | the certificate claims a sleeve the book never traded, or hides one it did |
+
+An integrity check that was never *measured* is not passed. A sweep cannot decide sign inversion —
+that is its own material trial — so a candidate carrying no falsification result is inadmissible
+until one exists. The blindness scan, the source scan, the §5.1 coordinate rule, the A1 inertness
+rule and the A3 volatility-target ban are hard for the same reason and are unaffected by A4.
+
+**§7.6's holdout stage does not follow A4.** There the floors remain conjunctive and hard. That
+stage asks whether a book is good enough to put on a paper desk, not which book is best, and §1.1
+keeps "no winner" as a permitted answer.
 
 **Integrity gates** (evaluated before any performance number):
 
@@ -807,6 +850,94 @@ after activation require a prospective, append-only amendment recorded **before*
 are accessed. Historical evidence is never rewritten. Silence, missing output and DNF never count
 as a valid submission.
 
+### Amendment A1 — 2026-08-08, prospective: the effect half of the §7.2 neighbourhood rule
+
+**Recorded before any team affected by it accessed the tournament data.** Teams 05-12 had not
+started; teams 01-04 had finished.
+
+Team 04 reported, and declined to use, a gap in §7.2: the materiality rule polices the *declared*
+variation but nothing policed whether that variation moved the *book*. A coordinate the strategy
+consumes through a quantiser can vary by the required 5% and produce a byte-identical result, and
+because an inert point lands exactly on the nominee it pulls the median onto the peak — scoring
+*better* than an honest declaration. The team measured the alternative it passed up as worth about
+0.006 of bootstrap fraction against the axes it did declare, and disclosed it instead.
+
+§7.2 now adds: no point may reproduce the nominee's scored metric vector exactly; a sweep
+containing one is void.
+
+**Retroactive effect: none, verified rather than assumed.** The three completed sweeps were checked
+against the new rule before it was written. Team 04's sweep measured zero inert points directly;
+teams 01 and 02 declared only integer bar counts and a threshold, every variation clearing its
+quantisation step by a wide margin. No completed result changes.
+
+The amendment can only make nomination harder and cannot advantage any team, which is the sole
+class of change this section permits once teams are running.
+
+### Amendment A2 — 2026-08-08, prospective: two structural floor interactions disclosed, no rule changed
+
+Team 04 reported that two floors interact with this window and this universe in ways the charter had
+not stated. Both are recorded as §14.9 and §14.10 and **neither floor is changed**. Both candidate
+changes would have *loosened* a floor, and teams 01-04 designed against the strict form; loosening
+after they froze would advantage the teams that had not yet started. Disclosure is the fair
+instrument here, a rule change is not.
+
+### Amendment A3 — 2026-08-08, prospective: a declared volatility target is forbidden (§6)
+
+`volatility_target.enabled` must be `false`. A candidate declaring `true` is refused by the free
+`--check`, before it can cost a trial.
+
+The field was admitted on the reasoning that it was largely inert, since a declared target may only
+reduce and the common risk unit has already pulled the executed book toward 10% annualised. That
+reasoning was wrong in the direction that matters. The policy measures the volatility of the book it
+has **already scaled**, so the loop settles with realised gross and turnover at a fractional power of
+the declared target rather than pinned to it. A team short of the turnover floor can therefore clear
+it by declaring a smaller number instead of by trading less — a floor passed by paperwork. Refusing
+the field is the only remedy that does not require the organiser to judge intent, and it is what §6's
+division of shape from scale already implied.
+
+**Retroactive effect: one nomination touched, and handled at organiser cost rather than the team's.**
+Teams 02, 03 and 04 declared `enabled: false` throughout. Team 01's nominated candidate declares
+`enabled: true` at `annualized_target: 0.10` — the same figure as the organiser's own risk unit, with
+`maximum_scale: 1.0` so it can only reduce — and its certificate records that the team identified the
+lower-target exploit explicitly and **declined to use it**, fixing its turnover overrun by slowing
+its ladder instead. Because the rule changed under a team that had already frozen, the tournament
+pays for the re-score rather than the team: the frozen nominee is swept again with the target
+disabled, at the accepted-trial count the team actually spent, and the result recorded here stands as
+its score under this amendment. Nothing is charged to team 01's budget and no trial is consumed.
+
+### Amendment A4 — 2026-08-08: in-sample advancement is ranked, not gated
+
+**Organiser ruling, on the tournament's own objective.** The twenty-two floors of §7.3 were
+conjunctive: miss one, and the candidate left the field regardless of everything else. Measured
+against real submissions that proved too blunt. Team 04's residual cross-section was positive in all
+four folds (worst +0.195), positive on both sleeves, inside every risk and cost limit, and cleared
+twenty-one of twenty-two floors — and scored nothing, because trial-adjusted confidence landed at
+0.839 against a 0.90 floor that on this window demands a plateau-median Sharpe near 1.13.
+
+Under A4 every floor is still measured, still reported and still recorded verbatim; a miss costs
+points rather than the tournament. In-sample advancement is the §7.4 ranking score over every
+admissible candidate, and the top three by that score advance. The ranking formula is **unchanged**
+— the same 58 points of fold consistency, 35 of drawdown control and 7 of multiplicity honesty,
+fixed before any team ran. Nothing in it was re-weighted after results were visible, which is the
+one thing that would have made this ruling a way of choosing a winner rather than a way of ranking
+one. The confidence term in particular was already graded rather than a cliff.
+
+Exempt, and still disqualifying: `sign_inversion_not_profitable` and
+`declared_roles_match_traded_sides` (§7.3), plus the blindness scan, the source scan, the §5.1
+coordinate rule, the A1 inertness rule and the A3 volatility-target ban. Those say the evidence is
+not what it claims, and no ranking repairs a false claim.
+
+**Not applied to the holdout.** §7.6 keeps conjunctive floors, because that stage asks whether a
+book is deployable rather than which book is best, and §1.1 keeps "no winner" available.
+
+**Known consequence, stated rather than discovered later.** The ranking score measures fold
+consistency, drawdown, Calmar, positive quarters and multiplicity honesty. It does **not** measure
+turnover, cost efficiency, realised volatility or trade count. Those were previously enforced only
+as floors, so under A4 a book that churns with thin edge per unit of turnover can rank on in-sample
+evidence where it would once have been removed. The floors remain on the record for every candidate,
+and the holdout stage still enforces them conjunctively, so such a book cannot win — but it can
+occupy one of the three holdout slots.
+
 ## 14. Known limitations, stated up front
 
 1. The holdout window overlaps four prior organiser-level reveals (§2.1). Mitigated structurally,
@@ -822,11 +953,13 @@ as a valid submission.
 5. The common risk unit makes drawdowns comparable but means the reported book is not the book a
    team would deploy at its own chosen risk level. Both normalised and raw are reported.
 6. Because the common risk unit resizes the book the declared risk policy then governs (§6), a
-   team's declared *sizes* — its volatility target, and the drawdown level at which its brake
-   engages — do not survive intact into the executed book. Its declared *shape* does. This is a
-   deliberate consequence of levelling risk before comparing drawdowns, and it is disclosed rather
-   than mitigated: a strategy whose edge depends on running at its own chosen scale is not one this
-   tournament can rank.
+   team's declared *sizes* — the drawdown level at which its brake engages — do not survive intact
+   into the executed book. Its declared *shape* does. This is a deliberate consequence of levelling
+   risk before comparing drawdowns, and it is disclosed rather than mitigated: a strategy whose edge
+   depends on running at its own chosen scale is not one this tournament can rank. The volatility
+   target used to be the other example here; amendment A3 forbids it outright, because the
+   interaction was not merely a distortion of a declared size but a way to move turnover without
+   trading differently.
 7. A concentrated book is evaluated, but it is not evaluated on equal terms, and the reason is
    arithmetic rather than a judgement about concentration. The §4 caps reduce and never
    redistribute, so a four-name equal-weight book executes at 0.80 gross and a single-name book at
@@ -856,3 +989,27 @@ as a valid submission.
    would name the process and the moment of every read rather than inferring one from a timestamp;
    it requires root. An organiser who can arrange either should, and should say so in the record —
    both supersede the tripwires in §5 rather than supplementing them.
+
+9. **The both-sides-gross-positive floor (§7.3) is a standalone-viability test, and on a rising
+   window that is a strong requirement, not a neutral one.** A dollar-neutral book's short sleeve is
+   gross-positive only if the shorted names fall in *absolute* terms — much stronger than "short the
+   relative losers", which is the only thing a cross-sectional book claims to do. Measured on the
+   in-sample window, an equal-weight top-20 basket sums to **+1.99** in simple returns over 4335
+   bars, so the floor pushes cross-sectional lanes toward a *concentrated* short sleeve: team 04
+   measured 48 diversified sleeves, every one gross-negative (best −0.22), and reached positive only
+   by narrowing to a fifth of the names. The floor is kept as written — it is the one test that
+   separates a market-neutral book from a long book wearing a hedge, and loosening a floor after
+   teams have designed against it would advantage the teams that had not yet started. It is stated
+   here so lanes 04, 05 and 06 design for it rather than discover it at their eighth trial. The
+   interaction is sharper at 20 names than it would be at 40, where a deeper loser tail is reachable
+   without concentrating.
+
+10. **The multiplicity adjustment counts every trial, including the ones spent trying to falsify
+    your own result.** `1 − T·(1−B)` against a 0.90 floor means a team at the 8-trial minimum needs
+    a bootstrap fraction of 0.9875, and one that uses all twelve needs 0.9917. That penalises
+    ablations and falsification batteries exactly as it penalises a parameter search, which is
+    backwards with respect to what this charter asks for everywhere else. It is kept because the
+    alternative — organiser judgement about which trials "count" — is the discretion §2.1 exists to
+    remove, and because a team can always choose to run fewer. Teams should budget for it: on this
+    window an all-folds-positive book at the minimum trial count still failed this floor, on
+    B = 0.977, which is why it is written down here.

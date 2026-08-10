@@ -693,6 +693,14 @@ def test_the_full_chain_composes_from_candidate_runs_to_a_verdict():
     # explains it.
     assert set(verdict.scored) == ASSEMBLED_METRIC_KEYS
     assert verdict.gates.checks
-    assert verdict.qualified is (verdict.score is not None)
+    # Pre-A4 this read `qualified is (score is not None)`: a score existed exactly when every floor
+    # passed. A4 broke that on purpose -- a floor misser is scored and ranked -- so the surviving
+    # invariant is the narrower one: a score is withheld only from a candidate whose admission gate
+    # was MEASURED and FAILED. The synthetic book misses floors and is scored negatively, which is
+    # A5's decaying tail working: "much worse than the threshold" must not collapse onto "at it".
+    assert (verdict.score is None) is verdict.gates.refuted
+    assert verdict.admissible is (
+        verdict.gates.integrity_verdict == "passed" and verdict.gates.substance_verdict == "passed"
+    )
     if not verdict.qualified:
         assert verdict.failures

@@ -326,6 +326,58 @@ def test_a_missing_risk_policy_is_named(tmp_path):
         load_candidate_risk_policy(candidate)
 
 
+def _set_volatility_target(candidate, **fields):
+    path = candidate / "risk_policy.json"
+    policy = json.loads(path.read_text())
+    policy["volatility_target"] = {**policy["volatility_target"], **fields}
+    path.write_text(json.dumps(policy))
+    return policy
+
+
+def test_a_declared_volatility_target_is_refused(tmp_path):
+    """Charter §6, amendment A3: scale belongs to the organiser, shape belongs to the team.
+
+    The field is also self-referential -- the policy measures the volatility of the book it has
+    already scaled -- so a team short of the turnover floor could clear it by declaring a smaller
+    number rather than by trading less.
+    """
+    workspace = tmp_path / "team-01"
+    candidate = _write_candidate(workspace)
+    _set_volatility_target(candidate, enabled=True)
+    with pytest.raises(CandidateLoadError, match="volatility_target.enabled = true"):
+        load_candidate_risk_policy(candidate)
+
+
+def test_a_disabled_volatility_target_still_loads(tmp_path):
+    """The refusal is of the *behaviour*, not of the schema.
+
+    Every candidate the field has ever shipped in carries the block with ``enabled = false``, and a
+    ban that rejected the key itself would refuse every honest policy in the tournament.
+    """
+    workspace = tmp_path / "team-01"
+    candidate = _write_candidate(workspace)
+    _set_volatility_target(candidate, enabled=False, annualized_target=0.02)
+    assert load_candidate_risk_policy(candidate).volatility_target.enabled is False
+
+
+def test_the_free_check_refuses_a_declared_volatility_target_before_any_trial(tmp_path):
+    """It must fire on ``--check``, which spends nothing, not first at the scored run.
+
+    A ban a team discovers only after paying a trial is a ban that costs the honest team most.
+    """
+    workspace = tmp_path / "team-01"
+    candidate = _write_candidate(workspace)
+    _set_volatility_target(candidate, enabled=True)
+    with pytest.raises(CandidateLoadError, match="volatility_target.enabled = true"):
+        check_candidate(
+            candidate_root=candidate,
+            workspace_root=workspace,
+            team_id="team-01",
+            candidate_id="baseline",
+            source_sha256="a" * 64,
+        )
+
+
 _RELOAD_SOURCE = (
     "VALUE = {value}\n"
     "class B:\n"

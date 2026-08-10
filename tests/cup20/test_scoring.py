@@ -202,24 +202,29 @@ def test_component_weights_sum_to_exactly_one_hundred():
 
 NON_FINITE_ORIENTATION = [
     # component, raw override value, expected TOTAL score (others held at ZERO_CREDIT)
+    #
+    # Amendment A5: the worst end of each component now earns MINUS its weight rather than zero.
+    # Under the old clamp, "infinitely bad" and "merely at the threshold" both scored zero on the
+    # term, so the score could not tell them apart. Orientation is what these rows exist to pin, and
+    # it is unchanged -- only the magnitude of the worst case moved, from 0 to -weight.
     ("worst_fold_sharpe", float("nan"), 0.0),
     ("worst_fold_sharpe", float("inf"), 30.0),
-    ("worst_fold_sharpe", float("-inf"), 0.0),
+    ("worst_fold_sharpe", float("-inf"), -30.0),
     ("median_fold_sharpe", float("nan"), 0.0),
     ("median_fold_sharpe", float("inf"), 20.0),
-    ("median_fold_sharpe", float("-inf"), 0.0),
+    ("median_fold_sharpe", float("-inf"), -20.0),
     ("max_drawdown", float("nan"), 0.0),
-    ("max_drawdown", float("inf"), 0.0),  # inverted: infinite drawdown is the worst book
+    ("max_drawdown", float("inf"), -20.0),  # inverted: infinite drawdown is the worst book
     ("max_drawdown", float("-inf"), 20.0),  # inverted: -inf drawdown is algebraically the best
     ("calmar", float("nan"), 0.0),
     ("calmar", float("inf"), 15.0),  # the historical bug's exact scenario
-    ("calmar", float("-inf"), 0.0),
+    ("calmar", float("-inf"), -15.0),
     ("positive_quarter_fraction", float("nan"), 0.0),
     ("positive_quarter_fraction", float("inf"), 8.0),
-    ("positive_quarter_fraction", float("-inf"), 0.0),
+    ("positive_quarter_fraction", float("-inf"), -8.0),
     ("trial_adjusted_confidence", float("nan"), 0.0),
     ("trial_adjusted_confidence", float("inf"), 7.0),
-    ("trial_adjusted_confidence", float("-inf"), 0.0),
+    ("trial_adjusted_confidence", float("-inf"), -7.0),
 ]
 
 # 6 components x {nan, +inf, -inf}; pins the battery's own breadth so a future edit can't
@@ -261,11 +266,57 @@ def test_calmar_positive_infinity_scores_the_same_full_credit_as_an_ordinary_1_5
 
 FINITE_GENERAL_BRANCH = [
     # component, value, expected total (rest of the dict left at BASE's own full-credit values)
-    ("worst_fold_sharpe", -5.0, 70.0),  # finite lower saturation, direct orientation: 100 - 30
-    ("max_drawdown", 0.50, 80.0),  # finite lower-argument saturation, inverted: 100 - 20
+    #
+    # Amendment A5 replaced the lower clamp with a decaying tail, so the two out-of-range rows no
+    # longer SATURATE -- that was the defect: a book at 21% drawdown and one at 95% scored
+    # identically, and the ranking could not order them. Mid-range rows are untouched by A5, which
+    # is the property that matters: the tail changes nothing above a threshold.
+    ("worst_fold_sharpe", -5.0, 100.0 - 30.0 - 24.782608695652176),  # arg -4.75 -> -0.826087
+    ("max_drawdown", 0.50, 100.0 - 20.0 - 13.333333333333334),  # arg -2.0 -> -0.666667
     ("worst_fold_sharpe", 0.25, 85.0),  # exact mid-range: arg=0.5 -> half of 30=15; 100-30+15
     ("max_drawdown", 0.125, 90.0),  # exact mid-range, inverted: arg=0.5 -> half of 20=10; 100-20+10
 ]
+
+
+def test_the_decaying_tail_orders_books_that_the_old_clamp_could_not():
+    """The defect A5 fixes, pinned so it cannot come back.
+
+    Under the clamp, 21% and 95% drawdown both scored 41.789 and worst folds of -0.26 and -40.0
+    both scored 38.173. A score that returns the same number for a survivable book and a ruinous
+    one is not ranking them; it is deferring to whichever tie-break runs next, and only when every
+    other term happens to agree exactly.
+    """
+    base = {
+        "worst_fold_sharpe": 0.195,
+        "median_fold_sharpe": 0.870,
+        "max_drawdown": 0.127,
+        "calmar": 0.877,
+        "positive_quarter_fraction": 0.647,
+        "trial_adjusted_confidence": 0.839,
+    }
+    drawdowns = [robustness_score(dict(base, max_drawdown=d), drawdown_floor=0.20)
+                 for d in (0.21, 0.50, 0.95)]
+    assert drawdowns == sorted(drawdowns, reverse=True)
+    assert len(set(drawdowns)) == 3
+
+    folds = [robustness_score(dict(base, worst_fold_sharpe=w), drawdown_floor=0.20)
+             for w in (-0.26, -5.0, -40.0)]
+    assert folds == sorted(folds, reverse=True)
+    assert len(set(folds)) == 3
+
+
+def test_the_tail_never_lets_one_term_swamp_the_other_five():
+    """Hyperbolic, not linear: the tail approaches -1 and never passes it.
+
+    A linear continuation would let a single catastrophic term dominate without limit, so one bad
+    fold could outrank every other property of the book combined. Each term stays inside its own
+    weight.
+    """
+    from crypto_trade.cup20.scoring import _decaying
+
+    assert _decaying(-1e12) > -1.0
+    assert _decaying(float("-inf")) == -1.0
+    assert _decaying(-1e12) < _decaying(-1e6) < _decaying(-1.0) < 0.0
 
 
 @pytest.mark.parametrize(("component", "value", "expected_score"), FINITE_GENERAL_BRANCH)

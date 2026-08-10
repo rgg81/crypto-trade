@@ -275,6 +275,50 @@ def evaluate_materialised_point(job: PointJob) -> PointOutcome:
     )
 
 
+def _same_number(left: float, right: float) -> bool:
+    """Equality that treats two ``NaN``s as the same measurement, because here they are."""
+    left, right = float(left), float(right)
+    if math.isnan(left) and math.isnan(right):
+        return True
+    return left == right
+
+
+def inert_points(outcomes: Sequence[PointOutcome]) -> tuple[str, ...]:
+    """Points whose scored vector reproduces the nominee's exactly -- the variation moved nothing.
+
+    :meth:`~crypto_trade.cup20.neighbourhood.NeighbourhoodDeclaration.validate` polices the
+    *declaration*: every coordinate must vary by at least 5% of the nominee's own magnitude in both
+    directions. That is necessary and not sufficient. A coordinate the strategy consumes through a
+    quantiser -- ``round(n * fraction)`` over a twenty-name universe is the case a team found and
+    reported rather than used -- can satisfy the 5% rule and still produce a byte-identical book,
+    because both variations land inside the same quantisation cell.
+
+    Such an axis is worse than uninformative. It scores *better* than an honest one: an inert point
+    sits exactly on the nominee, so it drags the per-metric median toward the nominee's own value,
+    which is precisely the peak §7.2 exists to discount. Declaring three inert coordinates would
+    convert the anti-peak-picking rule into a rubber stamp for the peak.
+
+    So the rule has two halves. The declaration half is checked before anything runs, from the
+    numbers a team wrote down. This is the effect half, decided from measurement after the points
+    have run -- the only moment inertness is knowable -- and therefore not arguable.
+    """
+    if not outcomes:
+        return ()
+    nominee = outcomes[0]
+    if not nominee.scored:
+        # Vacuous truth is not evidence. An empty metric vector holds every dimension constant, so
+        # ``all()`` over it says "identical" about a comparison that never happened -- and this
+        # function's output disqualifies a sweep. Never accuse on an absence of measurements.
+        return ()
+    inert: list[str] = []
+    for outcome in outcomes[1:]:
+        if set(outcome.scored) != set(nominee.scored):
+            continue
+        if all(_same_number(outcome.scored[key], nominee.scored[key]) for key in nominee.scored):
+            inert.append(outcome.label)
+    return tuple(inert)
+
+
 def median_bootstrap_fraction(outcomes: Sequence[PointOutcome]) -> float:
     """``B`` for the neighbourhood: the per-point median, ``NaN`` if any point had none.
 
@@ -616,6 +660,17 @@ def run_neighbourhood_sweep(
     ]
     outcomes = tuple(_run_jobs(jobs, workers=resolved_workers))
 
+    if inert := inert_points(outcomes):
+        raise SweepError(
+            "the declared neighbourhood is not a neighbourhood: "
+            f"{len(inert)} point(s) reproduced the nominee's scored metrics exactly "
+            f"({', '.join(inert)}). A coordinate whose declared variation does not move the book "
+            "explores nothing and pulls the median onto the nominee, which is the peak the sweep "
+            "exists to discount. Widen the variation past whatever quantises it -- a fraction the "
+            "strategy rounds into a name count is the usual cause -- or declare a coordinate the "
+            "strategy actually responds to, then re-declare and sweep again."
+        )
+
     per_point = [outcome.scored for outcome in outcomes]
     median = neighbourhood_median(per_point)
     fraction = positive_point_fraction(per_point)
@@ -633,7 +688,7 @@ def run_neighbourhood_sweep(
         statistics_config=raw["statistics"],
         research_config=raw["research"],
         declared_roles=tuple(declared_roles),
-        sign_inversion_passes_core=False,
+        sign_inversion_passes_core=None,  # not measured here; its own trial
         neighbourhood_positive_fraction=fraction,
         trial_adjusted_confidence=confidence,
         drawdown_floor=float(raw["floors"]["max_drawdown"]),

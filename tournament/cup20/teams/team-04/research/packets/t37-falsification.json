@@ -1,0 +1,48 @@
+{
+  "candidate_gross_edge_bps_per_turnover": 77.82268620811968,
+  "candidate_id": "resid-composite",
+  "inverted_core_gates": {
+    "annualized_return": false,
+    "annualized_volatility": true,
+    "double_cost_annualized_return": false,
+    "double_cost_sharpe": false,
+    "max_drawdown": false,
+    "net_sharpe": false,
+    "trade_count": true,
+    "triple_cost_sharpe": false
+  },
+  "inverted_metrics": {
+    "annualized_return": -0.19404576827962494,
+    "annualized_volatility": 0.13326636240062284,
+    "double_cost_annualized_return": -0.20698532896882404,
+    "double_cost_sharpe": -1.671104921513287,
+    "max_drawdown": 0.5925649288610468,
+    "net_sharpe": -1.5518951714548568,
+    "trade_count": 3865.0,
+    "triple_cost_sharpe": -1.789590239067893
+  },
+  "placebo_exceedance": 0.0,
+  "placebo_gross_edge_bps_per_turnover": [
+    8.824965945026173,
+    9.713144033704202,
+    2.075133751384517,
+    -16.659097662562196,
+    2.287293497658148,
+    13.83725746259965,
+    23.149420115481053,
+    -12.00296639470145
+  ],
+  "placebo_seeds": [
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12
+  ],
+  "sign_inversion_passes_core": false,
+  "team_id": "team-04",
+  "trial_sequence": 37
+}

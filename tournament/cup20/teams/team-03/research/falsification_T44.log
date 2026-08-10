@@ -1,0 +1,25 @@
+running under accepted trial #44 (11 of 12 trials spent); window [2020-08-17 00:00:00+00:00, 2024-08-01 00:00:00+00:00) -- this takes minutes, not seconds
+------------------------------------------------------------------------------
+CUP-20 falsification battery -- team-03 / run-gated-trend  (trial #44)
+------------------------------------------------------------------------------
+exact sign inversion, scored on the core floors (charter 7.3)
+------------------------------------------------------------------------------
+  fails   net_sharpe                                 -1.485140
+  fails   double_cost_sharpe                         -1.653132
+  fails   triple_cost_sharpe                         -1.821179
+  fails   annualized_return                          -0.181160
+  fails   double_cost_annualized_return              -0.198664
+  fails   max_drawdown                                0.596685
+  CLEARS  annualized_volatility                       0.128897
+  CLEARS  trade_count                             30026.000000
+
+  The inversion does not clear the core floors. The falsifier is satisfied.
+
+gross-edge placebo -- same weights, randomly attributed across eligible symbols
+------------------------------------------------------------------------------
+  candidate gross edge             52.9583 bps per unit one-way turnover
+  placebo books (8)          min -0.7881  median 2.6866  max 4.8060
+  placebo exceedance        0.0000  (fraction of placebos reaching the candidate)
+------------------------------------------------------------------------------
+
+completed in 3108.7s
