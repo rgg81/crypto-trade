@@ -40,6 +40,31 @@ past the immutable ``OOS_CUTOFF = 2025-03-24``), the ENTIRE in-sample window is 
 name — so the spliced IS is BIT-IDENTICAL to pure ``ct.load_tradfi`` and the confirmed IS baseline
 cannot have moved. The splice only alters the recent (2026) OOS tail, on the traded instrument.
 
+===================================================================== MID-SERIES SPLIT DETECTION
+Binance single-stock perps do not always split-adjust in lockstep with the underlying (found via
+CRWDUSDT, 2026-07-02: perp closed the day at ~1/4 its open, a real 4:1 split the RAW perp feed never
+rebased — Yahoo, loaded ``auto_adjust=True``, already handles it cleanly). Left alone, that single
+un-adjusted bar reads as a ~-75% one-day crash and permanently mis-scales every spliced price after
+it (the single boundary-anchor multiplier no longer matches the post-split share count).
+
+Detection compares perp's day-over-day return against Yahoo's SAME-DAY (already split-adjusted)
+return on the aligned trading-day grid — a real split shows a huge one-day divergence there since
+Yahoo tracks the true price throughout; ordinary basis/tracking noise between perp and Yahoo is a
+few bps, never remotely close. But a raw divergence alone is NOT sufficient: ~10 names in this
+universe show a single-day divergence >15% that reverts the very next day (a transient data blip,
+confirmed by checking the perp/Yahoo ratio before vs. after — CRWD's ratio is a stable ~4.0x for
+weeks, snaps to ~1.0x, and STAYS there; the blips return to ~1.0x within a day). Only a PERSISTENT
+ratio shift (checked against a forward window) is treated as a real split and re-based; a one-day
+reversion is left untouched — see ``_detect_split_points``.
+
+CAVEAT (a deliberate, bounded exception to "past-only"): confirming persistence needs a few
+FORWARD trading days of data, so a split within the last ``SPLIT_CONFIRM_WINDOW`` bars may not yet
+be detected — the correction lands within that window, once enough data exists to distinguish it
+from a one-day blip. This is a data-quality revision (identical in spirit to Yahoo's own
+``auto_adjust=True`` retroactively rescaling history when a split posts), not a lookahead into any
+tradeable signal: by the time a day flips from "unconfirmed" to "confirmed split", it is already
+days in the past and irrelevant to what any current decision would have used as inputs.
+
 Run:  uv run python analysis/portfolio/tradfi/splice_loader.py [--sym TSLAUSDT]
 """
 
@@ -62,6 +87,45 @@ LIVE_DIR = ct._ROOT / "data_live_tradfi"
 _OHLC = ("open", "high", "low", "close")
 _PERP_USECOLS = ["open_time", "open", "high", "low", "close", "volume"]
 
+# Mid-series split detection (see module docstring "MID-SERIES SPLIT DETECTION").
+SPLIT_DIVERGE_THRESHOLD = 0.15  # single-day |perp_ret - yahoo_ret| to flag a CANDIDATE split day
+SPLIT_CONFIRM_WINDOW = 3  # trading days each side used to confirm the ratio shift PERSISTS
+SPLIT_PERSIST_THRESHOLD = 0.15  # required |after/before - 1| on the perp/yahoo ratio to confirm
+
+
+def _detect_split_points(
+    yahoo: pd.DataFrame,
+    aligned: pd.DataFrame,
+    diverge_threshold: float = SPLIT_DIVERGE_THRESHOLD,
+    window: int = SPLIT_CONFIRM_WINDOW,
+    persist_threshold: float = SPLIT_PERSIST_THRESHOLD,
+) -> list[int]:
+    """Sorted list of ``open_time`` (ms) where the perp feed has an un-adjusted split that Yahoo
+    (already split-adjusted) does not show — a PERSISTENT perp/Yahoo ratio shift, not a one-day
+    blip. ``aligned`` is the perp frame already restricted to Yahoo's trading-day index."""
+    if len(aligned) < 2 * window + 1:
+        return []
+    yahoo_c = yahoo["close"].reindex(aligned.index)
+    perp_ret = aligned["close"].pct_change()
+    yahoo_ret = yahoo_c.pct_change()
+    diverge = (perp_ret - yahoo_ret).abs()
+    ratio = aligned["close"] / yahoo_c
+
+    out: list[int] = []
+    candidates = diverge[diverge > diverge_threshold].index
+    for i, t in enumerate(aligned.index):
+        if t not in candidates:
+            continue
+        if i < window or i + window >= len(aligned):
+            continue  # can't confirm persistence yet — near an edge of the loaded data
+        before = float(ratio.iloc[i - window : i].median())
+        after = float(ratio.iloc[i + 1 : i + 1 + window].median())
+        if before <= 0 or not (after == after) or not (before == before):  # NaN-safe
+            continue
+        if abs(after / before - 1.0) > persist_threshold:
+            out.append(int(t))
+    return out
+
 
 def load_perp_frame(perp_sym: str, live_dir: Path = LIVE_DIR) -> pd.DataFrame | None:
     """Raw 24/7 perp daily OHLCV frame indexed by ``open_time`` (ms), or ``None`` if absent."""
@@ -77,9 +141,13 @@ def splice_one(yahoo: pd.DataFrame, perp: pd.DataFrame | None) -> tuple[pd.DataF
     """Return ``(spliced_frame, d)`` for one name — the leak-safe Yahoo/perp OHLC splice.
 
     ``spliced_frame`` shares the Yahoo trading-day index; OHLC on ``t >= d`` is the perp re-based to
-    the Yahoo level at the boundary ``d`` (each field on its own past-only anchor). ``d`` is the
-    perp-inception ``open_time`` (ms), or ``None`` when there is no valid perp overlap (< 2 aligned
-    bars) — in which case the pure Yahoo frame is returned unchanged.
+    the Yahoo level at the boundary ``d`` (each field on its own past-only anchor there). ``d`` is
+    the perp-inception ``open_time`` (ms), or ``None`` when there is no valid perp overlap (< 2
+    aligned bars) — in which case the pure Yahoo frame is returned unchanged.
+
+    Any CONFIRMED mid-series split in the raw perp feed (see module docstring) gets an additional
+    anchor at its own breakpoint, so the un-adjusted split never reads as a fake return and every
+    post-split level matches Yahoo's true (split-adjusted) price, not a stale pre-split scale.
     """
     if perp is None:
         return yahoo.copy(), None
@@ -89,11 +157,31 @@ def splice_one(yahoo: pd.DataFrame, perp: pd.DataFrame | None) -> tuple[pd.DataF
     if len(aligned) < 2:
         return yahoo.copy(), None
     d = int(aligned.index.min())  # PIT perp inception on the trading-day grid
+    splits = [t for t in _detect_split_points(yahoo, aligned) if t > d]
+    breakpoints = sorted({d, *splits})
     out = yahoo.copy()
     for field in _OHLC:
-        anchor = float(yahoo.at[d, field]) / float(aligned.at[d, field])
-        rebased = anchor * aligned[field]
-        rebased.at[d] = float(yahoo.at[d, field])  # anchor EXACT at d (|Δ| == 0, no float drift)
+        rebased = pd.Series(index=aligned.index, dtype=float)
+        for i, bp in enumerate(breakpoints):
+            seg_end = breakpoints[i + 1] if i + 1 < len(breakpoints) else None
+            mask = aligned.index >= bp
+            if seg_end is not None:
+                mask = mask & (aligned.index < seg_end)
+            seg = aligned.index[mask]
+            if len(seg) == 0:
+                continue
+            # At d (inception) each field anchors independently — the whole bar is the first
+            # REAL trading bar, no intra-bar contamination. At a mid-series split the split day's
+            # OWN bar can straddle the transition (open/high still pre-split, low/close already
+            # post-split — see CRWD 2026-07-02), so every field anchors off 'close' alone, the
+            # one field confirmed clean by end-of-day (the split day itself is still forced exact
+            # to Yahoo below, so this anchor only matters for days AFTER the split).
+            anchor_field = field if bp == d else "close"
+            anchor = float(yahoo.at[bp, anchor_field]) / float(aligned.at[bp, anchor_field])
+            rebased.loc[seg] = anchor * aligned.loc[seg, field]
+        rebased.loc[d] = float(yahoo.at[d, field])  # anchor EXACT at d (|Δ| == 0, no float drift)
+        for bp in splits:
+            rebased.loc[bp] = float(yahoo.at[bp, field])  # exact at each confirmed split too
         out.loc[aligned.index, field] = rebased
     if "volume" in aligned.columns:  # traded-instrument volume on spliced bars (unused downstream)
         out["volume"] = out["volume"].astype(float)  # Yahoo volume is int64; perp is float

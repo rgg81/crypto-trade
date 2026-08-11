@@ -114,6 +114,74 @@ def test_synthetic_no_perp_returns_pure_yahoo():
     assert (spliced == yahoo).all().all()
 
 
+# ---------------------------------------------------- mid-series split detection (synthetic) -----
+def _inject_split(perp: pd.DataFrame, split_t: int, ratio: float, *, intrabar: bool) -> pd.DataFrame:
+    """Un-adjusted split from ``split_t`` onward (perp keeps trading at the OLD share count).
+
+    ``intrabar=True`` mimics the real CRWD case: the split day's own bar straddles the
+    transition (open/high still pre-split, low/close already post-split) — the harder case the
+    fix must also handle, not just a clean cut starting exactly at the boundary.
+    """
+    out = perp.copy()
+    after = out.index > split_t
+    for field in ("open", "high", "low", "close"):
+        out.loc[after, field] = out.loc[after, field] / ratio
+    if intrabar:
+        out.at[split_t, "low"] = out.at[split_t, "low"] / ratio
+        out.at[split_t, "close"] = out.at[split_t, "close"] / ratio
+        # open/high stay at the PRE-split scale for the split day's own bar
+    else:
+        for field in ("open", "high", "low", "close"):
+            out.at[split_t, field] = out.at[split_t, field] / ratio
+    return out
+
+
+def test_synthetic_mid_series_split_detected_and_corrected():
+    yahoo, perp = _synthetic()
+    common = sorted(perp.index.intersection(yahoo.index))
+    split_t = common[20]  # well clear of both edges given SPLIT_CONFIRM_WINDOW=3
+    perp_split = _inject_split(perp, split_t, ratio=4.0, intrabar=True)
+
+    spliced, d = sl.splice_one(yahoo, perp_split)
+    ret = spliced["close"].pct_change()
+    # the split day itself must NOT read as a ~-75% crash
+    assert abs(ret.loc[split_t]) < 0.10
+    # OHLC ordering holds even on the contaminated split-day bar and right after it
+    idx = spliced.index[(spliced.index >= common[18]) & (spliced.index <= common[23])]
+    seg = spliced.loc[idx]
+    assert (seg["low"] <= seg[["open", "close"]].min(axis=1) + 1e-9).all()
+    assert (seg["high"] >= seg[["open", "close"]].max(axis=1) - 1e-9).all()
+    # the TRUE return across the split (from the un-injected perp) is restored, not the raw 1/4 one
+    day_after = common[21]
+    true_ret = perp.at[day_after, "close"] / perp.at[split_t, "close"]
+    corrected_ret = spliced.at[day_after, "close"] / spliced.at[split_t, "close"]
+    assert abs(corrected_ret / true_ret - 1.0) < 0.05
+
+
+def test_synthetic_transient_blip_not_corrected():
+    """A one-day divergence that REVERTS the next day is noise, not a split — leave it alone."""
+    yahoo, perp = _synthetic()
+    common = sorted(perp.index.intersection(yahoo.index))
+    blip_t = common[20]
+    perp_blip = perp.copy()
+    for field in ("open", "high", "low", "close"):
+        perp_blip.at[blip_t, field] = perp_blip.at[blip_t, field] * 1.3  # one-day spike, no persist
+
+    plain, _ = sl.splice_one(yahoo, perp)
+    blipped, _ = sl.splice_one(yahoo, perp_blip)
+    # nothing past the blip day should differ — no split was confirmed, no re-base introduced
+    after = blipped.index > blip_t
+    for field in ("open", "high", "low", "close"):
+        assert (blipped.loc[after, field].to_numpy() == plain.loc[after, field].to_numpy()).all()
+
+
+def test_detect_split_points_ignores_short_series():
+    yahoo, perp = _synthetic()
+    common = sorted(perp.index.intersection(yahoo.index))
+    aligned = perp.loc[common[:4]].sort_index()  # shorter than 2*window+1
+    assert sl._detect_split_points(yahoo, aligned) == []
+
+
 # ------------------------------------------------------------------ real-data gate ----------------
 @pytest.fixture(scope="module")
 def gate():
