@@ -457,6 +457,18 @@ evaluator refuses to run without an accepted trial of the right kind for exactly
 on disk, which is what makes "journaled before you look at any number" a fact rather than an
 aspiration.
 
+**A killed evaluation does not burn its trial.** `cup20_trial.py` journals the trial;
+`cup20_evaluate.py` *resolves* an already-accepted one rather than creating another. So if an
+evaluation dies part-way — a killed process, a lost session, a machine that went away — simply run
+the same `cup20_evaluate.py` command again. It re-resolves the same accepted trial and prints
+`running under accepted trial #N (K of 12 trials spent)` with K unchanged. Two teams have hit this
+independently; one nearly abandoned a nomination believing the trial was gone. Check the header line
+rather than assuming.
+
+**Pass `--output <path>.json` on every sweep and every scored run.** The packet is the only durable
+record of your own numbers. A team whose session ended before it wrote up its sweep lost the numbers
+entirely and needed a full re-run to recover them — which cost no trial, but cost forty minutes.
+
 **Step 6 before step 7 is free and you should not skip it.** A neighbourhood that fails validation
 is refused at the append and costs nothing — but only if you find out at the append. Once a trial is
 accepted it is spent, and there is no refund for a declaration you then fixed.

@@ -1,0 +1,48 @@
+{
+  "candidate_gross_edge_bps_per_turnover": 163.40342880564378,
+  "candidate_id": "downside-tercile",
+  "inverted_core_gates": {
+    "annualized_return": false,
+    "annualized_volatility": true,
+    "double_cost_annualized_return": false,
+    "double_cost_sharpe": false,
+    "max_drawdown": false,
+    "net_sharpe": false,
+    "trade_count": true,
+    "triple_cost_sharpe": false
+  },
+  "inverted_metrics": {
+    "annualized_return": -0.20318616345033214,
+    "annualized_volatility": 0.13271270418274606,
+    "double_cost_annualized_return": -0.2103717311339519,
+    "double_cost_sharpe": -1.7121720699250507,
+    "max_drawdown": 0.6106477438091851,
+    "net_sharpe": -1.6442344499271377,
+    "trade_count": 4093.0,
+    "triple_cost_sharpe": -1.779939773883448
+  },
+  "placebo_exceedance": 0.0,
+  "placebo_gross_edge_bps_per_turnover": [
+    -19.834998407244633,
+    -1.490927848264316,
+    6.312387924662249,
+    13.285714303704973,
+    11.585829977248132,
+    11.24525940106929,
+    6.5608787117543415,
+    14.508538940288759
+  ],
+  "placebo_seeds": [
+    20200818,
+    20200819,
+    20200820,
+    20200821,
+    20200822,
+    20200823,
+    20200824,
+    20200825
+  ],
+  "sign_inversion_passes_core": false,
+  "team_id": "team-06",
+  "trial_sequence": 65
+}

@@ -1,0 +1,27 @@
+running under accepted trial #65 (8 of 12 trials spent); window [2020-08-17 00:00:00+00:00, 2024-08-01 00:00:00+00:00) -- this takes minutes, not seconds
+------------------------------------------------------------------------------
+CUP-20 falsification battery -- team-06 / downside-tercile  (trial #65)
+------------------------------------------------------------------------------
+exact sign inversion, scored on the core floors (charter 7.3)
+------------------------------------------------------------------------------
+  fails   net_sharpe                                 -1.644234
+  fails   double_cost_sharpe                         -1.712172
+  fails   triple_cost_sharpe                         -1.779940
+  fails   annualized_return                          -0.203186
+  fails   double_cost_annualized_return              -0.210372
+  fails   max_drawdown                                0.610648
+  CLEARS  annualized_volatility                       0.132713
+  CLEARS  trade_count                              4093.000000
+
+  The inversion does not clear the core floors. The falsifier is satisfied.
+
+gross-edge placebo -- same weights, randomly attributed across eligible symbols
+------------------------------------------------------------------------------
+  candidate gross edge            163.4034 bps per unit one-way turnover
+  placebo books (8)          min -19.8350  median 8.9031  max 14.5085
+  placebo exceedance        0.0000  (fraction of placebos reaching the candidate)
+------------------------------------------------------------------------------
+
+packet written to tournament/cup20/teams/team-06/research/packets/t65-falsification.json
+
+completed in 2673.3s
