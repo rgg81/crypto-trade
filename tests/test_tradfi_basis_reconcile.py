@@ -12,6 +12,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
 _TF = Path(__file__).resolve().parents[1] / "analysis" / "portfolio" / "tradfi"
 if str(_TF) not in sys.path:
@@ -71,6 +72,39 @@ def test_fwd_ret_is_open_to_open():
     assert rf["A"].iloc[0] == 11.0 / 10.0 - 1.0
     assert rf["A"].iloc[1] == 12.0 / 11.0 - 1.0
     assert np.isnan(rf["A"].iloc[2])  # last bar has no forward open
+
+
+# ------------------------------------------------------------------ split-detection guard --------
+def test_fwd_ret_masks_crwd_style_4_for_1_split():
+    # Real 2026-07-02->07-03 CRWDUSDT perp opens: 773.10 -> 195.18 (ratio 0.2525, a 4:1 split
+    # Binance re-based with no contract-multiplier adjustment). Must be masked to NaN, not returned
+    # as a fake -74.8% loss; the day BEFORE and the day AFTER (normal moves) must be untouched.
+    idx = pd.to_datetime([0, DAY_MS, 2 * DAY_MS, 3 * DAY_MS], unit="ms")
+    opens = pd.DataFrame({"CRWDUSDT": [763.87, 773.10, 195.18, 187.25]}, index=idx)
+    rf = rc.fwd_ret(opens)
+    assert rf["CRWDUSDT"].iloc[0] == pytest.approx(773.10 / 763.87 - 1.0)  # normal day, untouched
+    assert np.isnan(rf["CRWDUSDT"].iloc[1])  # the split day itself: masked
+    assert rf["CRWDUSDT"].iloc[2] == pytest.approx(187.25 / 195.18 - 1.0)  # post-split, untouched
+
+
+@pytest.mark.parametrize("ratio", [0.5, 1.0 / 3, 0.25, 0.2, 0.1, 2.0, 3.0, 4.0, 10.0])
+def test_split_like_mask_flags_common_split_multipliers(ratio):
+    assert rc._split_like_mask(np.array([ratio]))[0]
+
+
+@pytest.mark.parametrize("ratio", [1.0, 1.10, 0.90, 1.36, 0.634, 0.532, 1.687])
+def test_split_like_mask_does_not_flag_organic_moves(ratio):
+    # 1.36/0.634/0.532/1.687 are real observed non-split single-day moves in the universe
+    # (ASTS +36.8%, IREN -36.4%, CRDO -46.8%, ASTS +68.6%) — none are near a split target at 3% tol.
+    assert not rc._split_like_mask(np.array([ratio]))[0]
+
+
+def test_fwd_ret_preserves_nan_for_missing_data():
+    idx = pd.to_datetime([0, DAY_MS, 2 * DAY_MS], unit="ms")
+    opens = pd.DataFrame({"A": [10.0, np.nan, 12.0]}, index=idx)
+    rf = rc.fwd_ret(opens)
+    assert np.isnan(rf["A"].iloc[0])
+    assert np.isnan(rf["A"].iloc[1])
 
 
 def test_daily_funding_bins_holding_window_and_weekend(tmp_path, monkeypatch):

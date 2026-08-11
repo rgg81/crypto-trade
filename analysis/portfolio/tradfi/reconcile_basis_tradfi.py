@@ -81,9 +81,41 @@ def load_perp_opens(
     return pd.DataFrame(cols).reindex(columns=sorted(cols))
 
 
+# Common forward-split (2:1, 3:1, ...) and reverse-split (1:2, 1:3, ...) multipliers. Confirmed
+# real-world case: CRWDUSDT perp open ratio 195.18/773.10 = 0.2525 on 2026-07-02->07-03, a 4:1
+# split Binance re-based into the perp price with no corresponding contract-multiplier adjustment
+# in this codebase — a raw fwd_ret there would show a fake -74.8% "loss" with zero economic basis.
+_SPLIT_MULTIPLIERS = (2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 50, 100)
+_SPLIT_TARGETS = tuple(sorted({*_SPLIT_MULTIPLIERS, *(1.0 / m for m in _SPLIT_MULTIPLIERS)}))
+
+
+def _split_like_mask(ratio: np.ndarray, tol: float = 0.03) -> np.ndarray:
+    """True where ``ratio`` (price[t+1]/price[t]) lands within ``tol`` relative distance of a
+    common split/reverse-split multiplier — a data artifact, not a real price move. Deliberately
+    narrow (integer ratios only, 3% band) to avoid masking genuine large organic moves (e.g. a
+    GME-style -60% day sits nowhere near the 0.5 or 0.333 bands at this tolerance)."""
+    finite = np.isfinite(ratio) & (ratio > 0)
+    mask = np.zeros(ratio.shape, dtype=bool)
+    for target in _SPLIT_TARGETS:
+        mask |= finite & (np.abs(ratio - target) <= tol * target)
+    return mask
+
+
 def fwd_ret(opens: pd.DataFrame) -> pd.DataFrame:
-    """Leak-safe forward open-to-open return over the trading-day grid (matches core ret_fwd)."""
-    return opens.shift(-1) / opens - 1.0
+    """Leak-safe forward open-to-open return over the trading-day grid (matches core ret_fwd).
+
+    A day whose forward ratio lands on a common split/reverse-split multiplier is masked to NaN
+    instead of returned as a real move (see ``_split_like_mask``). Binance re-bases these TradFi
+    perps to track the underlying's split-adjusted price with no contract-multiplier adjustment on
+    this codebase's side, so the raw ratio on the split day is a data artifact. NaN here flows into
+    the existing coverage-aware masking in ``live_tradfi._live_returns`` (an unavailable leg gets
+    weight 0 for that one day) — the safe fallback: one day of a leg contributing nothing beats a
+    phantom double-digit-percent swing in the LIVE track.
+    """
+    ratio = (opens.shift(-1) / opens).to_numpy()
+    fwd = ratio - 1.0
+    fwd[_split_like_mask(ratio)] = np.nan
+    return pd.DataFrame(fwd, index=opens.index, columns=opens.columns)
 
 
 def daily_funding(
