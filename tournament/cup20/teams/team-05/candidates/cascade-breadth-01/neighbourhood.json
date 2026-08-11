@@ -1,0 +1,12 @@
+{
+  "coordinates": ["SHOCK_Z", "BASKET_NAMES", "LOOKBACK_BARS"],
+  "nominee": {"SHOCK_Z": -2.0, "BASKET_NAMES": 8, "LOOKBACK_BARS": 60},
+  "points": [
+    {"SHOCK_Z": -1.75, "BASKET_NAMES": 8, "LOOKBACK_BARS": 60},
+    {"SHOCK_Z": -2.25, "BASKET_NAMES": 8, "LOOKBACK_BARS": 60},
+    {"SHOCK_Z": -2.0, "BASKET_NAMES": 6, "LOOKBACK_BARS": 60},
+    {"SHOCK_Z": -2.0, "BASKET_NAMES": 10, "LOOKBACK_BARS": 60},
+    {"SHOCK_Z": -2.0, "BASKET_NAMES": 8, "LOOKBACK_BARS": 45},
+    {"SHOCK_Z": -2.0, "BASKET_NAMES": 8, "LOOKBACK_BARS": 80}
+  ]
+}
