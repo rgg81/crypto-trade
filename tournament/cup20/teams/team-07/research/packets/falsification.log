@@ -1,0 +1,27 @@
+running under accepted trial #76 (9 of 12 trials spent); window [2020-08-17 00:00:00+00:00, 2024-08-01 00:00:00+00:00) -- this takes minutes, not seconds
+------------------------------------------------------------------------------
+CUP-20 falsification battery -- team-07 / carry-crowd-guard  (trial #76)
+------------------------------------------------------------------------------
+exact sign inversion, scored on the core floors (charter 7.3)
+------------------------------------------------------------------------------
+  fails   net_sharpe                                 -1.521411
+  fails   double_cost_sharpe                         -1.797452
+  fails   triple_cost_sharpe                         -2.073121
+  fails   annualized_return                          -0.160852
+  fails   double_cost_annualized_return              -0.186220
+  fails   max_drawdown                                0.524630
+  CLEARS  annualized_volatility                       0.111171
+  CLEARS  trade_count                             35032.000000
+
+  The inversion does not clear the core floors. The falsifier is satisfied.
+
+gross-edge placebo -- same weights, randomly attributed across eligible symbols
+------------------------------------------------------------------------------
+  candidate gross edge             33.8541 bps per unit one-way turnover
+  placebo books (8)          min -2.9598  median -0.9120  max 3.0236
+  placebo exceedance        0.0000  (fraction of placebos reaching the candidate)
+------------------------------------------------------------------------------
+
+packet written to tournament/cup20/teams/team-07/research/packets/falsification-carry-crowd-guard.json
+
+completed in 3440.6s

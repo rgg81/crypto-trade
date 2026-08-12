@@ -1,0 +1,128 @@
+running under accepted trial #75 (9 of 12 trials spent); window [2020-08-17 00:00:00+00:00, 2024-08-01 00:00:00+00:00) -- this takes minutes, not seconds
+------------------------------------------------------------------------------
+CUP-20 neighbourhood sweep -- team-07 / carry-crowd-guard
+------------------------------------------------------------------------------
+  trial            #75  (9 of 12 accepted trials spent)
+  source           463bb83acb9a7129397c7a7e8786f50ef6fa327f4a77203f1e2babfc73028919
+  snapshot         ceeedfcd7117a16a58d2bb9bbf9716356c9473098fe8512703d1656834746d48
+  window           [2020-08-17 00:00:00+00:00, 2024-08-01 00:00:00+00:00)   seed 20260807
+  folds            F1 [2020-08-17, 2021-08-01), F2 [2021-08-01, 2022-08-01), F3 [2022-08-01, 2023-08-01), F4 [2023-08-01, 2024-08-01)
+  coordinates      CARRY_LOOKBACK, RISK_LOOKBACK, SLEEVE_NAMES, CROWDING_PENALTY
+  points           9 including the nominee, 4 worker(s), 1856.9s wall clock
+
+the points, each a separately materialised and separately executed file
+------------------------------------------------------------------------------
+  point                               net_sharpe   2x_sharpe  ann_return    max_dd   trades
+  nominee  CARRY_LOOKBACK=63 CROWDING_PENALTY=0.6 RISK_LOOKBACK=63 SLEEVE_NAMES=7      0.9744      0.6972      0.1078    0.1655    35103
+  point-1  CARRY_LOOKBACK=48 CROWDING_PENALTY=0.6 RISK_LOOKBACK=63 SLEEVE_NAMES=7      0.4171      0.1018      0.0406    0.1460    35668
+  point-2  CARRY_LOOKBACK=84 CROWDING_PENALTY=0.6 RISK_LOOKBACK=63 SLEEVE_NAMES=7      0.7847      0.5363      0.0817    0.1706    34579
+  point-3  CARRY_LOOKBACK=63 CROWDING_PENALTY=0.6 RISK_LOOKBACK=48 SLEEVE_NAMES=7      0.9225      0.6384      0.1021    0.1630    35075
+  point-4  CARRY_LOOKBACK=63 CROWDING_PENALTY=0.6 RISK_LOOKBACK=84 SLEEVE_NAMES=7      0.9651      0.7011      0.1068    0.1721    35028
+  point-5  CARRY_LOOKBACK=63 CROWDING_PENALTY=0.6 RISK_LOOKBACK=63 SLEEVE_NAMES=6      0.9063      0.6298      0.0988    0.1700    30048
+  point-6  CARRY_LOOKBACK=63 CROWDING_PENALTY=0.6 RISK_LOOKBACK=63 SLEEVE_NAMES=8      0.7898      0.5199      0.0836    0.1588    40332
+  point-7  CARRY_LOOKBACK=63 CROWDING_PENALTY=0.4 RISK_LOOKBACK=63 SLEEVE_NAMES=7      0.9765      0.7007      0.1079    0.1649    35067
+  point-8  CARRY_LOOKBACK=63 CROWDING_PENALTY=0.8 RISK_LOOKBACK=63 SLEEVE_NAMES=7      0.9674      0.6879      0.1072    0.1664    35071
+    nominee  CARRY_LOOKBACK=63 CROWDING_PENALTY=0.6 RISK_LOOKBACK=63 SLEEVE_NAMES=7  ->  strategy.py 14e95c4f3aafbd032b4a2d88ccb6403be8fe5c09edb214d37eb18fde67a74666
+    point-1  CARRY_LOOKBACK=48 CROWDING_PENALTY=0.6 RISK_LOOKBACK=63 SLEEVE_NAMES=7  ->  strategy.py 106f23cc61d98712f4eeba24ad384b4e62f00939ea1e716981292aef38f9a842
+    point-2  CARRY_LOOKBACK=84 CROWDING_PENALTY=0.6 RISK_LOOKBACK=63 SLEEVE_NAMES=7  ->  strategy.py 571b2a8f55ddec092f8e07879c2157bc67432add7d02aec409f45564348187e6
+    point-3  CARRY_LOOKBACK=63 CROWDING_PENALTY=0.6 RISK_LOOKBACK=48 SLEEVE_NAMES=7  ->  strategy.py aaccf2d93bcb69bfd86022983ddc99dfd86872b3a008c45227f716fedcf2f887
+    point-4  CARRY_LOOKBACK=63 CROWDING_PENALTY=0.6 RISK_LOOKBACK=84 SLEEVE_NAMES=7  ->  strategy.py 39013aab33033e3e96baa3c20ac968d2ef983c378d5b974f1fba332deef4b024
+    point-5  CARRY_LOOKBACK=63 CROWDING_PENALTY=0.6 RISK_LOOKBACK=63 SLEEVE_NAMES=6  ->  strategy.py ab3655520dc1fe12cda563c2549c45bcb6302c21a247c9a8a8a621dc468ef29b
+    point-6  CARRY_LOOKBACK=63 CROWDING_PENALTY=0.6 RISK_LOOKBACK=63 SLEEVE_NAMES=8  ->  strategy.py 87e4d4e9babf863e623879174101171b3516df9c2c382bd05be480cdd55df9ee
+    point-7  CARRY_LOOKBACK=63 CROWDING_PENALTY=0.4 RISK_LOOKBACK=63 SLEEVE_NAMES=7  ->  strategy.py f59ca072c64ca253dcbd0ebd6100fc902a02ca4a88c6696cbc2d51182b79ca9d
+    point-8  CARRY_LOOKBACK=63 CROWDING_PENALTY=0.8 RISK_LOOKBACK=63 SLEEVE_NAMES=7  ->  strategy.py c85595281e0f8d6e541396921f0faed6dda1858db2bba9adc1a1be59c19fe1ed
+
+YOUR SCORE -- the per-metric MEDIAN across the declared neighbourhood (section 7.2)
+------------------------------------------------------------------------------
+  annualized_return                               0.102138
+  annualized_turnover                            40.834217
+  annualized_volatility                           0.111295
+  calmar                                          0.398519
+  cost_share_of_positive_gross                    0.023282
+  double_cost_annualized_return                   0.067583
+  double_cost_annualized_turnover                40.838645
+  double_cost_max_drawdown                        0.171577
+  double_cost_positive_quarter_fraction           0.705882
+  double_cost_sharpe                              0.638423
+  gross_edge_bps_per_turnover                    32.070910
+  long_gross_pnl                                  0.494683
+  max_drawdown                                    0.165510
+  max_fold_positive_pnl_share                     0.271152
+  median_fold_sharpe                              0.568053
+  net_sharpe                                      0.922500
+  positive_fold_count                             4.000000
+  positive_quarter_count                         13.000000
+  positive_quarter_fraction                       0.764706
+  short_gross_pnl                                 0.027393
+  top5_day_share                                  0.027652
+  trade_count                                 35071.000000
+  triple_cost_sharpe                              0.354473
+  worst_fold_sharpe                               0.270563
+
+  positive_point_fraction   1.0000  required >= 0.7  (9 of 9 points have positive 1x return AND positive 2x Sharpe)
+  trial-adjusted confidence B=0.9700 (median across points), T=9, confidence=0.7300
+
+hard floors (charter 7.3), on the MEDIAN. '----' is a gate a sweep cannot decide.
+------------------------------------------------------------------------------
+  ----  sign_inversion_not_profitable          not measured here; run --falsification, which is its own material trial
+  PASS  net_sharpe                                   0.922500  required >= 0.8
+  PASS  double_cost_sharpe                           0.638423  required >= 0.5
+  PASS  triple_cost_sharpe                           0.354473  required > 0
+  PASS  annualized_return                            0.102138  required > 0
+  PASS  double_cost_annualized_return                0.067583  required > 0
+  PASS  max_drawdown                                 0.165510  required <= 0.2
+  PASS  annualized_volatility                        0.111295  required >= 0.06
+  PASS  positive_quarter_fraction                    0.764706  required >= 0.5
+  PASS  positive_fold_count                          4.000000  required >= 3
+  PASS  worst_fold_sharpe                            0.270563  required >= -0.25
+  FAIL  annualized_turnover                         40.834217  required <= 25
+  FAIL  gross_edge_bps_per_turnover                 32.070910  required >= 40
+  PASS  cost_share_of_positive_gross                 0.023282  required <= 0.3
+  PASS  top5_day_share                               0.027652  required <= 0.35
+  PASS  max_fold_positive_pnl_share                  0.271152  required <= 0.6
+  PASS  trade_count                              35071.000000  required >= 500
+  PASS  neighbourhood_positive_fraction              1.000000  required >= 0.7
+  FAIL  trial_adjusted_confidence                    0.730000  required >= 0.9
+  PASS  declared_roles_match_traded_sides      declared ['long', 'short'], traded ['long', 'short']
+  PASS  role_long_gross_pnl                          0.494683  required > 0
+  PASS  role_short_gross_pnl                         0.027393  required > 0
+
+------------------------------------------------------------------------------
+  verdict: FAILS 3 measured floor(s)
+  indicative ranking score G: 29.820
+------------------------------------------------------------------------------
+
+DIAGNOSTIC ONLY -- your NOMINATED POINT's own vector. This is NOT your score.
+------------------------------------------------------------------------------
+  annualized_return                               0.107766   (median       0.102138)
+  annualized_turnover                            41.083170   (median      40.834217)
+  annualized_volatility                           0.111400   (median       0.111295)
+  calmar                                          0.432075   (median       0.398519)
+  cost_share_of_positive_gross                    0.023404   (median       0.023282)
+  double_cost_annualized_return                   0.074134   (median       0.067583)
+  double_cost_annualized_turnover                41.087599   (median      40.838645)
+  double_cost_max_drawdown                        0.171577   (median       0.171577)
+  double_cost_positive_quarter_fraction           0.764706   (median       0.705882)
+  double_cost_sharpe                              0.697186   (median       0.638423)
+  gross_edge_bps_per_turnover                    33.854116   (median      32.070910)
+  long_gross_pnl                                  0.523225   (median       0.494683)
+  max_drawdown                                    0.165510   (median       0.165510)
+  max_fold_positive_pnl_share                     0.271807   (median       0.271152)
+  median_fold_sharpe                              0.631568   (median       0.568053)
+  net_sharpe                                      0.974397   (median       0.922500)
+  positive_fold_count                             4.000000   (median       4.000000)
+  positive_quarter_count                         13.000000   (median      13.000000)
+  positive_quarter_fraction                       0.764706   (median       0.764706)
+  short_gross_pnl                                 0.027393   (median       0.027393)
+  top5_day_share                                  0.027493   (median       0.027652)
+  trade_count                                 35103.000000   (median   35071.000000)
+  triple_cost_sharpe                              0.420210   (median       0.354473)
+  worst_fold_sharpe                               0.370510   (median       0.270563)
+
+  Section 7.2 scores the median, not this. Where the two disagree, the median is the
+  number you are ranked on -- a nominated point is the max of a noisy surface.
+------------------------------------------------------------------------------
+
+packet written to tournament/cup20/teams/team-07/research/packets/sweep-carry-crowd-guard.json
+
+completed in 1856.9s

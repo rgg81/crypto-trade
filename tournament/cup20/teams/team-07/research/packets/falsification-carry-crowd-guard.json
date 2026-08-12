@@ -1,0 +1,48 @@
+{
+  "candidate_gross_edge_bps_per_turnover": 33.854115882136064,
+  "candidate_id": "carry-crowd-guard",
+  "inverted_core_gates": {
+    "annualized_return": false,
+    "annualized_volatility": true,
+    "double_cost_annualized_return": false,
+    "double_cost_sharpe": false,
+    "max_drawdown": false,
+    "net_sharpe": false,
+    "trade_count": true,
+    "triple_cost_sharpe": false
+  },
+  "inverted_metrics": {
+    "annualized_return": -0.1608522350825321,
+    "annualized_volatility": 0.1111708219862248,
+    "double_cost_annualized_return": -0.18622000657466187,
+    "double_cost_sharpe": -1.797451592930262,
+    "max_drawdown": 0.5246303227568732,
+    "net_sharpe": -1.5214113424278102,
+    "trade_count": 35032.0,
+    "triple_cost_sharpe": -2.07312140099772
+  },
+  "placebo_exceedance": 0.0,
+  "placebo_gross_edge_bps_per_turnover": [
+    -0.9889192072479743,
+    -1.5941546804228977,
+    -0.5148146922210693,
+    -0.8351140425506133,
+    -1.7997181463776217,
+    0.07430944562128793,
+    -2.9597539516801104,
+    3.023611690690925
+  ],
+  "placebo_seeds": [
+    20260808,
+    20260809,
+    20260810,
+    20260811,
+    20260812,
+    20260813,
+    20260814,
+    20260815
+  ],
+  "sign_inversion_passes_core": false,
+  "team_id": "team-07",
+  "trial_sequence": 76
+}
