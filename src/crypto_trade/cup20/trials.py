@@ -50,7 +50,30 @@ from crypto_trade.cup20.journal import accepted_trial_count, append_record, read
 TRIAL_ACCEPTED_EVENT = "trial_accepted"
 """The one journal event type that consumes a trial. Nothing else counts against the budget."""
 
-TRIAL_KINDS: tuple[str, ...] = ("point", "neighbourhood", "falsification")
+TRIAL_KINDS: tuple[str, ...] = ("point", "neighbourhood", "falsification", "ablation")
+
+MULTIPLICITY_CHARGED_KINDS: frozenset[str] = frozenset({"point", "neighbourhood"})
+"""Kinds that count toward ``T`` in ``1 - T(1-B)`` (amendment A6).
+
+The multiplicity correction exists to charge a team for the number of chances it had to PICK a
+winner. Charging every trial identically charged a falsification battery -- a run whose whole
+purpose is to attack the team's own result -- exactly as it charged another parameter search, and
+seven teams into the field the effect was visible: four of them stopped at the eight-trial minimum
+with a third of the budget unspent, because further research cost points. The rule was buying
+conservatism, which is the opposite of what the tournament wants.
+
+``falsification`` and ``ablation`` are therefore exempt, and neither exemption is free:
+
+* a ``falsification`` battery is run by the organiser on a nominee, cannot be steered, and is not a
+  chance to pick anything;
+* an ``ablation`` is declared as a CONTROL before it runs, and declaring it **forfeits that
+  candidate's eligibility to be nominated** (see :func:`ablated_candidates`). A team may explore
+  without charge, but what it explored under that flag cannot become its answer. Without that price
+  the flag would simply be a free relabelling of an ordinary search.
+
+The kind is journaled BEFORE the run, so a search that disappoints cannot be reclassified as an
+ablation afterwards.
+"""
 """The three shapes section 7.1 recognises.
 
 ``point`` is an ordinary evaluation of one frozen candidate state. ``neighbourhood`` is the
@@ -518,3 +541,71 @@ def resolve_accepted_trial(
         "of source bytes, config, feature set, seed, parameters, window, cost model and risk "
         "policy differs from an earlier one). Journal it before evaluating."
     )
+
+
+def multiplicity_charged_count(journal_path: str | Path, team_id: str) -> int:
+    """``T`` for ``1 - T(1-B)``: accepted trials that could have produced the nominee (A6).
+
+    Distinct from :func:`~crypto_trade.cup20.journal.accepted_trial_count`, which is the BUDGET
+    count and still charges every trial including exempt ones. A team has twelve trials to spend
+    whatever it spends them on; what A6 changes is only how many of them the multiplicity
+    correction treats as chances to pick a winner.
+
+    A record with no ``kind`` is charged. Kind is a required field of the material tuple, so its
+    absence means a hand-edited or malformed record, and the fail-closed reading of "we cannot tell
+    what this was" is to charge it.
+    """
+    charged = 0
+    for record in read_records(journal_path):
+        if record.get("event_type") != TRIAL_ACCEPTED_EVENT:
+            continue
+        payload = record.get("payload")
+        if not isinstance(payload, Mapping) or payload.get("team_id") != team_id:
+            continue
+        if str(payload.get("kind", "point")) in MULTIPLICITY_CHARGED_KINDS:
+            charged += 1
+    return charged
+
+
+def ablated_source_digests(journal_path: str | Path, team_id: str) -> frozenset[str]:
+    """Source digests this team ever journaled as an ``ablation``, and so may not nominate (A6).
+
+    The exemption's price. An ablation runs without raising the multiplicity bar because it is
+    declared a control rather than a contender; letting a control be nominated after the fact would
+    make the declaration worthless, since every search would be filed as an ablation and promoted
+    only when it happened to work.
+
+    Keyed on the SOURCE DIGEST rather than the candidate id, and that is the whole strength of it.
+    An id-keyed forfeit is defeated by copying the directory: declare nine ablations for free,
+    find the best, copy its ``strategy.py`` to a fresh id, journal that as a point and nominate it —
+    paying one charge for a nine-candidate search. The bytes are what was explored, so the bytes are
+    what carries the forfeit, and a rename changes nothing.
+    """
+    return frozenset(
+        str(record["payload"]["source_sha256"])
+        for record in read_records(journal_path)
+        if record.get("event_type") == TRIAL_ACCEPTED_EVENT
+        and isinstance(record.get("payload"), Mapping)
+        and record["payload"].get("team_id") == team_id
+        and str(record["payload"].get("kind")) == "ablation"
+        and "source_sha256" in record["payload"]
+    )
+
+
+def kind_for_mode(*, falsification: bool, ablation: bool, neighbourhood: bool) -> str:
+    """Map the evaluator's mutually exclusive mode flags to a trial kind.
+
+    Lives here, beside ``TRIAL_KINDS``, rather than inline in the CLI, because the two must agree
+    exactly: kind is part of the material tuple, so a kind the evaluator can never *produce* is a
+    kind whose journaled trial can never be *resolved*. A6 shipped with exactly that hole -- a team
+    could journal ``--kind ablation`` and then had no way to run it, losing the trial permanently.
+    A function can be tested against ``TRIAL_KINDS`` for surjectivity; an if/elif chain inside
+    ``main()`` cannot.
+    """
+    if falsification:
+        return "falsification"
+    if ablation:
+        return "ablation"
+    if neighbourhood:
+        return "neighbourhood"
+    return "point"

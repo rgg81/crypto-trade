@@ -17,11 +17,11 @@ import math
 import os
 import re
 import stat
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from types import MappingProxyType
-from typing import Any, BinaryIO, Iterator, Mapping
-
+from typing import Any, BinaryIO
 
 SCHEMA_VERSION = "top40-v3-train-journal-v1"
 GENESIS_SHA256 = "0" * 64

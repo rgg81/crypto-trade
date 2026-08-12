@@ -555,3 +555,149 @@ def test_the_most_recent_matching_trial_wins(tmp_path):
         journal, team_id="team-01", candidate_id="baseline", recomputed=_recomputed(trial)
     )
     assert resolved.sequence == 2
+
+
+# --- amendment A6: the multiplicity charge counts only chances to pick a winner ----------------
+
+
+def _journal_with(tmp_path, kinds, team_id="team-01"):
+    """A journal holding one accepted trial per kind, through the real append path."""
+    from crypto_trade.cup20.journal import append_record
+
+    path = tmp_path / "journal.jsonl"
+    for index, kind in enumerate(kinds):
+        append_record(
+            path,
+            "trial_accepted",
+            {"team_id": team_id, "candidate_id": f"c{index}", "kind": kind},
+        )
+    return path
+
+
+def test_falsification_and_ablation_do_not_raise_the_multiplicity_bar(tmp_path):
+    """A6's point: attacking your own result, and declaring a control, are not extra guesses.
+
+    Charging them identically to a parameter search is what made four of the first seven teams stop
+    at the eight-trial minimum with a third of the budget unspent.
+    """
+    from crypto_trade.cup20.journal import accepted_trial_count
+    from crypto_trade.cup20.trials import multiplicity_charged_count
+
+    path = _journal_with(
+        tmp_path, ["point", "point", "neighbourhood", "falsification", "ablation", "ablation"]
+    )
+    assert accepted_trial_count(path, "team-01") == 6  # the BUDGET still charges every trial
+    assert multiplicity_charged_count(path, "team-01") == 3  # 2 point + 1 neighbourhood
+
+
+def test_a_kindless_record_is_charged_rather_than_waved_through(tmp_path):
+    """Fail closed: 'we cannot tell what this was' must not become a free trial."""
+    from crypto_trade.cup20.journal import append_record
+    from crypto_trade.cup20.trials import multiplicity_charged_count
+
+    path = tmp_path / "journal.jsonl"
+    append_record(path, "trial_accepted", {"team_id": "team-01", "candidate_id": "c"})
+    assert multiplicity_charged_count(path, "team-01") == 1
+
+
+def test_the_charge_is_per_team(tmp_path):
+    from crypto_trade.cup20.journal import append_record
+    from crypto_trade.cup20.trials import multiplicity_charged_count
+
+    path = _journal_with(tmp_path, ["point", "point"], team_id="team-01")
+    append_record(
+        path, "trial_accepted", {"team_id": "team-02", "candidate_id": "x", "kind": "point"}
+    )
+    assert multiplicity_charged_count(path, "team-01") == 2
+    assert multiplicity_charged_count(path, "team-02") == 1
+
+
+def test_ablation_is_a_recognised_kind_and_the_charged_set_excludes_it():
+    from crypto_trade.cup20.trials import MULTIPLICITY_CHARGED_KINDS, TRIAL_KINDS
+
+    assert "ablation" in TRIAL_KINDS
+    assert MULTIPLICITY_CHARGED_KINDS == {"point", "neighbourhood"}
+    assert not MULTIPLICITY_CHARGED_KINDS & {"falsification", "ablation"}
+
+
+def test_the_ablation_forfeit_follows_the_bytes_not_the_candidate_name(tmp_path):
+    """The price of the exemption, in the version a rename cannot defeat.
+
+    Keyed on the candidate id, the forfeit is trivially escaped: declare nine ablations for free,
+    find the best, copy its strategy.py to a fresh id, journal that as a point and nominate it --
+    a nine-candidate search for one charge. The bytes are what was explored.
+    """
+    from crypto_trade.cup20.journal import append_record
+    from crypto_trade.cup20.trials import ablated_source_digests
+
+    path = tmp_path / "journal.jsonl"
+    append_record(
+        path,
+        "trial_accepted",
+        {"team_id": "team-01", "candidate_id": "keep", "kind": "point", "source_sha256": "a" * 64},
+    )
+    append_record(
+        path,
+        "trial_accepted",
+        {
+            "team_id": "team-01",
+            "candidate_id": "control",
+            "kind": "ablation",
+            "source_sha256": "b" * 64,
+        },
+    )
+    assert ablated_source_digests(path, "team-01") == frozenset({"b" * 64})
+
+    # the escape an id-keyed forfeit allowed: identical bytes under a new name
+    append_record(
+        path,
+        "trial_accepted",
+        {
+            "team_id": "team-01",
+            "candidate_id": "renamed-contender",
+            "kind": "point",
+            "source_sha256": "b" * 64,
+        },
+    )
+    assert "b" * 64 in ablated_source_digests(path, "team-01")
+    assert "a" * 64 not in ablated_source_digests(path, "team-01")
+
+
+def test_every_trial_kind_is_reachable_from_some_evaluator_mode():
+    """Regression: A6 shipped with ``--kind ablation`` journalable but unrunnable.
+
+    Kind is part of the material tuple, so a trial journaled ``ablation`` can only be resolved by an
+    evaluator that PRODUCES ``ablation`` -- and no mode did. The trial was spent and permanently
+    unevaluable, and the non-nomination guard then blocked re-running the same candidate as a point.
+    A team found this by losing a trial to it.
+
+    Surjectivity onto ``TRIAL_KINDS`` is the property: every kind a team can journal must be a kind
+    some mode yields, or that kind is a trap.
+    """
+    from crypto_trade.cup20.trials import TRIAL_KINDS, kind_for_mode
+
+    reachable = {
+        kind_for_mode(falsification=f, ablation=a, neighbourhood=n)
+        for f in (True, False)
+        for a in (True, False)
+        for n in (True, False)
+    }
+    assert reachable == set(TRIAL_KINDS)
+
+
+def test_the_evaluator_uses_that_mapping_rather_than_its_own_copy():
+    """A second copy of the mapping inside main() could drift from TRIAL_KINDS unnoticed."""
+    import pathlib
+
+    source = pathlib.Path("scripts/cup20_evaluate.py").read_text()
+    assert "kind_for_mode(" in source
+    assert 'kind = "falsification"' not in source
+
+
+def test_the_mode_precedence_is_stable():
+    from crypto_trade.cup20.trials import kind_for_mode
+
+    assert kind_for_mode(falsification=False, ablation=False, neighbourhood=False) == "point"
+    assert kind_for_mode(falsification=False, ablation=True, neighbourhood=False) == "ablation"
+    assert kind_for_mode(falsification=False, ablation=False, neighbourhood=True) == "neighbourhood"
+    assert kind_for_mode(falsification=True, ablation=False, neighbourhood=False) == "falsification"

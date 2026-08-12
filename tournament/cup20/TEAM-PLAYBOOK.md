@@ -261,6 +261,20 @@ equal are one trial; any difference is a new one.
 - **`--roles` is a claim you make before the numbers exist.** It is checked against the sides your
   book actually traded (charter §7.3, "roles are observed, not declared"), and you cannot re-declare
   after seeing which sleeve paid — re-declaring is a new material trial.
+- **`--kind ablation` costs you nothing on the multiplicity bar, and costs you the candidate**
+  (charter amendment A6). `T` in `1 − T·(1−B)` counts only `point` and `neighbourhood` trials, so a
+  falsification battery and any trial you declare an ablation no longer raise the bar your nominee
+  must clear. The budget is unchanged — twelve trials, all of them charged against it.
+
+  The price is that **a candidate journaled as an ablation can never be nominated.** It is a
+  control, and the free pre-flight refuses it if you later try to evaluate it as a contender.
+  Without that price the flag would just be a free relabelling of any search, promoted whenever it
+  happened to work. Kind is journaled before the run, so you cannot reclassify a disappointment.
+
+  Use it for what it is for: the run that removes your mechanism and changes nothing else, the
+  transparent baseline, the control that tells you whether your lane's idea is doing any work. Those
+  runs are how good research is done and you should no longer be paying points for them.
+
 - **`--kind`** defaults to `point`. Use `neighbourhood` for the declared sweep and `falsification`
   for the battery; each is one trial, and each kind is its own material trial, so a `point` trial
   does not licence a battery.
@@ -456,6 +470,17 @@ That is **two** trials for steps 7–10 in total, and about an hour of wall cloc
 evaluator refuses to run without an accepted trial of the right kind for exactly the candidate state
 on disk, which is what makes "journaled before you look at any number" a fact rather than an
 aspiration.
+
+**Two data limitations of this snapshot, found by a team and confirmed by the organiser.** Neither
+is a rule; both will cost you a trial if you assume otherwise.
+
+- **`funding_time` lands milliseconds AFTER its settlement instant on roughly 47% of rows.** A
+  boundary-leak test that selects on `funding_time` will therefore look like it is excluding the
+  settlement at your decision when it is not, or vice versa. Select on the settlement instant.
+- **Perp-minus-mark is NOT the perp-spot basis.** Its correlation with funding is +0.010. There is
+  no spot series in this snapshot, so a true basis is not observable here. If your mandate names
+  basis, say what you substituted and why rather than computing something basis-shaped and calling
+  it basis.
 
 **A killed evaluation does not burn its trial.** `cup20_trial.py` journals the trial;
 `cup20_evaluate.py` *resolves* an already-accepted one rather than creating another. So if an

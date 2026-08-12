@@ -55,8 +55,10 @@ from crypto_trade.cup20.snapshot import load_snapshot, resolve_is_start
 from crypto_trade.cup20.sweep import SweepError, run_neighbourhood_sweep
 from crypto_trade.cup20.trials import (
     TrialNotAcceptedError,
+    ablated_source_digests,
     candidate_source_digest,
     cost_model,
+    multiplicity_charged_count,
     resolve_accepted_trial,
     risk_policy_digest,
 )
@@ -81,6 +83,12 @@ def main() -> None:
         "--check",
         action="store_true",
         help="verify the candidate loads without evaluating it; costs no trial",
+    )
+    mode.add_argument(
+        "--ablation",
+        action="store_true",
+        help="an ordinary evaluation resolved against a trial journaled --kind ablation. Exempt "
+        "from the multiplicity charge (A6); the candidate can never be nominated.",
     )
     mode.add_argument(
         "--neighbourhood",
@@ -175,12 +183,11 @@ def main() -> None:
     is_start = resolve_is_start(
         snapshot.membership, target_size=int(raw["universe"]["target_size"])
     )
-    if arguments.falsification:
-        kind = "falsification"
-    elif arguments.neighbourhood:
-        kind = "neighbourhood"
-    else:
-        kind = "point"
+    kind = kind_for_mode(
+        falsification=arguments.falsification,
+        ablation=arguments.ablation,
+        neighbourhood=arguments.neighbourhood,
+    )
     try:
         recomputed = {
             "kind": kind,
@@ -210,12 +217,35 @@ def main() -> None:
         raise SystemExit(2) from failure
 
     spent = accepted_trial_count(journal_path, arguments.team)
+    # Amendment A6 splits the two counts. `spent` is the BUDGET -- every trial, whatever its kind.
+    # `charged` is the MULTIPLICITY count that feeds 1 - T(1-B), and it excludes falsification
+    # batteries and declared ablations, because neither is a chance to pick a winner.
+    charged = multiplicity_charged_count(journal_path, arguments.team)
+    exempt = spent - charged
     print(
         f"running under accepted trial #{resolution.sequence} "
-        f"({spent} of {raw['research']['trial_budget']} trials spent); "
-        f"window [{is_start}, {IS_END}) -- this takes minutes, not seconds",
+        f"({spent} of {raw['research']['trial_budget']} trials spent"
+        + (f", {exempt} exempt from multiplicity; T={charged}" if exempt else f"; T={charged}")
+        + f"); window [{is_start}, {IS_END}) -- this takes minutes, not seconds",
         flush=True,
     )
+
+    # The price of the ablation exemption: a candidate explored under that flag is a control and
+    # cannot become the answer. Refused here rather than at nomination so a team finds out for free
+    # -- this check runs before any market data is touched.
+    if not arguments.falsification and not arguments.ablation:
+        ablated = ablated_source_digests(journal_path, arguments.team)
+        if source_sha256 in ablated:
+            print(
+                f"REFUSED: {arguments.candidate} has the source bytes of a candidate journaled as "
+                "an ablation, which exempted them "
+                "from the multiplicity charge on the understanding that it is a CONTROL. A control "
+                "cannot be nominated -- otherwise every search would be filed as an ablation and "
+                "promoted only when it worked. Copying the directory does not help: the forfeit "
+                "follows the bytes, not the name. Change the strategy and journal it --kind point.",
+                file=sys.stderr,
+            )
+            raise SystemExit(2)
 
     sweep_root: Path | None = None
     try:
@@ -253,7 +283,7 @@ def main() -> None:
                     seed=resolution.trial.seed,
                     declared_roles=resolution.trial.declared_roles,
                     trial_sequence=resolution.sequence,
-                    accepted_trials=spent,
+                    accepted_trials=charged,
                     source_sha256=source_sha256,
                     is_start=is_start,
                     workers=arguments.workers,
@@ -280,7 +310,7 @@ def main() -> None:
                 seed=resolution.trial.seed,
                 declared_roles=resolution.trial.declared_roles,
                 trial_sequence=resolution.sequence,
-                accepted_trials=spent,
+                accepted_trials=charged,
                 source_sha256=source_sha256,
                 is_start=is_start,
             )

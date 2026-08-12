@@ -24,6 +24,7 @@ import numpy as np
 import pandas as pd
 
 import crypto_trade.tournament.top40_v3 as tournament_contract
+from crypto_trade.tournament import pure_crypto_universe_v6, source_archive_v3
 from crypto_trade.tournament.engine_v2 import (
     EvaluationResult,
     EvaluatorConfig,
@@ -41,8 +42,6 @@ from crypto_trade.tournament.metrics_v3 import (
     sharpe_confidence_interval,
 )
 from crypto_trade.tournament.protocol import REBALANCE_INSTRUCTION_COLUMN, DecisionContext
-from crypto_trade.tournament import pure_crypto_universe_v6
-from crypto_trade.tournament import source_archive_v3
 from crypto_trade.tournament.risk_policy import load_risk_policy
 
 _TEAM_ID = re.compile(r"team-(?:0[1-9]|10)")

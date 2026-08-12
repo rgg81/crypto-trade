@@ -46,6 +46,7 @@ def main() -> int:
 
     # Mark price for sizing + barriers.
     import json
+
     import httpx
     r = httpx.get(f"{BASE}/fapi/v1/premiumIndex", params={"symbol": SYMBOL}, timeout=10.0)
     mark = float(json.loads(r.text)["markPrice"])

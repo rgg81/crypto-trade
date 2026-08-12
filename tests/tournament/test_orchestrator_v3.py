@@ -9,7 +9,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from crypto_trade.tournament import journal_v3, orchestrator_v3 as organizer, phase0_v3
+from crypto_trade.tournament import journal_v3, phase0_v3
+from crypto_trade.tournament import orchestrator_v3 as organizer
 from crypto_trade.tournament.qualification_v3 import CandidateIdentity
 from crypto_trade.tournament.top40_v3 import LoadedV3Config
 

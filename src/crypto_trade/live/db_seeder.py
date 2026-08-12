@@ -30,14 +30,13 @@ from __future__ import annotations
 
 import sqlite3
 from collections import defaultdict
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 import pandas as pd
 
 from crypto_trade.live.models import LiveConfig, LiveTrade, ModelConfig
 from crypto_trade.live.state_store import StateStore
-
 
 _CANDLE_8H_MS = 28_800_000
 

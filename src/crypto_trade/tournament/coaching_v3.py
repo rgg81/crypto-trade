@@ -13,7 +13,6 @@ import math
 import re
 from collections.abc import Mapping
 from pathlib import PurePosixPath
-from typing import Any
 
 from crypto_trade.tournament.qualification_v3 import (
     PUBLIC_CORE_FLOORS,
@@ -22,7 +21,6 @@ from crypto_trade.tournament.qualification_v3 import (
     MetricCheck,
     assess_public,
 )
-
 
 PACKET_SCHEMA_VERSION = "top40-v3-train-coaching-packet-v1"
 TRAIN_SCORE_START = "2020-02-03"

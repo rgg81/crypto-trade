@@ -129,7 +129,7 @@ def main() -> int:
         mark * 1.01,
     )])
     # F: invalid format (sci-notation) using deliberately small stop
-    print(f"  -> F. literal sci-notation stopPrice='1e-05'")
+    print("  -> F. literal sci-notation stopPrice='1e-05'")
     try:
         resp = c._signed_post(
             "/fapi/v1/order",
@@ -161,7 +161,7 @@ def main() -> int:
             print(f"  cancel {oid} failed: {exc}")
     try:
         c.cancel_all_orders(SYMBOL)
-        print(f"  cancel_all OK")
+        print("  cancel_all OK")
     except Exception as exc:
         print(f"  cancel_all failed: {exc}")
     try:

@@ -10,14 +10,14 @@ from __future__ import annotations
 
 import os
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from crypto_trade.live.auth_client import AuthenticatedBinanceClient
 
 con = sqlite3.connect("data/testnet.db")
 cur = con.cursor()
-may_start = int(datetime(2026, 5, 1, tzinfo=timezone.utc).timestamp() * 1000)
-may_end = int(datetime(2026, 6, 1, tzinfo=timezone.utc).timestamp() * 1000)
+may_start = int(datetime(2026, 5, 1, tzinfo=UTC).timestamp() * 1000)
+may_end = int(datetime(2026, 6, 1, tzinfo=UTC).timestamp() * 1000)
 
 
 def trade_type(eid: str | None) -> str:
@@ -66,7 +66,7 @@ for r in closed:
     typ = trade_type(eid)
     totals[typ][0] += 1
     totals[typ][1] += weighted
-    iso = datetime.fromtimestamp(ct / 1000, tz=timezone.utc).strftime("%m-%d %H:%M:%S")
+    iso = datetime.fromtimestamp(ct / 1000, tz=UTC).strftime("%m-%d %H:%M:%S")
     print(
         f"{iso:17}  {typ:7} {model:8} {sym:9} {dirn:+d}    "
         f"{entry:>10.4f}  {ex:>10.4f}  {net:+7.2f}%  {wf:.2f}  {weighted:+9.4f}  {reason}"

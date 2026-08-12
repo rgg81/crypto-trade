@@ -13,7 +13,6 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-
 ANNUALIZATION_DAYS = 365
 BOOTSTRAP_SAMPLES = 2_000
 BOOTSTRAP_BLOCK_DAYS = 10

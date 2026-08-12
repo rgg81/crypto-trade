@@ -21,7 +21,7 @@ import argparse
 import csv
 import sqlite3
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 SYMBOL_TO_MODEL_V1: dict[str, str] = {
@@ -101,7 +101,7 @@ def load_db_trades(db_path: Path, models: set[str]) -> list[dict]:
 
 
 def iso(ms: int) -> str:
-    return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M")
+    return datetime.fromtimestamp(ms / 1000, tz=UTC).strftime("%Y-%m-%d %H:%M")
 
 
 def main() -> int:
@@ -164,7 +164,7 @@ def main() -> int:
 
     extra = [r for r in db if (r["model"], r["symbol"], r["open_time"]) not in seen_db_keys]
 
-    print(f"=== RESULTS ===")
+    print("=== RESULTS ===")
     print(f"  MATCH                 : {len(matches)}")
     print(f"  DIRECTION_MISMATCH    : {len(dir_mismatch)}")
     print(f"  MISSING_IN_DB         : {len(missing)}")
@@ -204,7 +204,7 @@ def main() -> int:
             )
         if len(paper) > 20:
             print(f"    ... +{len(paper) - 20} more")
-        print(f"  (Real Binance — should match backtest if they were live-tick opens):")
+        print("  (Real Binance — should match backtest if they were live-tick opens):")
         for r in real:
             print(
                 f"    {r['model']:8} {r['symbol']:9} ot={iso(r['open_time'])} "
@@ -214,7 +214,7 @@ def main() -> int:
         print()
 
     # Verdict
-    print(f"=== VERDICT ===")
+    print("=== VERDICT ===")
     if dir_mismatch:
         print("  ❌ FAIL — direction mismatch on at least one trade")
         return 1

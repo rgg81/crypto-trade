@@ -1,0 +1,48 @@
+{
+  "candidate_gross_edge_bps_per_turnover": 35.441533442939146,
+  "candidate_id": "funding-term-dynamics",
+  "inverted_core_gates": {
+    "annualized_return": false,
+    "annualized_volatility": true,
+    "double_cost_annualized_return": false,
+    "double_cost_sharpe": false,
+    "max_drawdown": false,
+    "net_sharpe": false,
+    "trade_count": true,
+    "triple_cost_sharpe": false
+  },
+  "inverted_metrics": {
+    "annualized_return": -0.22866229911159264,
+    "annualized_volatility": 0.11661446203318088,
+    "double_cost_annualized_return": -0.2614471218197376,
+    "double_cost_sharpe": -2.53143899527937,
+    "max_drawdown": 0.6903043439933901,
+    "net_sharpe": -2.1669332598313473,
+    "trade_count": 2081.0,
+    "triple_cost_sharpe": -2.891764714668674
+  },
+  "placebo_exceedance": 0.0,
+  "placebo_gross_edge_bps_per_turnover": [
+    -5.321016584067118,
+    -10.42870236774007,
+    -7.947046776373224,
+    -1.5495053102524876,
+    3.633552174361405,
+    7.25697767421509,
+    -14.25094665971006,
+    -11.026547292304226
+  ],
+  "placebo_seeds": [
+    20200818,
+    20200819,
+    20200820,
+    20200821,
+    20200822,
+    20200823,
+    20200824,
+    20200825
+  ],
+  "sign_inversion_passes_core": false,
+  "team_id": "team-08",
+  "trial_sequence": 87
+}

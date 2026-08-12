@@ -15,10 +15,9 @@ import json
 import os
 import re
 import stat
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Iterable, Mapping
-
 
 SCHEMA_VERSION = "top40-v3-candidate-source-archive-v1"
 ARCHIVE_NAMESPACE = "reports-top40-v3/source-archives/sha256"

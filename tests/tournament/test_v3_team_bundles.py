@@ -8,7 +8,6 @@ from pathlib import Path
 
 from crypto_trade.tournament.risk_policy import load_risk_policy
 
-
 ROOT = Path(__file__).parents[2]
 TEAM_ROOT = ROOT / "tournament/top40-v3/teams"
 TEAM_IDS = tuple(f"team-{number:02d}" for number in range(1, 11))

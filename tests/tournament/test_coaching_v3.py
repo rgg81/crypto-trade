@@ -18,7 +18,6 @@ from crypto_trade.tournament.runner_v3 import (
     WindowMetrics,
 )
 
-
 ARTIFACT_NAMES = (
     "targets",
     "events",

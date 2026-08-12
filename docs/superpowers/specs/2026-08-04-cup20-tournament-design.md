@@ -916,6 +916,33 @@ evidence where it would once have been removed. The floors remain on the record 
 and the holdout stage still enforces them conjunctively, so such a book cannot win — but it can
 occupy one of the three holdout slots.
 
+### Amendment A6 — 2026-08-11: the multiplicity charge counts only chances to pick a winner
+
+`T` in `1 − T·(1−B)` now counts accepted trials of kind `point` and `neighbourhood` only.
+`falsification` and a new kind, `ablation`, are exempt. The **budget** is unchanged: twelve trials,
+every one of them charged against it whatever its kind.
+
+**Why, measured rather than argued.** §14.10 disclosed that the correction penalised falsification
+and ablation exactly as it penalised a parameter search, and predicted teams would find that
+backwards. Seven teams in, the effect is on the record: **four of the first seven stopped at the
+eight-trial minimum with a third of their budget unspent**, and two more stopped at nine. Further
+research made a candidate score worse, so teams stopped researching. That is the opposite of what
+this tournament is for, and disclosure alone did not fix it.
+
+A falsification battery is run by the organiser on a nominee, cannot be steered, and is not a chance
+to pick anything. An `ablation` is declared a **control before it runs**, and the exemption has a
+price: **declaring a candidate an ablation forfeits its eligibility to be nominated.** A team may
+explore without charge, but what it explored under that flag cannot become its answer — otherwise
+the flag would be a free relabelling of any search, promoted only when it happened to work. Kind is
+journaled before the run, so a disappointing search cannot be reclassified afterwards. The refusal
+fires in the free pre-flight, before any market data is read.
+
+**Retroactive effect: every completed team gains slightly, none loses, and the order is unchanged.**
+Recomputed at the A6 count, confidence rises by between +0.002 and +0.067 across teams 01–07 — most
+where a team had run two falsification batteries, which is the case the old rule punished hardest.
+The ranking order is identical before and after. Teams 08–12 face the amended rule from the start
+and every earlier team's score has been recomputed under it, so the field is scored on one basis.
+
 ## 14. Known limitations, stated up front
 
 1. The holdout window overlaps four prior organiser-level reveals (§2.1). Mitigated structurally,
