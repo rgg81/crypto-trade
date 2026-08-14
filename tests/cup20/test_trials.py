@@ -685,14 +685,54 @@ def test_every_trial_kind_is_reachable_from_some_evaluator_mode():
     assert reachable == set(TRIAL_KINDS)
 
 
-def test_the_evaluator_uses_that_mapping_rather_than_its_own_copy():
-    """A second copy of the mapping inside main() could drift from TRIAL_KINDS unnoticed."""
-    import pathlib
+def test_every_scored_mode_of_the_evaluator_actually_runs(tmp_path):
+    """Regression: the evaluator called ``kind_for_mode`` without importing it.
 
-    source = pathlib.Path("scripts/cup20_evaluate.py").read_text()
-    assert "kind_for_mode(" in source
-    assert 'kind = "falsification"' not in source
+    Every scored mode -- point, ablation, neighbourhood, falsification -- died with a NameError
+    immediately after the snapshot loaded and immediately BEFORE the accepted trial was resolved.
+    Only ``--check`` returns early enough to survive, so the harness looked healthy until a team
+    spent its first trial. A whole team hit this and had to run the organiser's own script through
+    a shim inside its own workspace to proceed.
 
+    Two earlier attempts at this test were worthless and both are worth remembering. The first
+    asserted ``"kind_for_mode(" in source`` -- satisfied by the call site itself, so it passed with
+    the import absent. The second ran the script against a MISSING candidate, which refuses at the
+    source-digest step, before the broken line is ever reached. The candidate must exist and the
+    journal must be empty, so the run reaches ``kind_for_mode`` and then refuses at trial
+    resolution.
+    """
+    import subprocess
+    import sys
+
+    workspace = tmp_path / "team-01"
+    candidate = workspace / "candidates" / "baseline"
+    candidate.mkdir(parents=True)
+    (candidate / "strategy.py").write_text("def build_strategy():\n    raise NotImplementedError\n")
+    (candidate / "risk_policy.json").write_text(json.dumps(MINIMAL_RISK_POLICY))
+    empty_journal = tmp_path / "journal.jsonl"
+    empty_journal.write_text("")
+
+    for mode in ([], ["--ablation"], ["--neighbourhood"], ["--falsification"]):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "scripts/cup20_evaluate.py",
+                "--team", "team-01",
+                "--candidate", "baseline",
+                "--team-root", str(tmp_path),
+                "--journal", str(empty_journal),
+                *mode,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+        label = mode or ["point"]
+        combined = completed.stdout + completed.stderr
+        assert "NameError" not in combined, f"{label}: {combined[-400:]}"
+        assert "Traceback" not in combined, f"{label}: {combined[-400:]}"
+        assert "REFUSED" in combined, f"{label}: {combined[-400:]}"
+        assert completed.returncode == 2, f"{label}: exit {completed.returncode}"
 
 def test_the_mode_precedence_is_stable():
     from crypto_trade.cup20.trials import kind_for_mode

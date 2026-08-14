@@ -14,5 +14,5 @@
   "sealed_manifest_sha256": "0bcd6dbfcfc615dff030f85eecb4265877bc4074d4b4224a2fa6da81b14e5c4c",
   "sealed_root": "data/cup20/sealed",
   "test_output_path": "tournament/cup20/activation-tests.out",
-  "test_output_sha256": "582531e70f46de548077b074166fe4b7eb2bba321a4d17aaeb49c8d3124cc8e6"
+  "test_output_sha256": "c690d8017c95713d626896713b91cea1aad5c8a2803ac1a9ad2848d5a22f8c34"
 }

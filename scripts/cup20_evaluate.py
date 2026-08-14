@@ -58,6 +58,7 @@ from crypto_trade.cup20.trials import (
     ablated_source_digests,
     candidate_source_digest,
     cost_model,
+    kind_for_mode,
     multiplicity_charged_count,
     resolve_accepted_trial,
     risk_policy_digest,

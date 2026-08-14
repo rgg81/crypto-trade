@@ -1,0 +1,48 @@
+{
+  "candidate_gross_edge_bps_per_turnover": 261.33258373061454,
+  "candidate_id": "volofvol-regime",
+  "inverted_core_gates": {
+    "annualized_return": false,
+    "annualized_volatility": true,
+    "double_cost_annualized_return": false,
+    "double_cost_sharpe": false,
+    "max_drawdown": false,
+    "net_sharpe": false,
+    "trade_count": true,
+    "triple_cost_sharpe": false
+  },
+  "inverted_metrics": {
+    "annualized_return": -0.15566269431961965,
+    "annualized_volatility": 0.1370799454419783,
+    "double_cost_annualized_return": -0.15992194520593916,
+    "double_cost_sharpe": -1.2001846440619086,
+    "max_drawdown": 0.5811114891995808,
+    "net_sharpe": -1.1649634122926875,
+    "trade_count": 37302.0,
+    "triple_cost_sharpe": -1.2352658734657045
+  },
+  "placebo_exceedance": 1.0,
+  "placebo_gross_edge_bps_per_turnover": [
+    261.33258373061454,
+    261.33258373061454,
+    261.33258373061454,
+    261.33258373061454,
+    261.33258373061454,
+    261.33258373061454,
+    261.33258373061454,
+    261.33258373061454
+  ],
+  "placebo_seeds": [
+    20260815,
+    20260816,
+    20260817,
+    20260818,
+    20260819,
+    20260820,
+    20260821,
+    20260822
+  ],
+  "sign_inversion_passes_core": false,
+  "team_id": "team-10",
+  "trial_sequence": 108
+}

@@ -1,0 +1,48 @@
+{
+  "candidate_gross_edge_bps_per_turnover": 94.14291388368291,
+  "candidate_id": "print-size-flow",
+  "inverted_core_gates": {
+    "annualized_return": false,
+    "annualized_volatility": true,
+    "double_cost_annualized_return": false,
+    "double_cost_sharpe": false,
+    "max_drawdown": false,
+    "net_sharpe": false,
+    "trade_count": true,
+    "triple_cost_sharpe": false
+  },
+  "inverted_metrics": {
+    "annualized_return": -0.22413804363734724,
+    "annualized_volatility": 0.1198056866062595,
+    "double_cost_annualized_return": -0.2369679421674763,
+    "double_cost_sharpe": -2.1958765284411075,
+    "max_drawdown": 0.6468135787801539,
+    "net_sharpe": -2.0575663983754975,
+    "trade_count": 85501.0,
+    "triple_cost_sharpe": -2.3340508830455544
+  },
+  "placebo_exceedance": 0.0,
+  "placebo_gross_edge_bps_per_turnover": [
+    -0.14675669537856526,
+    -0.6079165235264444,
+    1.4465907635814055,
+    -0.05331300663299413,
+    -1.3997426257252417,
+    -0.13134459206807966,
+    0.3412502137862589,
+    0.273658172220366
+  ],
+  "placebo_seeds": [
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25
+  ],
+  "sign_inversion_passes_core": false,
+  "team_id": "team-09",
+  "trial_sequence": 92
+}
