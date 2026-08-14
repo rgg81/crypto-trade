@@ -120,7 +120,26 @@ reimplement the ranking, the median-volume statistic, or the mark-coverage rule.
 
 ---
 
-### Task 4: The paper tick
+### Task 4: Exact-replay tick (PARITY BY CONSTRUCTION)
+
+**The design decision that makes parity provable rather than tested.** The desk does NOT
+reimplement execution. At each boundary it rebuilds the snapshot through that boundary and re-runs
+the tournament's own `run_candidate` over the WHOLE window from `IS_START` to now, then reads the
+forward tail off the result. Fills at next-bar-open, the 5 bps taker fee, the 2.5 bps slippage per
+side, native per-event funding, the common risk unit and both cap applications are therefore not
+"matched" to the backtest -- they ARE the backtest, executing the same lines of the same module.
+
+There is no code path in the desk that computes a fill, a fee or a slippage figure. If one appears,
+it is a defect: it means execution has been duplicated and the two copies can now disagree.
+
+Cost: one full-window evaluation per tick, measured at roughly 8 minutes against 8-hourly
+boundaries. That is the price of exact replay and it is worth paying.
+
+Determinism check, run every tick: the replay must reproduce the previous tick's forward rows
+bit-identically. A change in an already-recorded forward row means the input data was revised
+underneath the desk, which is an append-invariance abort, not a rounding difference.
+
+### Task 4 (original framing): The paper tick
 
 **Files:**
 - Create: `src/crypto_trade/cup20_desk/tick.py`
