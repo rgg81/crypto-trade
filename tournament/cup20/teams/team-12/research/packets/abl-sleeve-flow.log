@@ -1,0 +1,81 @@
+running under accepted trial #125 (8 of 12 trials spent, 7 exempt from multiplicity; T=1); window [2020-08-17 00:00:00+00:00, 2024-08-01 00:00:00+00:00) -- this takes minutes, not seconds
+------------------------------------------------------------------------------
+CUP-20 coaching packet -- team-12 / abl-sleeve-flow
+------------------------------------------------------------------------------
+  trial            #125  (1 of 12 accepted trials spent)
+  source           145b4f0f8fe8e18e4473ce0700381211eb382a63e8e67e1bfbd983b9ce5683f0
+  snapshot         ceeedfcd7117a16a58d2bb9bbf9716356c9473098fe8512703d1656834746d48
+  window           [2020-08-17 00:00:00+00:00, 2024-08-01 00:00:00+00:00)   seed 20200817
+  folds            F1 [2020-08-17, 2021-08-01), F2 [2021-08-01, 2022-08-01), F3 [2022-08-01, 2023-08-01), F4 [2023-08-01, 2024-08-01)
+
+metric vector, at every cost level
+------------------------------------------------------------------------------
+  metric                                            1x              2x              3x
+  annualized_return                           0.155058        0.138032        0.121250
+  annualized_turnover                        19.792189       19.794635       19.797095
+  annualized_volatility                       0.115692        0.115713        0.115742
+  calmar                                      1.262097        1.092837        0.934546
+  cost_share_of_positive_gross                0.011001        0.022004        0.033009
+  gross_edge_bps_per_turnover                83.563075       83.552715       83.542282
+  long_gross_pnl                              0.568710        0.568743        0.568776
+  max_drawdown                                0.122858        0.126306        0.129743
+  net_sharpe                                  1.304004        1.175404        1.046742
+  positive_quarter_count                     14.000000       13.000000       12.000000
+  positive_quarter_fraction                   0.823529        0.764706        0.705882
+  short_gross_pnl                             0.086052        0.086018        0.085985
+  top5_day_share                              0.028870        0.028860        0.028847
+  trade_count                             17243.000000    17242.000000    17246.000000
+
+fold Sharpes (2x cost, the level section 7.3 floors them at)
+------------------------------------------------------------------------------
+  F1                                          1.039679
+  F2                                          1.421857
+  F3                                          0.767358
+  F4                                          1.446828
+
+trial-adjusted confidence: B=0.9960, T=1, confidence=0.9960
+
+hard floors (charter 7.3). '----' is a gate a single point cannot decide.
+------------------------------------------------------------------------------
+  ----  neighbourhood_positive_fraction              1.000000  required >= 0.7  (assumed; a single point cannot measure a neighbourhood)
+  ----  sign_inversion_not_profitable          not measured here; run --falsification, which is its own material trial
+  PASS  net_sharpe                                   1.304004  required >= 0.8
+  PASS  double_cost_sharpe                           1.175404  required >= 0.5
+  PASS  triple_cost_sharpe                           1.046742  required > 0
+  PASS  annualized_return                            0.155058  required > 0
+  PASS  double_cost_annualized_return                0.138032  required > 0
+  PASS  max_drawdown                                 0.122858  required <= 0.2
+  PASS  annualized_volatility                        0.115692  required >= 0.06
+  PASS  positive_quarter_fraction                    0.823529  required >= 0.5
+  PASS  positive_fold_count                          4.000000  required >= 3
+  PASS  worst_fold_sharpe                            0.767358  required >= -0.25
+  PASS  annualized_turnover                         19.792189  required <= 25
+  PASS  gross_edge_bps_per_turnover                 83.563075  required >= 40
+  PASS  cost_share_of_positive_gross                 0.011001  required <= 0.3
+  PASS  top5_day_share                               0.028870  required <= 0.35
+  PASS  max_fold_positive_pnl_share                  0.277478  required <= 0.6
+  PASS  trade_count                              17243.000000  required >= 500
+  PASS  trial_adjusted_confidence                    0.996000  required >= 0.9
+  PASS  declared_roles_match_traded_sides      declared ['long', 'short'], traded ['long', 'short']
+  PASS  role_long_gross_pnl                          0.568710  required > 0
+  PASS  role_short_gross_pnl                         0.086052  required > 0
+
+exposure caps -- how far your book was reduced (charter 4)
+------------------------------------------------------------------------------
+  executed     4/722 boundaries reduced, minimum scale 0.9605, median 0.9673, binding {'gross': 4, 'net': 0, 'symbol': 0}
+  requested    0/722 boundaries reduced, minimum scale 1.0000, median 1.0000, binding {'gross': 0, 'net': 0, 'symbol': 0}
+
+  risk-unit scalar   median 0.5497  min 0.2842  max 1.0422
+
+------------------------------------------------------------------------------
+  verdict: NO MEASURED FAILURE -- 2 gate(s) cannot be decided at a single point
+  indicative ranking score G: 83.121
+
+  This is your NOMINATED POINT's own vector. It is not your score. Section 7.2
+  scores the per-metric MEDIAN across your declared neighbourhood, which is always
+  below the maximum of a noisy surface and is what the organiser will rank you on.
+------------------------------------------------------------------------------
+
+packet written to tournament/cup20/teams/team-12/research/packets/abl-sleeve-flow.json
+
+completed in 1090.5s

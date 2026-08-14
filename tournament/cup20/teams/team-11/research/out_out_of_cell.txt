@@ -1,0 +1,19 @@
+== SPLIT-A: measure on Mon-Wed bars, predict at Thu-Sun boundaries (and reverse) ==
+asia share       measured Mon-Wed -> tested Thu-Sun        IC=-0.0061 t= -1.18 n= 2328  H1=+0.0007 H2=-0.0120
+asia share       measured Thu-Sun -> tested Mon-Wed        IC=-0.0352 t= -6.10 n= 1754  H1=-0.0270 H2=-0.0424
+asia share       [all bars, all boundaries -- reference]   IC=-0.0216 t= -5.58 n= 4082  H1=-0.0168 H2=-0.0257
+
+US minus Asia    measured Mon-Wed -> tested Thu-Sun        IC=+0.0023 t= +0.44 n= 2328  H1=-0.0119 H2=+0.0149
+US minus Asia    measured Thu-Sun -> tested Mon-Wed        IC=+0.0255 t= +4.40 n= 1754  H1=+0.0137 H2=+0.0359
+US minus Asia    [all bars, all boundaries -- reference]   IC=+0.0156 t= +4.02 n= 4082  H1=+0.0036 H2=+0.0263
+
+== SPLIT-B: measure on even ISO weeks, predict on odd ISO weeks (and reverse) ==
+asia share       measured even weeks -> tested odd weeks   IC=-0.0156 t= -2.90 n= 2045  H1=-0.0168 H2=-0.0145
+asia share       measured odd weeks -> tested even weeks   IC=-0.0236 t= -4.27 n= 2037  H1=-0.0153 H2=-0.0307
+
+US minus Asia    measured even weeks -> tested odd weeks   IC=+0.0050 t= +0.92 n= 2045  H1=-0.0022 H2=+0.0114
+US minus Asia    measured odd weeks -> tested even weeks   IC=+0.0187 t= +3.40 n= 2037  H1=+0.0014 H2=+0.0339
+
+== SPLIT-C: measure on the FIRST half of the window, sign frozen, tested on the SECOND half ==
+asia share       H1 IC=-0.0168 (t=-3.07, n=1915)   H2 IC=-0.0257 (t=-4.73, n=2167)   SIGN HOLDS
+US minus Asia    H1 IC=+0.0036 (t=+0.65, n=1915)   H2 IC=+0.0263 (t=+4.80, n=2167)   SIGN HOLDS

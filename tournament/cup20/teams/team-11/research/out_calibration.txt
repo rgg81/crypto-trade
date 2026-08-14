@@ -1,0 +1,48 @@
+panel built in 0.4s; boundaries=4335
+fastsim  full evaluation: 4.9s
+organiser full evaluation: 433.7s
+
+metric                 organiser        fastsim         residual
+--- cost 1x ---
+net_sharpe                  -1.387613      -1.414285      -0.026672
+annualized_return           -0.158829      -0.161311      -0.002482
+annualized_volatility        0.119462       0.119310      -0.000152
+max_drawdown                 0.528214       0.528218      +0.000004
+annualized_turnover         94.204031      94.097633      -0.106397
+gross_edge_bps             -10.138855     -10.475506      -0.336651
+cost_share                   0.057096       0.057230      +0.000134
+long_gross_pnl              -0.033780      -0.041132      -0.007353
+short_gross_pnl             -0.344344      -0.349105      -0.004761
+trade_count              32171.000000   32157.000000     -14.000000
+--- cost 2x ---
+net_sharpe                  -1.978861      -2.005383      -0.026522
+annualized_return           -0.216395      -0.218652      -0.002256
+annualized_volatility        0.119565       0.119429      -0.000136
+max_drawdown                 0.639538       0.639554      +0.000016
+annualized_turnover         94.222842      94.115985      -0.106857
+gross_edge_bps             -10.154680     -10.492354      -0.337674
+cost_share                   0.114205       0.114472      +0.000267
+long_gross_pnl              -0.034436      -0.041829      -0.007393
+short_gross_pnl             -0.344353      -0.349112      -0.004759
+trade_count              32232.000000   32176.000000     -56.000000
+fold sharpes 2x:
+  F1  organiser  -2.5355   fastsim  -2.6200   residual  -0.0845
+  F2  organiser  -0.7475   fastsim  -0.7475   residual  -0.0000
+  F3  organiser  -2.3806   fastsim  -2.3806   residual  +0.0000
+  F4  organiser  -2.2214   fastsim  -2.2214   residual  -0.0000
+--- cost 3x ---
+net_sharpe                  -2.568733      -2.594885      -0.026152
+annualized_return           -0.270064      -0.272107      -0.002043
+annualized_volatility        0.119700       0.119578      -0.000122
+max_drawdown                 0.724653       0.724665      +0.000012
+annualized_turnover         94.241408      94.134577      -0.106830
+gross_edge_bps             -10.171782     -10.509431      -0.337649
+cost_share                   0.171326       0.171727      +0.000401
+long_gross_pnl              -0.035146      -0.042543      -0.007396
+short_gross_pnl             -0.344355      -0.349112      -0.004757
+trade_count              32232.000000   32213.000000     -19.000000
+
+exposure_caps requested min scale: organiser 1.000000  fastsim 1.000000
+total wall clock 439.1s
+
+[exited with code 0]

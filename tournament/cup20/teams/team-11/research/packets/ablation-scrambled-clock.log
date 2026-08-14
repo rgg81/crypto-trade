@@ -1,0 +1,81 @@
+running under accepted trial #113 (3 of 12 trials spent, 2 exempt from multiplicity; T=1); window [2020-08-17 00:00:00+00:00, 2024-08-01 00:00:00+00:00) -- this takes minutes, not seconds
+------------------------------------------------------------------------------
+CUP-20 coaching packet -- team-11 / ablation-scrambled-clock
+------------------------------------------------------------------------------
+  trial            #113  (1 of 12 accepted trials spent)
+  source           95c86fd0050a07f3e98fe1ebb95cc6771712ec6f39f17982057927ed01f7471e
+  snapshot         ceeedfcd7117a16a58d2bb9bbf9716356c9473098fe8512703d1656834746d48
+  window           [2020-08-17 00:00:00+00:00, 2024-08-01 00:00:00+00:00)   seed 11
+  folds            F1 [2020-08-17, 2021-08-01), F2 [2021-08-01, 2022-08-01), F3 [2022-08-01, 2023-08-01), F4 [2023-08-01, 2024-08-01)
+
+metric vector, at every cost level
+------------------------------------------------------------------------------
+  metric                                            1x              2x              3x
+  annualized_return                           0.035974        0.022831        0.009844
+  annualized_turnover                        16.987328       16.991811       16.996311
+  annualized_volatility                       0.118908        0.118961        0.119041
+  calmar                                      0.147911        0.088498        0.036129
+  cost_share_of_positive_gross                0.009751        0.019504        0.029260
+  gross_edge_bps_per_turnover                32.197428       32.180362       32.163248
+  long_gross_pnl                              0.321716        0.321769        0.321822
+  max_drawdown                                0.243211        0.257982        0.272474
+  net_sharpe                                  0.356527        0.249090        0.141660
+  positive_quarter_count                     10.000000       10.000000        8.000000
+  positive_quarter_fraction                   0.588235        0.588235        0.470588
+  short_gross_pnl                            -0.105185       -0.105296       -0.105406
+  top5_day_share                              0.027458        0.027386        0.027302
+  trade_count                              7352.000000     7372.000000     7370.000000
+
+fold Sharpes (2x cost, the level section 7.3 floors them at)
+------------------------------------------------------------------------------
+  F1                                          0.794328
+  F2                                          0.813313
+  F3                                         -2.082938
+  F4                                          0.942433
+
+trial-adjusted confidence: B=0.7530, T=1, confidence=0.7530
+
+hard floors (charter 7.3). '----' is a gate a single point cannot decide.
+------------------------------------------------------------------------------
+  ----  neighbourhood_positive_fraction              1.000000  required >= 0.7  (assumed; a single point cannot measure a neighbourhood)
+  ----  sign_inversion_not_profitable          not measured here; run --falsification, which is its own material trial
+  FAIL  net_sharpe                                   0.356527  required >= 0.8
+  FAIL  double_cost_sharpe                           0.249090  required >= 0.5
+  PASS  triple_cost_sharpe                           0.141660  required > 0
+  PASS  annualized_return                            0.035974  required > 0
+  PASS  double_cost_annualized_return                0.022831  required > 0
+  FAIL  max_drawdown                                 0.243211  required <= 0.2
+  PASS  annualized_volatility                        0.118908  required >= 0.06
+  PASS  positive_quarter_fraction                    0.588235  required >= 0.5
+  PASS  positive_fold_count                          3.000000  required >= 3
+  FAIL  worst_fold_sharpe                           -2.082938  required >= -0.25
+  PASS  annualized_turnover                         16.987328  required <= 25
+  FAIL  gross_edge_bps_per_turnover                 32.197428  required >= 40
+  PASS  cost_share_of_positive_gross                 0.009751  required <= 0.3
+  PASS  top5_day_share                               0.027458  required <= 0.35
+  PASS  max_fold_positive_pnl_share                  0.297003  required <= 0.6
+  PASS  trade_count                               7352.000000  required >= 500
+  FAIL  trial_adjusted_confidence                    0.753000  required >= 0.9
+  PASS  declared_roles_match_traded_sides      declared ['long', 'short'], traded ['long', 'short']
+  PASS  role_long_gross_pnl                          0.321716  required > 0
+  FAIL  role_short_gross_pnl                        -0.105185  required > 0
+
+exposure caps -- how far your book was reduced (charter 4)
+------------------------------------------------------------------------------
+  executed     16/207 boundaries reduced, minimum scale 0.8628, median 0.9300, binding {'gross': 16, 'net': 0, 'symbol': 0}
+  requested    0/207 boundaries reduced, minimum scale 1.0000, median 1.0000, binding {'gross': 0, 'net': 0, 'symbol': 0}
+
+  risk-unit scalar   median 0.5957  min 0.2822  max 1.1853
+
+------------------------------------------------------------------------------
+  verdict: FAILS 7 measured floor(s)
+  indicative ranking score G: -9.604
+
+  This is your NOMINATED POINT's own vector. It is not your score. Section 7.2
+  scores the per-metric MEDIAN across your declared neighbourhood, which is always
+  below the maximum of a noisy surface and is what the organiser will rank you on.
+------------------------------------------------------------------------------
+
+packet written to tournament/cup20/teams/team-11/research/packets/ablation-scrambled-clock.json
+
+completed in 637.1s

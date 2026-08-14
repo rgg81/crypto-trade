@@ -1,0 +1,1548 @@
+{
+  "accepted_trials": 2,
+  "bootstrap_positive_fraction": 0.996,
+  "candidate_id": "mse-01",
+  "coordinates": [
+    "REBALANCE_PHASE",
+    "RISK_PARITY_BARS",
+    "FLOW_BASE_LOOKBACK",
+    "LOWRISK_BASE_LOOKBACK"
+  ],
+  "declared_roles": [
+    "long",
+    "short"
+  ],
+  "elapsed_seconds": 1492.6023682490013,
+  "folds": [
+    {
+      "end": "2021-08-01 00:00:00+00:00",
+      "name": "F1",
+      "start": "2020-08-17 00:00:00+00:00"
+    },
+    {
+      "end": "2022-08-01 00:00:00+00:00",
+      "name": "F2",
+      "start": "2021-08-01 00:00:00+00:00"
+    },
+    {
+      "end": "2023-08-01 00:00:00+00:00",
+      "name": "F3",
+      "start": "2022-08-01 00:00:00+00:00"
+    },
+    {
+      "end": "2024-08-01 00:00:00+00:00",
+      "name": "F4",
+      "start": "2023-08-01 00:00:00+00:00"
+    }
+  ],
+  "gates": {
+    "annualized_return": {
+      "comparison": ">",
+      "floor": null,
+      "measured": true,
+      "note": "",
+      "observed": 0.16433283070567573,
+      "passed": true
+    },
+    "annualized_turnover": {
+      "comparison": "<=",
+      "floor": 25.0,
+      "measured": true,
+      "note": "",
+      "observed": 17.014568781512153,
+      "passed": true
+    },
+    "annualized_volatility": {
+      "comparison": ">=",
+      "floor": 0.06,
+      "measured": true,
+      "note": "",
+      "observed": 0.1258140672919554,
+      "passed": true
+    },
+    "cost_share_of_positive_gross": {
+      "comparison": "<=",
+      "floor": 0.3,
+      "measured": true,
+      "note": "",
+      "observed": 0.009277481242419826,
+      "passed": true
+    },
+    "declared_roles_match_traded_sides": {
+      "comparison": "",
+      "floor": null,
+      "measured": true,
+      "note": "declared ['long', 'short'], traded ['long', 'short']",
+      "observed": null,
+      "passed": true
+    },
+    "double_cost_annualized_return": {
+      "comparison": ">",
+      "floor": null,
+      "measured": true,
+      "note": "",
+      "observed": 0.15003594523569785,
+      "passed": true
+    },
+    "double_cost_sharpe": {
+      "comparison": ">=",
+      "floor": 0.5,
+      "measured": true,
+      "note": "",
+      "observed": 1.1749504560392128,
+      "passed": true
+    },
+    "gross_edge_bps_per_turnover": {
+      "comparison": ">=",
+      "floor": 40.0,
+      "measured": true,
+      "note": "",
+      "observed": 102.94176980852244,
+      "passed": true
+    },
+    "max_drawdown": {
+      "comparison": "<=",
+      "floor": 0.2,
+      "measured": true,
+      "note": "",
+      "observed": 0.11478583353629501,
+      "passed": true
+    },
+    "max_fold_positive_pnl_share": {
+      "comparison": "<=",
+      "floor": 0.6,
+      "measured": true,
+      "note": "",
+      "observed": 0.32282463386807725,
+      "passed": true
+    },
+    "neighbourhood_positive_fraction": {
+      "comparison": ">=",
+      "floor": 0.7,
+      "measured": true,
+      "note": "",
+      "observed": 1.0,
+      "passed": true
+    },
+    "net_sharpe": {
+      "comparison": ">=",
+      "floor": 0.8,
+      "measured": true,
+      "note": "",
+      "observed": 1.273185740277451,
+      "passed": true
+    },
+    "positive_fold_count": {
+      "comparison": ">=",
+      "floor": 3.0,
+      "measured": true,
+      "note": "",
+      "observed": 4.0,
+      "passed": true
+    },
+    "positive_quarter_fraction": {
+      "comparison": ">=",
+      "floor": 0.5,
+      "measured": true,
+      "note": "",
+      "observed": 0.9411764705882353,
+      "passed": true
+    },
+    "role_long_gross_pnl": {
+      "comparison": ">",
+      "floor": null,
+      "measured": true,
+      "note": "",
+      "observed": 0.6048219877468273,
+      "passed": true
+    },
+    "role_short_gross_pnl": {
+      "comparison": ">",
+      "floor": null,
+      "measured": true,
+      "note": "",
+      "observed": 0.0741098191296773,
+      "passed": true
+    },
+    "sign_inversion_not_profitable": {
+      "comparison": "",
+      "floor": null,
+      "measured": false,
+      "note": "not measured here; run --falsification, which is its own material trial",
+      "observed": null,
+      "passed": true
+    },
+    "top5_day_share": {
+      "comparison": "<=",
+      "floor": 0.35,
+      "measured": true,
+      "note": "",
+      "observed": 0.033008445684708065,
+      "passed": true
+    },
+    "trade_count": {
+      "comparison": ">=",
+      "floor": 500.0,
+      "measured": true,
+      "note": "",
+      "observed": 17124.0,
+      "passed": true
+    },
+    "trial_adjusted_confidence": {
+      "comparison": ">=",
+      "floor": 0.9,
+      "measured": true,
+      "note": "",
+      "observed": 0.992,
+      "passed": true
+    },
+    "triple_cost_sharpe": {
+      "comparison": ">",
+      "floor": null,
+      "measured": true,
+      "note": "",
+      "observed": 1.0766054675610133,
+      "passed": true
+    },
+    "worst_fold_sharpe": {
+      "comparison": ">=",
+      "floor": -0.25,
+      "measured": true,
+      "note": "",
+      "observed": 0.6414752626479845,
+      "passed": true
+    }
+  },
+  "measured_failures": [],
+  "median": {
+    "annualized_return": 0.16433283070567573,
+    "annualized_turnover": 17.014568781512153,
+    "annualized_volatility": 0.1258140672919554,
+    "calmar": 1.218583496193714,
+    "cost_share_of_positive_gross": 0.009277481242419826,
+    "double_cost_annualized_return": 0.15003594523569785,
+    "double_cost_annualized_turnover": 17.017460650054687,
+    "double_cost_max_drawdown": 0.11827310440221461,
+    "double_cost_positive_quarter_fraction": 0.9411764705882353,
+    "double_cost_sharpe": 1.1749504560392128,
+    "gross_edge_bps_per_turnover": 102.94176980852244,
+    "long_gross_pnl": 0.6048219877468273,
+    "max_drawdown": 0.11478583353629501,
+    "max_fold_positive_pnl_share": 0.32282463386807725,
+    "median_fold_sharpe": 1.2397757676800194,
+    "net_sharpe": 1.273185740277451,
+    "positive_fold_count": 4.0,
+    "positive_quarter_count": 16.0,
+    "positive_quarter_fraction": 0.9411764705882353,
+    "short_gross_pnl": 0.0741098191296773,
+    "top5_day_share": 0.033008445684708065,
+    "trade_count": 17124.0,
+    "triple_cost_sharpe": 1.0766054675610133,
+    "worst_fold_sharpe": 0.6414752626479845
+  },
+  "nominee_diagnostic_only": {
+    "annualized_return": 0.16795769483873557,
+    "annualized_turnover": 17.014568781512153,
+    "annualized_volatility": 0.12610113578171928,
+    "calmar": 1.2947310882431127,
+    "cost_share_of_positive_gross": 0.009292790767348734,
+    "double_cost_annualized_return": 0.1531318651725706,
+    "double_cost_annualized_turnover": 17.017460650054687,
+    "double_cost_max_drawdown": 0.11827310440221461,
+    "double_cost_positive_quarter_fraction": 0.9411764705882353,
+    "double_cost_sharpe": 1.1930974484575858,
+    "gross_edge_bps_per_turnover": 102.94176980852244,
+    "long_gross_pnl": 0.6106810773361101,
+    "max_drawdown": 0.11478583353629501,
+    "max_fold_positive_pnl_share": 0.3239214786565743,
+    "median_fold_sharpe": 1.2677197883306528,
+    "net_sharpe": 1.294402921809983,
+    "positive_fold_count": 4.0,
+    "positive_quarter_count": 16.0,
+    "positive_quarter_fraction": 0.9411764705882353,
+    "short_gross_pnl": 0.0827248662494163,
+    "top5_day_share": 0.0330249634674637,
+    "trade_count": 17126.0,
+    "triple_cost_sharpe": 1.0916850048576592,
+    "worst_fold_sharpe": 0.6317757146339299
+  },
+  "points": [
+    {
+      "bootstrap_positive_fraction": 0.996,
+      "bound_constants": {
+        "FLOW_BASE_LOOKBACK": 63.0,
+        "LOWRISK_BASE_LOOKBACK": 189.0,
+        "REBALANCE_PHASE": 3.0,
+        "RISK_PARITY_BARS": 270.0
+      },
+      "coordinates": {
+        "FLOW_BASE_LOOKBACK": 63.0,
+        "LOWRISK_BASE_LOOKBACK": 189.0,
+        "REBALANCE_PHASE": 3.0,
+        "RISK_PARITY_BARS": 270.0
+      },
+      "cost_levels": {
+        "1x": {
+          "annualized_return": 0.16795769483873557,
+          "annualized_turnover": 17.014568781512153,
+          "annualized_volatility": 0.12610113578171928,
+          "calmar": 1.463226686293372,
+          "cost_share_of_positive_gross": 0.009292790767348734,
+          "gross_edge_bps_per_turnover": 102.94176980852244,
+          "long_gross_pnl": 0.6106810773361101,
+          "max_drawdown": 0.11478583353629501,
+          "net_sharpe": 1.294402921809983,
+          "positive_quarter_count": 16,
+          "positive_quarter_fraction": 0.9411764705882353,
+          "short_gross_pnl": 0.0827248662494163,
+          "top5_day_share": 0.0330249634674637,
+          "trade_count": 17126
+        },
+        "2x": {
+          "annualized_return": 0.1531318651725706,
+          "annualized_turnover": 17.017460650054687,
+          "annualized_volatility": 0.12609650201665099,
+          "calmar": 1.2947310882431127,
+          "cost_share_of_positive_gross": 0.018587960474697074,
+          "gross_edge_bps_per_turnover": 102.91950756555335,
+          "long_gross_pnl": 0.6107081849697055,
+          "max_drawdown": 0.11827310440221461,
+          "net_sharpe": 1.1930974484575858,
+          "positive_quarter_count": 16,
+          "positive_quarter_fraction": 0.9411764705882353,
+          "short_gross_pnl": 0.08266563100923266,
+          "top5_day_share": 0.03297107439626957,
+          "trade_count": 17127
+        },
+        "3x": {
+          "annualized_return": 0.1384877011934733,
+          "annualized_turnover": 17.02036066302637,
+          "annualized_volatility": 0.12609938715902902,
+          "calmar": 1.1374848244474645,
+          "cost_share_of_positive_gross": 0.027885522000690662,
+          "gross_edge_bps_per_turnover": 102.8971881981445,
+          "long_gross_pnl": 0.6107352885714212,
+          "max_drawdown": 0.12174905389242796,
+          "net_sharpe": 1.0916850048576592,
+          "positive_quarter_count": 16,
+          "positive_quarter_fraction": 0.9411764705882353,
+          "short_gross_pnl": 0.08260629568246258,
+          "top5_day_share": 0.03291487824796578,
+          "trade_count": 17126
+        }
+      },
+      "entrypoint_sha256": "b1aaf8d42541185151ad51d0266f4def70e06d24a2eb1b11e0dfd408acc1f54a",
+      "exposure_caps": {
+        "executed": {
+          "binding_cap_counts": {
+            "gross": 0,
+            "net": 0,
+            "symbol": 0
+          },
+          "boundaries": 722,
+          "median_scale": 1.0,
+          "minimum_scale": 1.0,
+          "stage": "executed",
+          "trimmed_boundaries": 0,
+          "trimmed_fraction": 0.0
+        },
+        "requested": {
+          "binding_cap_counts": {
+            "gross": 0,
+            "net": 0,
+            "symbol": 2
+          },
+          "boundaries": 722,
+          "median_scale": 0.9922133601683403,
+          "minimum_scale": 0.9919923032720209,
+          "stage": "requested",
+          "trimmed_boundaries": 2,
+          "trimmed_fraction": 0.002770083102493075
+        }
+      },
+      "fold_sharpes": {
+        "F1": 1.335743530014323,
+        "F2": 1.5737005281387038,
+        "F3": 0.6317757146339299,
+        "F4": 1.1996960466469828
+      },
+      "is_nominee": true,
+      "label": "nominee  FLOW_BASE_LOOKBACK=63 LOWRISK_BASE_LOOKBACK=189 REBALANCE_PHASE=3 RISK_PARITY_BARS=270",
+      "observed_roles": [
+        "long",
+        "short"
+      ],
+      "risk_scalars": {
+        "count": 4335.0,
+        "maximum": 1.0,
+        "median": 0.4614919888777676,
+        "minimum": 0.23468240065964077
+      },
+      "scored": {
+        "annualized_return": 0.16795769483873557,
+        "annualized_turnover": 17.014568781512153,
+        "annualized_volatility": 0.12610113578171928,
+        "calmar": 1.2947310882431127,
+        "cost_share_of_positive_gross": 0.009292790767348734,
+        "double_cost_annualized_return": 0.1531318651725706,
+        "double_cost_annualized_turnover": 17.017460650054687,
+        "double_cost_max_drawdown": 0.11827310440221461,
+        "double_cost_positive_quarter_fraction": 0.9411764705882353,
+        "double_cost_sharpe": 1.1930974484575858,
+        "gross_edge_bps_per_turnover": 102.94176980852244,
+        "long_gross_pnl": 0.6106810773361101,
+        "max_drawdown": 0.11478583353629501,
+        "max_fold_positive_pnl_share": 0.3239214786565743,
+        "median_fold_sharpe": 1.2677197883306528,
+        "net_sharpe": 1.294402921809983,
+        "positive_fold_count": 4.0,
+        "positive_quarter_count": 16.0,
+        "positive_quarter_fraction": 0.9411764705882353,
+        "short_gross_pnl": 0.0827248662494163,
+        "top5_day_share": 0.0330249634674637,
+        "trade_count": 17126.0,
+        "triple_cost_sharpe": 1.0916850048576592,
+        "worst_fold_sharpe": 0.6317757146339299
+      },
+      "seconds": 1489.3079398269983
+    },
+    {
+      "bootstrap_positive_fraction": 0.996,
+      "bound_constants": {
+        "FLOW_BASE_LOOKBACK": 63.0,
+        "LOWRISK_BASE_LOOKBACK": 189.0,
+        "REBALANCE_PHASE": 1.0,
+        "RISK_PARITY_BARS": 270.0
+      },
+      "coordinates": {
+        "FLOW_BASE_LOOKBACK": 63.0,
+        "LOWRISK_BASE_LOOKBACK": 189.0,
+        "REBALANCE_PHASE": 1.0,
+        "RISK_PARITY_BARS": 270.0
+      },
+      "cost_levels": {
+        "1x": {
+          "annualized_return": 0.15229167651037256,
+          "annualized_turnover": 17.07451408309699,
+          "annualized_volatility": 0.12659575971371767,
+          "calmar": 1.3178530567508184,
+          "cost_share_of_positive_gross": 0.009272016814361817,
+          "gross_edge_bps_per_turnover": 94.77576628648086,
+          "long_gross_pnl": 0.5675328818998084,
+          "max_drawdown": 0.11556043803992033,
+          "net_sharpe": 1.183179356271204,
+          "positive_quarter_count": 17,
+          "positive_quarter_fraction": 1.0,
+          "short_gross_pnl": 0.07311683747047219,
+          "top5_day_share": 0.03127413633167182,
+          "trade_count": 16847
+        },
+        "2x": {
+          "annualized_return": 0.13761391047273897,
+          "annualized_turnover": 17.07741872599841,
+          "annualized_volatility": 0.12668325461564936,
+          "calmar": 1.1545064969586707,
+          "cost_share_of_positive_gross": 0.01854649703375376,
+          "gross_edge_bps_per_turnover": 94.75536403843913,
+          "long_gross_pnl": 0.567574586170694,
+          "max_drawdown": 0.1191971728485347,
+          "net_sharpe": 1.0812218152833857,
+          "positive_quarter_count": 16,
+          "positive_quarter_fraction": 0.9411764705882353,
+          "short_gross_pnl": 0.07304618253511938,
+          "top5_day_share": 0.03129420546102359,
+          "trade_count": 16867
+        },
+        "3x": {
+          "annualized_return": 0.12311704261631107,
+          "annualized_turnover": 17.080307429884222,
+          "annualized_volatility": 0.12677849884979758,
+          "calmar": 1.0024048141158648,
+          "cost_share_of_positive_gross": 0.02782345055726745,
+          "gross_edge_bps_per_turnover": 94.73520051806307,
+          "long_gross_pnl": 0.5676181311381445,
+          "max_drawdown": 0.12282167930817656,
+          "net_sharpe": 0.9793139548573876,
+          "positive_quarter_count": 15,
+          "positive_quarter_fraction": 0.8823529411764706,
+          "short_gross_pnl": 0.07297465645362328,
+          "top5_day_share": 0.03130353161080265,
+          "trade_count": 16885
+        }
+      },
+      "entrypoint_sha256": "4d7d5b9d35bda2e43f1e7250ff85bc22b1e1765c9d9847823a65cf541b5d56c9",
+      "exposure_caps": {
+        "executed": {
+          "binding_cap_counts": {
+            "gross": 0,
+            "net": 0,
+            "symbol": 0
+          },
+          "boundaries": 723,
+          "median_scale": 1.0,
+          "minimum_scale": 1.0,
+          "stage": "executed",
+          "trimmed_boundaries": 0,
+          "trimmed_fraction": 0.0
+        },
+        "requested": {
+          "binding_cap_counts": {
+            "gross": 0,
+            "net": 0,
+            "symbol": 2
+          },
+          "boundaries": 723,
+          "median_scale": 0.9587780688172082,
+          "minimum_scale": 0.9408520182481095,
+          "stage": "requested",
+          "trimmed_boundaries": 2,
+          "trimmed_fraction": 0.0027662517289073307
+        }
+      },
+      "fold_sharpes": {
+        "F1": 0.7932346817456021,
+        "F2": 1.5016943602200312,
+        "F3": 0.8342153310062006,
+        "F4": 1.3788290940547698
+      },
+      "is_nominee": false,
+      "label": "point-1  FLOW_BASE_LOOKBACK=63 LOWRISK_BASE_LOOKBACK=189 REBALANCE_PHASE=1 RISK_PARITY_BARS=270",
+      "observed_roles": [
+        "long",
+        "short"
+      ],
+      "risk_scalars": {
+        "count": 4335.0,
+        "maximum": 1.0,
+        "median": 0.46298081872898533,
+        "minimum": 0.23315104301571948
+      },
+      "scored": {
+        "annualized_return": 0.15229167651037256,
+        "annualized_turnover": 17.07451408309699,
+        "annualized_volatility": 0.12659575971371767,
+        "calmar": 1.1545064969586707,
+        "cost_share_of_positive_gross": 0.009272016814361817,
+        "double_cost_annualized_return": 0.13761391047273897,
+        "double_cost_annualized_turnover": 17.07741872599841,
+        "double_cost_max_drawdown": 0.1191971728485347,
+        "double_cost_positive_quarter_fraction": 0.9411764705882353,
+        "double_cost_sharpe": 1.0812218152833857,
+        "gross_edge_bps_per_turnover": 94.77576628648086,
+        "long_gross_pnl": 0.5675328818998084,
+        "max_drawdown": 0.11556043803992033,
+        "max_fold_positive_pnl_share": 0.32195282501953243,
+        "median_fold_sharpe": 1.1065222125304852,
+        "net_sharpe": 1.183179356271204,
+        "positive_fold_count": 4.0,
+        "positive_quarter_count": 17.0,
+        "positive_quarter_fraction": 1.0,
+        "short_gross_pnl": 0.07311683747047219,
+        "top5_day_share": 0.03127413633167182,
+        "trade_count": 16847.0,
+        "triple_cost_sharpe": 0.9793139548573876,
+        "worst_fold_sharpe": 0.7932346817456021
+      },
+      "seconds": 1470.6028425950008
+    },
+    {
+      "bootstrap_positive_fraction": 0.997,
+      "bound_constants": {
+        "FLOW_BASE_LOOKBACK": 63.0,
+        "LOWRISK_BASE_LOOKBACK": 189.0,
+        "REBALANCE_PHASE": 5.0,
+        "RISK_PARITY_BARS": 270.0
+      },
+      "coordinates": {
+        "FLOW_BASE_LOOKBACK": 63.0,
+        "LOWRISK_BASE_LOOKBACK": 189.0,
+        "REBALANCE_PHASE": 5.0,
+        "RISK_PARITY_BARS": 270.0
+      },
+      "cost_levels": {
+        "1x": {
+          "annualized_return": 0.16655775748282897,
+          "annualized_turnover": 16.78755463722066,
+          "annualized_volatility": 0.1258140672919554,
+          "calmar": 1.6547984192004563,
+          "cost_share_of_positive_gross": 0.009093854320348285,
+          "gross_edge_bps_per_turnover": 103.62243408561646,
+          "long_gross_pnl": 0.6145681838070759,
+          "max_drawdown": 0.10065138783689687,
+          "net_sharpe": 1.2876363012223313,
+          "positive_quarter_count": 16,
+          "positive_quarter_fraction": 0.9411764705882353,
+          "short_gross_pnl": 0.0741098191296773,
+          "top5_day_share": 0.030570837476634218,
+          "trade_count": 16926
+        },
+        "2x": {
+          "annualized_return": 0.15194377876036214,
+          "annualized_turnover": 16.7901973475464,
+          "annualized_volatility": 0.12580006500883908,
+          "calmar": 1.4550191943536013,
+          "cost_share_of_positive_gross": 0.01818988194193504,
+          "gross_edge_bps_per_turnover": 103.59776556378051,
+          "long_gross_pnl": 0.6146056053541542,
+          "max_drawdown": 0.10442733631968604,
+          "net_sharpe": 1.1875189768422572,
+          "positive_quarter_count": 16,
+          "positive_quarter_fraction": 0.9411764705882353,
+          "short_gross_pnl": 0.0740168362346516,
+          "top5_day_share": 0.03058297566240219,
+          "trade_count": 16926
+        },
+        "3x": {
+          "annualized_return": 0.13750682626472033,
+          "annualized_turnover": 16.792846750658867,
+          "annualized_volatility": 0.12579322353322264,
+          "calmar": 1.2709729376828456,
+          "cost_share_of_positive_gross": 0.027288093443022347,
+          "gross_edge_bps_per_turnover": 103.57303697947717,
+          "long_gross_pnl": 0.6146430463557441,
+          "max_drawdown": 0.10819020782253141,
+          "net_sharpe": 1.0872857874043937,
+          "positive_quarter_count": 13,
+          "positive_quarter_fraction": 0.7647058823529411,
+          "short_gross_pnl": 0.07392365739294324,
+          "top5_day_share": 0.030586907090498248,
+          "trade_count": 16927
+        }
+      },
+      "entrypoint_sha256": "69205513cc336297ee3246d87075c676da20eb00168aba924639d229ebf7be28",
+      "exposure_caps": {
+        "executed": {
+          "binding_cap_counts": {
+            "gross": 0,
+            "net": 0,
+            "symbol": 0
+          },
+          "boundaries": 722,
+          "median_scale": 1.0,
+          "minimum_scale": 1.0,
+          "stage": "executed",
+          "trimmed_boundaries": 0,
+          "trimmed_fraction": 0.0
+        },
+        "requested": {
+          "binding_cap_counts": {
+            "gross": 0,
+            "net": 0,
+            "symbol": 3
+          },
+          "boundaries": 722,
+          "median_scale": 0.9658337313513399,
+          "minimum_scale": 0.964549658273577,
+          "stage": "requested",
+          "trimmed_boundaries": 3,
+          "trimmed_fraction": 0.004155124653739612
+        }
+      },
+      "fold_sharpes": {
+        "F1": 1.2752173063700307,
+        "F2": 1.4375208032787379,
+        "F3": 0.7334573375161406,
+        "F4": 1.3044957490006983
+      },
+      "is_nominee": false,
+      "label": "point-2  FLOW_BASE_LOOKBACK=63 LOWRISK_BASE_LOOKBACK=189 REBALANCE_PHASE=5 RISK_PARITY_BARS=270",
+      "observed_roles": [
+        "long",
+        "short"
+      ],
+      "risk_scalars": {
+        "count": 4335.0,
+        "maximum": 1.0,
+        "median": 0.460346181830353,
+        "minimum": 0.233823485029771
+      },
+      "scored": {
+        "annualized_return": 0.16655775748282897,
+        "annualized_turnover": 16.78755463722066,
+        "annualized_volatility": 0.1258140672919554,
+        "calmar": 1.4550191943536013,
+        "cost_share_of_positive_gross": 0.009093854320348285,
+        "double_cost_annualized_return": 0.15194377876036214,
+        "double_cost_annualized_turnover": 16.7901973475464,
+        "double_cost_max_drawdown": 0.10442733631968604,
+        "double_cost_positive_quarter_fraction": 0.9411764705882353,
+        "double_cost_sharpe": 1.1875189768422572,
+        "gross_edge_bps_per_turnover": 103.62243408561646,
+        "long_gross_pnl": 0.6145681838070759,
+        "max_drawdown": 0.10065138783689687,
+        "max_fold_positive_pnl_share": 0.3283985197461834,
+        "median_fold_sharpe": 1.2898565276853646,
+        "net_sharpe": 1.2876363012223313,
+        "positive_fold_count": 4.0,
+        "positive_quarter_count": 16.0,
+        "positive_quarter_fraction": 0.9411764705882353,
+        "short_gross_pnl": 0.0741098191296773,
+        "top5_day_share": 0.030570837476634218,
+        "trade_count": 16926.0,
+        "triple_cost_sharpe": 1.0872857874043937,
+        "worst_fold_sharpe": 0.7334573375161406
+      },
+      "seconds": 1477.2973694660013
+    },
+    {
+      "bootstrap_positive_fraction": 0.9965,
+      "bound_constants": {
+        "FLOW_BASE_LOOKBACK": 63.0,
+        "LOWRISK_BASE_LOOKBACK": 189.0,
+        "REBALANCE_PHASE": 3.0,
+        "RISK_PARITY_BARS": 180.0
+      },
+      "coordinates": {
+        "FLOW_BASE_LOOKBACK": 63.0,
+        "LOWRISK_BASE_LOOKBACK": 189.0,
+        "REBALANCE_PHASE": 3.0,
+        "RISK_PARITY_BARS": 180.0
+      },
+      "cost_levels": {
+        "1x": {
+          "annualized_return": 0.17435642585278766,
+          "annualized_turnover": 16.744165466785248,
+          "annualized_volatility": 0.12647089702892125,
+          "calmar": 1.5253029548483226,
+          "cost_share_of_positive_gross": 0.009142145011322218,
+          "gross_edge_bps_per_turnover": 107.74280975390931,
+          "long_gross_pnl": 0.605815524219502,
+          "max_drawdown": 0.11430937394999396,
+          "net_sharpe": 1.3341956486426725,
+          "positive_quarter_count": 17,
+          "positive_quarter_fraction": 1.0,
+          "short_gross_pnl": 0.10839589021147375,
+          "top5_day_share": 0.033008445684708065,
+          "trade_count": 17166
+        },
+        "2x": {
+          "annualized_return": 0.15968375233969057,
+          "annualized_turnover": 16.746937472338598,
+          "annualized_volatility": 0.12646477834916806,
+          "calmar": 1.3584594944827046,
+          "cost_share_of_positive_gross": 0.01828654343703819,
+          "gross_edge_bps_per_turnover": 107.71929955627712,
+          "long_gross_pnl": 0.6058524085419049,
+          "max_drawdown": 0.11754767292527735,
+          "net_sharpe": 1.2347980210981466,
+          "positive_quarter_count": 17,
+          "positive_quarter_fraction": 1.0,
+          "short_gross_pnl": 0.1083213724900968,
+          "top5_day_share": 0.032955981229034675,
+          "trade_count": 17166
+        },
+        "3x": {
+          "annualized_return": 0.14518813247317985,
+          "annualized_turnover": 16.749713411666953,
+          "annualized_volatility": 0.12646562721988056,
+          "calmar": 1.2021262357792697,
+          "cost_share_of_positive_gross": 0.0274332011386446,
+          "gross_edge_bps_per_turnover": 107.6957525698354,
+          "long_gross_pnl": 0.6058893516613955,
+          "max_drawdown": 0.12077611165275226,
+          "net_sharpe": 1.1352953175795188,
+          "positive_quarter_count": 16,
+          "positive_quarter_fraction": 0.9411764705882353,
+          "short_gross_pnl": 0.10824666814186129,
+          "top5_day_share": 0.03289940007595784,
+          "trade_count": 17165
+        }
+      },
+      "entrypoint_sha256": "26afac904823fc55034cb3c18a55edba1179f1825f0be342bbc6d6884a6cde32",
+      "exposure_caps": {
+        "executed": {
+          "binding_cap_counts": {
+            "gross": 0,
+            "net": 0,
+            "symbol": 0
+          },
+          "boundaries": 722,
+          "median_scale": 1.0,
+          "minimum_scale": 1.0,
+          "stage": "executed",
+          "trimmed_boundaries": 0,
+          "trimmed_fraction": 0.0
+        },
+        "requested": {
+          "binding_cap_counts": {
+            "gross": 0,
+            "net": 0,
+            "symbol": 2
+          },
+          "boundaries": 722,
+          "median_scale": 0.9972032034572945,
+          "minimum_scale": 0.9954227467720512,
+          "stage": "requested",
+          "trimmed_boundaries": 2,
+          "trimmed_fraction": 0.002770083102493075
+        }
+      },
+      "fold_sharpes": {
+        "F1": 1.349133817026541,
+        "F2": 1.6058741768311993,
+        "F3": 0.6414752626479845,
+        "F4": 1.3107953867278197
+      },
+      "is_nominee": false,
+      "label": "point-3  FLOW_BASE_LOOKBACK=63 LOWRISK_BASE_LOOKBACK=189 REBALANCE_PHASE=3 RISK_PARITY_BARS=180",
+      "observed_roles": [
+        "long",
+        "short"
+      ],
+      "risk_scalars": {
+        "count": 4335.0,
+        "maximum": 1.0,
+        "median": 0.465163805510162,
+        "minimum": 0.2329713867987557
+      },
+      "scored": {
+        "annualized_return": 0.17435642585278766,
+        "annualized_turnover": 16.744165466785248,
+        "annualized_volatility": 0.12647089702892125,
+        "calmar": 1.3584594944827046,
+        "cost_share_of_positive_gross": 0.009142145011322218,
+        "double_cost_annualized_return": 0.15968375233969057,
+        "double_cost_annualized_turnover": 16.746937472338598,
+        "double_cost_max_drawdown": 0.11754767292527735,
+        "double_cost_positive_quarter_fraction": 1.0,
+        "double_cost_sharpe": 1.2347980210981466,
+        "gross_edge_bps_per_turnover": 107.74280975390931,
+        "long_gross_pnl": 0.605815524219502,
+        "max_drawdown": 0.11430937394999396,
+        "max_fold_positive_pnl_share": 0.3237231191504072,
+        "median_fold_sharpe": 1.3299646018771805,
+        "net_sharpe": 1.3341956486426725,
+        "positive_fold_count": 4.0,
+        "positive_quarter_count": 17.0,
+        "positive_quarter_fraction": 1.0,
+        "short_gross_pnl": 0.10839589021147375,
+        "top5_day_share": 0.033008445684708065,
+        "trade_count": 17166.0,
+        "triple_cost_sharpe": 1.1352953175795188,
+        "worst_fold_sharpe": 0.6414752626479845
+      },
+      "seconds": 1485.5394113139992
+    },
+    {
+      "bootstrap_positive_fraction": 0.9975,
+      "bound_constants": {
+        "FLOW_BASE_LOOKBACK": 63.0,
+        "LOWRISK_BASE_LOOKBACK": 189.0,
+        "REBALANCE_PHASE": 3.0,
+        "RISK_PARITY_BARS": 360.0
+      },
+      "coordinates": {
+        "FLOW_BASE_LOOKBACK": 63.0,
+        "LOWRISK_BASE_LOOKBACK": 189.0,
+        "REBALANCE_PHASE": 3.0,
+        "RISK_PARITY_BARS": 360.0
+      },
+      "cost_levels": {
+        "1x": {
+          "annualized_return": 0.1734316945411294,
+          "annualized_turnover": 17.02224490018009,
+          "annualized_volatility": 0.12585248908746796,
+          "calmar": 1.8485694299030904,
+          "cost_share_of_positive_gross": 0.009277481242419826,
+          "gross_edge_bps_per_turnover": 105.61993442513607,
+          "long_gross_pnl": 0.5997368493168787,
+          "max_drawdown": 0.09381941069436672,
+          "net_sharpe": 1.3338823540002187,
+          "positive_quarter_count": 17,
+          "positive_quarter_fraction": 1.0,
+          "short_gross_pnl": 0.11202992430819864,
+          "top5_day_share": 0.032900757840409196,
+          "trade_count": 17126
+        },
+        "2x": {
+          "annualized_return": 0.15853141401660453,
+          "annualized_turnover": 17.02513170813414,
+          "annualized_volatility": 0.12584691350151472,
+          "calmar": 1.6549137067245168,
+          "cost_share_of_positive_gross": 0.01855732083128806,
+          "gross_edge_bps_per_turnover": 105.59836364511239,
+          "long_gross_pnl": 0.5997666147899081,
+          "max_drawdown": 0.09579436883774284,
+          "net_sharpe": 1.232351073215238,
+          "positive_quarter_count": 17,
+          "positive_quarter_fraction": 1.0,
+          "short_gross_pnl": 0.11197547866900762,
+          "top5_day_share": 0.03284754440538983,
+          "trade_count": 17126
+        },
+        "3x": {
+          "annualized_return": 0.1438137934381598,
+          "annualized_turnover": 17.028022542302775,
+          "annualized_volatility": 0.12584889413802272,
+          "calmar": 1.466681253633834,
+          "cost_share_of_positive_gross": 0.027839524878234687,
+          "gross_edge_bps_per_turnover": 105.57676033727583,
+          "long_gross_pnl": 0.5997963761095564,
+          "max_drawdown": 0.09805388395184589,
+          "net_sharpe": 1.1307085453050612,
+          "positive_quarter_count": 16,
+          "positive_quarter_fraction": 0.9411764705882353,
+          "short_gross_pnl": 0.11192093688400293,
+          "top5_day_share": 0.03279138553473401,
+          "trade_count": 17128
+        }
+      },
+      "entrypoint_sha256": "8f113af7832891d6c6cd989e4281caca7059a3e488d8e2bfb994e7b26b616448",
+      "exposure_caps": {
+        "executed": {
+          "binding_cap_counts": {
+            "gross": 0,
+            "net": 0,
+            "symbol": 0
+          },
+          "boundaries": 722,
+          "median_scale": 1.0,
+          "minimum_scale": 1.0,
+          "stage": "executed",
+          "trimmed_boundaries": 0,
+          "trimmed_fraction": 0.0
+        },
+        "requested": {
+          "binding_cap_counts": {
+            "gross": 0,
+            "net": 0,
+            "symbol": 1
+          },
+          "boundaries": 722,
+          "median_scale": 0.9976164957048684,
+          "minimum_scale": 0.9976164957048684,
+          "stage": "requested",
+          "trimmed_boundaries": 1,
+          "trimmed_fraction": 0.0013850415512465374
+        }
+      },
+      "fold_sharpes": {
+        "F1": 1.513686066220646,
+        "F2": 1.5383768349898677,
+        "F3": 0.6123938691885725,
+        "F4": 1.181389327042501
+      },
+      "is_nominee": false,
+      "label": "point-4  FLOW_BASE_LOOKBACK=63 LOWRISK_BASE_LOOKBACK=189 REBALANCE_PHASE=3 RISK_PARITY_BARS=360",
+      "observed_roles": [
+        "long",
+        "short"
+      ],
+      "risk_scalars": {
+        "count": 4335.0,
+        "maximum": 1.0,
+        "median": 0.4584357462975675,
+        "minimum": 0.2262882747152572
+      },
+      "scored": {
+        "annualized_return": 0.1734316945411294,
+        "annualized_turnover": 17.02224490018009,
+        "annualized_volatility": 0.12585248908746796,
+        "calmar": 1.6549137067245168,
+        "cost_share_of_positive_gross": 0.009277481242419826,
+        "double_cost_annualized_return": 0.15853141401660453,
+        "double_cost_annualized_turnover": 17.02513170813414,
+        "double_cost_max_drawdown": 0.09579436883774284,
+        "double_cost_positive_quarter_fraction": 1.0,
+        "double_cost_sharpe": 1.232351073215238,
+        "gross_edge_bps_per_turnover": 105.61993442513607,
+        "long_gross_pnl": 0.5997368493168787,
+        "max_drawdown": 0.09381941069436672,
+        "max_fold_positive_pnl_share": 0.327163691030867,
+        "median_fold_sharpe": 1.3475376966315735,
+        "net_sharpe": 1.3338823540002187,
+        "positive_fold_count": 4.0,
+        "positive_quarter_count": 17.0,
+        "positive_quarter_fraction": 1.0,
+        "short_gross_pnl": 0.11202992430819864,
+        "top5_day_share": 0.032900757840409196,
+        "trade_count": 17126.0,
+        "triple_cost_sharpe": 1.1307085453050612,
+        "worst_fold_sharpe": 0.6123938691885725
+      },
+      "seconds": 1480.607013371
+    },
+    {
+      "bootstrap_positive_fraction": 0.995,
+      "bound_constants": {
+        "FLOW_BASE_LOOKBACK": 48.0,
+        "LOWRISK_BASE_LOOKBACK": 189.0,
+        "REBALANCE_PHASE": 3.0,
+        "RISK_PARITY_BARS": 270.0
+      },
+      "coordinates": {
+        "FLOW_BASE_LOOKBACK": 48.0,
+        "LOWRISK_BASE_LOOKBACK": 189.0,
+        "REBALANCE_PHASE": 3.0,
+        "RISK_PARITY_BARS": 270.0
+      },
+      "cost_levels": {
+        "1x": {
+          "annualized_return": 0.15504779361417098,
+          "annualized_turnover": 17.926561004461476,
+          "annualized_volatility": 0.12576292850087484,
+          "calmar": 1.2663413796210539,
+          "cost_share_of_positive_gross": 0.009830293422588829,
+          "gross_edge_bps_per_turnover": 91.876271692666,
+          "long_gross_pnl": 0.6048219877468273,
+          "max_drawdown": 0.12243759550885736,
+          "net_sharpe": 1.209146515567453,
+          "positive_quarter_count": 16,
+          "positive_quarter_fraction": 0.9411764705882353,
+          "short_gross_pnl": 0.04721964968515158,
+          "top5_day_share": 0.03293391896546814,
+          "trade_count": 17164
+        },
+        "2x": {
+          "annualized_return": 0.13960596458007402,
+          "annualized_turnover": 17.929516761787866,
+          "annualized_volatility": 0.12575928781509227,
+          "calmar": 1.107446332913311,
+          "cost_share_of_positive_gross": 0.019662964051279447,
+          "gross_edge_bps_per_turnover": 91.8567238611143,
+          "long_gross_pnl": 0.6048506135578003,
+          "max_drawdown": 0.12606115567949794,
+          "net_sharpe": 1.10211914407541,
+          "positive_quarter_count": 14,
+          "positive_quarter_fraction": 0.8235294117647058,
+          "short_gross_pnl": 0.047159780515586114,
+          "top5_day_share": 0.03287713331627494,
+          "trade_count": 17165
+        },
+        "3x": {
+          "annualized_return": 0.12436391216163245,
+          "annualized_turnover": 17.93247670308018,
+          "annualized_volatility": 0.12576365253822538,
+          "calmar": 0.9590639380547341,
+          "cost_share_of_positive_gross": 0.029498018215070566,
+          "gross_edge_bps_per_turnover": 91.83714786234216,
+          "long_gross_pnl": 0.6048792287853134,
+          "max_drawdown": 0.12967218057836616,
+          "net_sharpe": 0.9949870517877131,
+          "positive_quarter_count": 14,
+          "positive_quarter_fraction": 0.8235294117647058,
+          "short_gross_pnl": 0.04709982833239529,
+          "top5_day_share": 0.03281727936137706,
+          "trade_count": 17166
+        }
+      },
+      "entrypoint_sha256": "7beb6900db74830b82e27f5c64fa5a5ad709ea0d2f2dbaf7a8de71d86ec6b9a1",
+      "exposure_caps": {
+        "executed": {
+          "binding_cap_counts": {
+            "gross": 0,
+            "net": 0,
+            "symbol": 0
+          },
+          "boundaries": 722,
+          "median_scale": 1.0,
+          "minimum_scale": 1.0,
+          "stage": "executed",
+          "trimmed_boundaries": 0,
+          "trimmed_fraction": 0.0
+        },
+        "requested": {
+          "binding_cap_counts": {
+            "gross": 0,
+            "net": 0,
+            "symbol": 0
+          },
+          "boundaries": 722,
+          "median_scale": 1.0,
+          "minimum_scale": 1.0,
+          "stage": "requested",
+          "trimmed_boundaries": 0,
+          "trimmed_fraction": 0.0
+        }
+      },
+      "fold_sharpes": {
+        "F1": 1.223422318147839,
+        "F2": 1.6089030836855795,
+        "F3": 0.50357962034125,
+        "F4": 1.0397281866399066
+      },
+      "is_nominee": false,
+      "label": "point-5  FLOW_BASE_LOOKBACK=48 LOWRISK_BASE_LOOKBACK=189 REBALANCE_PHASE=3 RISK_PARITY_BARS=270",
+      "observed_roles": [
+        "long",
+        "short"
+      ],
+      "risk_scalars": {
+        "count": 4335.0,
+        "maximum": 1.0,
+        "median": 0.46124009805031085,
+        "minimum": 0.23504367488464797
+      },
+      "scored": {
+        "annualized_return": 0.15504779361417098,
+        "annualized_turnover": 17.926561004461476,
+        "annualized_volatility": 0.12576292850087484,
+        "calmar": 1.107446332913311,
+        "cost_share_of_positive_gross": 0.009830293422588829,
+        "double_cost_annualized_return": 0.13960596458007402,
+        "double_cost_annualized_turnover": 17.929516761787866,
+        "double_cost_max_drawdown": 0.12606115567949794,
+        "double_cost_positive_quarter_fraction": 0.8235294117647058,
+        "double_cost_sharpe": 1.10211914407541,
+        "gross_edge_bps_per_turnover": 91.876271692666,
+        "long_gross_pnl": 0.6048219877468273,
+        "max_drawdown": 0.12243759550885736,
+        "max_fold_positive_pnl_share": 0.3217421204545046,
+        "median_fold_sharpe": 1.1315752523938727,
+        "net_sharpe": 1.209146515567453,
+        "positive_fold_count": 4.0,
+        "positive_quarter_count": 16.0,
+        "positive_quarter_fraction": 0.9411764705882353,
+        "short_gross_pnl": 0.04721964968515158,
+        "top5_day_share": 0.03293391896546814,
+        "trade_count": 17164.0,
+        "triple_cost_sharpe": 0.9949870517877131,
+        "worst_fold_sharpe": 0.50357962034125
+      },
+      "seconds": 1473.352514622
+    },
+    {
+      "bootstrap_positive_fraction": 0.996,
+      "bound_constants": {
+        "FLOW_BASE_LOOKBACK": 80.0,
+        "LOWRISK_BASE_LOOKBACK": 189.0,
+        "REBALANCE_PHASE": 3.0,
+        "RISK_PARITY_BARS": 270.0
+      },
+      "coordinates": {
+        "FLOW_BASE_LOOKBACK": 80.0,
+        "LOWRISK_BASE_LOOKBACK": 189.0,
+        "REBALANCE_PHASE": 3.0,
+        "RISK_PARITY_BARS": 270.0
+      },
+      "cost_levels": {
+        "1x": {
+          "annualized_return": 0.16433283070567573,
+          "annualized_turnover": 16.454319337168844,
+          "annualized_volatility": 0.12572375119161544,
+          "calmar": 1.3170219220181096,
+          "cost_share_of_positive_gross": 0.009012655867756736,
+          "gross_edge_bps_per_turnover": 104.30121596220279,
+          "long_gross_pnl": 0.5980055516167824,
+          "max_drawdown": 0.12477607848308547,
+          "net_sharpe": 1.273185740277451,
+          "positive_quarter_count": 16,
+          "positive_quarter_fraction": 0.9411764705882353,
+          "short_gross_pnl": 0.08142375488658873,
+          "top5_day_share": 0.03324640592605817,
+          "trade_count": 17106
+        },
+        "2x": {
+          "annualized_return": 0.15003594523569785,
+          "annualized_turnover": 16.457169233297666,
+          "annualized_volatility": 0.12571527095338314,
+          "calmar": 1.1707874184180576,
+          "cost_share_of_positive_gross": 0.018027689668441406,
+          "gross_edge_bps_per_turnover": 104.27799393642495,
+          "long_gross_pnl": 0.5980368756820323,
+          "max_drawdown": 0.1281496050225951,
+          "net_sharpe": 1.1749504560392128,
+          "positive_quarter_count": 15,
+          "positive_quarter_fraction": 0.8823529411764706,
+          "short_gross_pnl": 0.08135881134184988,
+          "top5_day_share": 0.03323780230404847,
+          "trade_count": 17107
+        },
+        "3x": {
+          "annualized_return": 0.13590823967972376,
+          "annualized_turnover": 16.460027105768415,
+          "annualized_volatility": 0.12571408181436827,
+          "calmar": 1.0334250593132088,
+          "cost_share_of_positive_gross": 0.027045113832239828,
+          "gross_edge_bps_per_turnover": 104.25471464502267,
+          "long_gross_pnl": 0.5980681812972101,
+          "max_drawdown": 0.13151242894191606,
+          "net_sharpe": 1.0766054675610133,
+          "positive_quarter_count": 15,
+          "positive_quarter_fraction": 0.8823529411764706,
+          "short_gross_pnl": 0.0812937898942881,
+          "top5_day_share": 0.033226159666004,
+          "trade_count": 17107
+        }
+      },
+      "entrypoint_sha256": "190266c590983a8e046a9e84d3ad577749aacab2fc27a0b1544ee8c289830d6f",
+      "exposure_caps": {
+        "executed": {
+          "binding_cap_counts": {
+            "gross": 0,
+            "net": 0,
+            "symbol": 0
+          },
+          "boundaries": 722,
+          "median_scale": 1.0,
+          "minimum_scale": 1.0,
+          "stage": "executed",
+          "trimmed_boundaries": 0,
+          "trimmed_fraction": 0.0
+        },
+        "requested": {
+          "binding_cap_counts": {
+            "gross": 0,
+            "net": 0,
+            "symbol": 0
+          },
+          "boundaries": 722,
+          "median_scale": 1.0,
+          "minimum_scale": 1.0,
+          "stage": "requested",
+          "trimmed_boundaries": 0,
+          "trimmed_fraction": 0.0
+        }
+      },
+      "fold_sharpes": {
+        "F1": 1.248845175680685,
+        "F2": 1.572242783088233,
+        "F3": 0.6783899150197491,
+        "F4": 1.1971860684038407
+      },
+      "is_nominee": false,
+      "label": "point-6  FLOW_BASE_LOOKBACK=80 LOWRISK_BASE_LOOKBACK=189 REBALANCE_PHASE=3 RISK_PARITY_BARS=270",
+      "observed_roles": [
+        "long",
+        "short"
+      ],
+      "risk_scalars": {
+        "count": 4335.0,
+        "maximum": 1.0,
+        "median": 0.460367281592909,
+        "minimum": 0.23432262107365115
+      },
+      "scored": {
+        "annualized_return": 0.16433283070567573,
+        "annualized_turnover": 16.454319337168844,
+        "annualized_volatility": 0.12572375119161544,
+        "calmar": 1.1707874184180576,
+        "cost_share_of_positive_gross": 0.009012655867756736,
+        "double_cost_annualized_return": 0.15003594523569785,
+        "double_cost_annualized_turnover": 16.457169233297666,
+        "double_cost_max_drawdown": 0.1281496050225951,
+        "double_cost_positive_quarter_fraction": 0.8823529411764706,
+        "double_cost_sharpe": 1.1749504560392128,
+        "gross_edge_bps_per_turnover": 104.30121596220279,
+        "long_gross_pnl": 0.5980055516167824,
+        "max_drawdown": 0.12477607848308547,
+        "max_fold_positive_pnl_share": 0.32258450958715185,
+        "median_fold_sharpe": 1.2230156220422628,
+        "net_sharpe": 1.273185740277451,
+        "positive_fold_count": 4.0,
+        "positive_quarter_count": 16.0,
+        "positive_quarter_fraction": 0.9411764705882353,
+        "short_gross_pnl": 0.08142375488658873,
+        "top5_day_share": 0.03324640592605817,
+        "trade_count": 17106.0,
+        "triple_cost_sharpe": 1.0766054675610133,
+        "worst_fold_sharpe": 0.6783899150197491
+      },
+      "seconds": 1465.467468584
+    },
+    {
+      "bootstrap_positive_fraction": 0.9955,
+      "bound_constants": {
+        "FLOW_BASE_LOOKBACK": 63.0,
+        "LOWRISK_BASE_LOOKBACK": 150.0,
+        "REBALANCE_PHASE": 3.0,
+        "RISK_PARITY_BARS": 270.0
+      },
+      "coordinates": {
+        "FLOW_BASE_LOOKBACK": 63.0,
+        "LOWRISK_BASE_LOOKBACK": 150.0,
+        "REBALANCE_PHASE": 3.0,
+        "RISK_PARITY_BARS": 270.0
+      },
+      "cost_levels": {
+        "1x": {
+          "annualized_return": 0.15750223960486154,
+          "annualized_turnover": 17.211029006402214,
+          "annualized_volatility": 0.12556834390889582,
+          "calmar": 1.3816387933332281,
+          "cost_share_of_positive_gross": 0.00944696374178424,
+          "gross_edge_bps_per_turnover": 96.60412679847289,
+          "long_gross_pnl": 0.6026645021479055,
+          "max_drawdown": 0.11399668304397026,
+          "net_sharpe": 1.2277345071982264,
+          "positive_quarter_count": 17,
+          "positive_quarter_fraction": 1.0,
+          "short_gross_pnl": 0.05556523460123003,
+          "top5_day_share": 0.03303555042442202,
+          "trade_count": 17068
+        },
+        "2x": {
+          "annualized_return": 0.14263844473366416,
+          "annualized_turnover": 17.213894859863395,
+          "annualized_volatility": 0.12556982902717115,
+          "calmar": 1.2130870610886824,
+          "cost_share_of_positive_gross": 0.018896238819861633,
+          "gross_edge_bps_per_turnover": 96.5822312763234,
+          "long_gross_pnl": 0.6026952283686305,
+          "max_drawdown": 0.11758302376554375,
+          "net_sharpe": 1.1247603251961016,
+          "positive_quarter_count": 15,
+          "positive_quarter_fraction": 0.8823529411764706,
+          "short_gross_pnl": 0.05549489798308749,
+          "top5_day_share": 0.033015444650529045,
+          "trade_count": 17067
+        },
+        "3x": {
+          "annualized_return": 0.12795907489359903,
+          "annualized_turnover": 17.216766073776736,
+          "annualized_volatility": 0.12557892584359412,
+          "calmar": 1.0561402069436545,
+          "cost_share_of_positive_gross": 0.028347833347203533,
+          "gross_edge_bps_per_turnover": 96.56029458730174,
+          "long_gross_pnl": 0.6027259553952476,
+          "max_drawdown": 0.12115728011520133,
+          "net_sharpe": 1.0216924032391947,
+          "positive_quarter_count": 14,
+          "positive_quarter_fraction": 0.8235294117647058,
+          "short_gross_pnl": 0.055424435199537575,
+          "top5_day_share": 0.03299225240733357,
+          "trade_count": 17067
+        }
+      },
+      "entrypoint_sha256": "1aff0fa2dc0f133949efab825749177737cf5972a2616c7aac42de4b82a9c9aa",
+      "exposure_caps": {
+        "executed": {
+          "binding_cap_counts": {
+            "gross": 0,
+            "net": 0,
+            "symbol": 0
+          },
+          "boundaries": 722,
+          "median_scale": 1.0,
+          "minimum_scale": 1.0,
+          "stage": "executed",
+          "trimmed_boundaries": 0,
+          "trimmed_fraction": 0.0
+        },
+        "requested": {
+          "binding_cap_counts": {
+            "gross": 0,
+            "net": 0,
+            "symbol": 2
+          },
+          "boundaries": 722,
+          "median_scale": 0.9589275912621085,
+          "minimum_scale": 0.9481582568146362,
+          "stage": "requested",
+          "trimmed_boundaries": 2,
+          "trimmed_fraction": 0.002770083102493075
+        }
+      },
+      "fold_sharpes": {
+        "F1": 1.3525795027483594,
+        "F2": 1.4221006634369808,
+        "F3": 0.6243284107729045,
+        "F4": 1.0445194244296967
+      },
+      "is_nominee": false,
+      "label": "point-7  FLOW_BASE_LOOKBACK=63 LOWRISK_BASE_LOOKBACK=150 REBALANCE_PHASE=3 RISK_PARITY_BARS=270",
+      "observed_roles": [
+        "long",
+        "short"
+      ],
+      "risk_scalars": {
+        "count": 4335.0,
+        "maximum": 1.0,
+        "median": 0.4621900813131755,
+        "minimum": 0.233824946763192
+      },
+      "scored": {
+        "annualized_return": 0.15750223960486154,
+        "annualized_turnover": 17.211029006402214,
+        "annualized_volatility": 0.12556834390889582,
+        "calmar": 1.2130870610886824,
+        "cost_share_of_positive_gross": 0.00944696374178424,
+        "double_cost_annualized_return": 0.14263844473366416,
+        "double_cost_annualized_turnover": 17.213894859863395,
+        "double_cost_max_drawdown": 0.11758302376554375,
+        "double_cost_positive_quarter_fraction": 0.8823529411764706,
+        "double_cost_sharpe": 1.1247603251961016,
+        "gross_edge_bps_per_turnover": 96.60412679847289,
+        "long_gross_pnl": 0.6026645021479055,
+        "max_drawdown": 0.11399668304397026,
+        "max_fold_positive_pnl_share": 0.32282463386807725,
+        "median_fold_sharpe": 1.198549463589028,
+        "net_sharpe": 1.2277345071982264,
+        "positive_fold_count": 4.0,
+        "positive_quarter_count": 17.0,
+        "positive_quarter_fraction": 1.0,
+        "short_gross_pnl": 0.05556523460123003,
+        "top5_day_share": 0.03303555042442202,
+        "trade_count": 17068.0,
+        "triple_cost_sharpe": 1.0216924032391947,
+        "worst_fold_sharpe": 0.6243284107729045
+      },
+      "seconds": 1466.1050720109997
+    },
+    {
+      "bootstrap_positive_fraction": 0.996,
+      "bound_constants": {
+        "FLOW_BASE_LOOKBACK": 63.0,
+        "LOWRISK_BASE_LOOKBACK": 231.0,
+        "REBALANCE_PHASE": 3.0,
+        "RISK_PARITY_BARS": 270.0
+      },
+      "coordinates": {
+        "FLOW_BASE_LOOKBACK": 63.0,
+        "LOWRISK_BASE_LOOKBACK": 231.0,
+        "REBALANCE_PHASE": 3.0,
+        "RISK_PARITY_BARS": 270.0
+      },
+      "cost_levels": {
+        "1x": {
+          "annualized_return": 0.16157556405162476,
+          "annualized_turnover": 16.861880149656205,
+          "annualized_volatility": 0.1246175245950464,
+          "calmar": 1.3774978301434684,
+          "cost_share_of_positive_gross": 0.009302941027201582,
+          "gross_edge_bps_per_turnover": 100.50352692823652,
+          "long_gross_pnl": 0.6145830527877165,
+          "max_drawdown": 0.11729642001308738,
+          "net_sharpe": 1.2643388568578813,
+          "positive_quarter_count": 16,
+          "positive_quarter_fraction": 0.9411764705882353,
+          "short_gross_pnl": 0.05632388559858792,
+          "top5_day_share": 0.03329919038696586,
+          "trade_count": 17124
+        },
+        "2x": {
+          "annualized_return": 0.14696041888946043,
+          "annualized_turnover": 16.864758048002887,
+          "annualized_volatility": 0.12462132918941458,
+          "calmar": 1.218583496193714,
+          "cost_share_of_positive_gross": 0.018608260330751247,
+          "gross_edge_bps_per_turnover": 100.48080325470983,
+          "long_gross_pnl": 0.6146150077467866,
+          "max_drawdown": 0.12059938391459935,
+          "net_sharpe": 1.1626646660991482,
+          "positive_quarter_count": 16,
+          "positive_quarter_fraction": 0.9411764705882353,
+          "short_gross_pnl": 0.05625472077231253,
+          "top5_day_share": 0.03327910561665103,
+          "trade_count": 17126
+        },
+        "3x": {
+          "annualized_return": 0.13252272118487762,
+          "annualized_turnover": 16.867643032235858,
+          "annualized_volatility": 0.12463262182876811,
+          "calmar": 1.069660224832791,
+          "cost_share_of_positive_gross": 0.02791596888851347,
+          "gross_edge_bps_per_turnover": 100.4580299209617,
+          "long_gross_pnl": 0.6146469584380145,
+          "max_drawdown": 0.12389235208366611,
+          "net_sharpe": 1.060898307627196,
+          "positive_quarter_count": 15,
+          "positive_quarter_fraction": 0.8823529411764706,
+          "short_gross_pnl": 0.056185458624755824,
+          "top5_day_share": 0.03325641423531107,
+          "trade_count": 17125
+        }
+      },
+      "entrypoint_sha256": "2124798ef83b6e9e3b661d5b2b44c0e294ccb145fca47fd24bf06a1744106491",
+      "exposure_caps": {
+        "executed": {
+          "binding_cap_counts": {
+            "gross": 0,
+            "net": 0,
+            "symbol": 0
+          },
+          "boundaries": 722,
+          "median_scale": 1.0,
+          "minimum_scale": 1.0,
+          "stage": "executed",
+          "trimmed_boundaries": 0,
+          "trimmed_fraction": 0.0
+        },
+        "requested": {
+          "binding_cap_counts": {
+            "gross": 0,
+            "net": 0,
+            "symbol": 1
+          },
+          "boundaries": 722,
+          "median_scale": 0.9924131584234354,
+          "minimum_scale": 0.9924131584234354,
+          "stage": "requested",
+          "trimmed_boundaries": 1,
+          "trimmed_fraction": 0.0013850415512465374
+        }
+      },
+      "fold_sharpes": {
+        "F1": 1.2367035637265047,
+        "F2": 1.5055576421462613,
+        "F3": 0.6529064809027704,
+        "F4": 1.242847971633534
+      },
+      "is_nominee": false,
+      "label": "point-8  FLOW_BASE_LOOKBACK=63 LOWRISK_BASE_LOOKBACK=231 REBALANCE_PHASE=3 RISK_PARITY_BARS=270",
+      "observed_roles": [
+        "long",
+        "short"
+      ],
+      "risk_scalars": {
+        "count": 4335.0,
+        "maximum": 1.0,
+        "median": 0.4617446007342997,
+        "minimum": 0.24129244760705368
+      },
+      "scored": {
+        "annualized_return": 0.16157556405162476,
+        "annualized_turnover": 16.861880149656205,
+        "annualized_volatility": 0.1246175245950464,
+        "calmar": 1.218583496193714,
+        "cost_share_of_positive_gross": 0.009302941027201582,
+        "double_cost_annualized_return": 0.14696041888946043,
+        "double_cost_annualized_turnover": 16.864758048002887,
+        "double_cost_max_drawdown": 0.12059938391459935,
+        "double_cost_positive_quarter_fraction": 0.9411764705882353,
+        "double_cost_sharpe": 1.1626646660991482,
+        "gross_edge_bps_per_turnover": 100.50352692823652,
+        "long_gross_pnl": 0.6145830527877165,
+        "max_drawdown": 0.11729642001308738,
+        "max_fold_positive_pnl_share": 0.3206360075552439,
+        "median_fold_sharpe": 1.2397757676800194,
+        "net_sharpe": 1.2643388568578813,
+        "positive_fold_count": 4.0,
+        "positive_quarter_count": 16.0,
+        "positive_quarter_fraction": 0.9411764705882353,
+        "short_gross_pnl": 0.05632388559858792,
+        "top5_day_share": 0.03329919038696586,
+        "trade_count": 17124.0,
+        "triple_cost_sharpe": 1.060898307627196,
+        "worst_fold_sharpe": 0.6529064809027704
+      },
+      "seconds": 1478.2927857140003
+    }
+  ],
+  "positive_point_fraction": 1.0,
+  "positive_point_fraction_floor": 0.7,
+  "ranking_score": 84.26701225441472,
+  "score_is_the_neighbourhood_median": true,
+  "seed": 20200817,
+  "snapshot_sha256": "ceeedfcd7117a16a58d2bb9bbf9716356c9473098fe8512703d1656834746d48",
+  "source_sha256": "383c550d50f09b5f3be1e36e6c5aefc6512a8c33947a9547d3306cea2471e189",
+  "team_id": "team-12",
+  "trial_adjusted_confidence": 0.992,
+  "trial_budget": 12,
+  "trial_sequence": 129,
+  "unmeasured_gates": [
+    "sign_inversion_not_profitable"
+  ],
+  "verdict": "NO MEASURED FAILURE -- 1 gate(s) cannot be decided by a neighbourhood sweep",
+  "window": {
+    "end": "2024-08-01 00:00:00+00:00",
+    "start": "2020-08-17 00:00:00+00:00"
+  },
+  "workers": 9,
+  "workspace": {
+    "files_scanned": 108,
+    "root": "/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind-top20-low-dd/tournament/cup20/teams/team-12",
+    "unscanned": [],
+    "violations": []
+  }
+}

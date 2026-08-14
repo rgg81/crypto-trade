@@ -1,0 +1,77 @@
+== raw IC by cell, quantity and window ==
+quote volume  asia only (00-08 UTC)            W=63 IC=-0.0177 t= -4.63 | H1 -0.0121 (t=-2.24) | H2 -0.0231 (t=-4.29)  STABLE
+quote volume  asia only (00-08 UTC)            W=126 IC=-0.0202 t= -5.21 | H1 -0.0108 (t=-1.96) | H2 -0.0291 (t=-5.35)  STABLE
+quote volume  asia only (00-08 UTC)            W=252 IC=-0.0206 t= -5.04 | H1 -0.0114 (t=-1.94) | H2 -0.0287 (t=-5.05)  STABLE
+quote volume  asia only (00-08 UTC)            W=378 IC=-0.0236 t= -5.46 | H1 -0.0124 (t=-1.94) | H2 -0.0329 (t=-5.59)  STABLE
+quote volume  weekend only (Sat/Sun)           W=63 IC=-0.0157 t= -3.82 | H1 -0.0063 (t=-1.09) | H2 -0.0249 (t=-4.23)  STABLE
+quote volume  weekend only (Sat/Sun)           W=126 IC=-0.0207 t= -4.89 | H1 -0.0106 (t=-1.81) | H2 -0.0303 (t=-4.95)  STABLE
+quote volume  weekend only (Sat/Sun)           W=252 IC=-0.0235 t= -5.25 | H1 -0.0133 (t=-2.09) | H2 -0.0326 (t=-5.16)  STABLE
+quote volume  weekend only (Sat/Sun)           W=378 IC=-0.0250 t= -5.28 | H1 -0.0057 (t=-0.84) | H2 -0.0409 (t=-6.27)  STABLE
+quote volume  DESK-CLOSED (weekend OR 00-08)   W=63 IC=-0.0194 t= -4.79 | H1 -0.0114 (t=-2.03) | H2 -0.0272 (t=-4.67)  STABLE
+quote volume  DESK-CLOSED (weekend OR 00-08)   W=126 IC=-0.0227 t= -5.49 | H1 -0.0134 (t=-2.36) | H2 -0.0315 (t=-5.26)  STABLE
+quote volume  DESK-CLOSED (weekend OR 00-08)   W=252 IC=-0.0240 t= -5.57 | H1 -0.0109 (t=-1.80) | H2 -0.0356 (t=-5.84)  STABLE
+quote volume  DESK-CLOSED (weekend OR 00-08)   W=378 IC=-0.0249 t= -5.43 | H1 -0.0069 (t=-1.03) | H2 -0.0397 (t=-6.36)  STABLE
+quote volume  weekday 00-08 only               W=63 IC=-0.0110 t= -2.97 | H1 -0.0086 (t=-1.62) | H2 -0.0134 (t=-2.58)  STABLE
+quote volume  weekday 00-08 only               W=126 IC=-0.0141 t= -3.73 | H1 -0.0078 (t=-1.42) | H2 -0.0200 (t=-3.86)  STABLE
+quote volume  weekday 00-08 only               W=252 IC=-0.0130 t= -3.27 | H1 -0.0025 (t=-0.43) | H2 -0.0223 (t=-4.12)  STABLE
+quote volume  weekday 00-08 only               W=378 IC=-0.0141 t= -3.30 | H1 -0.0066 (t=-1.02) | H2 -0.0202 (t=-3.59)  STABLE
+
+abs return    asia only (00-08 UTC)            W=63 IC=-0.0099 t= -2.54 | H1 -0.0017 (t=-0.31) | H2 -0.0179 (t=-3.26)  STABLE
+abs return    asia only (00-08 UTC)            W=126 IC=-0.0144 t= -3.71 | H1 -0.0090 (t=-1.64) | H2 -0.0194 (t=-3.57)  STABLE
+abs return    asia only (00-08 UTC)            W=252 IC=-0.0152 t= -3.85 | H1 -0.0074 (t=-1.31) | H2 -0.0221 (t=-4.01)  STABLE
+abs return    asia only (00-08 UTC)            W=378 IC=-0.0171 t= -4.25 | H1 -0.0102 (t=-1.77) | H2 -0.0228 (t=-4.07)  STABLE
+abs return    weekend only (Sat/Sun)           W=63 IC=-0.0170 t= -4.24 | H1 -0.0088 (t=-1.57) | H2 -0.0249 (t=-4.36)  STABLE
+abs return    weekend only (Sat/Sun)           W=126 IC=-0.0246 t= -6.01 | H1 -0.0146 (t=-2.57) | H2 -0.0340 (t=-5.79)  STABLE
+abs return    weekend only (Sat/Sun)           W=252 IC=-0.0238 t= -5.66 | H1 -0.0121 (t=-2.13) | H2 -0.0341 (t=-5.58)  STABLE
+abs return    weekend only (Sat/Sun)           W=378 IC=-0.0237 t= -5.53 | H1 -0.0108 (t=-1.84) | H2 -0.0344 (t=-5.60)  STABLE
+abs return    DESK-CLOSED (weekend OR 00-08)   W=63 IC=-0.0175 t= -4.36 | H1 -0.0091 (t=-1.61) | H2 -0.0257 (t=-4.51)  STABLE
+abs return    DESK-CLOSED (weekend OR 00-08)   W=126 IC=-0.0196 t= -4.82 | H1 -0.0118 (t=-2.07) | H2 -0.0269 (t=-4.65)  STABLE
+abs return    DESK-CLOSED (weekend OR 00-08)   W=252 IC=-0.0213 t= -5.18 | H1 -0.0093 (t=-1.64) | H2 -0.0319 (t=-5.41)  STABLE
+abs return    DESK-CLOSED (weekend OR 00-08)   W=378 IC=-0.0207 t= -4.88 | H1 -0.0079 (t=-1.36) | H2 -0.0312 (t=-5.17)  STABLE
+abs return    weekday 00-08 only               W=63 IC=-0.0016 t= -0.41 | H1 +0.0054 (t=+1.00) | H2 -0.0084 (t=-1.59)  FLIPS
+abs return    weekday 00-08 only               W=126 IC=-0.0013 t= -0.34 | H1 +0.0015 (t=+0.27) | H2 -0.0038 (t=-0.74)  FLIPS
+abs return    weekday 00-08 only               W=252 IC=-0.0048 t= -1.28 | H1 +0.0012 (t=+0.21) | H2 -0.0102 (t=-1.99)  FLIPS
+abs return    weekday 00-08 only               W=378 IC=-0.0053 t= -1.38 | H1 -0.0016 (t=-0.28) | H2 -0.0084 (t=-1.60)  STABLE
+
+trade count   asia only (00-08 UTC)            W=63 IC=-0.0194 t= -4.99 | H1 -0.0121 (t=-2.19) | H2 -0.0265 (t=-4.85)  STABLE
+trade count   asia only (00-08 UTC)            W=126 IC=-0.0207 t= -5.28 | H1 -0.0103 (t=-1.84) | H2 -0.0306 (t=-5.55)  STABLE
+trade count   asia only (00-08 UTC)            W=252 IC=-0.0220 t= -5.25 | H1 -0.0118 (t=-1.99) | H2 -0.0309 (t=-5.28)  STABLE
+trade count   asia only (00-08 UTC)            W=378 IC=-0.0245 t= -5.54 | H1 -0.0137 (t=-2.12) | H2 -0.0335 (t=-5.52)  STABLE
+trade count   weekend only (Sat/Sun)           W=63 IC=-0.0128 t= -3.18 | H1 -0.0018 (t=-0.33) | H2 -0.0235 (t=-4.02)  STABLE
+trade count   weekend only (Sat/Sun)           W=126 IC=-0.0159 t= -3.79 | H1 -0.0023 (t=-0.40) | H2 -0.0287 (t=-4.72)  STABLE
+trade count   weekend only (Sat/Sun)           W=252 IC=-0.0201 t= -4.58 | H1 -0.0070 (t=-1.14) | H2 -0.0318 (t=-5.08)  STABLE
+trade count   weekend only (Sat/Sun)           W=378 IC=-0.0225 t= -4.84 | H1 -0.0017 (t=-0.26) | H2 -0.0396 (t=-6.18)  STABLE
+trade count   DESK-CLOSED (weekend OR 00-08)   W=63 IC=-0.0179 t= -4.43 | H1 -0.0083 (t=-1.50) | H2 -0.0272 (t=-4.64)  STABLE
+trade count   DESK-CLOSED (weekend OR 00-08)   W=126 IC=-0.0207 t= -4.99 | H1 -0.0088 (t=-1.54) | H2 -0.0320 (t=-5.32)  STABLE
+trade count   DESK-CLOSED (weekend OR 00-08)   W=252 IC=-0.0247 t= -5.67 | H1 -0.0123 (t=-2.00) | H2 -0.0356 (t=-5.79)  STABLE
+trade count   DESK-CLOSED (weekend OR 00-08)   W=378 IC=-0.0278 t= -6.07 | H1 -0.0111 (t=-1.64) | H2 -0.0417 (t=-6.67)  STABLE
+trade count   weekday 00-08 only               W=63 IC=-0.0136 t= -3.63 | H1 -0.0127 (t=-2.36) | H2 -0.0145 (t=-2.78)  STABLE
+trade count   weekday 00-08 only               W=126 IC=-0.0173 t= -4.49 | H1 -0.0130 (t=-2.30) | H2 -0.0213 (t=-4.06)  STABLE
+trade count   weekday 00-08 only               W=252 IC=-0.0175 t= -4.33 | H1 -0.0101 (t=-1.70) | H2 -0.0241 (t=-4.35)  STABLE
+trade count   weekday 00-08 only               W=378 IC=-0.0172 t= -3.96 | H1 -0.0124 (t=-1.89) | H2 -0.0211 (t=-3.65)  STABLE
+
+== DESK-CLOSED share, neutralised against the other lanes' factors ==
+W=126 raw                                          IC=-0.0227 t= -5.49 | H1 -0.0134 (t=-2.36) | H2 -0.0315 (t=-5.26)  STABLE
+W=126   | volatility                               IC=-0.0103 t= -2.68 | H1 -0.0081 (t=-1.48) | H2 -0.0124 (t=-2.28)  STABLE
+W=126   | size                                     IC=-0.0186 t= -4.59 | H1 -0.0121 (t=-2.16) | H2 -0.0247 (t=-4.24)  STABLE
+W=126   | momentum                                 IC=-0.0240 t= -6.06 | H1 -0.0161 (t=-2.94) | H2 -0.0313 (t=-5.52)  STABLE
+W=126   | crowding                                 IC=-0.0154 t= -3.83 | H1 -0.0078 (t=-1.40) | H2 -0.0225 (t=-3.90)  STABLE
+W=126   | ALL FOUR                                 IC=-0.0072 t= -1.95 | H1 -0.0071 (t=-1.37) | H2 -0.0072 (t=-1.39)  STABLE
+
+W=252 raw                                          IC=-0.0240 t= -5.57 | H1 -0.0109 (t=-1.80) | H2 -0.0356 (t=-5.84)  STABLE
+W=252   | volatility                               IC=-0.0133 t= -3.28 | H1 -0.0048 (t=-0.82) | H2 -0.0208 (t=-3.69)  STABLE
+W=252   | size                                     IC=-0.0172 t= -4.01 | H1 -0.0085 (t=-1.39) | H2 -0.0248 (t=-4.16)  STABLE
+W=252   | momentum                                 IC=-0.0246 t= -5.94 | H1 -0.0125 (t=-2.13) | H2 -0.0353 (t=-6.07)  STABLE
+W=252   | crowding                                 IC=-0.0140 t= -3.34 | H1 -0.0027 (t=-0.45) | H2 -0.0240 (t=-4.07)  STABLE
+W=252   | ALL FOUR                                 IC=-0.0077 t= -1.97 | H1 -0.0040 (t=-0.71) | H2 -0.0109 (t=-2.05)  STABLE
+
+W=378 raw                                          IC=-0.0249 t= -5.43 | H1 -0.0069 (t=-1.03) | H2 -0.0397 (t=-6.36)  STABLE
+W=378   | volatility                               IC=-0.0132 t= -3.07 | H1 -0.0003 (t=-0.04) | H2 -0.0238 (t=-4.17)  STABLE
+W=378   | size                                     IC=-0.0149 t= -3.24 | H1 -0.0000 (t=-0.00) | H2 -0.0273 (t=-4.37)  STABLE
+W=378   | momentum                                 IC=-0.0244 t= -5.56 | H1 -0.0059 (t=-0.91) | H2 -0.0397 (t=-6.69)  STABLE
+W=378   | crowding                                 IC=-0.0137 t= -3.10 | H1 +0.0025 (t=+0.38) | H2 -0.0271 (t=-4.49)  FLIPS
+W=378   | ALL FOUR                                 IC=-0.0073 t= -1.77 | H1 +0.0004 (t=+0.06) | H2 -0.0137 (t=-2.49)  FLIPS
+
+== scrambled-clock null for the DESK-CLOSED cell (cell size held exactly) ==
+W=126: true IC -0.0227  null mean +0.0004 sd 0.0051  z=-4.54  p=0.0000
+W=252: true IC -0.0240  null mean -0.0001 sd 0.0057  z=-4.19  p=0.0000

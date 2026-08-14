@@ -1,0 +1,48 @@
+{
+  "candidate_gross_edge_bps_per_turnover": 102.94176980852244,
+  "candidate_id": "mse-01",
+  "inverted_core_gates": {
+    "annualized_return": false,
+    "annualized_volatility": true,
+    "double_cost_annualized_return": false,
+    "double_cost_sharpe": false,
+    "max_drawdown": false,
+    "net_sharpe": false,
+    "trade_count": true,
+    "triple_cost_sharpe": false
+  },
+  "inverted_metrics": {
+    "annualized_return": -0.19143446046882995,
+    "annualized_volatility": 0.12542775513701176,
+    "double_cost_annualized_return": -0.20158751696893862,
+    "double_cost_sharpe": -1.7308320600613218,
+    "max_drawdown": 0.5877494631556616,
+    "net_sharpe": -1.6308184230133007,
+    "trade_count": 17225.0,
+    "triple_cost_sharpe": -1.8306970298975105
+  },
+  "placebo_exceedance": 0.0,
+  "placebo_gross_edge_bps_per_turnover": [
+    4.678463654580729,
+    4.173829189182537,
+    -2.0590697226630517,
+    0.5373860874339729,
+    0.1069318025789407,
+    -0.07008034449197019,
+    3.51338274537705,
+    6.956340948130764
+  ],
+  "placebo_seeds": [
+    20200818,
+    20200819,
+    20200820,
+    20200821,
+    20200822,
+    20200823,
+    20200824,
+    20200825
+  ],
+  "sign_inversion_passes_core": false,
+  "team_id": "team-12",
+  "trial_sequence": 130
+}

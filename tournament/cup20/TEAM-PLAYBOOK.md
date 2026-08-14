@@ -261,6 +261,17 @@ equal are one trial; any difference is a new one.
 - **`--roles` is a claim you make before the numbers exist.** It is checked against the sides your
   book actually traded (charter §7.3, "roles are observed, not declared"), and you cannot re-declare
   after seeing which sleeve paid — re-declaring is a new material trial.
+- **To RUN an ablation you must pass `--ablation` to the evaluator**, not only `--kind ablation`
+  to the trial recorder. The kind is part of the material tuple, so a trial journaled `ablation`
+  is only resolved by an evaluation that declares the same kind — run it without the flag and the
+  evaluator refuses with `none of kind 'point'`, which reads like a mis-journaled trial rather than
+  a missing flag. It costs nothing (the refusal precedes trial resolution), but it is confusing:
+  one team had seven ablations refused on first launch before working it out and reported the gap.
+
+  ```
+  uv run python scripts/cup20_evaluate.py --team team-NN --candidate <id> --ablation --output ...
+  ```
+
 - **`--kind ablation` costs you nothing on the multiplicity bar, and costs you the candidate**
   (charter amendment A6). `T` in `1 − T·(1−B)` counts only `point` and `neighbourhood` trials, so a
   falsification battery and any trial you declare an ablation no longer raise the bar your nominee

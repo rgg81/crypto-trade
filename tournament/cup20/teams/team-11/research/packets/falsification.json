@@ -1,0 +1,48 @@
+{
+  "candidate_gross_edge_bps_per_turnover": 82.30799059040169,
+  "candidate_id": "desk-closed-share",
+  "inverted_core_gates": {
+    "annualized_return": false,
+    "annualized_volatility": true,
+    "double_cost_annualized_return": false,
+    "double_cost_sharpe": false,
+    "max_drawdown": false,
+    "net_sharpe": false,
+    "trade_count": true,
+    "triple_cost_sharpe": false
+  },
+  "inverted_metrics": {
+    "annualized_return": -0.13110363883183052,
+    "annualized_volatility": 0.11786702012127623,
+    "double_cost_annualized_return": -0.14042629536733608,
+    "double_cost_sharpe": -1.2230059896398824,
+    "max_drawdown": 0.48028814978837464,
+    "net_sharpe": -1.1331506876221753,
+    "trade_count": 6991.0,
+    "triple_cost_sharpe": -1.3124757382172076
+  },
+  "placebo_exceedance": 0.0,
+  "placebo_gross_edge_bps_per_turnover": [
+    3.923590009271168,
+    2.2658222454277097,
+    24.418328839156786,
+    9.619453065278535,
+    1.4099064051456296,
+    -9.51739528862056,
+    16.499031087889502,
+    -3.8912298311986366
+  ],
+  "placebo_seeds": [
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19
+  ],
+  "sign_inversion_passes_core": false,
+  "team_id": "team-11",
+  "trial_sequence": 116
+}

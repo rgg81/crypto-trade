@@ -1,0 +1,7 @@
+permutations = 300; window = 126 bars; boundaries = 4335
+
+measure                       true IC    perm mean    perm sd    z      p(one-sided)
+asia_volume_share              -0.0202     +0.0009     0.0046   -4.56     0.0000
+us_minus_asia_volume_share     +0.0140     +0.0002     0.0049   +2.81     0.0000
+asia_volatility_share          -0.0144     +0.0000     0.0046   -3.15     0.0033
+weekend_volatility_share       -0.0246     +0.0006     0.0044   -5.78     0.0000

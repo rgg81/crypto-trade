@@ -1,0 +1,27 @@
+running under accepted trial #116 (8 of 12 trials spent, 6 exempt from multiplicity; T=2); window [2020-08-17 00:00:00+00:00, 2024-08-01 00:00:00+00:00) -- this takes minutes, not seconds
+------------------------------------------------------------------------------
+CUP-20 falsification battery -- team-11 / desk-closed-share  (trial #116)
+------------------------------------------------------------------------------
+exact sign inversion, scored on the core floors (charter 7.3)
+------------------------------------------------------------------------------
+  fails   net_sharpe                                 -1.133151
+  fails   double_cost_sharpe                         -1.223006
+  fails   triple_cost_sharpe                         -1.312476
+  fails   annualized_return                          -0.131104
+  fails   double_cost_annualized_return              -0.140426
+  fails   max_drawdown                                0.480288
+  CLEARS  annualized_volatility                       0.117867
+  CLEARS  trade_count                              6991.000000
+
+  The inversion does not clear the core floors. The falsifier is satisfied.
+
+gross-edge placebo -- same weights, randomly attributed across eligible symbols
+------------------------------------------------------------------------------
+  candidate gross edge             82.3080 bps per unit one-way turnover
+  placebo books (8)          min -9.5174  median 3.0947  max 24.4183
+  placebo exceedance        0.0000  (fraction of placebos reaching the candidate)
+------------------------------------------------------------------------------
+
+packet written to tournament/cup20/teams/team-11/research/packets/falsification.json
+
+completed in 2707.7s
