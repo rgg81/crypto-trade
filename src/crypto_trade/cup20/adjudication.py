@@ -25,6 +25,7 @@ from crypto_trade.cup20.qualification import (
     compliance_factor,
     evaluate_floors,
     evaluate_holdout_eligibility,
+    holdout_compliance_factor,
 )
 from crypto_trade.cup20.scored_metrics import (
     ASSEMBLED_METRIC_KEYS,
@@ -69,7 +70,10 @@ class CandidateAdjudication:
         consult different gates.
         """
         if self.stage == "holdout":
-            return self.gates.passed
+            # A7: every finalist is rankable. Integrity was established in-sample -- the holdout
+            # observation is a neighbourhood sweep and runs no falsification battery, so there is
+            # no integrity verdict to take here and nothing to fail closed on.
+            return True
         if self.stage != "in_sample":
             raise ValueError(f"unknown adjudication stage: {self.stage!r}")
         return self.gates.admissible
@@ -290,21 +294,18 @@ def adjudicate_holdout_candidate(
         nominated_point_double_cost_return=nominated_point_double_cost_return,
     )
     inputs = ranking_metrics(scored, trial_adjusted_confidence=trial_adjusted_confidence)
-    if not gates.passed:
-        return CandidateAdjudication(
-            team_id=team_id,
-            candidate_id=candidate_id,
-            scored=scored,
-            ranking_inputs=inputs,
-            gates=gates,
-            score=None,
-            stage="holdout",
-        )
+    # Amendment A7: the holdout RANKS rather than gates. Section 8's six eligibility conditions are
+    # still evaluated, still reported and still travel with the verdict -- what changed is that
+    # missing one costs points through `compliance_factor` instead of removing a finalist from
+    # contention. Every finalist therefore carries a score, and the winner is the highest of them.
+    #
+    # Recorded prospectively: this was ruled BEFORE the sealed window had been restored, so no
+    # holdout number existed when the rule changed. That is the condition section 13 imposes, and
+    # it is the whole reason the ruling is admissible at all.
     non_finite = sorted(key for key, value in inputs.items() if not math.isfinite(value))
     if non_finite:
         raise ValueError(
-            f"finalist {team_id}/{candidate_id} passed every eligibility condition but its "
-            f"ranking inputs are not finite: {non_finite}"
+            f"finalist {team_id}/{candidate_id} has non-finite ranking inputs: {non_finite}"
         )
     return CandidateAdjudication(
         team_id=team_id,
@@ -312,7 +313,8 @@ def adjudicate_holdout_candidate(
         scored=scored,
         ranking_inputs=inputs,
         gates=gates,
-        score=robustness_score(inputs, drawdown_floor=float(holdout["max_drawdown"])),
+        score=robustness_score(inputs, drawdown_floor=float(holdout["max_drawdown"]))
+        * holdout_compliance_factor(gates),
         stage="holdout",
     )
 

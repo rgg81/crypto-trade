@@ -1,0 +1,141 @@
+{
+  "activation_freeze_sha256": "8ea581f6cfa4b905dbe2c8a1838a78d4549ae2549ddaa7d5ea41c5c53b8f2b78",
+  "advancing_slots": 3,
+  "amendments_in_force": [
+    "A1",
+    "A2",
+    "A3",
+    "A4",
+    "A5",
+    "A6",
+    "A7"
+  ],
+  "charter_sha256": "5ece159d12da6e3c9a2fb11bc22b7006d64c2ec72590e3a8054b3ea5e2673bbc",
+  "field_closed": true,
+  "finalists": [
+    {
+      "candidate_id": "print-size-flow",
+      "certificate_sha256": "6c6ef2701b35f6a215bd584486d7a6ff4ec803d052df4c00f6a797b618b0d276",
+      "in_sample_G": 91.25,
+      "multiplicity_charged_trials": 2,
+      "neighbourhood_sha256": "ae19c694715dd69542dce2753dab3bc0e6f40eb4eda8ee0d74bec6883d79e665",
+      "rank": 1,
+      "risk_policy_sha256": "f230789147791e1a31b2a122b58ee2f22177f9437bfc018f2d3cfa96886090c4",
+      "source_sha256": "8031850e7588a6b2d9351dbe10009d6c4a20015ffe92281c6516f7aa8faa6ae8",
+      "team_id": "team-09"
+    },
+    {
+      "candidate_id": "mse-01",
+      "certificate_sha256": "b6059d79137051bcb8a9687eb724f2015466a11580676e0dcd0d9f6f540ceee2",
+      "in_sample_G": 84.27,
+      "multiplicity_charged_trials": 2,
+      "neighbourhood_sha256": "0a37de3d9f3c5e0bd8d1833e9d0ede9e48029923d8c2093682ead08e1e1fc032",
+      "rank": 2,
+      "risk_policy_sha256": "ece7aafa8b88290741806aa354b53dd8125f2ad822d1433b5d4da179b5523bb3",
+      "source_sha256": "383c550d50f09b5f3be1e36e6c5aefc6512a8c33947a9547d3306cea2471e189",
+      "team_id": "team-12"
+    },
+    {
+      "candidate_id": "channel-position-ls",
+      "certificate_sha256": "8df5f41effbe21d8b7b6957164b046050d8f7b2b678e724dfe30c142c3ab36fb",
+      "in_sample_G": 70.58,
+      "multiplicity_charged_trials": 7,
+      "neighbourhood_sha256": "a7754b484ad0514b34c3eca0a8408467051f814d48b63c4a755e7879dadce4cb",
+      "rank": 3,
+      "risk_policy_sha256": "725e99818b874fc16198f868247d1f7b0aa238e3161c14eb359073ec7539a9f0",
+      "source_sha256": "67cb77e29a583b70c20387aa97cbcf8da8b4590208a56af05f3ffcac90c61bb6",
+      "team_id": "team-02"
+    }
+  ],
+  "holdout_still_quarantined_at_freeze": true,
+  "in_sample_ranking": [
+    {
+      "G": 91.25,
+      "T": 2,
+      "candidate": "print-size-flow",
+      "rank": 1,
+      "team": "team-09"
+    },
+    {
+      "G": 84.27,
+      "T": 2,
+      "candidate": "mse-01",
+      "rank": 2,
+      "team": "team-12"
+    },
+    {
+      "G": 70.58,
+      "T": 7,
+      "candidate": "channel-position-ls",
+      "rank": 3,
+      "team": "team-02"
+    },
+    {
+      "G": 53.43,
+      "T": 7,
+      "candidate": "downside-tercile",
+      "rank": 4,
+      "team": "team-06"
+    },
+    {
+      "G": 50.45,
+      "T": 2,
+      "candidate": "desk-closed-share",
+      "rank": 5,
+      "team": "team-11"
+    },
+    {
+      "G": 48.92,
+      "T": 7,
+      "candidate": "resid-composite",
+      "rank": 6,
+      "team": "team-04"
+    },
+    {
+      "G": 44.3,
+      "T": 2,
+      "candidate": "volofvol-regime",
+      "rank": 7,
+      "team": "team-10"
+    },
+    {
+      "G": 35.47,
+      "T": 9,
+      "candidate": "run-gated-trend",
+      "rank": 8,
+      "team": "team-03"
+    },
+    {
+      "G": 31.25,
+      "T": 7,
+      "candidate": "slow-tsmom",
+      "rank": 9,
+      "team": "team-01"
+    },
+    {
+      "G": 30.79,
+      "T": 10,
+      "candidate": "cascade-breadth-01",
+      "rank": 10,
+      "team": "team-05"
+    },
+    {
+      "G": 30.12,
+      "T": 8,
+      "candidate": "carry-crowd-guard",
+      "rank": 11,
+      "team": "team-07"
+    },
+    {
+      "G": 2.3,
+      "T": 7,
+      "candidate": "funding-term-dynamics",
+      "rank": 12,
+      "team": "team-08"
+    }
+  ],
+  "journal_head_sha256": "fb0de804992013e9e3101fe5947f73dfa65d3c2d62817d806b366d20a61983b6",
+  "journal_records_at_freeze": 135,
+  "schema_version": "cup20-selection-freeze-v1",
+  "tournament": "cup20"
+}

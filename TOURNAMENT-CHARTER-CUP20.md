@@ -965,6 +965,38 @@ where a team had run two falsification batteries, which is the case the old rule
 The ranking order is identical before and after. Teams 08–12 face the amended rule from the start
 and every earlier team's score has been recomputed under it, so the field is scored on one basis.
 
+### Amendment A7 — 2026-08-14, prospective: the holdout ranks rather than gates
+
+**Organiser ruling, and the third in the same direction.** §7.6 and §8 gated the holdout
+conjunctively: a finalist missing any one of §8's six winner-eligibility conditions was eliminated,
+and §1.1's "no winner" followed if all three missed. A4 had already replaced that logic in-sample.
+A7 extends it: §8's conditions are still evaluated, still reported and still travel with every
+verdict — a miss now costs points instead of the tournament, and **the highest holdout score wins.**
+
+**Recorded before the sealed window was restored.** No holdout number existed when this was ruled;
+the finalists were known, their holdout results were not. That is exactly the condition §13 imposes
+on an amendment, and it is the only thing that makes this one admissible rather than a rule written
+around a result.
+
+**Three of §8's six conditions the ranking score already prices** — `max_drawdown` directly at 20
+points (rebased to the §8 ceiling), `positive_quarter_count` through `positive_quarter_fraction` at
+8, and a negative `annualized_return` through Calmar at 15, which A5's decaying tail carries below
+zero. **The other four have no term in `G`**: `annualized_return`, `double_cost_annualized_return`,
+`double_cost_sharpe` and the nominated point's own 2×-cost return. Left unpriced they would cost
+nothing at all, which is precisely the defect A5 was written to close at the other stage. They are
+therefore priced by a multiplicative, equal-weighted `holdout_compliance_factor` over those four —
+binary, because §8 states no magnitude for any of them and inventing one now, with the three
+finalists known, is the discretion this charter exists to remove.
+
+**Integrity is not re-tested at the holdout and does not need to be.** The observation is a
+neighbourhood sweep and runs no falsification battery, so there is no integrity verdict to take
+there; it was established in-sample, where every finalist passed.
+
+**Stated plainly: this can crown a book that breached a risk floor out of sample.** The organiser
+recommended keeping the holdout conjunctive for exactly that reason and was overruled. The
+consequence is disclosed here rather than discovered later, and the winner's full §8 condition
+vector is published alongside its score, so what was crowned is legible.
+
 ## 14. Known limitations, stated up front
 
 1. The holdout window overlaps four prior organiser-level reveals (§2.1). Mitigated structurally,

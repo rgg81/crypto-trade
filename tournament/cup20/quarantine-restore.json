@@ -1,0 +1,17 @@
+{
+  "access_baseline_path": "tournament/cup20/sealed-access-baseline.json",
+  "armed_files": [
+    "HOLDOUT-CANARY-DO-NOT-READ.txt",
+    "bars.parquet",
+    "contract_metadata.parquet",
+    "funding.parquet",
+    "manifest.json",
+    "mark_prices.parquet",
+    "membership.parquet"
+  ],
+  "receipt_path": "tournament/cup20/quarantine-receipt.json",
+  "restored_at_epoch": 1786740829.6537802,
+  "schema_version": "cup20-quarantine-receipt-v1",
+  "sealed_manifest_sha256": "0bcd6dbfcfc615dff030f85eecb4265877bc4074d4b4224a2fa6da81b14e5c4c",
+  "selection_freeze_path": "tournament/cup20/selection-freeze.json"
+}

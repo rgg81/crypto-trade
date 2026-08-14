@@ -450,3 +450,43 @@ def compliance_factor(scored: Mapping[str, float], *, floors: Mapping[str, Any])
     if not credits:
         return 1.0
     return sum(credits.values()) / len(credits)
+
+
+# --- amendment A7: pricing section 8's conditions instead of gating on them --------------------
+
+# Section 8 states six winner-eligibility conditions. Three of them the ranking score already
+# prices -- `max_drawdown` directly (20 points, rebased to the section 8 ceiling),
+# `positive_quarter_count` through `positive_quarter_fraction` (8 points), and a negative
+# `annualized_return` through Calmar (15 points, and A5's decaying tail carries it below zero).
+#
+# These are the ones with NO term in G. Left unpriced under A7 they would cost nothing at all,
+# which is the exact defect A5 was written to close at the in-sample stage; the same construction
+# answers it here. All four are bare "> 0" conditions, so the credit is binary -- section 8 states
+# no magnitude for any of them, and inventing one now, with the finalists known, is precisely the
+# discretion the charter exists to remove.
+HOLDOUT_UNPRICED_CONDITIONS: tuple[str, ...] = (
+    "annualized_return",
+    "double_cost_annualized_return",
+    "double_cost_sharpe",
+    "nominated_point_double_cost_return",
+)
+
+
+def holdout_compliance_factor(gates: GateVector) -> float:
+    """Mean credit across the section 8 conditions ``G`` does not price, in ``[0, 1]`` (A7).
+
+    Multiplicative and equal-weighted for A5's reasons: an additive block needs a weight for the
+    block, and any weight chosen now is chosen with the three finalists already known. A factor
+    needs no such number, leaves a fully compliant finalist's score untouched, and makes missing a
+    condition cost something rather than nothing.
+
+    Reads the gate vector rather than the metrics so that the thresholds have exactly one
+    definition -- :func:`evaluate_holdout_eligibility` -- and cannot drift from a second copy here.
+    A condition the vector does not carry is treated as unmet: at this stage every condition is
+    always evaluated, so its absence means the vector was built wrong, and the fail-closed reading
+    is the safe one.
+    """
+    credits = [
+        1.0 if gates.checks.get(name, False) else 0.0 for name in HOLDOUT_UNPRICED_CONDITIONS
+    ]
+    return sum(credits) / len(credits)

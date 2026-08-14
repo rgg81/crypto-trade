@@ -1,0 +1,21 @@
+{
+  "armed_at_epoch": 1786740829.652419,
+  "files": {
+    "HOLDOUT-CANARY-DO-NOT-READ.txt": 1786568029652419072,
+    "bars.parquet": 1786568029652419072,
+    "contract_metadata.parquet": 1786568029652419072,
+    "funding.parquet": 1786568029652419072,
+    "manifest.json": 1786568029652419072,
+    "mark_prices.parquet": 1786568029652419072,
+    "membership.parquet": 1786568029652419072
+  },
+  "mount_options": [
+    "rw",
+    "relatime",
+    "discard",
+    "errors=remount-ro",
+    "data=ordered"
+  ],
+  "schema_version": "cup20-sealed-access-baseline-v1",
+  "sealed_root": "data/cup20/sealed"
+}

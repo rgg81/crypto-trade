@@ -423,16 +423,23 @@ def test_the_holdout_fixture_would_be_eligible_before_any_override():
 )
 def test_each_section_8_condition_fails_on_its_own(override, expected_failure):
     verdict = _holdout(**override)
+    # A7: the condition is still evaluated and still NAMED -- it now costs points rather than the
+    # tournament. Every finalist carries a score and the highest wins.
     assert not verdict.qualified
     assert verdict.failures == (expected_failure,)
-    assert verdict.score is None
+    assert verdict.score is not None
+    assert verdict.admissible
 
 
 def test_the_nominated_point_condition_fails_on_its_own():
     verdict = _holdout(nominated=-0.02)
     assert not verdict.qualified
     assert verdict.failures == ("nominated_point_double_cost_return",)
-    assert verdict.score is None
+    # A7 prices it: this is one of the four section 8 conditions G has no term for, so missing it
+    # costs a quarter of the holdout compliance factor rather than removing the finalist.
+    assert verdict.score is not None
+    clean = _holdout()
+    assert verdict.score == pytest.approx(clean.score * 0.75)
 
 
 @pytest.mark.parametrize(
@@ -530,7 +537,7 @@ def test_a_holdout_passer_with_a_non_finite_ranking_input_raises():
     # `double_cost_annualized_turnover` is gated by no section 8 condition at all, so a non-finite
     # one reaches the ranking. It must raise here, naming the finalist, rather than deep inside a
     # sort of the whole finalist population.
-    with pytest.raises(ValueError, match="not finite"):
+    with pytest.raises(ValueError, match="non-finite ranking inputs"):
         _holdout(double_cost_annualized_turnover=math.inf)
 
 
@@ -654,13 +661,17 @@ def test_a_flawless_finalist_is_admissible_at_the_holdout_stage():
     assert finalist.admissible
     assert finalist.qualified
 
+    # A7: a finalist that misses a section 8 condition is still RANKED -- the miss is priced.
     failing = dataclasses.replace(
         finalist, gates=GateVector(checks={"net_sharpe": True, "max_drawdown": False})
     )
-    assert not failing.admissible  # conjunctive at the holdout, exactly as before A4
+    assert failing.admissible
+    assert not failing.qualified  # still reported as a miss, just no longer fatal
 
+    # The in-sample question is unchanged and still fails closed on the same vector: A7 is a
+    # holdout ruling and must not leak backwards into the stage A4 governs.
     same_vector_in_sample = dataclasses.replace(finalist, stage="in_sample")
-    assert not same_vector_in_sample.admissible  # and the IS question still fails closed
+    assert not same_vector_in_sample.admissible
 
 
 def test_an_unknown_stage_is_refused_rather_than_guessed():
@@ -726,3 +737,48 @@ def test_ranked_and_rejected_partition_the_population_exactly():
     rejected = {c.team_id for c in result.rejected}
     assert ranked & rejected == set()
     assert ranked | rejected == {c.team_id for c in result.candidates}
+
+
+# --- amendment A7: the holdout ranks rather than gates -----------------------------------------
+
+
+def test_the_holdout_prices_its_unpriced_conditions_rather_than_ignoring_them():
+    """A7's version of the defect A5 closed in-sample.
+
+    Three of section 8's six conditions the ranking score already prices. The other four have no
+    term in G, so under a naive "just stop gating" they would cost NOTHING -- the same hole that
+    let an under-risked book score a perfect 100 at the in-sample stage. Each is worth a quarter of
+    the factor.
+    """
+    from crypto_trade.cup20.qualification import HOLDOUT_UNPRICED_CONDITIONS
+
+    clean = _holdout()
+    assert clean.score is not None
+    for condition, expected in (
+        ("annualized_return", 0.75),
+        ("double_cost_sharpe", 0.75),
+    ):
+        missed = _holdout(**{condition: -0.01})
+        assert missed.score == pytest.approx(clean.score * expected), condition
+    assert len(HOLDOUT_UNPRICED_CONDITIONS) == 4
+
+
+def test_the_conditions_G_already_prices_are_not_charged_twice():
+    """A condition charged once by G and again by the factor is a condition weighted arbitrarily."""
+    from crypto_trade.cup20.qualification import HOLDOUT_UNPRICED_CONDITIONS
+
+    priced_by_g = {"max_drawdown", "positive_quarter_count", "positive_quarter_fraction", "calmar"}
+    assert not set(HOLDOUT_UNPRICED_CONDITIONS) & priced_by_g
+
+
+def test_a_finalist_missing_every_unpriced_condition_scores_zero_not_none():
+    """The floor of the factor is zero, so such a finalist ranks last rather than vanishing."""
+    verdict = _holdout(
+        annualized_return=-0.01,
+        double_cost_annualized_return=-0.01,
+        double_cost_sharpe=-0.01,
+        nominated=-0.01,
+    )
+    assert verdict.score == pytest.approx(0.0)
+    assert verdict.admissible
+    assert verdict.as_ranked_entry().score == pytest.approx(0.0)

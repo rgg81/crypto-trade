@@ -79,6 +79,7 @@ from crypto_trade.cup20.neighbourhood import (
 )
 from crypto_trade.cup20.qualification import (
     ADMISSION_GATES,
+    HOLDOUT_UNPRICED_CONDITIONS,
     INTEGRITY_GATES,
     SUBSTANCE_GATES,
     UNPRICED_FLOOR_SPECS,
@@ -87,6 +88,7 @@ from crypto_trade.cup20.qualification import (
     evaluate_floors,
     evaluate_holdout_eligibility,
     floor_credits,
+    holdout_compliance_factor,
 )
 from crypto_trade.cup20.quarantine import (
     CUSTODY_CLOSE_EVENTS,
@@ -237,6 +239,7 @@ __all__ = [
     "GateDetail",
     "GateVector",
     "HOLDOUT_ONLY_KEYS",
+    "HOLDOUT_UNPRICED_CONDITIONS",
     "INTEGRITY_GATES",
     "IS_END",
     "JournalBusyError",
@@ -324,6 +327,7 @@ __all__ = [
     "fold_positive_pnl_shares",
     "fold_sharpes",
     "gate_details",
+    "holdout_compliance_factor",
     "holdout_folds",
     "inert_points",
     "is_folds",

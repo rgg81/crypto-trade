@@ -1,0 +1,179 @@
+{
+  "amendment": "A7 -- section 8 conditions priced, not gating; highest score wins",
+  "folds": [
+    {
+      "end": "2025-02-01 00:00:00+00:00",
+      "name": "H1",
+      "start": "2024-08-01 00:00:00+00:00"
+    },
+    {
+      "end": "2025-08-01 00:00:00+00:00",
+      "name": "H2",
+      "start": "2025-02-01 00:00:00+00:00"
+    },
+    {
+      "end": "2026-02-01 00:00:00+00:00",
+      "name": "H3",
+      "start": "2025-08-01 00:00:00+00:00"
+    },
+    {
+      "end": "2026-08-01 00:00:00+00:00",
+      "name": "H4",
+      "start": "2026-02-01 00:00:00+00:00"
+    }
+  ],
+  "observations": [
+    {
+      "candidate_id": "channel-position-ls",
+      "holdout_G": 65.97896171263761,
+      "holdout_rank": 1,
+      "in_sample_G": 70.58,
+      "in_sample_rank": 3,
+      "median": {
+        "annualized_return": 0.25982065677565935,
+        "annualized_turnover": 13.254242491703573,
+        "annualized_volatility": 0.11985211377148794,
+        "calmar": 2.358079622799509,
+        "cost_share_of_positive_gross": 0.007105544684758507,
+        "double_cost_annualized_return": 0.24627130885080994,
+        "double_cost_annualized_turnover": 13.25748212100879,
+        "double_cost_max_drawdown": 0.10443723208906619,
+        "double_cost_positive_quarter_fraction": 0.6666666666666666,
+        "double_cost_sharpe": 1.8925896163049492,
+        "gross_edge_bps_per_turnover": 172.1372930128241,
+        "long_gross_pnl": 0.1868570921256698,
+        "max_drawdown": 0.10057319358077976,
+        "max_fold_positive_pnl_share": 0.29024371675006827,
+        "median_fold_sharpe": 1.855344378129127,
+        "net_sharpe": 1.98161834705095,
+        "positive_fold_count": 3.0,
+        "positive_quarter_count": 6.0,
+        "positive_quarter_fraction": 0.6666666666666666,
+        "short_gross_pnl": 0.34004440507197264,
+        "top5_day_share": 0.05745342669611973,
+        "trade_count": 838.0,
+        "triple_cost_sharpe": 1.803038253612793,
+        "worst_fold_sharpe": -0.05442902113371068
+      },
+      "nominated_point_double_cost_return": 0.26724937635793045,
+      "points": 7,
+      "seconds": 1501.8702838610043,
+      "section_8_conditions": {
+        "annualized_return": true,
+        "double_cost_annualized_return": true,
+        "double_cost_sharpe": true,
+        "max_drawdown": true,
+        "nominated_point_double_cost_return": true,
+        "positive_quarter_count": true
+      },
+      "section_8_misses": [],
+      "team_id": "team-02"
+    },
+    {
+      "candidate_id": "mse-01",
+      "holdout_G": 54.54225308512937,
+      "holdout_rank": 2,
+      "in_sample_G": 84.27,
+      "in_sample_rank": 2,
+      "median": {
+        "annualized_return": 0.11155181182962193,
+        "annualized_turnover": 21.653164043122928,
+        "annualized_volatility": 0.12226143564430189,
+        "calmar": 0.8400331049682678,
+        "cost_share_of_positive_gross": 0.011744775288318786,
+        "double_cost_annualized_return": 0.09333403746608027,
+        "double_cost_annualized_turnover": 21.659381216665356,
+        "double_cost_max_drawdown": 0.12365105820061173,
+        "double_cost_positive_quarter_fraction": 0.6666666666666666,
+        "double_cost_sharpe": 0.8179694817358427,
+        "gross_edge_bps_per_turnover": 60.499002738549386,
+        "long_gross_pnl": 0.3108753697867052,
+        "max_drawdown": 0.11473297595670529,
+        "max_fold_positive_pnl_share": 0.32350618907330597,
+        "median_fold_sharpe": 1.0019620258114914,
+        "net_sharpe": 0.959382540111579,
+        "positive_fold_count": 3.0,
+        "positive_quarter_count": 6.0,
+        "positive_quarter_fraction": 0.6666666666666666,
+        "short_gross_pnl": -0.05428385050871729,
+        "top5_day_share": 0.05742041244213771,
+        "trade_count": 9468.0,
+        "triple_cost_sharpe": 0.6766470793544522,
+        "worst_fold_sharpe": -0.1516175900015898
+      },
+      "nominated_point_double_cost_return": 0.08695827158442171,
+      "points": 9,
+      "seconds": 2198.2227565310022,
+      "section_8_conditions": {
+        "annualized_return": true,
+        "double_cost_annualized_return": true,
+        "double_cost_sharpe": true,
+        "max_drawdown": true,
+        "nominated_point_double_cost_return": true,
+        "positive_quarter_count": true
+      },
+      "section_8_misses": [],
+      "team_id": "team-12"
+    },
+    {
+      "candidate_id": "print-size-flow",
+      "holdout_G": -0.0,
+      "holdout_rank": 3,
+      "in_sample_G": 91.25,
+      "in_sample_rank": 1,
+      "median": {
+        "annualized_return": -0.005810044008061177,
+        "annualized_turnover": 22.893618964838545,
+        "annualized_volatility": 0.09814044598982322,
+        "calmar": -0.13948232670130756,
+        "cost_share_of_positive_gross": 0.014837861200859398,
+        "double_cost_annualized_return": -0.02232283700016835,
+        "double_cost_annualized_turnover": 22.89566158841742,
+        "double_cost_max_drawdown": 0.14570925428140602,
+        "double_cost_positive_quarter_fraction": 0.3333333333333333,
+        "double_cost_sharpe": -0.18111795676590534,
+        "gross_edge_bps_per_turnover": 7.198508902869205,
+        "long_gross_pnl": 0.07550926170348193,
+        "max_drawdown": 0.13670695220228346,
+        "max_fold_positive_pnl_share": 0.2857448094144356,
+        "median_fold_sharpe": -0.22605070404145583,
+        "net_sharpe": -0.010405881609790878,
+        "positive_fold_count": 2.0,
+        "positive_quarter_count": 3.0,
+        "positive_quarter_fraction": 0.3333333333333333,
+        "short_gross_pnl": -0.021409360977968667,
+        "top5_day_share": 0.04166639343419502,
+        "trade_count": 38808.0,
+        "triple_cost_sharpe": -0.3517037842780769,
+        "worst_fold_sharpe": -1.6712649654607474
+      },
+      "nominated_point_double_cost_return": -0.013339658280981048,
+      "points": 9,
+      "seconds": 2336.791395704,
+      "section_8_conditions": {
+        "annualized_return": false,
+        "double_cost_annualized_return": false,
+        "double_cost_sharpe": false,
+        "max_drawdown": true,
+        "nominated_point_double_cost_return": false,
+        "positive_quarter_count": false
+      },
+      "section_8_misses": [
+        "annualized_return",
+        "double_cost_annualized_return",
+        "double_cost_sharpe",
+        "positive_quarter_count",
+        "nominated_point_double_cost_return"
+      ],
+      "team_id": "team-09"
+    }
+  ],
+  "schema_version": "cup20-holdout-observations-v1",
+  "sealed_manifest_sha256": "0bcd6dbfcfc615dff030f85eecb4265877bc4074d4b4224a2fa6da81b14e5c4c",
+  "seed": 42,
+  "window": {
+    "end": "2026-08-01 00:00:00+00:00",
+    "start": "2024-08-01 00:00:00+00:00"
+  },
+  "winner": "team-02"
+}
