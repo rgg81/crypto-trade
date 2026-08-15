@@ -41,11 +41,12 @@ before the first new boundary or that boundary cannot be scored at all. Both fai
 rather than absorbed: :class:`UnscoredBoundaryError` names a boundary that emitted nothing.
 
 **The assembled snapshot narrows, the cache does not.** ``build_forward_snapshot`` scopes every
-frame to the symbols membership actually holds, and additionally narrows the mark panel to the
-period each symbol is a member for -- extended by one boundary, because the evaluator closes a
-departing member's position AT the boundary it stops being eligible and demands a mark for a held
-symbol there. Narrowing can only ever remove marks no evaluation consults; a mistake in it is a
-loud ``missing current mark`` raise from the evaluator, never a changed number.
+frame to the symbols membership actually holds, and additionally drops each symbol's marks from
+before it was first admitted -- see :func:`narrow_mark_panel`, and note that the tail is NOT
+narrowed, because a participation-capped exit keeps a departed member on the book for boundaries
+that belong to nobody's membership period. Narrowing can only ever remove marks no evaluation
+consults; a mistake in it is a loud ``missing current mark`` raise from the evaluator, never a
+changed number.
 """
 
 from __future__ import annotations
@@ -58,7 +59,6 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
-import numpy as np
 import pandas as pd
 
 from crypto_trade.cup20.config import load_config
@@ -298,50 +298,34 @@ def _seed_incumbency(
 
 
 def narrow_mark_panel(mark_prices: pd.DataFrame, membership: pd.DataFrame) -> pd.DataFrame:
-    """Keep the marks an evaluation can consult: each symbol's membership period, plus its exit.
+    """Keep every mark from a symbol's FIRST admission onward, and nothing before it.
 
-    The evaluator reads a mark at exactly two kinds of ``(symbol, decision time)``: one where the
-    symbol is eligible, and one where a position in it is still open. The second is what makes this
-    the membership period *inclusive of the following boundary* rather than the half-open interval
-    the membership rule itself uses -- a member that leaves the universe at ``t`` is closed AT
-    ``t``, when it is already ineligible, and ``evaluate_targets`` raises ``missing current mark for
-    held symbols`` if that mark is absent. A tidy half-open narrowing removes exactly the mark the
-    exit needs.
+    The evaluator reads a mark at every ``(symbol, decision time)`` where a quantity is open, and
+    an open quantity outlives eligibility by an unbounded number of boundaries. That is not an
+    exotic case: ``max_bar_participation`` is 0.001, so a departing member's mandatory exit is
+    filled against one thousandth of the trailing bar volume and a large position in a thin name
+    unwinds over several boundaries -- 2024-04-22 08:00 for ``TRBUSDT``, 2025-03-17 08:00 for
+    ``1000BONKUSDT``, five days past the exit boundary for ``FTMUSDT``/``SOLUSDT``/``XRPUSDT`` in
+    February 2022. A delisting residual can sit even longer. None of those instants is a
+    reconstitution boundary, and none is inside anybody's membership period.
 
-    Everything else is unreadable by construction: no position can exist in a symbol before it is
-    first admitted, and none survives past the boundary that closes it, so a mark outside these
-    intervals cannot be looked up by any evaluation of any strategy.
+    An earlier version of this function narrowed to the membership period plus its exit boundary,
+    which is what the position record shows AFTER execution and therefore looks complete. It made
+    the assembled snapshot raise ``missing current mark for held symbols: ['TRBUSDT']`` out of the
+    evaluator on the first full-window replay -- loudly, which is the one good thing about it.
+
+    So the rule is the only one that is statically safe: a position can exist from the boundary a
+    symbol is first admitted until the end of the data, and cannot exist before it. Marks before
+    first admission, and every mark of a symbol that was never a member, are unreadable by
+    construction and are the narrowing. Narrowing can only ever remove rows no evaluation consults;
+    a mistake in it is a loud raise from the evaluator, never a changed number.
     """
     panel = conform_frame(MARK_PRICES, mark_prices)
     if panel.empty or membership.empty:
         return conform_frame(MARK_PRICES, panel.iloc[0:0])
-    grid = membership.pivot(
-        index="reconstitution_time", columns="symbol", values="liquidity_rank"
-    ).notna()
-    boundaries = pd.DatetimeIndex(grid.index)
-    times = pd.DatetimeIndex(panel["mark_time"])
-    column = grid.columns.get_indexer(panel["symbol"])
-    row = boundaries.searchsorted(times, side="right") - 1
-    values = grid.to_numpy(dtype=bool)
-
-    held = _member_at(values, row, column)
-    carried = _member_at(values, row - 1, column)
-    at_boundary = boundaries.get_indexer(times) >= 0
-    retained = held | (at_boundary & carried)
-    return conform_frame(MARK_PRICES, panel.loc[retained])
-
-
-def _member_at(values: np.ndarray, row: np.ndarray, column: np.ndarray) -> np.ndarray:
-    """``values[row, column]`` with out-of-range coordinates reading False rather than wrapping.
-
-    ``-1`` is a legitimate result of both ``searchsorted`` (a time before the first boundary) and
-    ``get_indexer`` (a symbol that is never a member), and numpy would happily read it as the LAST
-    row or column -- silently retaining a mark on the strength of somebody else's membership.
-    """
-    inside = (row >= 0) & (column >= 0)
-    result = np.zeros(len(row), dtype=bool)
-    result[inside] = values[row[inside], column[inside]]
-    return result
+    admitted = membership.groupby("symbol")["reconstitution_time"].min()
+    first = panel["symbol"].map(admitted)
+    return conform_frame(MARK_PRICES, panel.loc[first.notna() & (panel["mark_time"] >= first)])
 
 
 # ------------------------------------------------------------------------------------------------

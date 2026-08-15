@@ -350,7 +350,17 @@ class AppendResult:
 # ------------------------------------------------------------------------------------------------
 
 
-def frame_schema(name: str) -> FrameSchema:
+def frame_schema(name: str | FrameSchema) -> FrameSchema:
+    """The declared shape of a snapshot frame, or a caller's own :class:`FrameSchema`.
+
+    Passing a schema through is what lets a frame the SNAPSHOT does not hold -- the desk's forward
+    return and fill ledgers -- reach :func:`append_frame` and be compared by the same append
+    invariance the market frames are. A second comparison written for those ledgers is the defect
+    this admits: two implementations of "has a recorded row changed" can disagree, and the one that
+    is wrong is the one nobody tested against a real revision.
+    """
+    if isinstance(name, FrameSchema):
+        return name
     schema = SNAPSHOT_SCHEMAS.get(name)
     if schema is None:
         raise FrameSchemaError(
@@ -359,7 +369,7 @@ def frame_schema(name: str) -> FrameSchema:
     return schema
 
 
-def empty_frame(name: str) -> pd.DataFrame:
+def empty_frame(name: str | FrameSchema) -> pd.DataFrame:
     """A zero-row frame carrying the snapshot's exact columns and dtypes."""
     schema = frame_schema(name)
     return pd.DataFrame(
@@ -399,7 +409,7 @@ def infer_frame_name(frame: pd.DataFrame) -> str:
     return name
 
 
-def conform_frame(name: str, frame: pd.DataFrame) -> pd.DataFrame:
+def conform_frame(name: str | FrameSchema, frame: pd.DataFrame) -> pd.DataFrame:
     """Return ``frame`` in the snapshot's exact column order and dtypes, or refuse.
 
     Every frame this module returns or writes passes through here. It is the only defence against
@@ -407,6 +417,7 @@ def conform_frame(name: str, frame: pd.DataFrame) -> pd.DataFrame:
     wrong in a dtype.
     """
     schema = frame_schema(name)
+    name = schema.name
     present = set(frame.columns)
     missing = [column for column in schema.columns if column not in present]
     if missing:
@@ -1063,7 +1074,9 @@ def _retry_delay(retry_after: str | None, attempt: int) -> float:
 # ------------------------------------------------------------------------------------------------
 
 
-def append_frame(path: str | Path, frame: pd.DataFrame, *, name: str | None = None) -> AppendResult:
+def append_frame(
+    path: str | Path, frame: pd.DataFrame, *, name: str | FrameSchema | None = None
+) -> AppendResult:
     """Append only genuinely new rows, or abort naming the key and column that changed.
 
     Rows already on disk are compared value for value against the incoming ones under the frame's
@@ -1075,11 +1088,11 @@ def append_frame(path: str | Path, frame: pd.DataFrame, *, name: str | None = No
     counted in :attr:`AppendResult.transitioned`, and nothing else about it moves.
     """
     target = Path(path)
-    resolved = name or infer_frame_name(frame)
-    schema = frame_schema(resolved)
+    schema = frame_schema(name if name is not None else infer_frame_name(frame))
+    resolved = schema.name
     key = list(schema.key)
 
-    incoming = conform_frame(resolved, frame)
+    incoming = conform_frame(schema, frame)
     if incoming.duplicated(key).any():
         example = tuple(incoming.loc[incoming.duplicated(key, keep=False), key].iloc[0])
         raise ValueError(
@@ -1087,9 +1100,7 @@ def append_frame(path: str | Path, frame: pd.DataFrame, *, name: str | None = No
         )
 
     existing = (
-        conform_frame(resolved, pd.read_parquet(target))
-        if target.is_file()
-        else empty_frame(resolved)
+        conform_frame(schema, pd.read_parquet(target)) if target.is_file() else empty_frame(schema)
     )
     transitions = _resolve_overlap(schema, existing, incoming, target)
     settled = _apply_transitions(schema, existing, transitions)
@@ -1097,7 +1108,7 @@ def append_frame(path: str | Path, frame: pd.DataFrame, *, name: str | None = No
     additions = incoming.merge(existing.loc[:, key], on=key, how="left", indicator=True)
     additions = additions.loc[additions["_merge"] == "left_only", list(schema.columns)]
     combined = pd.concat([settled, additions], ignore_index=True) if len(additions) else settled
-    result = conform_frame(resolved, combined.sort_values(list(schema.order), kind="stable"))
+    result = conform_frame(schema, combined.sort_values(list(schema.order), kind="stable"))
     if not target.is_file() or not result.equals(existing):
         _write_parquet(result, target)
     return AppendResult(

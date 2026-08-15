@@ -41,6 +41,7 @@ from crypto_trade.cup20_desk.live_data import (
     AppendInvarianceError,
     BinancePublicDataError,
     CacheDriftError,
+    FrameSchema,
     FrameSchemaError,
     LifecycleTransition,
     PublicMarketDataClient,
@@ -1056,6 +1057,52 @@ def test_the_client_refuses_an_undeclared_endpoint(stub: _StubBinance):
     with PublicMarketDataClient(transport=stub.transport(), sleep=lambda _s: None) as client:
         with pytest.raises(ValueError, match="public"):
             client.get_json("/fapi/v1/order", params={"symbol": "BTCUSDT"})
+
+
+LEDGER_SCHEMA = FrameSchema(
+    name="a_caller_declared_ledger",
+    columns=("timestamp", "label", "value"),
+    dtypes=("datetime64[ns, UTC]", "str", "float64"),
+    key=("timestamp",),
+    order=("timestamp",),
+)
+
+
+def _ledger(value: float) -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "timestamp": [pd.Timestamp("2026-08-01T00:00:00Z")],
+            "label": ["bridge"],
+            "value": [value],
+        }
+    )
+
+
+def test_a_caller_can_append_a_frame_the_snapshot_does_not_hold(tmp_path: Path):
+    """``append_frame`` takes a schema, not only a snapshot frame name.
+
+    The desk's forward-return and fill ledgers need exactly this comparison -- has an already
+    recorded row come back different? -- and writing a second one for them is how two definitions
+    of append invariance end up disagreeing.
+    """
+    path = tmp_path / "ledger.parquet"
+    created = append_frame(path, _ledger(1.0), name=LEDGER_SCHEMA)
+    assert (created.name, created.appended, created.total) == (LEDGER_SCHEMA.name, 1, 1)
+    again = append_frame(path, _ledger(1.0), name=LEDGER_SCHEMA)
+    assert (again.appended, again.unchanged) == (0, 1)
+    with pytest.raises(AppendInvarianceError, match="value"):
+        append_frame(path, _ledger(2.0), name=LEDGER_SCHEMA)
+    assert conform_frame(LEDGER_SCHEMA, pd.read_parquet(path))["value"].tolist() == [1.0]
+
+
+def test_a_declared_ledger_has_no_lifecycle_bypass(tmp_path: Path):
+    """The delisting allowlist is scoped to ``contract_metadata``, not to any declared frame."""
+    path = tmp_path / "ledger.parquet"
+    append_frame(path, _ledger(1.0), name=LEDGER_SCHEMA)
+    changed = _ledger(1.0)
+    changed["label"] = ["archive_inference"]
+    with pytest.raises(AppendInvarianceError, match="label"):
+        append_frame(path, changed, name=LEDGER_SCHEMA)
 
 
 def test_append_result_is_an_immutable_record(tmp_path: Path):

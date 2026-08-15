@@ -379,35 +379,46 @@ def _acquisition_helpers():
 # --------------------------------------------------------------------------------------------
 
 
-def test_the_mark_panel_is_narrowed_to_membership(panel: dict[str, pd.DataFrame]):
+def test_the_mark_panel_is_narrowed_to_first_admission(panel: dict[str, pd.DataFrame]):
     membership = _extend(panel)
     narrowed = narrow_mark_panel(panel[MARK_PRICES], membership)
     assert len(narrowed) < len(panel[MARK_PRICES])
-    grid = membership.pivot(
-        index="reconstitution_time", columns="symbol", values="liquidity_rank"
-    ).notna()
-    boundaries = pd.DatetimeIndex(grid.index)
+    admitted = membership.groupby("symbol")["reconstitution_time"].min()
     for symbol, time in zip(narrowed["symbol"], narrowed["mark_time"], strict=True):
-        position = int(boundaries.searchsorted(time, side="right")) - 1
-        assert position >= 0
-        held = bool(grid.iloc[position].get(symbol, False))
-        exiting = time == boundaries[position] and bool(grid.iloc[position - 1].get(symbol, False))
-        assert held or exiting, (symbol, time)
+        assert symbol in admitted.index, symbol
+        assert time >= admitted[symbol], (symbol, time)
+    dropped = set(panel[MARK_PRICES]["symbol"]) - set(narrowed["symbol"])
+    assert dropped, "the fixture must carry a never-member whose marks are narrowed away"
 
 
-def test_the_narrowed_mark_panel_keeps_the_exit_boundary(panel: dict[str, pd.DataFrame]):
-    """A departing member is CLOSED at the boundary it stops being eligible, and needs a mark there.
+def test_the_narrowed_mark_panel_keeps_a_departed_members_tail(panel: dict[str, pd.DataFrame]):
+    """A departed member's position outlives its eligibility, so its marks must outlive it too.
 
-    ``evaluate_targets`` raises ``missing current mark for held symbols`` on exactly this row. The
-    half-open membership period -- the tidy reading, and the wrong one -- removes it.
+    ``max_bar_participation`` is 0.001, so the mandatory exit of a departing member is filled
+    against one thousandth of a bar's volume and a large position in a thin name takes several
+    boundaries to unwind -- and every one of those boundaries reads a mark for a symbol that is no
+    longer in anybody's membership period. Narrowing to the membership period plus its exit
+    boundary made the real full-window replay raise ``missing current mark for held symbols:
+    ['TRBUSDT']``; this is that defect, reduced to the fixture.
     """
     damaged = _without_one_mark(panel)
     membership = _extend(damaged)
-    assert UNMARKED not in _members_at(membership, BOUNDARIES[0])
+    assert UNMARKED not in _members_at(membership, BOUNDARIES[0]), "S05 must lose its seat here"
     narrowed = narrow_mark_panel(damaged[MARK_PRICES], membership)
     retained = set(zip(narrowed["symbol"], narrowed["mark_time"], strict=True))
-    assert (UNMARKED, BOUNDARIES[0]) in retained
-    assert (UNMARKED, BOUNDARIES[0] + pd.Timedelta(hours=16)) not in retained
+    for offset in (0, 16, 24, 48, 72):
+        moment = BOUNDARIES[0] + pd.Timedelta(hours=offset)
+        assert (UNMARKED, moment) in retained, (UNMARKED, moment)
+
+
+def test_marks_from_before_a_symbol_is_admitted_are_narrowed_away(panel: dict[str, pd.DataFrame]):
+    """The one direction that IS safe: no position can exist before the symbol is first eligible."""
+    membership = _extend(panel)
+    admitted = pd.Timestamp(membership["reconstitution_time"].min())
+    before = panel[MARK_PRICES].loc[panel[MARK_PRICES]["mark_time"] < admitted]
+    assert not before.empty, "the fixture must carry marks from before the first admission"
+    narrowed = narrow_mark_panel(panel[MARK_PRICES], membership)
+    assert narrowed["mark_time"].min() >= admitted
 
 
 def test_narrowing_never_removes_a_mark_a_member_needs(panel: dict[str, pd.DataFrame]):

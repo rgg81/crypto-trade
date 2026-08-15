@@ -166,12 +166,40 @@ reimplement the ranking, the median-volume statistic, or the mark-coverage rule.
    `ENAUSDT`, `HYPEUSDT`, `RIVERUSDT`, `TAOUSDT`. The universe has already turned over since the
    tournament window; treating the sealed metadata as sufficient would fail on day one.
 3. **The sealed mark panel is NOT narrowed to membership periods** — 77 symbols carry marks against
-   41 that were ever members. The earlier plan text asserting otherwise was wrong. The narrowing
-   Task 3 implements is INCLUSIVE of the exit boundary, because `evaluate_targets` force-closes a
-   departing member AT the boundary it stops being eligible and raises without that mark. A
-   half-open reading deletes precisely the mark the force-exit needs.
+   41 that were ever members. The earlier plan text asserting otherwise was wrong. **Superseded by
+   Task 4, see fact 5: the narrowing keeps everything from a symbol's first admission ONWARD.**
 4. **Warm-up bars below `IS_START` are retained.** Truncating them silently shortens every
    formation window. The decision grid still begins at `IS_START`.
+
+---
+
+### Operational facts established by Task 4 — Tasks 5-6 depend on these
+
+5. **The mark panel may only be narrowed at the FRONT.** Task 3's rule — the membership period plus
+   its exit boundary — is what the position record shows *after* execution, and it is wrong: a
+   departing member's mandatory exit is filled against `max_bar_participation` = 0.001 of a bar's
+   volume, so a large position in a thin name is still on the book several boundaries later, at
+   instants inside nobody's membership period. The first real full-window replay raised `missing
+   current mark for held symbols: ['TRBUSDT']` out of the evaluator; `1000BONKUSDT`, `PNUTUSDT` and
+   a five-day `FTMUSDT`/`SOLUSDT`/`XRPUSDT` unwind in Feb 2022 do the same. `narrow_mark_panel` now
+   keeps every mark at or after a symbol's first admission and nothing before it, which is the only
+   statically safe rule. Verified: the narrowed panel reproduces the un-narrowed one's evaluation
+   bit for bit over the whole six-year window.
+6. **The record is `desk/ledger/{forward_returns,paper_fills}.parquet`; the CSVs are renderings.**
+   The ledgers are appended through `live_data.append_frame` under a caller-declared `FrameSchema`
+   (which `frame_schema` now accepts, so there is exactly one implementation of "has a recorded row
+   changed"), and the CSVs are rewritten from the ledgers on every tick. **The healthcheck must
+   bind both**, and must treat a CSV that disagrees with its ledger as drift.
+7. **`desk/snapshot/` is a work product, not an artifact.** It is reassembled on every tick and
+   legitimately grows with the window; only the ledgers, the CSVs, `boundaries/`,
+   `latest-boundary.json` and `integrity.json` are the record. Boundary records are named
+   `boundaries/YYYYMMDDTHHMMSSZ.json`.
+8. **`integrity.json` pins `official_start`, `seam` and `is_start`,** and `run_tick` reads them back
+   rather than recomputing. A tick that would use a different `seam` or `is_start` raises
+   `DeskPinDriftError` before writing an artifact. The runner must not pass window overrides.
+9. **One tick costs ~410 s** against the real 6525-boundary window (assembly is 1.3 s of it), so a
+   25-minute publication lag and an 8-hourly grid leave ample headroom, but two ticks must never
+   overlap — the `fcntl` engine lock in Task 5 is load-bearing.
 
 ---
 
