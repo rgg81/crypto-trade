@@ -16,6 +16,11 @@ DESK_DIR="$ROOT/paper-cup20"
 LOG_DIR="$ROOT/logs"
 WATCHDOG_LOG="$LOG_DIR/cup20_paper_watchdog.log"
 ENGINE_LOG="$LOG_DIR/cup20_paper.log"
+# The runner's own FileHandler owns ENGINE_LOG. Redirecting stdout there too put two writers on one
+# file and every structured line appeared twice -- which reads, in a monitor, exactly like two
+# engines running. Uncaught output (a traceback before logging is configured, or from a library)
+# still has to go somewhere, so it goes to its own file.
+ENGINE_STDOUT="$LOG_DIR/cup20_paper.stdout.log"
 UV=/home/roberto/.local/bin/uv
 
 mkdir -p "$DESK_DIR" "$LOG_DIR"
@@ -41,5 +46,5 @@ fi
 cd "$ROOT"
 PYTHONUNBUFFERED=1 nohup "$UV" run python run_cup20_paper.py \
     </dev/null \
-    >>"$ENGINE_LOG" 2>&1 9>&- &
+    >>"$ENGINE_STDOUT" 2>&1 9>&- &
 log "engine was not running; started pid $! (paper only, no orders), logging to $ENGINE_LOG"
