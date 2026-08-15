@@ -154,6 +154,27 @@ reimplement the ranking, the median-volume statistic, or the mark-coverage rule.
 
 ---
 
+### Operational facts established by Tasks 2a/3 — Tasks 4-6 depend on these
+
+1. **The cache must hold the WIDE cross-section, not just members.** The trailing-180-day median
+   volume ranking needs every eligible symbol, not the twenty currently in. The desk must fetch the
+   full cross-section back at least 180 days before its first forward boundary or that boundary
+   cannot be scored at all. `data/cup20/acquisition` (670 symbols) is the shape; the split
+   member-only snapshots cannot reproduce a reconstitution and never could.
+2. **The desk must fetch its own `contract_metadata`.** The split snapshots scope metadata to the
+   62 symbols visible in-sample, and **four of today's twenty members are absent from both**:
+   `ENAUSDT`, `HYPEUSDT`, `RIVERUSDT`, `TAOUSDT`. The universe has already turned over since the
+   tournament window; treating the sealed metadata as sufficient would fail on day one.
+3. **The sealed mark panel is NOT narrowed to membership periods** — 77 symbols carry marks against
+   41 that were ever members. The earlier plan text asserting otherwise was wrong. The narrowing
+   Task 3 implements is INCLUSIVE of the exit boundary, because `evaluate_targets` force-closes a
+   departing member AT the boundary it stops being eligible and raises without that mark. A
+   half-open reading deletes precisely the mark the force-exit needs.
+4. **Warm-up bars below `IS_START` are retained.** Truncating them silently shortens every
+   formation window. The decision grid still begins at `IS_START`.
+
+---
+
 ### Task 4: Exact-replay tick (PARITY BY CONSTRUCTION)
 
 **The design decision that makes parity provable rather than tested.** The desk does NOT
