@@ -6,6 +6,13 @@
 **Goal:** Run CUP-20's winner — team-02 `channel-position-ls` — as a hash-bound, append-invariant
 paper desk for six months of forward observation, with a healthcheck, a digest and a monitor skill.
 
+**"Winner" means the HOLDOUT winner, and the distinction matters when reading the artifacts.**
+team-02 ranked **3rd in-sample** (G 70.58), behind team-09 (91.25) and team-12 (84.27). It won on
+the sealed window: holdout G 65.979 against 54.54 and 0.00, all six section 8 conditions passing,
+while the in-sample leader lost money out of sample. `selection-freeze.json` is ordered by
+IN-SAMPLE rank, so team-02 appears third in it; `holdout-observations.json` carries the result.
+Never describe team-02 as the in-sample leader, and never rank finalists off the selection freeze.
+
 **Architecture:** A new package `crypto_trade.cup20_desk` that *consumes* the frozen tournament
 stack without touching it. Forward market data is fetched from Binance public endpoints into a
 rolling snapshot with the same schema as `data/cup20/is`; the point-in-time universe is
