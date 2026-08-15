@@ -157,8 +157,25 @@ def summarise(desk_root: str | Path) -> Digest:
         returns=official.set_index("timestamp"),
         events=fills.loc[fills["phase"] == OFFICIAL],
     )
-    daily = daily_returns(evaluation)
-    metrics = window_metrics(evaluation)
+    # Before the first official bar there is nothing to summarise, and the tournament's
+    # `window_metrics` cannot be asked: on an empty window `daily_returns` returns a Series whose
+    # index is a bare RangeIndex, and the quarterly grouping inside `window_metrics` calls
+    # `tz_convert` on it and raises. That happens twice in a desk's life -- before the first tick,
+    # and throughout the unscored bridge -- and both are ordinary states, not failures. The fix
+    # belongs here rather than in `crypto_trade.cup20.metrics`, which is hash-bound by the
+    # activation freeze: the digest simply declines to ask a question the official window cannot
+    # answer yet, and reports zeros with `official_bars == 0` saying why.
+    if official.empty:
+        daily = pd.Series(dtype=float)
+        metrics = types.SimpleNamespace(
+            annualized_return=0.0,
+            net_sharpe=0.0,
+            max_drawdown=0.0,
+            annualized_turnover=0.0,
+        )
+    else:
+        daily = daily_returns(evaluation)
+        metrics = window_metrics(evaluation)
     net = official["net_return"].astype(float)
     growth = float((1.0 + net).prod()) if len(net) else 1.0
 

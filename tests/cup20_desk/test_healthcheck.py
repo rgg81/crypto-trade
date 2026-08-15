@@ -433,6 +433,28 @@ def test_ninety_official_bars_is_sufficient(tmp_path: Path):
     assert "INSUFFICIENT" not in summary.render()
 
 
+def test_a_desk_with_no_official_rows_summarises_rather_than_raising(tmp_path: Path):
+    """The two states every desk passes through before its first official bar must both report.
+
+    A desk that has never ticked has no ledger at all; a desk inside the unscored bridge has one
+    holding only bridge rows. Neither can be handed to the tournament's `window_metrics` -- an
+    empty window's daily index is not tz-aware and the quarterly grouping raises on it -- and both
+    are ordinary states the monitor reads routinely, so the digest must render them.
+    """
+    never_ticked = tmp_path / "never-ticked"
+    never_ticked.mkdir()
+    bridge_only = tmp_path / "bridge-only"
+    _ledger(bridge_only, [BRIDGE] * 12)
+
+    for root in (never_ticked, bridge_only):
+        summary = digest.summarise(root)
+        assert summary.official_bars == 0
+        assert summary.official_days == 0
+        assert not summary.sufficient
+        assert "INSUFFICIENT" in summary.render()
+    assert digest.summarise(bridge_only).bridge_bars == 12
+
+
 def test_the_digest_states_no_verdict(tmp_path: Path):
     _ledger(tmp_path, [OFFICIAL] * 120)
     rendered = digest.summarise(tmp_path).render().lower()
