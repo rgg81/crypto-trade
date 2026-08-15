@@ -41,6 +41,11 @@ logs/
 paper-team09/
 paper-team09-backups/
 
+# CUP-20 winner forward paper desk: a runtime working directory. It holds the desk's own market
+# cache (the wide Binance cross-section, hundreds of MB), a snapshot reassembled on every tick, and
+# the append-invariant forward ledgers. All of it is regenerable and none of it is source.
+paper-cup20/
+
 # Iteration artifacts — regenerable, large, binary
 reports/
 models/

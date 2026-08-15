@@ -557,11 +557,26 @@ def test_the_artifacts_and_their_bindings_are_written(ticked):
     assert integrity["boundary"] == AFTER_OFFICIAL_TICK.isoformat()
     for field in AUTHORITY_FIELDS:
         assert integrity[field] == getattr(results[-1].authority, field)
-    for name in ("forward_returns", "paper_fills", "current_positions", "boundary", "latest"):
+    # Both the renderings and the ledgers they render, under distinct names: an earlier merge
+    # collided the two and bound only the ledgers, leaving the published CSVs unbound.
+    for name in (
+        "forward_returns",
+        "paper_fills",
+        "current_positions",
+        "boundary",
+        "latest",
+        "forward_returns_ledger",
+        "paper_fills_ledger",
+    ):
         binding = integrity["artifacts"][name]
         path = desk.root / binding["path"]
         assert path.is_file()
         assert binding["sha256"] == hashlib.sha256(path.read_bytes()).hexdigest()
+    assert integrity["artifacts"]["forward_returns"]["path"] == "forward_returns.csv"
+    assert (
+        integrity["artifacts"]["forward_returns_ledger"]["path"]
+        == "ledger/forward_returns.parquet"
+    )
     record = desk.root / "boundaries" / "20260202T080000Z.json"
     assert record.is_file()
     assert json.loads(record.read_text()) == json.loads(

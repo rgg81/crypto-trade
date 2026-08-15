@@ -620,7 +620,14 @@ def persist_tick(result: TickResult, desk_root: str | Path) -> dict[str, Path]:
         fills=fills,
         appended=appended,
         artifacts=written,
-        ledgers={"forward_returns": forward_ledger, "paper_fills": fills_ledger},
+        # Suffixed, because the CSVs are already bound under the bare frame names and a plain
+        # `{**artifacts, **ledgers}` merge silently REPLACED them: the record's two most important
+        # files were bound and the two renderings were not, which is exactly backwards from what a
+        # reader of `artifacts` would assume. Both are bound now, under distinct names.
+        ledgers={
+            f"{FORWARD_RETURN_SCHEMA.name}_ledger": forward_ledger,
+            f"{FILL_SCHEMA.name}_ledger": fills_ledger,
+        },
     )
     written["integrity"] = _write_json(integrity, root / INTEGRITY_JSON)
     written["forward_ledger"] = forward_ledger

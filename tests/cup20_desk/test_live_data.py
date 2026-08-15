@@ -46,6 +46,7 @@ from crypto_trade.cup20_desk.live_data import (
     LifecycleTransition,
     PublicMarketDataClient,
     _require_total_classification,
+    _snap_funding_intervals,
     append_frame,
     cache_manifest,
     conform_frame,
@@ -144,6 +145,7 @@ class _StubBinance:
         switch_interval_hours: int = 4,
         bar_skew_ms: int = 0,
         mark_skew_ms: int = 0,
+        funding_jitter_ms: tuple[int, ...] = (),
     ) -> None:
         self.symbols = symbols
         self.funding_interval_hours = funding_interval_hours
@@ -152,6 +154,11 @@ class _StubBinance:
         self.switch_interval_hours = switch_interval_hours
         self.bar_skew_ms = bar_skew_ms
         self.mark_skew_ms = mark_skew_ms
+        # Publication jitter on the funding timestamp, cycled over the schedule. The real venue
+        # stamps settlements a few milliseconds late (`08:00:00.005`); a stub that emits a perfect
+        # grid is constant along the very dimension the interval derivation is sensitive to, and
+        # therefore cannot see an interval derived as 8.000001 where the archive says 8.0.
+        self.funding_jitter_ms = funding_jitter_ms
         self.requests: list[httpx.Request] = []
 
     def funding_times(self) -> list[int]:
@@ -166,7 +173,12 @@ class _StubBinance:
         switch = None if self.funding_switch is None else _milliseconds(self.funding_switch)
         times: list[int] = []
         while cursor < horizon:
-            times.append(cursor)
+            jitter = (
+                self.funding_jitter_ms[len(times) % len(self.funding_jitter_ms)]
+                if self.funding_jitter_ms
+                else 0
+            )
+            times.append(cursor + jitter)
             hours = (
                 self.switch_interval_hours
                 if switch is not None and cursor >= switch
@@ -376,6 +388,41 @@ def test_fetch_forward_derives_a_four_hour_funding_interval():
     assert (frames["funding"]["funding_interval_hours"] == 4.0).all()
     off_grid = frames["funding"]["settlement_time"].dt.hour % 8 != 0
     assert off_grid.any(), "a 4h schedule must produce marks off the 8h grid"
+
+
+def test_the_funding_interval_survives_settlement_timestamp_jitter():
+    """The sealed panel's ``8.0`` and the desk's derived ``8.000001`` are the same schedule.
+
+    Binance stamps settlements a few milliseconds late, so an interval derived from the spacing
+    between adjacent events is a whisker off a whole hour, while the monthly archives that built the
+    sealed snapshot publish the column outright as exactly ``8.0``. The desk's cache necessarily
+    overlaps the sealed window -- it has to reach back a complete liquidity lookback -- and
+    ``snapshot_forward._stack`` refuses any disagreement between two sources about one key, so the
+    unsnapped value aborted the first real tick with ``SourceConflictError``. Measured against the
+    real venue, 92 of 120 overlapping rows disagreed in this column and no other.
+    """
+    stub = _StubBinance(funding_jitter_ms=(0, 5, 3, 0, 7))
+    frames = fetch_forward(
+        SYMBOLS, WINDOW_START, WINDOW_END, transport=stub.transport(), sleep=lambda _s: None
+    )
+    funding = frames["funding"]
+    assert not funding.empty
+    jittered = funding["funding_time"].dt.microsecond != 0
+    assert jittered.any(), "the stub must actually publish jittered settlements"
+    assert (funding["funding_interval_hours"] == 8.0).all()
+    assert (funding["settlement_time"] == funding["funding_time"].dt.floor("h")).all()
+
+
+def test_an_irregular_funding_gap_is_not_snapped_to_a_whole_hour():
+    """Snapping absorbs jitter, and only jitter. A real gap still arrives as itself.
+
+    Otherwise the tolerance would be a silent repair: a relisted contract or a missed settlement
+    would be rewritten into a schedule it never had, and the append-invariance check downstream
+    would compare a number nobody observed.
+    """
+    values = pd.Series([8.0, 8.000001, 7.999999, 8.5, 26.25, 0.02])
+    snapped = _snap_funding_intervals(values)
+    assert list(snapped) == [8.0, 8.0, 8.0, 8.5, 26.25, 0.02]
 
 
 def test_funding_intervals_agree_across_overlapping_windows(tmp_path: Path):

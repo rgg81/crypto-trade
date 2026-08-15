@@ -143,6 +143,13 @@ FUNDING_LIMIT = 1000
 # already-recorded interval differently and abort on its own arithmetic.
 FUNDING_CONTEXT = pd.Timedelta(days=3)
 
+FUNDING_INTERVAL_TOLERANCE = pd.Timedelta(seconds=60)
+"""How far a derived funding interval may sit from a whole hour and still be read as that hour.
+See :func:`_snap_funding_intervals`; the jitter this absorbs is measured in milliseconds and the
+smallest interval the venue runs is an hour, so the tolerance cannot reach a real schedule."""
+
+SECONDS_PER_HOUR = 3600.0
+
 MANIFEST_FILENAME = "cache-manifest.json"
 CACHE_SCHEMA_VERSION = "cup20-desk-cache-v1"
 
@@ -983,6 +990,10 @@ def _fetch_funding(
     ``mark_price`` is the open of the 1h mark kline at the settlement's floor hour, joined by
     ``_attach_mark_prices``, and using a second definition of the same column would put two
     different numbers under one name across the seam.
+
+    The derived interval is then snapped to the venue's whole-hour schedule -- see
+    :func:`_snap_funding_intervals`, which exists because the two sources of this one column do not
+    otherwise agree.
     """
     frames: list[pd.DataFrame] = []
     for symbol in symbols:
@@ -1002,6 +1013,7 @@ def _fetch_funding(
             }
         )
         frame = derive_funding_intervals(frame, symbol=symbol)
+        frame["funding_interval_hours"] = _snap_funding_intervals(frame["funding_interval_hours"])
         in_window = (frame["funding_time"] >= start) & (frame["funding_time"] < end)
         kept = frame.loc[in_window]
         if not kept.empty:
@@ -1010,6 +1022,38 @@ def _fetch_funding(
         return empty_frame(FUNDING)
     events = pd.concat(frames, ignore_index=True).sort_values(["funding_time", "symbol"])
     return conform_frame(FUNDING, attach_mark_prices(events.reset_index(drop=True), hourly))
+
+
+def _snap_funding_intervals(intervals: pd.Series) -> pd.Series:
+    """Round a derived interval onto the venue's whole-hour schedule, within a tight tolerance.
+
+    **Why this exists, because it is not cosmetic.** ``funding_interval_hours`` reaches the sealed
+    snapshot two different ways. Binance's monthly funding archives publish the column outright, as
+    an exact whole number (the sealed panel holds only ``1.0``, ``4.0`` and ``8.0``), so the
+    acquisition's ``_derive_missing_funding_intervals`` never fires for an archive month. The REST
+    endpoint the desk must read publishes no interval at all, so every forward row is DERIVED, from
+    the spacing to the previous settlement -- and Binance stamps settlements with a few milliseconds
+    of publication jitter (``08:00:00.005``). The derived value is therefore ``8.000001`` where the
+    archive says ``8.0``.
+
+    Left alone that is a hard abort on the desk's very first tick, and it was: the cache must reach
+    back a complete 180-day liquidity lookback, which necessarily overlaps the sealed window, and
+    ``crypto_trade.cup20_desk.snapshot_forward._stack`` refuses ANY disagreement between two sources
+    about one key. Measured against the real venue and the real sealed panel, 92 of 120 overlapping
+    funding rows disagreed in this column alone; ``bars`` and ``mark_prices`` agreed bit for bit.
+
+    So the jitter is treated as what it is -- noise in the published timestamp, not a different
+    schedule. A spacing within :data:`FUNDING_INTERVAL_TOLERANCE` of a whole hour becomes that whole
+    hour; anything further away is left exactly as derived, so a genuinely irregular gap (a relisted
+    contract, a missed settlement) still reaches the caller as itself and, if it contradicts a
+    recorded row, still aborts. The tolerance is a minute against jitter measured in milliseconds
+    and a smallest real interval of one hour, so no real schedule can be reached by it.
+    """
+    values = intervals.astype(float)
+    whole = values.round()
+    off_by = (values - whole).abs() * SECONDS_PER_HOUR
+    snappable = (whole > 0.0) & (off_by <= FUNDING_INTERVAL_TOLERANCE.total_seconds())
+    return values.where(~snappable, whole)
 
 
 def _fetch_contract_metadata(
