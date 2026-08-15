@@ -101,6 +101,33 @@ Binance public endpoints only (klines, fundingRate, premiumIndex). Rate-limit po
 
 ---
 
+### Task 2a (prerequisite for Task 3): delisting is a transition, not a revision
+
+**Decided, after Task 2 raised it.** `contract_metadata` keyed on `(symbol,)` under strict
+append-invariance aborts when a symbol is delisted mid-window, because its provenance flips
+`current_exchangeInfo` -> `archive_inference`. Over six months on a twenty-name crypto universe
+this WILL fire, and a desk that halts on a routine delisting is not operational.
+
+The rule is wrong, not the event. Append-invariance exists to catch a **revised fact** — a bar whose
+OHLCV changed underneath us. A contract ceasing to exist is not a revision of an old fact; it is a
+new fact about a later time, and the tournament's own execution contract already treats delisting as
+normal ("force exit at the last executable open, no survivorship rescue").
+
+`append_frame` must therefore permit a **declared one-way transition** on `contract_metadata`:
+`current_exchangeInfo` -> `archive_inference`, and a live contract becoming delisted. Any other
+change to an existing metadata row — a changed tick size, a changed quote asset, a delisted contract
+returning to live — remains a hard abort. The permitted transitions are a frozen allowlist in the
+module, not a general "metadata may change" escape hatch.
+
+- [ ] **Step 1: failing test** — a delisting appends/transitions cleanly; a tick-size change on an
+      existing row still aborts; a delisted->live reversal aborts.
+- [ ] **Step 2: run, confirm failure**
+- [ ] **Step 3: implement**
+- [ ] **Step 4: tests pass; mutation-prove the allowlist is not a blanket bypass**
+- [ ] **Step 5: commit**
+
+---
+
 ### Task 3: Rolling universe and snapshot assembly
 
 **Files:**
