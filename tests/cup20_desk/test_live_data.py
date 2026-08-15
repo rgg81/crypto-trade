@@ -27,19 +27,24 @@ import pytest
 
 from crypto_trade.cup20.activation import verify_activation
 from crypto_trade.cup20_desk.live_data import (
+    CONTRACT_LIFECYCLE_TRANSITIONS,
+    DELISTING,
     EXCHANGE_INFO_ENDPOINT,
     FUNDING_RATE_ENDPOINT,
     KLINES_ENDPOINT,
     MANIFEST_FILENAME,
     MARK_PRICE_KLINES_ENDPOINT,
     PUBLIC_ENDPOINTS,
+    SNAPSHOT_DATASETS,
     SNAPSHOT_FRAMES,
     SNAPSHOT_SCHEMAS,
     AppendInvarianceError,
     BinancePublicDataError,
     CacheDriftError,
     FrameSchemaError,
+    LifecycleTransition,
     PublicMarketDataClient,
+    _require_total_classification,
     append_frame,
     cache_manifest,
     conform_frame,
@@ -260,7 +265,7 @@ def forward(stub: _StubBinance) -> dict[str, pd.DataFrame]:
 
 
 @pytest.mark.parametrize("root", [IS_ROOT, SEALED_ROOT], ids=["is", "sealed"])
-@pytest.mark.parametrize("name", SNAPSHOT_FRAMES)
+@pytest.mark.parametrize("name", SNAPSHOT_DATASETS)
 def test_declared_schema_matches_the_real_snapshot(root: Path, name: str):
     """Column for column, in order, and dtype for dtype, against the bytes the tournament sealed."""
     actual = pd.read_parquet(root / f"{name}.parquet")
@@ -271,7 +276,7 @@ def test_declared_schema_matches_the_real_snapshot(root: Path, name: str):
     )
 
 
-@pytest.mark.parametrize("name", SNAPSHOT_FRAMES)
+@pytest.mark.parametrize("name", SNAPSHOT_DATASETS)
 def test_empty_frame_carries_the_snapshot_dtypes(name: str):
     snapshot = pd.read_parquet(IS_ROOT / f"{name}.parquet")
     blank = empty_frame(name)
@@ -280,7 +285,7 @@ def test_empty_frame_carries_the_snapshot_dtypes(name: str):
 
 
 @pytest.mark.parametrize("root", [IS_ROOT, SEALED_ROOT], ids=["is", "sealed"])
-@pytest.mark.parametrize("name", SNAPSHOT_FRAMES)
+@pytest.mark.parametrize("name", SNAPSHOT_DATASETS)
 def test_written_parquet_matches_the_snapshot_arrow_schema(tmp_path: Path, root: Path, name: str):
     """The loader reads arrow, not pandas -- so the arrow schema is what must match."""
     written = tmp_path / f"{name}.parquet"
@@ -318,7 +323,7 @@ def test_natural_keys_are_the_ones_the_desk_appends_on():
 
 
 @pytest.mark.parametrize("root", [IS_ROOT, SEALED_ROOT], ids=["is", "sealed"])
-@pytest.mark.parametrize("name", SNAPSHOT_FRAMES)
+@pytest.mark.parametrize("name", SNAPSHOT_DATASETS)
 def test_every_key_is_unique_in_the_snapshot(root: Path, name: str):
     """A key that is not unique in the snapshot is not a natural key."""
     snapshot = pd.read_parquet(root / f"{name}.parquet")
@@ -604,6 +609,225 @@ def test_append_frame_keeps_the_snapshot_row_order(tmp_path: Path):
     stored = pd.read_parquet(path)
     expected = frame.sort_values(["open_time", "symbol"]).reset_index(drop=True)
     pd.testing.assert_frame_equal(stored, expected)
+
+
+# --------------------------------------------------------------------------------------------
+# delisting is a transition, not a revision
+# --------------------------------------------------------------------------------------------
+
+LIVE_CONTRACT = {
+    "symbol": "DELISTUSDT",
+    "contract_type": "PERPETUAL",
+    "quote_asset": "USDT",
+    "margin_asset": "USDT",
+    "is_crypto": True,
+    "onboard_date": pd.Timestamp("2021-03-01T00:00:00Z"),
+    "delivery_date": pd.Timestamp(PERPETUAL_DELIVERY_MS, unit="ms", tz="UTC"),
+    "underlying_type": "COIN",
+    "metadata_source": "current_exchangeInfo",
+}
+
+# What `crypto_trade.tournament.snapshot._contract_metadata` writes once the symbol has left live
+# exchangeInfo: archive-inferred, with a real delivery date and an onboard date read off whatever
+# bars that fetch happened to hold.
+DELISTED_CONTRACT = LIVE_CONTRACT | {
+    "onboard_date": pd.Timestamp("2026-08-03T00:00:00Z"),
+    "delivery_date": pd.Timestamp("2026-08-06T08:00:00Z"),
+    "underlying_type": "ARCHIVE_INFERRED_COIN",
+    "metadata_source": "archive_inference",
+}
+
+
+def _metadata(*rows: dict[str, object]) -> pd.DataFrame:
+    return conform_frame("contract_metadata", pd.DataFrame(list(rows)))
+
+
+@pytest.fixture
+def recorded_metadata(tmp_path: Path) -> Path:
+    path = tmp_path / "contract_metadata.parquet"
+    append_frame(path, _metadata(LIVE_CONTRACT))
+    return path
+
+
+def test_a_delisting_transitions_the_recorded_row(recorded_metadata: Path):
+    """The event this exists for: a member leaves exchangeInfo and the desk keeps running."""
+    result = append_frame(recorded_metadata, _metadata(DELISTED_CONTRACT))
+    assert (result.appended, result.unchanged, result.transitioned) == (0, 0, 1)
+    stored = pd.read_parquet(recorded_metadata).set_index("symbol").loc["DELISTUSDT"]
+    assert stored["metadata_source"] == "archive_inference"
+    assert stored["underlying_type"] == "ARCHIVE_INFERRED_COIN"
+    assert stored["delivery_date"] == DELISTED_CONTRACT["delivery_date"]
+
+
+def test_a_delisting_keeps_the_recorded_onboard_date(recorded_metadata: Path):
+    """The archive branch infers ``onboard_date`` from the fetch window, so the record wins.
+
+    Adopting the incoming value would let a desk that fetches one week at a time rewrite a 2021
+    listing date to last Monday -- a fact getting worse on every tick, under a rule whose whole
+    purpose is that recorded facts do not move.
+    """
+    append_frame(recorded_metadata, _metadata(DELISTED_CONTRACT))
+    stored = pd.read_parquet(recorded_metadata).set_index("symbol").loc["DELISTUSDT"]
+    assert stored["onboard_date"] == LIVE_CONTRACT["onboard_date"]
+
+
+def test_an_earlier_onboard_date_is_a_revision_and_aborts(recorded_metadata: Path):
+    """Later is a narrower window; earlier means the recorded value was simply wrong."""
+    rewound = DELISTED_CONTRACT | {"onboard_date": pd.Timestamp("2020-01-01T00:00:00Z")}
+    with pytest.raises(AppendInvarianceError, match="onboard_date"):
+        append_frame(recorded_metadata, _metadata(rewound))
+
+
+def test_a_second_identical_delisting_is_a_no_op(recorded_metadata: Path):
+    """Idempotent, or the desk aborts on its own transition the tick after it fires."""
+    append_frame(recorded_metadata, _metadata(DELISTED_CONTRACT))
+    digest = hashlib.sha256(recorded_metadata.read_bytes()).hexdigest()
+    result = append_frame(recorded_metadata, _metadata(DELISTED_CONTRACT))
+    assert (result.appended, result.unchanged, result.transitioned) == (0, 1, 0)
+    assert hashlib.sha256(recorded_metadata.read_bytes()).hexdigest() == digest
+
+
+def test_a_delisted_contract_returning_to_live_aborts(recorded_metadata: Path):
+    """The transition is one-way. A reversal is the record moving backwards."""
+    append_frame(recorded_metadata, _metadata(DELISTED_CONTRACT))
+    with pytest.raises(AppendInvarianceError, match="metadata_source"):
+        append_frame(recorded_metadata, _metadata(LIVE_CONTRACT))
+
+
+CONTRACT_IDENTITY_CHANGES = {
+    "quote_asset": "USDC",
+    "margin_asset": "USDC",
+    "contract_type": "CURRENT_QUARTER",
+    "is_crypto": False,
+}
+
+
+@pytest.mark.parametrize("column,value", sorted(CONTRACT_IDENTITY_CHANGES.items()))
+def test_a_changed_contract_identity_aborts_even_alongside_a_delisting(
+    recorded_metadata: Path, column: str, value: object
+):
+    """The allowlist is not a blanket bypass: it permits a state change, not a different contract.
+
+    Bundled WITH a genuine delisting on purpose. Rejecting the change on its own would only prove
+    the transition has to fire; rejecting it while the transition fires proves the allowlist is
+    read column by column rather than as a licence over the whole row.
+    """
+    with pytest.raises(AppendInvarianceError, match=column):
+        append_frame(recorded_metadata, _metadata(DELISTED_CONTRACT | {column: value}))
+
+
+def test_an_identity_change_without_a_delisting_aborts(recorded_metadata: Path):
+    with pytest.raises(AppendInvarianceError, match="quote_asset"):
+        append_frame(recorded_metadata, _metadata(LIVE_CONTRACT | {"quote_asset": "USDC"}))
+
+
+def test_a_delivery_date_may_only_be_brought_forward(recorded_metadata: Path):
+    """A delisting brings an unknown or far-future delivery date onto a date that has arrived."""
+    postponed = DELISTED_CONTRACT | {"delivery_date": pd.Timestamp("2200-01-01T00:00:00Z")}
+    with pytest.raises(AppendInvarianceError, match="delivery_date"):
+        append_frame(recorded_metadata, _metadata(postponed))
+
+
+def test_a_delivery_date_becoming_unknown_aborts(recorded_metadata: Path):
+    erased = DELISTED_CONTRACT | {"delivery_date": pd.NaT}
+    with pytest.raises(AppendInvarianceError, match="delivery_date"):
+        append_frame(recorded_metadata, _metadata(erased))
+
+
+def test_an_unnamed_underlying_type_aborts(recorded_metadata: Path):
+    """``followed`` columns move to a value named in advance, not to any value at all."""
+    invented = DELISTED_CONTRACT | {"underlying_type": "INDEX"}
+    with pytest.raises(AppendInvarianceError, match="underlying_type"):
+        append_frame(recorded_metadata, _metadata(invented))
+
+
+def test_a_transition_leaves_every_other_recorded_row_alone(tmp_path: Path):
+    path = tmp_path / "contract_metadata.parquet"
+    survivor = LIVE_CONTRACT | {"symbol": "STAYUSDT"}
+    append_frame(path, _metadata(LIVE_CONTRACT, survivor))
+    result = append_frame(path, _metadata(DELISTED_CONTRACT, survivor))
+    assert (result.appended, result.unchanged, result.transitioned) == (0, 1, 1)
+    stored = pd.read_parquet(path).set_index("symbol")
+    assert stored.loc["STAYUSDT", "metadata_source"] == "current_exchangeInfo"
+    assert stored.loc["STAYUSDT", "onboard_date"] == LIVE_CONTRACT["onboard_date"]
+
+
+def test_an_aborted_transition_writes_nothing(recorded_metadata: Path):
+    before = recorded_metadata.read_bytes()
+    with pytest.raises(AppendInvarianceError):
+        append_frame(recorded_metadata, _metadata(DELISTED_CONTRACT | {"quote_asset": "USDC"}))
+    assert recorded_metadata.read_bytes() == before
+
+
+@pytest.mark.parametrize("name", [name for name in SNAPSHOT_FRAMES if name != "contract_metadata"])
+def test_no_other_frame_can_transition(tmp_path: Path, name: str):
+    """The allowlist is scoped to one frame. A revised bar or mark still aborts.
+
+    Proved on the frames themselves rather than by reading ``DELISTING.frame``: a bug that dropped
+    the frame check would leave that attribute perfectly correct.
+    """
+    path = tmp_path / f"{name}.parquet"
+    frame = _sample(name)
+    append_frame(path, frame)
+    column, value = CHANGED_VALUES[name]
+    revised = frame.copy()
+    revised.loc[revised.index[0], column] = value
+    with pytest.raises(AppendInvarianceError, match=column):
+        append_frame(path, conform_frame(name, revised))
+
+
+def test_the_allowlist_is_declared_once_and_scoped_to_contract_metadata():
+    assert CONTRACT_LIFECYCLE_TRANSITIONS == (DELISTING,)
+    assert {transition.frame for transition in CONTRACT_LIFECYCLE_TRANSITIONS} == {
+        "contract_metadata"
+    }
+    assert DELISTING.trigger == (
+        "metadata_source",
+        "current_exchangeInfo",
+        "archive_inference",
+    )
+
+
+def test_every_metadata_column_is_classified_by_the_allowlist():
+    """A column nobody classified could be swept into a permissive bucket by a later edit."""
+    classified = (
+        {DELISTING.trigger_column}
+        | set(DELISTING.followed)
+        | set(DELISTING.advanced)
+        | set(DELISTING.deferred)
+        | set(DELISTING.invariant)
+    )
+    assert classified == set(SNAPSHOT_SCHEMAS["contract_metadata"].values)
+
+
+def test_an_incompletely_classified_transition_is_refused_at_declaration():
+    """The import-time guard, exercised: forgetting a column must be loud, not permissive."""
+    partial = dataclasses.replace(DELISTING, invariant=("contract_type", "quote_asset"))
+    with pytest.raises(FrameSchemaError, match="margin_asset"):
+        _require_total_classification(partial)
+
+
+def test_a_transition_may_not_classify_a_column_twice():
+    doubled = LifecycleTransition(
+        name="doubled",
+        frame="contract_metadata",
+        trigger=("metadata_source", "current_exchangeInfo", "archive_inference"),
+        followed={"underlying_type": (("COIN", "ARCHIVE_INFERRED_COIN"),)},
+        advanced=("delivery_date",),
+        deferred=("onboard_date", "delivery_date"),
+        invariant=("contract_type", "quote_asset", "margin_asset", "is_crypto"),
+    )
+    with pytest.raises(FrameSchemaError, match="twice"):
+        _require_total_classification(doubled)
+
+
+def test_a_delisting_survives_a_fetch_that_no_longer_carries_the_symbol(recorded_metadata: Path):
+    """After the delisting week the symbol has no bars, so no metadata row -- and no conflict."""
+    append_frame(recorded_metadata, _metadata(DELISTED_CONTRACT))
+    other = LIVE_CONTRACT | {"symbol": "STAYUSDT"}
+    result = append_frame(recorded_metadata, _metadata(other))
+    assert (result.appended, result.transitioned) == (1, 0)
+    assert set(pd.read_parquet(recorded_metadata)["symbol"]) == {"DELISTUSDT", "STAYUSDT"}
 
 
 # --------------------------------------------------------------------------------------------

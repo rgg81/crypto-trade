@@ -37,11 +37,36 @@ key that was already stored comes back carrying different values, it raises
 stored value and the incoming one available on the exception. Binance revising history underneath a
 running desk invalidates the forward record; it is not a rounding difference to absorb.
 
-One consequence is deliberate and worth stating: ``contract_metadata`` is keyed on ``symbol``
-alone, so a universe member that delists mid-window -- leaving live exchangeInfo and flipping from
-``current_exchangeInfo`` to ``archive_inference`` with a real ``delivery_date`` -- aborts the desk
-rather than silently rewriting its own history. That is a lifecycle event an operator must
-adjudicate, not one the data layer should absorb.
+**Delisting is a transition, not a revision.** ``contract_metadata`` is keyed on ``symbol`` alone,
+so a universe member that delists mid-window -- leaving live exchangeInfo and flipping from
+``current_exchangeInfo`` to ``archive_inference`` with a real ``delivery_date`` -- would abort a
+strictly append-invariant desk. Over six months on a twenty-name crypto universe that WILL happen,
+and a desk that halts on a routine delisting is not operational.
+
+The rule was wrong, not the event. Append invariance exists to catch a *revised fact*: a bar whose
+OHLCV changed underneath us. A contract ceasing to exist is not a revision of an old fact, it is a
+new fact about a later time, and the tournament's own execution contract already treats delisting
+as normal -- a member with no executable open is force-exited at its last executable open, with no
+survivorship rescue. So :data:`CONTRACT_LIFECYCLE_TRANSITIONS` declares exactly one permitted,
+one-way transition on an existing metadata row, and :func:`append_frame` applies it.
+
+It is an allowlist, not an escape hatch, and the difference is enforced three ways. It is scoped to
+``contract_metadata``: a changed close on a bar or a changed mark aborts as before. Within that
+frame each column is classified explicitly -- the trigger, the columns that follow it, the columns
+that may only move one way, and the four that identify the contract and may not move at all -- and
+:func:`_require_total_classification` refuses at import time if that classification does not cover
+every value column, so a schema that grows a column cannot quietly inherit a bypass. And every
+permitted move is directional: ``archive_inference`` never returns to ``current_exchangeInfo``, a
+delivery date may only be brought FORWARD from unknown or far-future to a date that has arrived,
+and a changed ``quote_asset``, ``margin_asset``, ``contract_type`` or ``is_crypto`` is a different
+contract wearing the same ticker and still aborts.
+
+One column is permitted to differ and is deliberately NOT adopted. ``_contract_metadata``'s
+archive-inference branch reads ``onboard_date`` off the bars it was handed, and the desk hands it
+one fetch window rather than the symbol's whole history, so the incoming onboard date is the desk's
+own narrower view of an unchanged fact, not a new one. The recorded value wins, and the incoming
+one may only be LATER -- an earlier one would mean the recorded value was wrong, which is a
+revision and aborts.
 """
 
 from __future__ import annotations
@@ -67,6 +92,7 @@ from pandas.api.types import pandas_dtype
 # lifecycle branches would create a second implementation of the schema, and two implementations
 # can disagree. These cannot -- they are the originals. `crypto_trade/tournament/` is not
 # hash-bound; `crypto_trade/cup20/` is, and nothing here touches it.
+from crypto_trade.cup20.universe import MEMBERSHIP_COLUMNS
 from crypto_trade.tournament.snapshot import _KLINE_COLUMNS as KLINE_FIELDS
 from crypto_trade.tournament.snapshot import _attach_mark_prices as attach_mark_prices
 from crypto_trade.tournament.snapshot import _canonical_bars as canonical_bars
@@ -124,7 +150,16 @@ BARS = "bars"
 FUNDING = "funding"
 MARK_PRICES = "mark_prices"
 CONTRACT_METADATA = "contract_metadata"
+MEMBERSHIP = "membership"
+
 SNAPSHOT_FRAMES: tuple[str, ...] = (BARS, FUNDING, MARK_PRICES, CONTRACT_METADATA)
+"""The four frames :func:`fetch_forward` acquires from public market data."""
+
+SNAPSHOT_DATASETS: tuple[str, ...] = (*SNAPSHOT_FRAMES, MEMBERSHIP)
+"""Every dataset a snapshot directory holds. ``membership`` is DERIVED rather than fetched -- it is
+built by ``crypto_trade.cup20_desk.snapshot_forward`` out of the other four -- but it is written
+alongside them and read back by the tournament's own loader, so its schema is declared here with
+the rest."""
 
 _TIMESTAMP = "datetime64[ns, UTC]"
 _MILLISECOND = 1_000_000
@@ -279,18 +314,35 @@ SNAPSHOT_SCHEMAS: Mapping[str, FrameSchema] = {
         key=("symbol",),
         order=("symbol",),
     ),
+    MEMBERSHIP: FrameSchema(
+        name=MEMBERSHIP,
+        # Column NAMES are imported from the tournament's own universe module rather than repeated
+        # here, so a membership frame this package writes cannot drift from the one
+        # ``build_membership`` produces. The dtypes are read off the sealed parquet, like the rest.
+        columns=MEMBERSHIP_COLUMNS,
+        dtypes=(_TIMESTAMP, "str", "int64", "float64"),
+        key=("reconstitution_time", "symbol"),
+        order=("reconstitution_time", "symbol"),
+    ),
 }
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class AppendResult:
-    """What one append actually did."""
+    """What one append actually did.
+
+    ``transitioned`` counts existing rows that changed state through
+    :data:`CONTRACT_LIFECYCLE_TRANSITIONS`. It is reported separately from ``appended`` and
+    ``unchanged`` precisely because it is the one case in which a recorded row is rewritten: an
+    operator reading a tick's result should see a delisting, not have it absorbed into a count.
+    """
 
     path: Path
     name: str
     appended: int
     unchanged: int
     total: int
+    transitioned: int = 0
 
 
 # ------------------------------------------------------------------------------------------------
@@ -302,7 +354,7 @@ def frame_schema(name: str) -> FrameSchema:
     schema = SNAPSHOT_SCHEMAS.get(name)
     if schema is None:
         raise FrameSchemaError(
-            f"{name!r} is not a CUP-20 snapshot frame; expected one of {SNAPSHOT_FRAMES}"
+            f"{name!r} is not a CUP-20 snapshot frame; expected one of {SNAPSHOT_DATASETS}"
         )
     return schema
 
@@ -380,6 +432,118 @@ def _cast(values: pd.Series, dtype: Any, *, name: str, column: str) -> pd.Series
         return values.astype(dtype)
     except (TypeError, ValueError) as exc:
         raise FrameSchemaError(f"{name}.{column} cannot be read as {dtype}: {exc}") from exc
+
+
+# ------------------------------------------------------------------------------------------------
+# declared lifecycle transitions
+# ------------------------------------------------------------------------------------------------
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class LifecycleTransition:
+    """One declared, one-way change of state an already-recorded row is permitted to make.
+
+    Every value column of the frame falls into exactly one bucket, and
+    :func:`_require_total_classification` refuses at import time if one does not:
+
+    ``trigger``
+        ``(column, from, to)``. The transition fires only when this column moves exactly this way.
+        A row whose trigger has not fired has no permitted changes at all.
+    ``followed``
+        ``column -> permitted (from, to) pairs``. Columns that change WITH the trigger, to a value
+        named in advance. The incoming value is adopted.
+    ``advanced``
+        Timestamp columns that may only be brought FORWARD: from unknown (``NaT``) or from a
+        far-future placeholder to an earlier, real date. A date moving later, or a real date
+        becoming unknown, is a revision. The incoming value is adopted.
+    ``deferred``
+        Timestamp columns the RECORDED value is kept for, because the incoming one is an artifact
+        of the desk's narrower observation window rather than a new fact. The incoming value may
+        only be later; earlier means the recorded value was wrong, which is a revision.
+    ``invariant``
+        The columns that identify the contract. Any change is a different contract wearing the same
+        ticker, and still aborts.
+    """
+
+    name: str
+    frame: str
+    trigger: tuple[str, str, str]
+    followed: Mapping[str, tuple[tuple[str, str], ...]]
+    advanced: tuple[str, ...]
+    deferred: tuple[str, ...]
+    invariant: tuple[str, ...]
+
+    @property
+    def trigger_column(self) -> str:
+        return self.trigger[0]
+
+    def fired(self, recorded: Any, incoming: Any) -> bool:
+        """The transition is happening on this refetch."""
+        _, before, after = self.trigger
+        return recorded == before and incoming == after
+
+    def settled(self, recorded: Any, incoming: Any) -> bool:
+        """The transition already happened, and the source still reports the same state.
+
+        Distinguished from :meth:`fired` because a rolling desk refetches the same window over and
+        over. A ``deferred`` column disagrees on EVERY one of those refetches -- the recorded value
+        was kept, the source keeps re-deriving its own -- so a transition that tolerated the
+        disagreement only while firing would abort on the very next tick. In this state nothing is
+        adopted: the ``deferred`` disagreement is tolerated and anything else still aborts.
+        """
+        _, _, after = self.trigger
+        return recorded == after and incoming == after
+
+
+DELISTING = LifecycleTransition(
+    name="delisting",
+    frame=CONTRACT_METADATA,
+    # The exact literals `crypto_trade.tournament.snapshot._contract_metadata` writes on its two
+    # lifecycle branches, read out of that function rather than assumed: a symbol still in live
+    # exchangeInfo gets `current_exchangeInfo` / the venue's own `underlyingType`, and one that has
+    # left it is archive-inferred.
+    trigger=("metadata_source", "current_exchangeInfo", "archive_inference"),
+    followed={"underlying_type": (("COIN", "ARCHIVE_INFERRED_COIN"),)},
+    advanced=("delivery_date",),
+    deferred=("onboard_date",),
+    invariant=("contract_type", "quote_asset", "margin_asset", "is_crypto"),
+)
+
+CONTRACT_LIFECYCLE_TRANSITIONS: tuple[LifecycleTransition, ...] = (DELISTING,)
+"""The complete, frozen allowlist. A change to an existing row that no entry here classifies is an
+:class:`AppendInvarianceError`, whatever frame it is in."""
+
+
+def _require_total_classification(transition: LifecycleTransition) -> LifecycleTransition:
+    """Refuse a transition that does not decide every value column of its frame.
+
+    The guarantee this buys is the one the allowlist is for: a column nobody classified would be
+    compared by the general path and abort -- fail-closed, so far so good -- but a column added to
+    the schema and quietly swept into a permissive bucket would not. Requiring an exact partition
+    means the classification has to be revisited by hand whenever the frame changes.
+    """
+    schema = frame_schema(transition.frame)
+    buckets = (
+        (transition.trigger_column,),
+        tuple(transition.followed),
+        transition.advanced,
+        transition.deferred,
+        transition.invariant,
+    )
+    classified = [column for bucket in buckets for column in bucket]
+    if len(classified) != len(set(classified)):
+        raise FrameSchemaError(f"{transition.name} classifies a column twice")
+    if set(classified) != set(schema.values):
+        difference = sorted(set(classified) ^ set(schema.values))
+        raise FrameSchemaError(
+            f"{transition.name} does not classify exactly the value columns of {transition.frame}; "
+            f"{difference} is classified by one and not the other"
+        )
+    return transition
+
+
+for _transition in CONTRACT_LIFECYCLE_TRANSITIONS:
+    _require_total_classification(_transition)
 
 
 # ------------------------------------------------------------------------------------------------
@@ -905,6 +1069,10 @@ def append_frame(path: str | Path, frame: pd.DataFrame, *, name: str | None = No
     Rows already on disk are compared value for value against the incoming ones under the frame's
     natural key. A difference is :class:`AppendInvarianceError` and nothing is written -- the stored
     file is left exactly as it was, and the exception carries both values.
+
+    The single exception is a lifecycle transition an entry in
+    :data:`CONTRACT_LIFECYCLE_TRANSITIONS` classifies in full. Such a row is rewritten in place,
+    counted in :attr:`AppendResult.transitioned`, and nothing else about it moves.
     """
     target = Path(path)
     resolved = name or infer_frame_name(frame)
@@ -923,11 +1091,12 @@ def append_frame(path: str | Path, frame: pd.DataFrame, *, name: str | None = No
         if target.is_file()
         else empty_frame(resolved)
     )
-    _require_append_invariance(schema, existing, incoming, target)
+    transitions = _resolve_overlap(schema, existing, incoming, target)
+    settled = _apply_transitions(schema, existing, transitions)
 
     additions = incoming.merge(existing.loc[:, key], on=key, how="left", indicator=True)
     additions = additions.loc[additions["_merge"] == "left_only", list(schema.columns)]
-    combined = pd.concat([existing, additions], ignore_index=True) if len(additions) else existing
+    combined = pd.concat([settled, additions], ignore_index=True) if len(additions) else settled
     result = conform_frame(resolved, combined.sort_values(list(schema.order), kind="stable"))
     if not target.is_file() or not result.equals(existing):
         _write_parquet(result, target)
@@ -935,37 +1104,134 @@ def append_frame(path: str | Path, frame: pd.DataFrame, *, name: str | None = No
         path=target,
         name=resolved,
         appended=int(len(additions)),
-        unchanged=int(len(incoming) - len(additions)),
+        unchanged=int(len(incoming) - len(additions) - len(transitions)),
         total=int(len(result)),
+        transitioned=int(len(transitions)),
     )
 
 
-def _require_append_invariance(
+def _resolve_overlap(
     schema: FrameSchema, existing: pd.DataFrame, incoming: pd.DataFrame, path: Path
-) -> None:
+) -> list[tuple[Mapping[str, Any], Mapping[str, Any]]]:
+    """Compare every already-recorded row against its refetch.
+
+    Returns ``(key, adopted values)`` for each row that made a declared lifecycle transition, and
+    raises :class:`AppendInvarianceError` for every other difference. An unchanged overlap returns
+    an empty list, which is the ordinary case on every tick.
+    """
     if existing.empty or incoming.empty:
-        return
+        return []
     key = list(schema.key)
     overlap = existing.merge(
         incoming, on=key, how="inner", suffixes=("__recorded", "__fetched"), validate="one_to_one"
     )
     if overlap.empty:
-        return
-    for column in schema.values:
-        recorded = overlap[f"{column}__recorded"]
-        fetched = overlap[f"{column}__fetched"]
-        differing = ~_element_equal(recorded, fetched)
-        if not differing.any():
+        return []
+    differing = {
+        column: ~_element_equal(overlap[f"{column}__recorded"], overlap[f"{column}__fetched"])
+        for column in schema.values
+    }
+    changed = pd.Series(False, index=overlap.index)
+    for mask in differing.values():
+        changed |= mask
+    if not changed.any():
+        return []
+
+    transitions: list[tuple[Mapping[str, Any], Mapping[str, Any]]] = []
+    for position in overlap.index[changed]:
+        row = overlap.loc[position]
+        columns = [column for column in schema.values if differing[column].loc[position]]
+        adopted, offending = _classify_change(schema, row, columns)
+        if adopted is None:
+            raise AppendInvarianceError(
+                name=schema.name,
+                path=path,
+                key={field: row[field] for field in key},
+                column=offending,
+                existing=row[f"{offending}__recorded"],
+                incoming=row[f"{offending}__fetched"],
+            )
+        if adopted:
+            transitions.append(({field: row[field] for field in key}, adopted))
+    return transitions
+
+
+def _classify_change(
+    schema: FrameSchema, row: pd.Series, columns: Sequence[str]
+) -> tuple[Mapping[str, Any] | None, str]:
+    """Decide whether one row's changes are a declared transition, and which values to adopt.
+
+    Returns ``(None, column)`` naming the column that refused, so the abort message points at the
+    fact that actually changed rather than at the transition machinery. An empty adoption mapping
+    means the differences are tolerated and nothing needs rewriting -- the already-settled refetch
+    of a row that transitioned on an earlier tick.
+    """
+    for transition in CONTRACT_LIFECYCLE_TRANSITIONS:
+        if transition.frame != schema.name:
             continue
-        row = overlap.loc[differing].iloc[0]
-        raise AppendInvarianceError(
-            name=schema.name,
-            path=path,
-            key={field: row[field] for field in key},
-            column=column,
-            existing=row[f"{column}__recorded"],
-            incoming=row[f"{column}__fetched"],
-        )
+        trigger = transition.trigger_column
+        before, after = row[f"{trigger}__recorded"], row[f"{trigger}__fetched"]
+        fired = transition.fired(before, after)
+        if not fired and not transition.settled(before, after):
+            continue
+        adopted: dict[str, Any] = {trigger: after} if fired else {}
+        for column in columns:
+            if column == trigger:
+                continue
+            recorded = row[f"{column}__recorded"]
+            fetched = row[f"{column}__fetched"]
+            if column in transition.deferred:
+                # Permitted to differ, deliberately not adopted -- see the module docstring. The
+                # only bucket tolerated once the transition has already settled.
+                if pd.isna(recorded) or pd.isna(fetched) or fetched < recorded:
+                    return None, column
+            elif not fired:
+                return None, column
+            elif column in transition.followed:
+                if (recorded, fetched) not in transition.followed[column]:
+                    return None, column
+                adopted[column] = fetched
+            elif column in transition.advanced:
+                if pd.isna(fetched) or not (pd.isna(recorded) or fetched < recorded):
+                    return None, column
+                adopted[column] = fetched
+            else:
+                return None, column
+        return adopted, trigger
+    return None, _offending_column(schema, columns)
+
+
+def _offending_column(schema: FrameSchema, columns: Sequence[str]) -> str:
+    """Which changed column to name when nothing classified the change.
+
+    A trigger column that moved is preferred: when a state machine runs backwards -- an
+    ``archive_inference`` row reported live again -- several columns move together, and the one
+    worth naming is the state itself rather than whichever happens to sort first.
+    """
+    triggers = {
+        transition.trigger_column
+        for transition in CONTRACT_LIFECYCLE_TRANSITIONS
+        if transition.frame == schema.name
+    }
+    return next((column for column in columns if column in triggers), columns[0])
+
+
+def _apply_transitions(
+    schema: FrameSchema,
+    existing: pd.DataFrame,
+    transitions: Sequence[tuple[Mapping[str, Any], Mapping[str, Any]]],
+) -> pd.DataFrame:
+    """Rewrite exactly the transitioned rows, leaving every other recorded row untouched."""
+    if not transitions:
+        return existing
+    result = existing.copy()
+    for key, adopted in transitions:
+        selector = pd.Series(True, index=result.index)
+        for field, value in key.items():
+            selector &= result[field] == value
+        for column, value in adopted.items():
+            result.loc[selector, column] = value
+    return conform_frame(schema.name, result)
 
 
 def _element_equal(recorded: pd.Series, fetched: pd.Series) -> pd.Series:
