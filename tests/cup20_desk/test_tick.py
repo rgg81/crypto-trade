@@ -574,8 +574,7 @@ def test_the_artifacts_and_their_bindings_are_written(ticked):
         assert binding["sha256"] == hashlib.sha256(path.read_bytes()).hexdigest()
     assert integrity["artifacts"]["forward_returns"]["path"] == "forward_returns.csv"
     assert (
-        integrity["artifacts"]["forward_returns_ledger"]["path"]
-        == "ledger/forward_returns.parquet"
+        integrity["artifacts"]["forward_returns_ledger"]["path"] == "ledger/forward_returns.parquet"
     )
     record = desk.root / "boundaries" / "20260202T080000Z.json"
     assert record.is_file()
@@ -982,3 +981,36 @@ def test_the_module_reaches_no_network_and_signs_nothing():
 def test_activation_freeze_still_verifies(monkeypatch):
     monkeypatch.chdir(REPO_ROOT)
     verify_activation("tournament/cup20/activation-freeze.json")
+
+
+def test_membership_is_the_universe_in_force_not_every_name_ever_a_member():
+    """Regression: the boundary record published 78 members for a twenty-name universe.
+
+    ``set(membership["symbol"])`` is the union over the whole assembled panel -- six years of
+    turnover -- and it was published under the label "members at the last boundary". A plausible
+    wrong number in a monitor is worse than an obviously wrong one: nobody questions it, and a real
+    break in the universe would hide underneath it.
+    """
+    import pandas as pd
+
+    from crypto_trade.cup20_desk.tick import _members_at
+
+    panel = pd.DataFrame(
+        {
+            "reconstitution_time": [
+                pd.Timestamp("2026-08-03", tz="UTC"),
+                pd.Timestamp("2026-08-03", tz="UTC"),
+                pd.Timestamp("2026-08-10", tz="UTC"),
+                pd.Timestamp("2026-08-10", tz="UTC"),
+            ],
+            "symbol": ["OLDUSDT", "BTCUSDT", "BTCUSDT", "NEWUSDT"],
+        }
+    )
+    at_second = _members_at(panel, pd.Timestamp("2026-08-15", tz="UTC"))
+    assert at_second == ("BTCUSDT", "NEWUSDT")
+    assert "OLDUSDT" not in at_second  # the union would have kept it
+
+    at_first = _members_at(panel, pd.Timestamp("2026-08-05", tz="UTC"))
+    assert at_first == ("BTCUSDT", "OLDUSDT")
+
+    assert _members_at(panel, pd.Timestamp("2026-07-01", tz="UTC")) == ()

@@ -492,8 +492,25 @@ def _read_tail(
         forward_returns=_forward_returns(result.returns, boundary=boundary, pins=pins),
         fills=_fills(result.events, boundary=boundary, pins=pins),
         positions=_positions(result.positions.loc[boundary], boundary=boundary, pins=pins),
-        membership=tuple(sorted(set(snapshot.membership["symbol"]))),
+        membership=_members_at(snapshot.membership, boundary),
     )
+
+
+def _members_at(membership: pd.DataFrame, boundary: pd.Timestamp) -> tuple[str, ...]:
+    """The universe AT this boundary -- the twenty names in force, not every name ever a member.
+
+    The obvious spelling, ``set(membership["symbol"])``, is the union over the whole assembled
+    panel: 78 distinct symbols across six years rather than the 20 in force today. It was published
+    under the label "members at the last boundary", which is a monitoring defect of the worst kind:
+    it reads as a plausible number, so nobody questions it, and a genuine break in the universe --
+    the twenty becoming nineteen, or forty -- would be invisible underneath it.
+    """
+    reconstitutions = membership["reconstitution_time"]
+    effective = reconstitutions[reconstitutions <= boundary]
+    if effective.empty:
+        return ()
+    latest = effective.max()
+    return tuple(sorted(membership.loc[reconstitutions == latest, "symbol"]))
 
 
 def _phase(moment: pd.Timestamp, official_start: pd.Timestamp) -> str:
