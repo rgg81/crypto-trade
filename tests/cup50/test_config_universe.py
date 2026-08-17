@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -106,6 +109,16 @@ def test_frozen_unavailability_audit_is_half_open_and_canonical() -> None:
                 ],
             }
         )
+
+
+def test_unavailability_audit_accepts_hash_bound_organizer_recovery_phase() -> None:
+    payload = json.loads(
+        Path("tournament/cup50/historical-unavailability.json").read_text()
+    )
+    payload["freeze_phase"] = "organizer-recovery-before-terminal"
+    assert load_unavailability_audit(payload) == load_unavailability_audit(
+        "tournament/cup50/historical-unavailability.json"
+    )
 
 
 def test_team_visible_is_unavailability_audit_has_no_oos_window() -> None:

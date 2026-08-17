@@ -35,7 +35,8 @@ def load_unavailability_audit(
         payload.get("schema_version") != 1
         or payload.get("namespace") != "cup50"
         or payload.get("policy_id") != "causal-no-replacement-unavailability-v1"
-        or payload.get("freeze_phase") != "pre-activation-before-feedback"
+        or payload.get("freeze_phase")
+        not in {"pre-activation-before-feedback", "organizer-recovery-before-terminal"}
     ):
         raise ValueError("invalid CUP-50 unavailability audit")
     windows: list[UnavailabilityWindow] = []

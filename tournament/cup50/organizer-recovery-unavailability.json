@@ -1,0 +1,108 @@
+{
+  "freeze_phase": "organizer-recovery-before-terminal",
+  "namespace": "cup50",
+  "policy_id": "causal-no-replacement-unavailability-v1",
+  "rule": "At a canonical decision boundary, a weekly member proven non-trading remains in the frozen roster but is not executable and is never replaced. A position held into the first unavailable boundary is force-settled at the preceding verified transaction bar close with the ordinary per-side cost multiplier and no participation cap; the strategy cannot reopen it while unavailable.",
+  "schema_version": 1,
+  "windows": [
+    {
+      "end": "2025-05-26T00:00:00Z",
+      "evidence": {
+        "daily_1h_archive_sha256": "bbbc23083b6b1eb97d4f91abcf440866217479a22ad12dc6dc22b8fb4ad13cd5",
+        "daily_1m_archive_sha256": "a04177ff288ef7531494ac6125d57684b905bfbd85c0d4b369441b3c96a9cb89",
+        "last_observation_close_time": "2025-05-21T09:03:59.999Z",
+        "last_observation_close": 0.746,
+        "source": "checksum-verified Binance USD-M daily transaction archives"
+      },
+      "reason": "Verified midweek cessation of EOSUSDT trading; no 16:00 UTC transaction open exists.",
+      "start": "2025-05-21T16:00:00Z",
+      "symbol": "EOSUSDT"
+    },
+    {
+      "end": "2025-01-13T00:00:00Z",
+      "evidence": {
+        "last_observation_close": 0.7702,
+        "last_observation_close_time": "2025-01-06T15:59:59.999Z",
+        "monthly_8h_archive_sha256": "3ffafbc660ceed9ad57cde79ec350e9dde4e342bbeb51bd4a0d172e79fdf6ae5",
+        "source": "checksum-verified Binance USD-M monthly transaction archive"
+      },
+      "reason": "Verified midweek cessation of FTMUSDT trading; subsequent canonical rows are zero-trade placeholders.",
+      "start": "2025-01-06T16:00:00Z",
+      "symbol": "FTMUSDT"
+    },
+    {
+      "end": "2022-06-13T00:00:00Z",
+      "evidence": {
+        "last_observation_close": 6.44,
+        "last_observation_close_time": "2022-06-10T15:59:59.999Z",
+        "monthly_8h_archive_sha256": "afb5c238fc77a9bff4559f5d3b83ac5416ea7e1f3a8c211fdb395ef863fb28a6",
+        "source": "checksum-verified Binance USD-M monthly transaction archive"
+      },
+      "reason": "Verified midweek cessation of ICPUSDT trading; the next canonical bar is a zero-trade placeholder.",
+      "start": "2022-06-10T16:00:00Z",
+      "symbol": "ICPUSDT"
+    },
+    {
+      "end": "2022-05-16T00:00:00Z",
+      "evidence": {
+        "daily_8h_archive_sha256": "dea67d24aec3913768d8ac2d37141496712150c94f5a2370d6daa9c1421eb581",
+        "daily_1h_archive_sha256": "5c08a0829589e414d96fc20086ac0c5fabe1e133cc1a9f7a6f3431efcce341a5",
+        "daily_1m_archive_sha256": "fd3beeefd927ea67d8bb2ab4c54dc6587b42fba286e185de696bd192f4682688",
+        "last_observation_close_time": "2022-05-13T06:49:59.999Z",
+        "last_observation_close": 0.008,
+        "source": "checksum-verified Binance USD-M daily transaction archives"
+      },
+      "reason": "Verified midweek cessation of LUNAUSDT trading; no 08:00 UTC transaction open exists.",
+      "start": "2022-05-13T08:00:00Z",
+      "symbol": "LUNAUSDT"
+    },
+    {
+      "end": "2024-09-09T00:00:00Z",
+      "evidence": {
+        "last_observation_close": 0.3846,
+        "last_observation_close_time": "2024-09-04T15:59:59.999Z",
+        "monthly_8h_archive_sha256": "76e7d6fc9c72c89ce7c94242aa806ca63b89ad618ead16d8843c9b97d4334887",
+        "source": "checksum-verified Binance USD-M monthly transaction archive"
+      },
+      "reason": "Verified midweek cessation of MATICUSDT trading; subsequent canonical rows are zero-trade placeholders.",
+      "start": "2024-09-04T16:00:00Z",
+      "symbol": "MATICUSDT"
+    },
+    {
+      "end": "2024-07-22T00:00:00Z",
+      "evidence": {
+        "last_observation_close": 6.6161,
+        "last_observation_close_time": "2024-07-16T15:59:59.999Z",
+        "monthly_8h_archive_sha256": "eee393f0aa36de08c9198bc5de0ce0167bffe891772b8eb2ab453bd0320d9430",
+        "source": "checksum-verified Binance USD-M monthly transaction archive"
+      },
+      "reason": "Verified midweek cessation of RNDRUSDT trading; subsequent canonical rows are zero-trade placeholders.",
+      "start": "2024-07-16T16:00:00Z",
+      "symbol": "RNDRUSDT"
+    },
+    {
+      "end": "2022-06-13T00:00:00Z",
+      "evidence": {
+        "last_observation_close": 0.0347,
+        "last_observation_close_time": "2022-06-09T15:59:59.999Z",
+        "monthly_8h_archive_sha256": "4dc02bea9304aeb6b063da1224e7f278b09c6a70c27f884f2ea3d1d3c459236a",
+        "source": "checksum-verified Binance USD-M monthly transaction archive"
+      },
+      "reason": "Verified midweek cessation of TLMUSDT trading; the next canonical bar is a zero-trade placeholder.",
+      "start": "2022-06-09T16:00:00Z",
+      "symbol": "TLMUSDT"
+    },
+    {
+      "end": "2023-11-20T00:00:00Z",
+      "evidence": {
+        "last_observation_close": 1.2792,
+        "last_observation_close_time": "2023-11-14T15:59:59.999Z",
+        "monthly_8h_archive_sha256": "904f616656c4d53f18ffa0cc789a1ab57af379836cf357217ee6b5fc6718e7a5",
+        "source": "checksum-verified Binance USD-M monthly transaction archive"
+      },
+      "reason": "Verified midweek cessation of TOMOUSDT trading; the next canonical bar is a zero-trade placeholder.",
+      "start": "2023-11-14T16:00:00Z",
+      "symbol": "TOMOUSDT"
+    }
+  ]
+}
