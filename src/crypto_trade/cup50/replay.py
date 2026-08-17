@@ -742,6 +742,20 @@ def _evaluate_targets_reference(
         else:
             end_price = next_rows["open"].reindex(symbols).astype(float)
         unavailable_next = set(unavailable_symbols(unavailability, next_time))
+        next_members = set(
+            _indexed_members_at(membership_boundaries, membership_members, next_time)
+        )
+        # Participation-limited positions can survive a weekly roster exit.  If such a former
+        # member subsequently reaches its last verified positive-activity bar, it cannot be
+        # allowed to turn an organizer execution shortfall into a candidate failure.  Settle it
+        # at that bar's close at the following boundary, exactly like a frozen midweek
+        # unavailability event.  Current members still require the pre-activation audit above.
+        next_symbols = set() if next_rows is None else set(next_rows.index.astype(str))
+        unavailable_next.update(
+            symbol
+            for symbol in set(current_rows.index.astype(str)) - next_members - next_symbols
+            if float(current_rows.at[symbol, "quote_volume"]) > 0.0
+        )
         for symbol in unavailable_next:
             if symbol in end_price.index and pd.isna(end_price[symbol]):
                 end_price.loc[symbol] = current_close.get(symbol, np.nan)
@@ -988,12 +1002,26 @@ def _prepare_execution(
     unavailable_next: list[frozenset[str]] = []
     for row, decision in enumerate(decisions):
         blocked = frozenset(unavailable_symbols(unavailability, decision))
-        following = frozenset(unavailable_symbols(unavailability, decision + step))
+        following = set(unavailable_symbols(unavailability, decision + step))
         suppressed.append(blocked)
-        unavailable_next.append(following)
-        for symbol in _indexed_members_at(
+        current_members = _indexed_members_at(
             membership_boundaries, membership_members, decision
-        ):
+        )
+        next_members = set(
+            _indexed_members_at(membership_boundaries, membership_members, decision + step)
+        )
+        missing_post_exit = (
+            np.isfinite(opens[row])
+            & np.isnan(opens[row + 1])
+            & (np.nan_to_num(quote_volumes[row], nan=0.0) > 0.0)
+        )
+        following.update(
+            symbols[position]
+            for position in np.flatnonzero(missing_post_exit)
+            if symbols[position] not in next_members
+        )
+        unavailable_next.append(frozenset(following))
+        for symbol in current_members:
             position = positions.get(symbol)
             if position is not None and symbol not in blocked:
                 eligible[row, position] = True

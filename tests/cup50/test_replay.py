@@ -415,6 +415,88 @@ def test_participation_limited_deleveraging_is_not_a_candidate_failure() -> None
     assert result.returns.iloc[1]["turnover"] == 0.0
 
 
+def test_carried_post_exit_position_settles_at_last_verified_close() -> None:
+    snapshot = _snapshot()
+    first = snapshot.window_start
+    third = first + pd.Timedelta(hours=16)
+    b_rows = []
+    for offset, symbol, open_price, close_price, volume in (
+        (0, "BUSDT", 10.0, 10.0, 1e9),
+        (8, "BUSDT", 10.0, 10.0, 1e9),
+        (16, "BUSDT", 10.0, 10.0, 1e9),
+    ):
+        opened = first + pd.Timedelta(hours=offset)
+        b_rows.append(
+            [
+                opened,
+                opened + pd.Timedelta(hours=8) - pd.Timedelta(milliseconds=1),
+                symbol,
+                open_price,
+                close_price,
+                volume,
+            ]
+        )
+    bars = pd.concat(
+        [
+            snapshot.bars,
+            pd.DataFrame(b_rows, columns=snapshot.bars.columns),
+        ],
+        ignore_index=True,
+    )
+    # A remains tradable for one boundary after leaving the roster, but there is no capacity to
+    # complete the organizer-owned liquidation before its final archived transaction bar.
+    bars.loc[
+        bars["symbol"].eq("AUSDT") & bars["open_time"].eq(first + pd.Timedelta(hours=8)),
+        "quote_volume",
+    ] = 1.0
+    marks = pd.concat(
+        [
+            snapshot.mark_prices,
+            pd.DataFrame(
+                [[first, "BUSDT", 10.0], [first + pd.Timedelta(hours=8), "BUSDT", 10.0]],
+                columns=snapshot.mark_prices.columns,
+            ),
+        ],
+        ignore_index=True,
+    )
+    membership = pd.DataFrame(
+        [
+            [first, "AUSDT", 1, 1000.0],
+            [first, "BUSDT", 2, 900.0],
+            [first + pd.Timedelta(hours=8), "BUSDT", 1, 900.0],
+        ],
+        columns=snapshot.membership.columns,
+    )
+    carried = dataclasses.replace(
+        snapshot,
+        bars=bars,
+        mark_prices=marks,
+        membership=membership,
+        window_end=third,
+    )
+    decisions = pd.date_range(first, third, freq="8h", inclusive="left")
+    targets = pd.DataFrame(
+        {
+            "AUSDT": [0.2, np.nan],
+            "BUSDT": [0.0, np.nan],
+            REBALANCE_COLUMN: [True, False],
+        },
+        index=decisions,
+    )
+
+    reference = _evaluate_targets_reference(targets, snapshot=carried, cost_multiplier=1.0)
+    observed = evaluate_targets(targets, snapshot=carried, cost_multiplier=1.0)
+
+    pd.testing.assert_frame_equal(observed.returns, reference.returns, check_exact=True)
+    pd.testing.assert_frame_equal(observed.events, reference.events, check_exact=True)
+    assert observed.final_state.quantities == {}
+    settlement = observed.events.loc[
+        observed.events["event_type"].eq("unavailability_settlement")
+    ]
+    assert settlement["symbol"].tolist() == ["AUSDT"]
+    assert settlement["timestamp"].tolist() == [third]
+
+
 def test_full_flat_target_path_has_exact_zero_execution_result() -> None:
     snapshot = _snapshot()
     strategy = NoInputStrategy()

@@ -33,7 +33,10 @@ pre-activation organizer audit; all other missing execution coverage fails readi
 bounded by open time and are strictly before the endpoint. Terminal marks and funding through
 2026-08-01 00:00 UTC are required. For every historical member, execution coverage continues from
 its first membership through every later positive-activity transaction interval, even after a
-roster exit, because participation-limited positions may remain carried. Checksum-bound hourly
+roster exit, because participation-limited positions may remain carried. If a former member reaches
+its last verified positive-activity bar before that organizer-owned liquidation completes, the
+residual is force-settled at that bar's close on the following boundary with ordinary costs and no
+participation cap. This rule cannot affect membership or reopen a position. Checksum-bound hourly
 marks value variable-frequency funding at each actual settlement; multiple settlements inside one
 8-hour holding interval are summed, while a verified monthly event ledger with no row proves zero
 funding for that interval. IS and sealed snapshots are physically separate,

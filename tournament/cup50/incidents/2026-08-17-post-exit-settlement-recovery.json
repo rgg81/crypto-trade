@@ -1,0 +1,22 @@
+{
+  "activation_sha256": "44668192414fca3610bb235ffb91907987d36416aec42db7f093e9ed18889ecd",
+  "candidate_sources_or_parameters_changed": false,
+  "date": "2026-08-17",
+  "diagnosis": "The carried-position acquisition correctly retained post-roster transaction history, but the evaluator required a future open even after a former member reached its last verified positive-activity bar. That organizer-owned liquidation shortfall paused the first point.",
+  "field_file_sha256": "ec8ddb73f9b3d8ff1a8e3052d26329de9fddfd2f5ae4aa87c1b004a8af9b5945",
+  "field_sha256": "21a3d628040b8e831b5541c14250a04a60ff7c012d5e3b6fab8b58b667aa499c",
+  "namespace": "cup50",
+  "observation_pause_record_sha256": "115cc802819b0ca2d8f0afad60914e2b969d04c8b1bc7a3571aab6e752f8bb74",
+  "old_evaluator_manifest_file_sha256": "756999fc5de4dd91557dc98cfd6b0d875e10b2d3d949db7627e82243230d4f26",
+  "old_evaluator_manifest_sha256": "131ea22a10ef894822aa4b99cb3a5315cd86e49569391424b64592bb4cd15772",
+  "remediation": "For a carried former member only, when its current bar is the last verified positive-activity transaction bar and the next boundary has no transaction open, force-settle the residual at the current close with ordinary costs and no participation cap. Current weekly members still require the frozen unavailability audit; membership, targets, data, scoring, and candidate bundles are unchanged.",
+  "remediated_evaluator_manifest_file_sha256": "c52d74fdcf0c684b9b1dcef139c4d825507e8e4bc91ec0ad6bd36ec5b046e9d6",
+  "remediated_evaluator_manifest_sha256": "fb75921f274ba8b4ea943c52d5bbe7c288eb5ebaa774a2306b41ec771463b3a5",
+  "remediated_replay_sha256": "aae75e292fce752315c02780640ce30afbb81596a35fb0ea4126e39f84bd600a",
+  "resume_policy": "Use the existing organizer-failure resume record for the already-started point; do not retry, replace, or restart any candidate terminal.",
+  "schema_version": 1,
+  "sealed_manifest_sha256": "2c7785dd66e5dea92c118aa7db6b0bcfa351cd99f6a113efed0e1565efea8166",
+  "status": "organizer-recovery-frozen-before-resume",
+  "team_dispositions_or_order_changed": false,
+  "test_transcript_sha256": "dfc089581aacf1cd5fe9c2db1a1f429eaa0d4ff56047e84d1159c7d48c01b5e6"
+}
