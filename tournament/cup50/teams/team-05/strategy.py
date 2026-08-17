@@ -16,7 +16,7 @@ class LiquidityShockReversal:
             if history is None or len(history) <= self.lookback_bars:
                 continue
             window = history.iloc[-self.lookback_bars :]
-            volume = window["quote_volume"].astype(float)
+            volume = window["quote_volume"]
             baseline = float(volume.median())
             previous = float(window["close"].iloc[-2])
             if baseline <= 0 or previous <= 0:

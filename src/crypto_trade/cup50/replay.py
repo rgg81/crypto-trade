@@ -252,11 +252,11 @@ def _past_auxiliary(frame: pd.DataFrame, decision: pd.Timestamp) -> pd.DataFrame
         if column in frame
     ]
     if not time_columns:
-        return frame.copy(deep=True)
+        return frame.copy(deep=False)
     if len(time_columns) != 1:
         raise ValueError("auxiliary dataset has an ambiguous causal time column")
     times = pd.to_datetime(frame[time_columns[0]], utc=True)
-    return frame.loc[times < decision].copy(deep=True)
+    return frame.loc[times < decision].copy(deep=False)
 
 
 def _bar_context_index(
@@ -290,7 +290,10 @@ def _context_bars(
         start = int(times.searchsorted(lower, side="left"))
         stop = int(times.searchsorted(decision, side="left"))
         if stop > start:
-            result[symbol] = history.iloc[start:stop].copy(deep=True).reset_index(drop=True)
+            # Pandas 3 copy-on-write makes this a mutation-isolated, lazy view.  Deep-copying
+            # roughly 50 x 540 rows at every boundary dominated multi-year replay time without
+            # adding any isolation.
+            result[symbol] = history.iloc[start:stop]
     return result
 
 
@@ -299,12 +302,14 @@ def _membership_index(
 ) -> tuple[pd.DatetimeIndex, tuple[tuple[str, ...], ...]]:
     frame = membership.copy()
     frame["reconstitution_time"] = pd.to_datetime(frame["reconstitution_time"], utc=True)
+    frame = frame.sort_values(
+        ["reconstitution_time", "liquidity_rank", "symbol"], ignore_index=True
+    )
     boundaries: list[pd.Timestamp] = []
     members: list[tuple[str, ...]] = []
-    for boundary, rows in frame.groupby("reconstitution_time", sort=True):
+    for boundary, rows in frame.groupby("reconstitution_time", sort=False):
         boundaries.append(pd.Timestamp(boundary))
-        ordered = rows.sort_values(["liquidity_rank", "symbol"])
-        members.append(tuple(ordered["symbol"].astype(str)))
+        members.append(tuple(rows["symbol"].astype(str)))
     return pd.DatetimeIndex(boundaries), tuple(members)
 
 
@@ -356,19 +361,26 @@ def generate_targets(
     )
     if decisions.empty:
         return pd.DataFrame(index=decisions, columns=[REBALANCE_COLUMN])
-    bar_frame = _normalise_bars(
-        _time_slice(bars, "close_time", upper=decisions.max(), upper_inclusive=False)
-    )
-    funding_frame = _normalise_funding(
-        _time_slice(funding, "funding_time", upper=decisions.max(), upper_inclusive=False)
-    )
-    bar_histories, bar_close_times = _bar_context_index(bar_frame)
-    funding_times = pd.DatetimeIndex(funding_frame["funding_time"])
-    membership_boundaries, membership_members = _membership_index(membership)
     uses_bars = getattr(strategy, "uses_bars", True)
     uses_funding = getattr(strategy, "uses_funding", True)
     if not isinstance(uses_bars, bool) or not isinstance(uses_funding, bool):
         raise ValueError("strategy input declarations must be booleans")
+    if uses_bars:
+        bar_frame = _normalise_bars(
+            _time_slice(bars, "close_time", upper=decisions.max(), upper_inclusive=False)
+        )
+        bar_histories, bar_close_times = _bar_context_index(bar_frame)
+    else:
+        bar_histories, bar_close_times = {}, {}
+    if uses_funding:
+        funding_frame = _normalise_funding(
+            _time_slice(funding, "funding_time", upper=decisions.max(), upper_inclusive=False)
+        )
+        funding_times = pd.DatetimeIndex(funding_frame["funding_time"])
+    else:
+        funding_frame = funding.iloc[0:0].drop(columns="mark_price", errors="ignore")
+        funding_times = pd.DatetimeIndex([])
+    membership_boundaries, membership_members = _membership_index(membership)
     symbols = sorted(set(membership["symbol"].astype(str)))
     rows: list[dict[str, Any]] = []
     for decision in decisions:
@@ -387,14 +399,14 @@ def generate_targets(
                 )
             )
             funding_stop = int(funding_times.searchsorted(decision, side="left"))
-            past_funding = funding_frame.iloc[funding_start:funding_stop].copy(deep=True)
+            past_funding = funding_frame.iloc[funding_start:funding_stop].copy(deep=False)
             past_funding = past_funding.loc[
                 past_funding["symbol"].astype(str).isin(eligible)
-            ].reset_index(drop=True)
+            ]
         else:
-            past_funding = funding_frame.iloc[0:0].copy(deep=True)
+            past_funding = funding_frame.iloc[0:0].copy(deep=False)
         # Settlement marks price the organizer's cashflow and are never a strategy input.
-        past_funding = past_funding.drop(columns="mark_price")
+        past_funding = past_funding.drop(columns="mark_price", errors="ignore")
         context = DecisionContextV2(
             decision_time=decision,
             bars=(
@@ -544,7 +556,7 @@ def require_execution_coverage(
         )
 
 
-def evaluate_targets(
+def _evaluate_targets_reference(
     targets: pd.DataFrame,
     *,
     snapshot: Snapshot,
@@ -706,7 +718,9 @@ def evaluate_targets(
         quantities = quantities + risk_filled.div(current_open).fillna(0.0)
         post_cap_weights = quantities.mul(current_mark).fillna(0.0) / equity_start
         if not _within_caps(post_cap_weights, config):
-            raise ValueError("participation capacity cannot restore the common exposure caps")
+            raise StrategyFailureError(
+                "participation capacity cannot restore the common exposure caps"
+            )
         filled_notional = strategy_filled + risk_filled
         turnover_usd = float(filled_notional.abs().sum())
         cost_rate = (
@@ -771,7 +785,9 @@ def evaluate_targets(
             close_notional = quantities.mul(end_price).fillna(0.0)
             close_capacity = (capacity - filled_notional.abs()).clip(lower=0.0)
             if (close_notional.abs() > close_capacity + 1e-9).any():
-                raise ValueError("terminal liquidation exceeds remaining participation capacity")
+                raise StrategyFailureError(
+                    "terminal liquidation exceeds remaining participation capacity"
+                )
             terminal_notional = float(close_notional.abs().sum())
             liquidation_notional += terminal_notional
             liquidation_cost += terminal_notional * cost_rate
@@ -788,7 +804,7 @@ def evaluate_targets(
         total_cost = costs_usd + liquidation_cost
         equity = equity_start + gross_pnl - total_cost
         if not math.isfinite(equity) or equity <= 0:
-            raise ValueError(f"portfolio insolvent at {decision}")
+            raise StrategyFailureError(f"portfolio insolvent at {decision}")
 
         for symbol, notional in strategy_filled[strategy_filled.ne(0.0)].items():
             event_rows.append(
@@ -846,6 +862,505 @@ def evaluate_targets(
     return EvaluationResultV2(returns=returns, events=events, final_state=state)
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class _PreparedExecution:
+    """Immutable array view reused by calibration and every independent cost pass."""
+
+    decisions: pd.DatetimeIndex
+    symbols: tuple[str, ...]
+    symbol_positions: Mapping[str, int]
+    opens: np.ndarray
+    closes: np.ndarray
+    quote_volumes: np.ndarray
+    marks: np.ndarray
+    bar_time_exists: np.ndarray
+    eligible: np.ndarray
+    suppressed: tuple[frozenset[str], ...]
+    unavailable_next: tuple[frozenset[str], ...]
+    funding_indices: tuple[np.ndarray, ...]
+    funding_marks: tuple[np.ndarray, ...]
+    funding_rates: tuple[np.ndarray, ...]
+    funding_times: tuple[tuple[pd.Timestamp, ...], ...]
+    funding_symbols: tuple[tuple[str, ...], ...]
+
+
+def _matrix(
+    frame: pd.DataFrame,
+    *,
+    time_column: str,
+    value_column: str,
+    times: pd.DatetimeIndex,
+    symbols: Sequence[str],
+) -> np.ndarray:
+    if frame.empty:
+        return np.full((len(times), len(symbols)), np.nan, dtype=float)
+    pivot = frame.pivot(index=time_column, columns="symbol", values=value_column)
+    return pivot.reindex(index=times, columns=symbols).to_numpy(dtype=float, copy=True)
+
+
+def _prepare_execution(
+    targets: pd.DataFrame,
+    *,
+    snapshot: Snapshot,
+    config: ExecutionConfig,
+    unavailability: Sequence[UnavailabilityWindow],
+) -> _PreparedExecution:
+    decisions = pd.DatetimeIndex(targets.index)
+    step = pd.Timedelta(hours=config.interval_hours)
+    first, end = decisions.min(), decisions.max() + step
+    bars = _normalise_bars(
+        _time_slice(
+            snapshot.bars,
+            "open_time",
+            lower=first,
+            upper=end,
+            upper_inclusive=True,
+        )
+    )
+    funding_source = snapshot.funding.copy()
+    if "settlement_time" not in funding_source:
+        funding_source["settlement_time"] = pd.to_datetime(
+            funding_source["funding_time"], utc=True, errors="raise"
+        ).dt.floor("h")
+    funding = _normalise_funding(
+        _time_slice(
+            funding_source,
+            "settlement_time",
+            lower=first,
+            lower_inclusive=False,
+            upper=end,
+            upper_inclusive=True,
+        )
+    )
+    marks = _normalise_marks(
+        _time_slice(
+            snapshot.mark_prices,
+            "mark_time",
+            lower=first,
+            upper=decisions.max(),
+            upper_inclusive=True,
+        )
+    )
+    symbols = tuple(
+        sorted(set(bars["symbol"].astype(str)) | set(targets) - {REBALANCE_COLUMN})
+    )
+    positions = {symbol: index for index, symbol in enumerate(symbols)}
+    bar_times = decisions.append(pd.DatetimeIndex([decisions[-1] + step]))
+    opens = _matrix(
+        bars,
+        time_column="open_time",
+        value_column="open",
+        times=bar_times,
+        symbols=symbols,
+    )
+    closes = _matrix(
+        bars,
+        time_column="open_time",
+        value_column="close",
+        times=bar_times,
+        symbols=symbols,
+    )
+    quote_volumes = _matrix(
+        bars,
+        time_column="open_time",
+        value_column="quote_volume",
+        times=bar_times,
+        symbols=symbols,
+    )
+    mark_values = _matrix(
+        marks,
+        time_column="mark_time",
+        value_column="mark_price",
+        times=decisions,
+        symbols=symbols,
+    )
+    existing_times = frozenset(pd.DatetimeIndex(bars["open_time"]))
+    bar_time_exists = np.array([time in existing_times for time in bar_times], dtype=bool)
+
+    membership_boundaries, membership_members = _membership_index(snapshot.membership)
+    eligible = np.zeros((len(decisions), len(symbols)), dtype=bool)
+    suppressed: list[frozenset[str]] = []
+    unavailable_next: list[frozenset[str]] = []
+    for row, decision in enumerate(decisions):
+        blocked = frozenset(unavailable_symbols(unavailability, decision))
+        following = frozenset(unavailable_symbols(unavailability, decision + step))
+        suppressed.append(blocked)
+        unavailable_next.append(following)
+        for symbol in _indexed_members_at(
+            membership_boundaries, membership_members, decision
+        ):
+            position = positions.get(symbol)
+            if position is not None and symbol not in blocked:
+                eligible[row, position] = True
+
+    funding_left = funding["settlement_time"].dt.ceil("8h") - step
+    funding_groups = {
+        pd.Timestamp(time): np.asarray(index, dtype=int)
+        for time, index in funding.groupby(funding_left, sort=False).groups.items()
+    }
+    funding_indices: list[np.ndarray] = []
+    funding_marks: list[np.ndarray] = []
+    funding_rates: list[np.ndarray] = []
+    funding_times: list[tuple[pd.Timestamp, ...]] = []
+    funding_symbols: list[tuple[str, ...]] = []
+    for decision in decisions:
+        rows = funding_groups.get(decision, np.array([], dtype=int))
+        group = funding.loc[rows]
+        names = tuple(group["symbol"].astype(str))
+        funding_indices.append(np.array([positions[name] for name in names], dtype=int))
+        funding_marks.append(group["mark_price"].to_numpy(dtype=float, copy=True))
+        funding_rates.append(group["funding_rate"].to_numpy(dtype=float, copy=True))
+        funding_times.append(tuple(pd.Timestamp(value) for value in group["settlement_time"]))
+        funding_symbols.append(names)
+    return _PreparedExecution(
+        decisions=decisions,
+        symbols=symbols,
+        symbol_positions=positions,
+        opens=opens,
+        closes=closes,
+        quote_volumes=quote_volumes,
+        marks=mark_values,
+        bar_time_exists=bar_time_exists,
+        eligible=eligible,
+        suppressed=tuple(suppressed),
+        unavailable_next=tuple(unavailable_next),
+        funding_indices=tuple(funding_indices),
+        funding_marks=tuple(funding_marks),
+        funding_rates=tuple(funding_rates),
+        funding_times=tuple(funding_times),
+        funding_symbols=tuple(funding_symbols),
+    )
+
+
+def _cap_array(values: np.ndarray, config: ExecutionConfig) -> np.ndarray:
+    absolute = np.abs(values)
+    gross = float(absolute.sum())
+    net = abs(float(values.sum()))
+    symbol = float(absolute.max()) if len(values) else 0.0
+    factors = [
+        ceiling / magnitude
+        for magnitude, ceiling in (
+            (gross, config.max_gross_exposure),
+            (net, config.max_abs_net_exposure),
+            (symbol, config.max_symbol_exposure),
+        )
+        if magnitude > ceiling
+    ]
+    return values * min([1.0, *factors])
+
+
+def _within_array_caps(
+    values: np.ndarray, config: ExecutionConfig, *, tolerance: float = 1e-10
+) -> bool:
+    absolute = np.abs(values)
+    return bool(
+        float(absolute.sum()) <= config.max_gross_exposure + tolerance
+        and abs(float(values.sum())) <= config.max_abs_net_exposure + tolerance
+        and (not len(values) or float(absolute.max()) <= config.max_symbol_exposure + tolerance)
+    )
+
+
+def evaluate_targets(
+    targets: pd.DataFrame,
+    *,
+    snapshot: Snapshot,
+    config: ExecutionConfig = ExecutionConfig(),
+    cost_multiplier: float,
+    terminal: bool = False,
+    initial_state: ReplayState | None = None,
+    unavailability: Sequence[UnavailabilityWindow] = (),
+    record_events: bool = True,
+    _prepared: _PreparedExecution | None = None,
+) -> EvaluationResultV2:
+    """Array-backed execution with the same ordered arithmetic as the reference contract."""
+    config.validate()
+    if not math.isfinite(cost_multiplier) or cost_multiplier < 0:
+        raise ValueError("cost_multiplier must be finite and nonnegative")
+    decisions = pd.DatetimeIndex(targets.index)
+    if decisions.tz is None or not decisions.is_monotonic_increasing or not decisions.is_unique:
+        raise ValueError("targets need a unique ascending UTC index")
+    if decisions.empty:
+        state = initial_state or ReplayState(snapshot.window_start, config.initial_equity, {})
+        return EvaluationResultV2(pd.DataFrame(), pd.DataFrame(), state)
+    step = pd.Timedelta(hours=config.interval_hours)
+    weight_columns = [column for column in targets if column != REBALANCE_COLUMN]
+    starts_flat = initial_state is None or not initial_state.quantities
+    target_values = targets.loc[:, weight_columns].fillna(0.0)
+    if starts_flat and not target_values.ne(0.0).any().any():
+        equity = config.initial_equity if initial_state is None else float(initial_state.equity)
+        rows = pd.DataFrame(
+            {
+                "decision_time": decisions,
+                "right_boundary": decisions + step,
+                "price_return": 0.0,
+                "funding_return": 0.0,
+                "gross_return": 0.0,
+                "fees_slippage": 0.0,
+                "net_return": 0.0,
+                "turnover": 0.0,
+                "gross_exposure": 0.0,
+                "equity": equity,
+            }
+        ).set_index("decision_time")
+        return EvaluationResultV2(
+            rows, pd.DataFrame(), ReplayState(decisions[-1] + step, equity, {})
+        )
+    prepared = _prepared or _prepare_execution(
+        targets, snapshot=snapshot, config=config, unavailability=unavailability
+    )
+    if not prepared.decisions.equals(decisions):
+        raise ValueError("prepared execution decisions do not align with targets")
+    symbols = prepared.symbols
+    size = len(symbols)
+    quantities = np.zeros(size, dtype=float)
+    equity = config.initial_equity
+    if initial_state is not None:
+        equity = float(initial_state.equity)
+        for symbol, quantity in initial_state.quantities.items():
+            position = prepared.symbol_positions.get(symbol)
+            if position is not None:
+                quantities[position] = float(quantity)
+    target_matrix = (
+        targets.drop(columns=REBALANCE_COLUMN)
+        .reindex(columns=symbols)
+        .fillna(0.0)
+        .to_numpy(dtype=float, copy=True)
+    )
+    explicit = targets[REBALANCE_COLUMN].to_numpy(dtype=bool, copy=True)
+    return_rows: list[dict[str, Any]] = []
+    event_rows: list[dict[str, Any]] = []
+    cost_rate = (
+        (config.taker_fee_bps_per_side + config.slippage_bps_per_side)
+        / 10_000
+        * cost_multiplier
+    )
+    for row, decision in enumerate(decisions):
+        next_time = decision + step
+        eligible = prepared.eligible[row]
+        carried_suppressed = [
+            symbol
+            for symbol in prepared.suppressed[row]
+            if symbol in prepared.symbol_positions
+            and quantities[prepared.symbol_positions[symbol]] != 0.0
+        ]
+        if carried_suppressed:
+            raise ValueError(
+                f"unavailable positions were not settled before {decision}: "
+                f"{sorted(carried_suppressed)}"
+            )
+        current_open = prepared.opens[row]
+        current_close = prepared.closes[row]
+        quote_volume = np.nan_to_num(prepared.quote_volumes[row], nan=0.0)
+        current_mark = prepared.marks[row]
+        required = eligible | (quantities != 0.0)
+        missing_bars = required & np.isnan(current_open)
+        if missing_bars.any():
+            raise ValueError(
+                f"missing transaction bar at {decision}: "
+                f"{[symbols[index] for index in np.flatnonzero(missing_bars)]}"
+            )
+        missing_marks = required & np.isnan(current_mark)
+        if missing_marks.any():
+            raise ValueError(
+                f"missing execution marks at {decision}: "
+                f"{[symbols[index] for index in np.flatnonzero(missing_marks)]}"
+            )
+
+        equity_start = equity
+        desired = quantities.copy()
+        if explicit[row]:
+            weights = target_matrix[row].copy()
+            weights[~eligible] = 0.0
+            capped = _cap_array(weights, config)
+            desired = np.divide(
+                capped * equity_start,
+                current_mark,
+                out=np.zeros(size, dtype=float),
+                where=np.isfinite(current_mark) & (current_mark != 0.0),
+            )
+        desired[~eligible] = 0.0
+        requested_quantity = desired - quantities
+        requested_notional = np.nan_to_num(requested_quantity * current_open, nan=0.0)
+        capacity = quote_volume * config.max_bar_participation
+        strategy_filled = np.clip(requested_notional, -capacity, capacity)
+        fill_quantity = np.divide(
+            strategy_filled,
+            current_open,
+            out=np.zeros(size, dtype=float),
+            where=np.isfinite(current_open) & (current_open != 0.0),
+        )
+        quantities = quantities + fill_quantity
+        quantities[np.abs(quantities) <= 1e-14] = 0.0
+        marked_weights = np.nan_to_num(quantities * current_mark, nan=0.0) / equity_start
+        capped_marked = _cap_array(marked_weights, config)
+        risk_requested = np.divide(
+            (capped_marked - marked_weights) * equity_start,
+            current_mark,
+            out=np.zeros(size, dtype=float),
+            where=np.isfinite(current_mark) & (current_mark != 0.0),
+        )
+        risk_requested_notional = np.nan_to_num(risk_requested * current_open, nan=0.0)
+        remaining_capacity = np.maximum(capacity - np.abs(strategy_filled), 0.0)
+        risk_filled = np.clip(risk_requested_notional, -remaining_capacity, remaining_capacity)
+        quantities = quantities + np.divide(
+            risk_filled,
+            current_open,
+            out=np.zeros(size, dtype=float),
+            where=np.isfinite(current_open) & (current_open != 0.0),
+        )
+        post_cap_weights = np.nan_to_num(quantities * current_mark, nan=0.0) / equity_start
+        if not _within_array_caps(post_cap_weights, config):
+            raise StrategyFailureError(
+                "participation capacity cannot restore the common exposure caps"
+            )
+        filled_notional = strategy_filled + risk_filled
+        turnover_usd = float(np.abs(filled_notional).sum())
+        costs_usd = turnover_usd * cost_rate
+
+        if prepared.bar_time_exists[row + 1]:
+            end_price = prepared.opens[row + 1].copy()
+        else:
+            end_price = current_close.copy()
+        for symbol in prepared.unavailable_next[row]:
+            position = prepared.symbol_positions.get(symbol)
+            if position is not None and np.isnan(end_price[position]):
+                end_price[position] = current_close[position]
+        held = quantities != 0.0
+        missing_end = held & np.isnan(end_price)
+        if missing_end.any():
+            raise ValueError(
+                f"missing next executable price at {next_time}: "
+                f"{[symbols[index] for index in np.flatnonzero(missing_end)]}"
+            )
+        price_change = np.nan_to_num(end_price - current_open, nan=0.0)
+        price_pnl_usd = float((quantities * price_change).sum())
+        funding_index = prepared.funding_indices[row]
+        event_quantities = quantities[funding_index]
+        funding_pnl_usd = -float(
+            (
+                event_quantities
+                * prepared.funding_marks[row]
+                * prepared.funding_rates[row]
+            ).sum()
+        )
+        held_quantities = quantities.copy()
+        exposure_marks = np.where(np.isnan(current_mark), current_open, current_mark)
+        exposure = float(
+            np.nansum(np.abs(held_quantities) * exposure_marks) / equity_start
+        )
+        gross_pnl = price_pnl_usd + funding_pnl_usd
+        liquidation_cost = 0.0
+        liquidation_notional = 0.0
+        settlement_positions = sorted(
+            (
+                prepared.symbol_positions[symbol]
+                for symbol in prepared.unavailable_next[row]
+                if symbol in prepared.symbol_positions
+                and quantities[prepared.symbol_positions[symbol]] != 0.0
+            ),
+            key=lambda index: symbols[index],
+        )
+        if settlement_positions:
+            settlement_array = np.asarray(settlement_positions, dtype=int)
+            close_notional = quantities[settlement_array] * end_price[settlement_array]
+            liquidation_notional += float(np.abs(close_notional).sum())
+            liquidation_cost += float(np.abs(close_notional).sum()) * cost_rate
+            if record_events:
+                for position, notional in zip(
+                    settlement_positions, close_notional, strict=True
+                ):
+                    event_rows.append(
+                        {
+                            "timestamp": next_time,
+                            "symbol": symbols[position],
+                            "event_type": "unavailability_settlement",
+                            "notional": -float(notional),
+                        }
+                    )
+            quantities[settlement_array] = 0.0
+        if terminal and row == len(decisions) - 1:
+            close_notional = np.nan_to_num(quantities * end_price, nan=0.0)
+            close_capacity = np.maximum(capacity - np.abs(filled_notional), 0.0)
+            if (np.abs(close_notional) > close_capacity + 1e-9).any():
+                raise StrategyFailureError(
+                    "terminal liquidation exceeds remaining participation capacity"
+                )
+            terminal_notional = float(np.abs(close_notional).sum())
+            liquidation_notional += terminal_notional
+            liquidation_cost += terminal_notional * cost_rate
+            if record_events:
+                for position in np.flatnonzero(close_notional != 0.0):
+                    event_rows.append(
+                        {
+                            "timestamp": next_time,
+                            "symbol": symbols[position],
+                            "event_type": "terminal_liquidation",
+                            "notional": -float(close_notional[position]),
+                        }
+                    )
+            quantities[:] = 0.0
+        total_cost = costs_usd + liquidation_cost
+        equity = equity_start + gross_pnl - total_cost
+        if not math.isfinite(equity) or equity <= 0:
+            raise StrategyFailureError(f"portfolio insolvent at {decision}")
+
+        if record_events:
+            for position in np.flatnonzero(strategy_filled != 0.0):
+                event_rows.append(
+                    {
+                        "timestamp": decision,
+                        "symbol": symbols[position],
+                        "event_type": "trade",
+                        "notional": float(strategy_filled[position]),
+                    }
+                )
+            for position in np.flatnonzero(risk_filled != 0.0):
+                event_rows.append(
+                    {
+                        "timestamp": decision,
+                        "symbol": symbols[position],
+                        "event_type": "risk_reduction",
+                        "notional": float(risk_filled[position]),
+                    }
+                )
+            for offset, position in enumerate(funding_index):
+                quantity = float(held_quantities[position])
+                if quantity:
+                    event_rows.append(
+                        {
+                            "timestamp": prepared.funding_times[row][offset],
+                            "symbol": prepared.funding_symbols[row][offset],
+                            "event_type": "funding",
+                            "notional": quantity * float(prepared.funding_marks[row][offset]),
+                        }
+                    )
+        return_rows.append(
+            {
+                "decision_time": decision,
+                "right_boundary": next_time,
+                "price_return": price_pnl_usd / equity_start,
+                "funding_return": funding_pnl_usd / equity_start,
+                "gross_return": gross_pnl / equity_start,
+                "fees_slippage": total_cost / equity_start,
+                "net_return": (gross_pnl - total_cost) / equity_start,
+                "turnover": (turnover_usd + liquidation_notional) / equity_start,
+                "gross_exposure": exposure,
+                "equity": equity,
+            }
+        )
+    returns = pd.DataFrame(return_rows).set_index("decision_time")
+    events = pd.DataFrame(event_rows)
+    state = ReplayState(
+        decision_time=decisions[-1] + step,
+        equity=float(equity),
+        quantities={
+            symbols[index]: float(quantities[index])
+            for index in np.flatnonzero(quantities != 0.0)
+        },
+    )
+    return EvaluationResultV2(returns=returns, events=events, final_state=state)
+
+
 def run_candidate(
     strategy: TargetStrategyV2,
     *,
@@ -857,6 +1372,7 @@ def run_candidate(
     config: ExecutionConfig = ExecutionConfig(),
     terminal: bool = False,
     unavailability: Sequence[UnavailabilityWindow] = (),
+    record_events: bool = True,
 ) -> CandidateReplay:
     """One target stream, one causal calibration pass, and independent 1x/2x/3x cost runs."""
     decisions = decision_grid(start, end, interval_hours=config.interval_hours)
@@ -871,6 +1387,14 @@ def run_candidate(
         unavailability=unavailability,
         history_days=config.strategy_history_days,
     )
+    nonflat = raw.drop(columns=REBALANCE_COLUMN).fillna(0.0).ne(0.0).any().any()
+    prepared = (
+        _prepare_execution(
+            raw, snapshot=snapshot, config=config, unavailability=unavailability
+        )
+        if nonflat
+        else None
+    )
     calibration = evaluate_targets(
         raw,
         snapshot=snapshot,
@@ -878,6 +1402,8 @@ def run_candidate(
         cost_multiplier=0.0,
         terminal=False,
         unavailability=unavailability,
+        record_events=False,
+        _prepared=prepared,
     )
     gross = calibration.returns["gross_return"]
     scalars = common_risk_scalars(
@@ -898,6 +1424,8 @@ def run_candidate(
             cost_multiplier=float(multiplier),
             terminal=terminal,
             unavailability=unavailability,
+            record_events=record_events,
+            _prepared=prepared,
         )
         for multiplier in (1, 2, 3)
     }

@@ -16,12 +16,12 @@ class VolumeConfirmedTrend:
             history = context.bars.get(symbol)
             if history is None or len(history) <= self.momentum_bars:
                 continue
-            close = history["close"].astype(float)
-            volume = history["quote_volume"].astype(float)
+            close = history["close"].to_numpy(dtype=float, copy=False)
+            volume = history["quote_volume"]
             baseline = float(volume.iloc[-self.volume_bars :].median())
             if baseline <= 0:
                 continue
-            momentum = float(close.iloc[-1] / close.iloc[-1 - self.momentum_bars] - 1.0)
+            momentum = float(close[-1] / close[-1 - self.momentum_bars] - 1.0)
             confirmation = min(2.0, float(volume.iloc[-3:].mean()) / baseline)
             scores[symbol] = momentum * confirmation
         selected = dict(sorted(scores.items(), key=lambda item: abs(item[1]), reverse=True)[:20])

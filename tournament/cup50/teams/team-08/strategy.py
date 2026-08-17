@@ -13,10 +13,14 @@ class FundingCrowdingReversal:
 
     def target_weights(self, context: DecisionContextV2, *, seed: int):
         scores: dict[str, float] = {}
+        funding = {
+            str(symbol): group["funding_rate"]
+            for symbol, group in context.funding.groupby("symbol", sort=False)
+        }
         for symbol in context.eligible_symbols:
-            rates = context.funding.loc[
-                context.funding["symbol"].astype(str) == symbol, "funding_rate"
-            ].astype(float)
+            rates = funding.get(symbol)
+            if rates is None:
+                continue
             if len(rates) < self.lookback_events:
                 continue
             window = rates.iloc[-self.lookback_events :]

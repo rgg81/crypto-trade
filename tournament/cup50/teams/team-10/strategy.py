@@ -17,8 +17,8 @@ class RelativeValueConvergence:
             history = context.bars.get(symbol)
             if history is None or len(history) <= self.lookback_bars:
                 continue
-            close = history["close"].astype(float)
-            changes[symbol] = float(close.iloc[-1] / close.iloc[-1 - self.lookback_bars] - 1.0)
+            close = history["close"].to_numpy(dtype=float, copy=False)
+            changes[symbol] = float(close[-1] / close[-1 - self.lookback_bars] - 1.0)
         if len(changes) < 4:
             return {}
         centre = statistics.median(changes.values())

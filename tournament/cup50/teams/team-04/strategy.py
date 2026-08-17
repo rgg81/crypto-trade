@@ -13,16 +13,16 @@ class ResidualMomentum:
         benchmark = context.bars.get("BTCUSDT")
         if benchmark is None or len(benchmark) <= self.lookback_bars:
             return {}
-        btc = benchmark["close"].astype(float)
-        btc_return = float(btc.iloc[-1] / btc.iloc[-1 - self.lookback_bars] - 1.0)
+        btc = benchmark["close"].to_numpy(dtype=float, copy=False)
+        btc_return = float(btc[-1] / btc[-1 - self.lookback_bars] - 1.0)
         residuals: dict[str, float] = {}
         for symbol in context.eligible_symbols:
             history = context.bars.get(symbol)
             if history is None or len(history) <= self.lookback_bars:
                 continue
-            close = history["close"].astype(float)
+            close = history["close"].to_numpy(dtype=float, copy=False)
             residuals[symbol] = float(
-                close.iloc[-1] / close.iloc[-1 - self.lookback_bars] - 1.0 - btc_return
+                close[-1] / close[-1 - self.lookback_bars] - 1.0 - btc_return
             )
         ordered = sorted(residuals, key=lambda symbol: (residuals[symbol], symbol))
         count = min(5, len(ordered) // 2)

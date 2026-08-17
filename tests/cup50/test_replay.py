@@ -8,6 +8,9 @@ import pytest
 
 from crypto_trade.cup50.availability import UnavailabilityWindow
 from crypto_trade.cup50.replay import (
+    REBALANCE_COLUMN,
+    StrategyFailureError,
+    _evaluate_targets_reference,
     apply_strategy_parameters,
     evaluate_targets,
     generate_targets,
@@ -353,6 +356,59 @@ def test_nonterminal_split_and_stitched_execution_are_bit_exact() -> None:
         check_exact=True,
     )
     assert monolithic.final_state == right.final_state
+
+
+def test_array_executor_is_bit_exact_to_frozen_reference_and_can_suppress_events() -> None:
+    snapshot = _snapshot()
+    decisions = pd.date_range(
+        snapshot.window_start, snapshot.window_end, freq="8h", inclusive="left"
+    )
+    targets = generate_targets(
+        RecordingStrategy(),
+        bars=snapshot.bars,
+        funding=snapshot.funding,
+        auxiliary={},
+        membership=snapshot.membership,
+        decision_times=decisions,
+        seed=1,
+    )
+    for cost in (0.0, 1.0, 2.0, 3.0):
+        reference = _evaluate_targets_reference(
+            targets, snapshot=snapshot, cost_multiplier=cost
+        )
+        observed = evaluate_targets(targets, snapshot=snapshot, cost_multiplier=cost)
+        pd.testing.assert_frame_equal(observed.returns, reference.returns, check_exact=True)
+        pd.testing.assert_frame_equal(observed.events, reference.events, check_exact=True)
+        assert observed.final_state == reference.final_state
+
+        suppressed = evaluate_targets(
+            targets, snapshot=snapshot, cost_multiplier=cost, record_events=False
+        )
+        pd.testing.assert_frame_equal(suppressed.returns, reference.returns, check_exact=True)
+        assert suppressed.events.empty
+        assert suppressed.final_state == reference.final_state
+
+
+def test_infeasible_participation_cap_is_a_candidate_failure() -> None:
+    snapshot = _snapshot()
+    snapshot.funding.loc[1, "funding_rate"] = 0.75
+    snapshot.bars.loc[snapshot.bars["open_time"] == snapshot.window_start, "quote_volume"] = 1e9
+    snapshot.bars.loc[
+        snapshot.bars["open_time"] == snapshot.window_start + pd.Timedelta(hours=8),
+        "quote_volume",
+    ] = 0.0
+    decisions = pd.date_range(
+        snapshot.window_start, snapshot.window_end, freq="8h", inclusive="left"
+    )
+    targets = pd.DataFrame(
+        {
+            "AUSDT": [1.0, np.nan],
+            REBALANCE_COLUMN: [True, False],
+        },
+        index=decisions,
+    )
+    with pytest.raises(StrategyFailureError, match="participation capacity"):
+        evaluate_targets(targets, snapshot=snapshot, cost_multiplier=0.0)
 
 
 def test_full_flat_target_path_has_exact_zero_execution_result() -> None:

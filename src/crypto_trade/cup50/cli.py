@@ -387,15 +387,38 @@ def _evaluate(arguments: argparse.Namespace) -> Mapping[str, object]:
         raise ValueError("evaluation scorer differs from its preregistered scorer")
     strategy = strategy_from_module(load_strategy_module(arguments.strategy))
     apply_strategy_parameters(strategy, binding["parameters"])
-    replay = run_candidate(
-        strategy,
-        snapshot=snapshot,
-        start=pd.Timestamp(arguments.start),
-        end=pd.Timestamp(arguments.end),
-        seed=arguments.seed,
-        terminal=arguments.terminal,
-        unavailability=load_unavailability_audit(arguments.unavailability_audit),
-    )
+    try:
+        replay = run_candidate(
+            strategy,
+            snapshot=snapshot,
+            start=pd.Timestamp(arguments.start),
+            end=pd.Timestamp(arguments.end),
+            seed=arguments.seed,
+            terminal=arguments.terminal,
+            unavailability=load_unavailability_audit(arguments.unavailability_audit),
+        )
+    except StrategyFailureError as error:
+        failure_digest = hashlib.sha256(
+            json.dumps(
+                {
+                    "team_id": arguments.team_id,
+                    "trial_id": arguments.trial_id,
+                    "failure": type(error).__name__,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+        record_trial_result(
+            arguments.trial_journal,
+            team_id=arguments.team_id,
+            trial_id=arguments.trial_id,
+            binding_sha256=arguments.binding_sha256,
+            source_path=source_path,
+            result_sha256=failure_digest,
+            succeeded=False,
+        )
+        return {"status": "candidate-dnf", "bundle_sha256": failure_digest}
     output = Path(arguments.output)
     output.mkdir(parents=True, exist_ok=False)
     replay.raw_targets.to_parquet(output / "targets.parquet")
@@ -556,6 +579,7 @@ def _observe(arguments: argparse.Namespace) -> Mapping[str, object]:
                 seed=int(job.get("seed", 0)),
                 terminal=False,
                 unavailability=unavailability,
+                record_events=False,
             )
             score = score_point(replay.costs)
             centre_returns = replay.costs[3].returns

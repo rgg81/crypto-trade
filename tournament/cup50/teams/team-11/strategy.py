@@ -16,8 +16,8 @@ class CalendarSettlementSeasonality:
             history = context.bars.get(symbol)
             if history is None or len(history) < 2:
                 continue
-            frame = history.copy()
-            returns = frame["close"].astype(float).pct_change()
+            frame = history
+            returns = frame["close"].pct_change()
             boundary = frame["close_time"].dt.ceil("8h")
             matches = returns[(boundary.dt.weekday == weekday) & (boundary.dt.hour == hour)]
             if len(matches.dropna()) >= self.minimum_matches:

@@ -15,8 +15,8 @@ class SlowTrend:
             history = context.bars.get(symbol)
             if history is None or len(history) <= self.lookback_bars:
                 continue
-            close = history["close"].astype(float)
-            change = float(close.iloc[-1] / close.iloc[-1 - self.lookback_bars] - 1.0)
+            close = history["close"].to_numpy(dtype=float, copy=False)
+            change = float(close[-1] / close[-1 - self.lookback_bars] - 1.0)
             if change:
                 signals[symbol] = 1.0 if change > 0 else -1.0
         gross = sum(abs(value) for value in signals.values())

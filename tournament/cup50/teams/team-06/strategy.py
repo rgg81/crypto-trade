@@ -17,7 +17,7 @@ class DefensiveSelection:
             history = context.bars.get(symbol)
             if history is None or len(history) <= self.lookback_bars:
                 continue
-            returns = history["close"].astype(float).pct_change().iloc[-self.lookback_bars :]
+            returns = history["close"].pct_change().iloc[-self.lookback_bars :]
             downside = returns.clip(upper=0.0)
             risk = float(math.sqrt(float((downside * downside).mean())))
             if math.isfinite(risk):

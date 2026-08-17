@@ -20,10 +20,10 @@ class TakerFlowPressure:
             ):
                 continue
             window = history.iloc[-self.lookback_bars :]
-            total = float(window["quote_volume"].astype(float).sum())
+            total = float(window["quote_volume"].sum())
             if total <= 0:
                 continue
-            buy_share = float(window["taker_buy_quote_volume"].astype(float).sum()) / total
+            buy_share = float(window["taker_buy_quote_volume"].sum()) / total
             scores[symbol] = buy_share - 0.5
         selected = dict(sorted(scores.items(), key=lambda item: abs(item[1]), reverse=True)[:15])
         gross = sum(abs(value) for value in selected.values())

@@ -3,7 +3,7 @@
     "nested": 52,
     "top": 43
   },
-  "cup50_shard": "52 passed after final source freeze",
+  "cup50_shard": "54 passed after the pre-feedback same-version performance fix; array execution is bit-exact to the frozen reference and all 12 optimized target streams match their prior streams",
   "current": {
     "nested": 33,
     "top": 37
