@@ -1,7 +1,7 @@
 Organizer recovery focused verification, 2026-08-17
 
 .venv/bin/pytest -q tests/cup50
-59 passed in 3.32s
+59 passed in 3.39s
 
 .venv/bin/ruff check src/crypto_trade/cup50 tests/cup50 scripts/cup50.py
 All checks passed!

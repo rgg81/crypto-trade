@@ -750,14 +750,24 @@ def _evaluate_targets_reference(
         # allowed to turn an organizer execution shortfall into a candidate failure.  Settle it
         # at that bar's close at the following boundary, exactly like a frozen midweek
         # unavailability event.  Current members still require the pre-activation audit above.
-        next_symbols = set() if next_rows is None else set(next_rows.index.astype(str))
+        next_active_symbols = (
+            set()
+            if next_rows is None
+            else set(
+                next_rows.loc[
+                    pd.to_numeric(next_rows["quote_volume"], errors="coerce").gt(0.0)
+                ].index.astype(str)
+            )
+        )
         unavailable_next.update(
             symbol
-            for symbol in set(current_rows.index.astype(str)) - next_members - next_symbols
+            for symbol in (
+                set(current_rows.index.astype(str)) - next_members - next_active_symbols
+            )
             if float(current_rows.at[symbol, "quote_volume"]) > 0.0
         )
         for symbol in unavailable_next:
-            if symbol in end_price.index and pd.isna(end_price[symbol]):
+            if symbol in end_price.index:
                 end_price.loc[symbol] = current_close.get(symbol, np.nan)
         held = quantities.ne(0.0)
         if end_price.loc[held].isna().any():
@@ -1010,14 +1020,17 @@ def _prepare_execution(
         next_members = set(
             _indexed_members_at(membership_boundaries, membership_members, decision + step)
         )
-        missing_post_exit = (
+        inactive_post_exit = (
             np.isfinite(opens[row])
-            & np.isnan(opens[row + 1])
             & (np.nan_to_num(quote_volumes[row], nan=0.0) > 0.0)
+            & (
+                np.isnan(opens[row + 1])
+                | (np.nan_to_num(quote_volumes[row + 1], nan=0.0) <= 0.0)
+            )
         )
         following.update(
             symbols[position]
-            for position in np.flatnonzero(missing_post_exit)
+            for position in np.flatnonzero(inactive_post_exit)
             if symbols[position] not in next_members
         )
         unavailable_next.append(frozenset(following))
@@ -1258,7 +1271,7 @@ def evaluate_targets(
             end_price = current_close.copy()
         for symbol in prepared.unavailable_next[row]:
             position = prepared.symbol_positions.get(symbol)
-            if position is not None and np.isnan(end_price[position]):
+            if position is not None:
                 end_price[position] = current_close[position]
         held = quantities != 0.0
         missing_end = held & np.isnan(end_price)

@@ -449,6 +449,15 @@ def test_carried_post_exit_position_settles_at_last_verified_close() -> None:
         bars["symbol"].eq("AUSDT") & bars["open_time"].eq(first + pd.Timedelta(hours=8)),
         "quote_volume",
     ] = 1.0
+    placeholder = snapshot.bars.loc[
+        snapshot.bars["symbol"].eq("AUSDT")
+        & snapshot.bars["open_time"].eq(first + pd.Timedelta(hours=8))
+    ].copy()
+    placeholder["open_time"] = third
+    placeholder["close_time"] = third + pd.Timedelta(hours=8) - pd.Timedelta(milliseconds=1)
+    placeholder["open"] = placeholder["close"]
+    placeholder["quote_volume"] = 0.0
+    bars = pd.concat([bars, placeholder], ignore_index=True)
     marks = pd.concat(
         [
             snapshot.mark_prices,
