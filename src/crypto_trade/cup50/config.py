@@ -110,7 +110,7 @@ _FROZEN: dict[tuple[str, ...], object] = {
     ("paper", "launch"): "first-canonical-8h-boundary-strictly-after-release",
     ("paper", "data_policy"): "public-only-append-invariant",
     ("data", "archive_reuse_policy"): "checksum-verified-raw-bytes-only",
-    ("data", "acquisition_root"): "data/cup50/acquisition-complete-v3",
+    ("data", "acquisition_root"): "data/cup50/acquisition-remediated-20260817",
     ("data", "is_root"): "data/cup50/is",
     ("data", "team_is_root"): "data/cup50/team-is",
     ("data", "sealed_root"): "data/cup50/sealed",

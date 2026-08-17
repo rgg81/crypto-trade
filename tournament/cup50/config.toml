@@ -21,7 +21,7 @@ release = "reports-cup50/leaderboard.json"
 common_risk_policy = "tournament/cup50/risk-policy.json"
 
 [data]
-acquisition_root = "data/cup50/acquisition-complete-v3"
+acquisition_root = "data/cup50/acquisition-remediated-20260817"
 is_root = "data/cup50/is"
 team_is_root = "data/cup50/team-is"
 sealed_root = "data/cup50/sealed"

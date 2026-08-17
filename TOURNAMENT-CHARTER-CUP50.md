@@ -31,7 +31,12 @@ the preceding verified transaction-bar close with the ordinary per-side cost mul
 participation cap, and cannot reopen while unavailable. Every such interval is frozen in the
 pre-activation organizer audit; all other missing execution coverage fails readiness. Bars are
 bounded by open time and are strictly before the endpoint. Terminal marks and funding through
-2026-08-01 00:00 UTC are required. IS and sealed snapshots are physically separate,
+2026-08-01 00:00 UTC are required. For every historical member, execution coverage continues from
+its first membership through every later positive-activity transaction interval, even after a
+roster exit, because participation-limited positions may remain carried. Checksum-bound hourly
+marks value variable-frequency funding at each actual settlement; multiple settlements inside one
+8-hour holding interval are summed, while a verified monthly event ledger with no row proves zero
+funding for that interval. IS and sealed snapshots are physically separate,
 checksum-bound, and censor every sealed-only symbol, roster, summary, cache, and metadata fact
 from the team-visible side.
 
@@ -99,6 +104,9 @@ release was invalidated before any sealed candidate read after an organizer-owne
 participation/exposure feasibility defect disqualified every IS trial. At the owner's direction,
 that failed release remains preserved as evidence and CUP-50 is remediated in place without
 changing any candidate source, parameters, seed, or nomination.
+The first remediation activation was likewise preserved before any sealed read when a full IS
+candidate exposed that execution coverage had incorrectly stopped at roster exit. Its partial IS
+trial evidence is non-scoring; remediation remains in the same owner-directed CUP-50 lineage.
 
 All twelve dispositions and the observation order freeze before sealed restoration. A durable
 batch marker precedes the first sealed read and every point has durable start/terminal records. An

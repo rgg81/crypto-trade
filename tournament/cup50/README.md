@@ -31,4 +31,5 @@ then exact public REST only where policy permits. A genuinely non-trading select
 in its frozen weekly roster and is never substituted. A pre-activation evidence audit makes it
 non-executable from the first affected canonical boundary and force-settles a carried position at
 the preceding verified transaction-bar close with ordinary costs. Any unaudited gap still fails
-readiness.
+readiness. Coverage continues after roster exit wherever positive transaction activity remains,
+and binds hourly marks so variable-frequency funding settlements are valued without substitution.

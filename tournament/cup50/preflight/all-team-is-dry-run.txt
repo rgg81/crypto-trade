@@ -1,0 +1,12 @@
+team-01 passed boundaries=3159
+team-02 passed boundaries=3159
+team-03 passed boundaries=3159
+team-04 passed boundaries=3159
+team-05 passed boundaries=3159
+team-06 passed boundaries=3159
+team-07 passed boundaries=3159
+team-08 passed boundaries=3159
+team-09 passed boundaries=3159
+team-10 passed boundaries=3159
+team-11 passed boundaries=3159
+team-12 passed boundaries=3159

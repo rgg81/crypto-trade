@@ -6,7 +6,9 @@
     "Participation-limited organizer deleveraging was incorrectly classified as a candidate StrategyFailureError.",
     "Zero-trade Binance placeholder bars were incorrectly accepted as continuous listing episodes.",
     "The activation readiness strategy was flat and therefore did not exercise carried positions, roster exits, participation limits, or post-exit execution coverage.",
-    "Quantity-unit dust normalization left economically zero positions open and could demand irrelevant post-exit marks."
+    "Quantity-unit dust normalization left economically zero positions open and could demand irrelevant post-exit marks.",
+    "The first remediation acquisition stopped execution coverage at roster exit even though participation-limited positions can remain carried.",
+    "The first remediation downloader assumed at most one funding settlement per 8-hour interval and treated verified zero-event intervals as missing data."
   ],
   "field_sha256": "c3cc8b2ff25065cc322eaee76e949136d520db600852e2e8635dd09ea27ebee5",
   "integrity_review_sha256": "346742caf60974f81dc5bffb1348b75a5b29bd51302c6ba5b48fe3cd33bd5ef4",
@@ -21,7 +23,20 @@
     "Derive listing and relisting episodes only from positive-activity canonical transaction bars and require a continuous 180-day episode.",
     "Audit midweek cessations and force-settle at the preceding verified transaction close.",
     "Normalize sub-nanodollar residual positions to zero after strategy and risk fills.",
-    "Replace flat readiness with a rotating full-gross, 20%-per-symbol dynamic-membership strategy before reactivation."
+    "Replace flat readiness with a rotating full-gross, 20%-per-symbol dynamic-membership strategy before reactivation.",
+    "Continue coverage after first membership across every positive-activity transaction interval and bind hourly funding settlement marks.",
+    "Preserve multiple variable-frequency funding settlements per holding interval and accept checksum-verified monthly ledgers with zero events.",
+    "Persist checksum-verified archive downloads across transient network failures."
+  ],
+  "remediation_attempts": [
+    {
+      "activation_sha256": "b88380a561c2443855da49da15424a3169fd4f1b1c2daab51e2435c0a9df604d",
+      "candidate_sources_or_parameters_changed": false,
+      "official_is_successes_preserved": 4,
+      "sealed_candidate_point_reads": 0,
+      "status": "invalidated-preserved-organizer-coverage-defect",
+      "unterminated_trial_charged": false
+    }
   ],
   "schema_version": 1,
   "sealed_candidate_point_reads": 0,

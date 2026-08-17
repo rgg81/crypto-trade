@@ -1,1 +1,1 @@
-{"decision_boundaries": 5895, "is_manifest_sha256": "6b5f0f8a0f3ee0e132e09efffcc7b1f7df34cd1fcf03c3d550356fbe7c76f201", "sealed_manifest_sha256": "dd2b2b2888265e42133266b57362c235e31fe8d385755f937836916fa551d893", "status": "ready"}
+{"boundaries": 5895, "cost_runs": [1, 2, 3], "is_manifest_sha256": "dd30c5f00a959042b07381975ff31d04d043a7d1440a0cacb0ce9078b9dbb68b", "sealed_manifest_sha256": "2c7785dd66e5dea92c118aa7db6b0bcfa351cd99f6a113efed0e1565efea8166", "status": "passed"}

@@ -7,7 +7,9 @@ import csv
 import datetime as dt
 import hashlib
 import json
+import os
 import shutil
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -341,9 +343,37 @@ def _execution_gaps(
     missing_marks: list[tuple[pd.Timestamp, str]] = []
     missing_funding: list[tuple[pd.Timestamp, str]] = []
     missing_bars: list[tuple[pd.Timestamp, str]] = []
+    # A member can remain carried after a weekly roster exit because the participation cap may
+    # prevent an immediate flatten.  Execution coverage therefore follows every historically
+    # selected symbol for as long as its transaction archive remains active, rather than ending
+    # at the membership boundary.  Zero-trade placeholders do not establish executability.
+    member_union = set(membership["symbol"].astype(str))
+    membership_times = pd.to_datetime(membership["reconstitution_time"], utc=True)
+    first_membership = (
+        membership.assign(reconstitution_time=membership_times)
+        .groupby("symbol", sort=False)["reconstitution_time"]
+        .min()
+        .to_dict()
+    )
+    bar_frame = bars.copy()
+    bar_frame["open_time"] = pd.to_datetime(bar_frame["open_time"], utc=True)
+    active_rows = pd.to_numeric(bar_frame["quote_volume"], errors="coerce").gt(0.0)
+    if "trade_count" in bar_frame:
+        active_rows |= pd.to_numeric(bar_frame["trade_count"], errors="coerce").gt(0.0)
+    active_rows &= bar_frame["open_time"].ge(
+        bar_frame["symbol"].astype(str).map(first_membership)
+    )
+    active_bar_symbols = {
+        pd.Timestamp(time): frozenset(set(group["symbol"].astype(str)) & member_union)
+        for time, group in bar_frame.loc[active_rows].groupby("open_time", sort=False)
+    }
     for decision in decisions:
         active = set(members_at(membership, decision))
-        executable = active - set(unavailable_symbols(unavailability, decision))
+        unavailable = set(unavailable_symbols(unavailability, decision))
+        executable = active - unavailable
+        coverage_symbols = (
+            active | set(active_bar_symbols.get(decision, ()))
+        ) - unavailable
         missing_bars.extend(
             (decision, symbol)
             for symbol in sorted(executable)
@@ -351,8 +381,17 @@ def _execution_gaps(
         )
         missing_marks.extend(
             (decision, symbol)
-            for symbol in sorted(executable)
+            for symbol in sorted(coverage_symbols)
             if (decision, symbol) not in mark_keys
+        )
+        # Funding frequency can change from eight hours to four, two, or one hour.  Preserve the
+        # canonical hourly settlement marks for every potentially carried interval so archived
+        # funding can always be valued at its actual settlement time.
+        missing_marks.extend(
+            (decision + pd.Timedelta(hours=offset), symbol)
+            for offset in range(1, 8)
+            for symbol in sorted(coverage_symbols)
+            if (decision + pd.Timedelta(hours=offset), symbol) not in mark_keys
         )
         unavailable_next = set(
             unavailable_symbols(unavailability, decision + pd.Timedelta(hours=8))
@@ -360,10 +399,12 @@ def _execution_gaps(
         missing_funding.extend(
             (decision, symbol)
             for symbol in sorted(
-                executable - unavailable_next - set(funded.get(decision, ()))
+                coverage_symbols - unavailable_next - set(funded.get(decision, ()))
             )
         )
+    last_interval = terminal - pd.Timedelta(hours=8)
     terminal_members = set(members_at(membership, terminal - pd.Timedelta(nanoseconds=1)))
+    terminal_members |= set(active_bar_symbols.get(last_interval, ()))
     terminal_members -= set(unavailable_symbols(unavailability, terminal))
     missing_marks.extend(
         (terminal, symbol)
@@ -384,27 +425,62 @@ def _execution_gaps(
     )
 
 
-def _download_verified_archive(url: str) -> tuple[bytes, bytes, str]:
+def _download_verified_archive(
+    url: str, *, cache_dir: str | Path | None = None
+) -> tuple[bytes, bytes, str]:
+    cache = Path(cache_dir) if cache_dir is not None else None
+    cache_key = hashlib.sha256(url.encode()).hexdigest()
+    archive_cache = cache / f"{cache_key}.archive" if cache is not None else None
+    checksum_cache = cache / f"{cache_key}.checksum" if cache is not None else None
+
+    def verified(archive: bytes, checksum: bytes) -> tuple[bytes, bytes, str] | None:
+        try:
+            expected = checksum.decode().strip().split()[0].lower()
+        except (IndexError, UnicodeDecodeError):
+            return None
+        observed = hashlib.sha256(archive).hexdigest()
+        if expected != observed:
+            return None
+        return archive, checksum, observed
+
+    if archive_cache is not None and checksum_cache is not None:
+        if archive_cache.is_file() and checksum_cache.is_file():
+            cached = verified(archive_cache.read_bytes(), checksum_cache.read_bytes())
+            if cached is not None:
+                return cached
+
     def download(resource: str) -> bytes:
-        for attempt in range(5):
+        for attempt in range(12):
             try:
                 with urllib.request.urlopen(resource, timeout=30) as response:  # noqa: S310
                     return response.read()
             except urllib.error.HTTPError:
                 raise
             except (TimeoutError, urllib.error.URLError):
-                if attempt == 4:
+                if attempt == 11:
                     raise
-                time.sleep(0.5 * (2**attempt))
+                time.sleep(min(30.0, 0.5 * (2**attempt)))
         raise AssertionError("unreachable archive retry state")
 
     archive = download(url)
     checksum = download(f"{url}.CHECKSUM")
-    expected = checksum.decode().strip().split()[0].lower()
-    observed = hashlib.sha256(archive).hexdigest()
-    if expected != observed:
+    result = verified(archive, checksum)
+    if result is None:
         raise ValueError(f"Binance archive checksum mismatch: {url}")
-    return archive, checksum, observed
+    if archive_cache is not None and checksum_cache is not None and cache is not None:
+        cache.mkdir(parents=True, exist_ok=True)
+        for path, payload in ((archive_cache, archive), (checksum_cache, checksum)):
+            descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=cache)
+            try:
+                with os.fdopen(descriptor, "wb") as handle:
+                    handle.write(payload)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(temporary, path)
+            finally:
+                if os.path.exists(temporary):
+                    os.unlink(temporary)
+    return result
 
 
 def _mark_archive_rows(
@@ -501,7 +577,9 @@ def _funding_archive_rows(
     import io
 
     rows: list[dict[str, object]] = []
-    covered: set[pd.Timestamp] = set()
+    # A checksum-verified monthly archive is the authoritative event ledger.  Required holding
+    # intervals with no row contain zero funding settlements; they are covered, not missing.
+    covered: set[pd.Timestamp] = set(required)
     previous: pd.Timestamp | None = None
     with zipfile.ZipFile(io.BytesIO(archive)) as bundle:
         names = bundle.namelist()
@@ -538,9 +616,9 @@ def _funding_archive_rows(
                     f"funding archive contains invalid values: {symbol} at {actual} "
                     f"(interval={interval}, rate={rate}, mark={mark})"
                 )
-            if interval_left in covered:
-                raise ValueError(f"funding archive duplicates an interval: {symbol}")
-            covered.add(interval_left)
+            # A four-, two-, or one-hour funding schedule legitimately contributes multiple
+            # settlements to one 8-hour holding interval.  The replay groups and sums every
+            # distinct settlement; ``covered`` only records that the interval has evidence.
             rows.append(
                 {
                     "funding_time": actual,
@@ -571,6 +649,7 @@ def acquire_execution_gaps(
         raise FileExistsError("CUP-50 coverage acquisition destination must be new")
     if workers < 1 or workers > 16:
         raise ValueError("acquisition workers must be in 1..16")
+    download_cache = output.parent / f".{output.name}.download-cache"
     manifest = json.loads(manifest_path.read_text())
     verified, entries = _verified_sources(source, manifest)
     snapshot = stitch_snapshots(load_snapshot(is_root), load_snapshot(sealed_root))
@@ -603,7 +682,9 @@ def acquire_execution_gaps(
             f"{symbol}/1h/{filename}"
         )
         try:
-            archive, checksum, digest = _download_verified_archive(url)
+            archive, checksum, digest = _download_verified_archive(
+                url, cache_dir=download_cache
+            )
         except urllib.error.HTTPError as error:
             if error.code != 404:
                 raise
@@ -653,7 +734,9 @@ def acquire_execution_gaps(
             f"{symbol}/1h/{filename}"
         )
         try:
-            archive, checksum, digest = _download_verified_archive(url)
+            archive, checksum, digest = _download_verified_archive(
+                url, cache_dir=download_cache
+            )
         except urllib.error.HTTPError as error:
             if error.code != 404:
                 raise
@@ -723,7 +806,9 @@ def acquire_execution_gaps(
             f"{symbol}/1h/{filename}"
         )
         try:
-            archive, checksum, digest = _download_verified_archive(url)
+            archive, checksum, digest = _download_verified_archive(
+                url, cache_dir=download_cache
+            )
         except urllib.error.HTTPError as error:
             if error.code != 404:
                 raise
@@ -776,7 +861,9 @@ def acquire_execution_gaps(
             "https://data.binance.vision/data/futures/um/daily/klines/"
             f"{symbol}/1h/{filename}"
         )
-        archive, checksum, digest = _download_verified_archive(url)
+        archive, checksum, digest = _download_verified_archive(
+            url, cache_dir=download_cache
+        )
         rows, missing = _transaction_archive_rows(
             archive, symbol=symbol, required=required
         )
@@ -842,7 +929,9 @@ def acquire_execution_gaps(
             f"{symbol}/{filename}"
         )
         try:
-            archive, checksum, digest = _download_verified_archive(url)
+            archive, checksum, digest = _download_verified_archive(
+                url, cache_dir=download_cache
+            )
         except urllib.error.HTTPError as error:
             if error.code != 404:
                 raise

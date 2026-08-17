@@ -3,7 +3,7 @@
     "nested": 52,
     "top": 43
   },
-  "cup50_shard": "55 passed after same-namespace organizer-defect remediation",
+  "cup50_shard": "58 passed after complete post-membership execution-coverage remediation",
   "current": {
     "nested": 33,
     "top": 37
