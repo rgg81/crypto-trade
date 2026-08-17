@@ -83,6 +83,8 @@ def test_physical_split_endpoint_semantics_and_roster_censorship(tmp_path) -> No
         oos_start=split,
         oos_end=end,
     )
+    assert research_paths.manifest.stat().st_mode & 0o444 == 0o444
+    assert sealed_paths.manifest.stat().st_mode & 0o444 == 0o444
     research, sealed = load_snapshot(research_paths.root), load_snapshot(sealed_paths.root)
     verify_semantic_coverage(research)
     verify_semantic_coverage(sealed)

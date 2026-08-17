@@ -209,27 +209,27 @@ def canonical_daily_quote_volume(
     canonical_duration = duration.isin(
         [pd.Timedelta(hours=8), pd.Timedelta(hours=8) - pd.Timedelta(milliseconds=1)]
     )
-    grouped = frame.groupby(["day", "symbol"], sort=True)
-    rows: list[dict[str, object]] = []
-    for (day, symbol), group in grouped:
-        hours = tuple(sorted(int(value) for value in group["hour"]))
-        complete = (
-            len(group) == 3
-            and hours == (0, 8, 16)
-            and bool(canonical_duration.loc[group.index].all())
-        )
-        if complete:
-            rows.append(
-                {
-                    "day": day,
-                    "symbol": str(symbol),
-                    "quote_volume": float(group["quote_volume"].sum()),
-                }
-            )
-    if not rows:
+    frame["canonical_duration"] = canonical_duration
+    frame["canonical_hour"] = frame["hour"].isin(_ALLOWED_OPEN_HOURS)
+    grouped = frame.groupby(["day", "symbol"], sort=True, observed=True)
+    summary = grouped.agg(
+        bar_count=("open_time", "size"),
+        distinct_hours=("hour", "nunique"),
+        hour_sum=("hour", "sum"),
+        canonical_hour=("canonical_hour", "all"),
+        canonical_duration=("canonical_duration", "all"),
+        quote_volume=("quote_volume", "sum"),
+    )
+    complete = summary.loc[
+        summary["bar_count"].eq(3)
+        & summary["distinct_hours"].eq(3)
+        & summary["hour_sum"].eq(24)
+        & summary["canonical_hour"]
+        & summary["canonical_duration"]
+    ]
+    if complete.empty:
         return pd.DataFrame(index=pd.DatetimeIndex([], tz="UTC"))
-    complete = pd.DataFrame(rows)
-    pivot = complete.pivot(index="day", columns="symbol", values="quote_volume").sort_index()
+    pivot = complete["quote_volume"].unstack("symbol").sort_index()
     full_days = pd.date_range(pivot.index.min(), pivot.index.max(), freq="D", tz="UTC")
     return pivot.reindex(full_days)
 
@@ -237,18 +237,29 @@ def canonical_daily_quote_volume(
 def derive_listing_episodes(
     bars: pd.DataFrame, *, interval_hours: int = 8
 ) -> tuple[ListingEpisode, ...]:
-    """Derive listing and relisting episodes solely from archived canonical bars."""
+    """Derive listing and relisting episodes from positive-activity archived bars.
+
+    Binance can publish zero-trade placeholder klines while a contract is not executable. Those
+    rows prove neither a listing nor continuity and therefore split episodes just like a missing
+    canonical bar.
+    """
     if interval_hours <= 0:
         raise ValueError("interval_hours must be positive")
-    required = {"open_time", "close_time", "symbol"}
+    required = {"open_time", "close_time", "symbol", "quote_volume"}
     missing = required - set(bars)
     if missing:
         raise ValueError(f"bars missing columns: {sorted(missing)}")
-    frame = bars.loc[:, ["open_time", "close_time", "symbol"]].copy()
+    frame = bars.loc[:, ["open_time", "close_time", "symbol", "quote_volume"]].copy()
     frame["open_time"] = pd.to_datetime(frame["open_time"], utc=True)
     frame["close_time"] = pd.to_datetime(frame["close_time"], utc=True)
+    frame["quote_volume"] = pd.to_numeric(frame["quote_volume"], errors="raise")
+    if not np.isfinite(frame["quote_volume"].to_numpy(dtype=float)).all():
+        raise ValueError("bars contain non-finite quote volume")
+    if (frame["quote_volume"] < 0).any():
+        raise ValueError("quote volume cannot be negative")
     if frame.duplicated(["open_time", "symbol"]).any():
         raise ValueError("bars contain duplicate episode keys")
+    frame = frame.loc[frame["quote_volume"] > 0].copy()
     gap = pd.Timedelta(hours=interval_hours)
     episodes: list[ListingEpisode] = []
     for symbol, group in frame.sort_values(["symbol", "open_time"]).groupby("symbol", sort=True):
@@ -268,20 +279,25 @@ def derive_listing_episodes(
 
 
 def episode_eligibility(
-    episodes: Sequence[ListingEpisode], boundaries: Sequence[pd.Timestamp]
+    episodes: Sequence[ListingEpisode],
+    boundaries: Sequence[pd.Timestamp],
+    *,
+    lookback_days: int = 180,
+    interval_hours: int = 8,
 ) -> pd.DataFrame:
-    """Past-only listing eligibility to combine with complete-window volume eligibility.
-
-    Episode *ends* are deliberately not consulted.  An end is only knowable after trading stops,
-    and extending a still-live episode with future archive bars must not rewrite an old boundary.
-    The exact 180-day completeness predicate in :func:`build_membership` removes a delisted or
-    recently relisted contract as soon as its archive develops a gap.
-    """
+    """Past-only eligibility requiring one continuous complete lookback episode."""
+    if lookback_days < 1 or interval_hours <= 0:
+        raise ValueError("lookback_days and interval_hours must be positive")
     ordered = tuple(_utc(boundary, "boundary") for boundary in boundaries)
     symbols = sorted({episode.symbol for episode in episodes})
     result = pd.DataFrame(False, index=pd.DatetimeIndex(ordered), columns=symbols, dtype=bool)
     for episode in episodes:
-        active = [boundary for boundary in ordered if episode.start < boundary]
+        active = [
+            boundary
+            for boundary in ordered
+            if episode.start <= boundary - pd.Timedelta(days=lookback_days)
+            and episode.end >= boundary - pd.Timedelta(milliseconds=1)
+        ]
         if active:
             result.loc[active, episode.symbol] = True
     return result

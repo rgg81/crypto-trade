@@ -7,6 +7,18 @@
   "window_end": "2024-02-01T00:00:00Z",
   "windows": [
     {
+      "end": "2022-06-13T00:00:00Z",
+      "evidence": {
+        "last_observation_close": 6.44,
+        "last_observation_close_time": "2022-06-10T15:59:59.999Z",
+        "monthly_8h_archive_sha256": "afb5c238fc77a9bff4559f5d3b83ac5416ea7e1f3a8c211fdb395ef863fb28a6",
+        "source": "checksum-verified Binance USD-M monthly transaction archive"
+      },
+      "reason": "Verified midweek cessation of ICPUSDT trading; the next canonical bar is a zero-trade placeholder.",
+      "start": "2022-06-10T16:00:00Z",
+      "symbol": "ICPUSDT"
+    },
+    {
       "end": "2022-05-16T00:00:00Z",
       "evidence": {
         "daily_8h_archive_sha256": "dea67d24aec3913768d8ac2d37141496712150c94f5a2370d6daa9c1421eb581",
@@ -19,6 +31,30 @@
       "reason": "Verified midweek cessation of LUNAUSDT trading; no 08:00 UTC transaction open exists.",
       "start": "2022-05-13T08:00:00Z",
       "symbol": "LUNAUSDT"
+    },
+    {
+      "end": "2022-06-13T00:00:00Z",
+      "evidence": {
+        "last_observation_close": 0.0347,
+        "last_observation_close_time": "2022-06-09T15:59:59.999Z",
+        "monthly_8h_archive_sha256": "4dc02bea9304aeb6b063da1224e7f278b09c6a70c27f884f2ea3d1d3c459236a",
+        "source": "checksum-verified Binance USD-M monthly transaction archive"
+      },
+      "reason": "Verified midweek cessation of TLMUSDT trading; the next canonical bar is a zero-trade placeholder.",
+      "start": "2022-06-09T16:00:00Z",
+      "symbol": "TLMUSDT"
+    },
+    {
+      "end": "2023-11-20T00:00:00Z",
+      "evidence": {
+        "last_observation_close": 1.2792,
+        "last_observation_close_time": "2023-11-14T15:59:59.999Z",
+        "monthly_8h_archive_sha256": "904f616656c4d53f18ffa0cc789a1ab57af379836cf357217ee6b5fc6718e7a5",
+        "source": "checksum-verified Binance USD-M monthly transaction archive"
+      },
+      "reason": "Verified midweek cessation of TOMOUSDT trading; the next canonical bar is a zero-trade placeholder.",
+      "start": "2023-11-14T16:00:00Z",
+      "symbol": "TOMOUSDT"
     }
   ]
 }

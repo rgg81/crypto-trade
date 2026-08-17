@@ -3,13 +3,14 @@
     "nested": 52,
     "top": 43
   },
-  "cup50_shard": "54 passed after the pre-feedback same-version performance fix; array execution is bit-exact to the frozen reference and all 12 optimized target streams match their prior streams",
+  "cup50_shard": "55 passed after same-namespace organizer-defect remediation",
   "current": {
     "nested": 33,
     "top": 37
   },
-  "legacy_cup20_shard": "stopped at 67 percent after 48 minutes in an unchanged multi-process exact-replay test; no CUP-50 source imports this namespace",
-  "method": "complete top-level and nested shards compared with parent; isolated CUP-50 suite; unchanged CUP-20 prefix through 67 percent",
+  "full_command_attempt": "373 passed and 5 deselected through 7 percent in 545.65 seconds; stopped inside an unchanged CUP-20 exact-replay leak test",
+  "legacy_cup20_shard": "unchanged multi-process exact-replay suite remains the repository-wide runtime bottleneck; no CUP-50 source imports this namespace",
+  "method": "complete top-level and nested shards compared with parent; isolated CUP-50 suite; repository-wide prefix through the unchanged CUP-20 runtime bottleneck",
   "new_failures": {
     "nested": [],
     "top": []

@@ -20,6 +20,7 @@ from crypto_trade.cup50.snapshot import Snapshot
 from crypto_trade.cup50.universe import members_at
 
 REBALANCE_COLUMN = "__cup50_rebalance__"
+_NOTIONAL_DUST_USD = 1e-9
 FORBIDDEN_CONTEXT_COLUMNS = frozenset(
     {
         "fill",
@@ -522,10 +523,13 @@ def require_execution_coverage(
             & bars["open_time"].lt(window.end)
             & bars["symbol"].astype(str).eq(window.symbol)
         ]
-        if not audited_rows.empty:
+        active_rows = audited_rows["quote_volume"].astype(float).gt(0.0)
+        if "trade_count" in audited_rows:
+            active_rows |= audited_rows["trade_count"].astype(float).gt(0.0)
+        if active_rows.any():
             raise ValueError(
-                f"unavailability audit suppresses an existing transaction bar: "
-                f"{window.symbol} at {audited_rows.iloc[0]['open_time']}"
+                f"unavailability audit suppresses an active transaction bar: "
+                f"{window.symbol} at {audited_rows.loc[active_rows].iloc[0]['open_time']}"
             )
     for raw in decision_times:
         decision = pd.Timestamp(raw).tz_convert("UTC")
@@ -701,12 +705,15 @@ def _evaluate_targets_reference(
         capacity = quote_volume * config.max_bar_participation
         strategy_filled = requested_notional.clip(lower=-capacity, upper=capacity)
         fill_quantity = strategy_filled.div(current_open).fillna(0.0)
-        quantities = (quantities + fill_quantity).where(
-            (quantities + fill_quantity).abs() > 1e-14, 0.0
+        quantities = quantities + fill_quantity
+        quantities = quantities.where(
+            quantities.mul(current_open).abs().fillna(0.0) > _NOTIONAL_DUST_USD, 0.0
         )
-        # A sparse hold can drift over the exposure limits even though its original target was
-        # valid. The common cap is therefore an every-boundary execution rule, not just a target
-        # validator. It only reduces the carried book and shares the bar's participation budget.
+        # A carried book can drift over an exposure limit even though its target was valid. Use
+        # all participation left after the strategy fill to reduce that drift. If the market's
+        # capacity is insufficient, the excess remains a temporary execution shortfall: the
+        # strategy cannot see or cause the organizer's fill constraint, so it is not a candidate
+        # failure. Every subsequent boundary continues deleveraging toward the capped book.
         marked_weights = quantities.mul(current_mark).fillna(0.0) / equity_start
         capped_marked = cap_target_row(marked_weights, config)
         risk_requested = (capped_marked - marked_weights).mul(equity_start).div(current_mark)
@@ -716,11 +723,9 @@ def _evaluate_targets_reference(
             lower=-remaining_capacity, upper=remaining_capacity
         )
         quantities = quantities + risk_filled.div(current_open).fillna(0.0)
-        post_cap_weights = quantities.mul(current_mark).fillna(0.0) / equity_start
-        if not _within_caps(post_cap_weights, config):
-            raise StrategyFailureError(
-                "participation capacity cannot restore the common exposure caps"
-            )
+        quantities = quantities.where(
+            quantities.mul(current_open).abs().fillna(0.0) > _NOTIONAL_DUST_USD, 0.0
+        )
         filled_notional = strategy_filled + risk_filled
         turnover_usd = float(filled_notional.abs().sum())
         cost_rate = (
@@ -1190,7 +1195,10 @@ def evaluate_targets(
             where=np.isfinite(current_open) & (current_open != 0.0),
         )
         quantities = quantities + fill_quantity
-        quantities[np.abs(quantities) <= 1e-14] = 0.0
+        quantities[
+            np.nan_to_num(np.abs(quantities * current_open), nan=0.0)
+            <= _NOTIONAL_DUST_USD
+        ] = 0.0
         marked_weights = np.nan_to_num(quantities * current_mark, nan=0.0) / equity_start
         capped_marked = _cap_array(marked_weights, config)
         risk_requested = np.divide(
@@ -1208,11 +1216,10 @@ def evaluate_targets(
             out=np.zeros(size, dtype=float),
             where=np.isfinite(current_open) & (current_open != 0.0),
         )
-        post_cap_weights = np.nan_to_num(quantities * current_mark, nan=0.0) / equity_start
-        if not _within_array_caps(post_cap_weights, config):
-            raise StrategyFailureError(
-                "participation capacity cannot restore the common exposure caps"
-            )
+        quantities[
+            np.nan_to_num(np.abs(quantities * current_open), nan=0.0)
+            <= _NOTIONAL_DUST_USD
+        ] = 0.0
         filled_notional = strategy_filled + risk_filled
         turnover_usd = float(np.abs(filled_notional).sum())
         costs_usd = turnover_usd * cost_rate

@@ -12,6 +12,7 @@ from crypto_trade.cup50.universe import (
     canonical_daily_quote_volume,
     classify_current_exchange_contracts,
     derive_listing_episodes,
+    episode_eligibility,
     members_at,
     pure_crypto_symbols,
 )
@@ -83,7 +84,7 @@ def test_frozen_config_and_exact_window() -> None:
 
 def test_frozen_unavailability_audit_is_half_open_and_canonical() -> None:
     windows = load_unavailability_audit("tournament/cup50/historical-unavailability.json")
-    assert len(windows) == 4
+    assert len(windows) == 5
     assert unavailable_symbols(windows, pd.Timestamp("2022-05-13T08:00:00Z")) == {
         "LUNAUSDT"
     }
@@ -109,7 +110,12 @@ def test_frozen_unavailability_audit_is_half_open_and_canonical() -> None:
 
 def test_team_visible_is_unavailability_audit_has_no_oos_window() -> None:
     windows = load_unavailability_audit("tournament/cup50/is-unavailability.json")
-    assert [window.symbol for window in windows] == ["LUNAUSDT"]
+    assert [window.symbol for window in windows] == [
+        "ICPUSDT",
+        "LUNAUSDT",
+        "TLMUSDT",
+        "TOMOUSDT",
+    ]
     assert all(window.end <= OOS_START for window in windows)
 
 
@@ -189,6 +195,24 @@ def test_listing_episodes_are_archive_derived() -> None:
     episodes = derive_listing_episodes(pd.concat([bars, later], ignore_index=True))
     assert len(episodes) == 2
     assert episodes[1].start == pd.Timestamp("2024-01-10T00:00:00Z")
+
+
+def test_zero_trade_placeholders_split_episodes_and_relisting_requires_full_lookback() -> None:
+    first = _bars(["AUSDT"], "2024-01-01", 2)
+    placeholders = _bars(["AUSDT"], "2024-01-03", 2)
+    placeholders["quote_volume"] = 0.0
+    relisted = _bars(["AUSDT"], "2024-01-05", 2)
+    episodes = derive_listing_episodes(
+        pd.concat([first, placeholders, relisted], ignore_index=True)
+    )
+    assert len(episodes) == 2
+    boundaries = [
+        pd.Timestamp("2024-01-03T00:00:00Z"),
+        pd.Timestamp("2024-01-04T00:00:00Z"),
+        pd.Timestamp("2024-01-06T00:00:00Z"),
+    ]
+    eligibility = episode_eligibility(episodes, boundaries, lookback_days=1)
+    assert eligibility["AUSDT"].tolist() == [True, False, True]
 
 
 def test_daily_volume_ignores_corrupted_rows_after_frozen_end() -> None:

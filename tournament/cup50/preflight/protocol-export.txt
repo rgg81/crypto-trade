@@ -1,1 +1,1 @@
-{"files": {"crypto_trade/cup50/protocol.py": "162bde78914ba853bd1edbe9496b0be9fd60f68abb78b6654203837d352a659d"}, "manifest_sha256": "74f635c980cdeab58a59a8996ba9e9f4a939a11c52ca5b5b1e37e44b186d3fe3", "namespace": "cup50-protocol-export", "schema_version": 1}
+{"files":{"crypto_trade/cup50/protocol.py":"162bde78914ba853bd1edbe9496b0be9fd60f68abb78b6654203837d352a659d"},"manifest_sha256":"74f635c980cdeab58a59a8996ba9e9f4a939a11c52ca5b5b1e37e44b186d3fe3","namespace":"cup50-protocol-export","schema_version":1}

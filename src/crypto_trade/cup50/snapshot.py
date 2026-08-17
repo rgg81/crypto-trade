@@ -87,6 +87,10 @@ def _atomic_write(path: Path, payload: bytes) -> None:
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary, path)
+        # Frozen snapshots are bind-mounted into the unprivileged evaluator container. Content
+        # confidentiality comes from mount isolation, while the manifest itself must be readable
+        # by the image's fixed non-host UID.
+        path.chmod(0o644)
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)

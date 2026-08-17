@@ -1,0 +1,30 @@
+{
+  "activation_sha256": "2acdaba419e85f051e49eea741bbfa9832391a04a0bdb0a83552e79d49983ce4",
+  "candidate_sources_or_parameters_changed": false,
+  "date": "2026-08-17",
+  "diagnosis": [
+    "Participation-limited organizer deleveraging was incorrectly classified as a candidate StrategyFailureError.",
+    "Zero-trade Binance placeholder bars were incorrectly accepted as continuous listing episodes.",
+    "The activation readiness strategy was flat and therefore did not exercise carried positions, roster exits, participation limits, or post-exit execution coverage.",
+    "Quantity-unit dust normalization left economically zero positions open and could demand irrelevant post-exit marks."
+  ],
+  "field_sha256": "c3cc8b2ff25065cc322eaee76e949136d520db600852e2e8635dd09ea27ebee5",
+  "integrity_review_sha256": "346742caf60974f81dc5bffb1348b75a5b29bd51302c6ba5b48fe3cd33bd5ef4",
+  "namespace": "cup50",
+  "observation_batch_records": 1,
+  "paper_desk_launched": false,
+  "reason": "organizer-owned evaluator and universe defects invalidated all twelve IS trials",
+  "release_sha256": "e4283d628794623807680dae99c2c304bbd2098e1a3c9154fce3d2acb2d6e207",
+  "remediation": [
+    "Preserve the failed activation, trial, field, observation, integrity, and release evidence.",
+    "Treat participation-limited cap restoration as a temporary organizer execution shortfall rather than candidate DNF.",
+    "Derive listing and relisting episodes only from positive-activity canonical transaction bars and require a continuous 180-day episode.",
+    "Audit midweek cessations and force-settle at the preceding verified transaction close.",
+    "Normalize sub-nanodollar residual positions to zero after strategy and risk fills.",
+    "Replace flat readiness with a rotating full-gross, 20%-per-symbol dynamic-membership strategy before reactivation."
+  ],
+  "schema_version": 1,
+  "sealed_candidate_point_reads": 0,
+  "status": "invalidated-preserved",
+  "supersession_policy": "same-namespace owner-directed remediation"
+}

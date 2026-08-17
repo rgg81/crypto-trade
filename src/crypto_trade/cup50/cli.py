@@ -80,6 +80,8 @@ from crypto_trade.cup50.universe import (
     build_membership,
     canonical_daily_quote_volume,
     classify_current_exchange_contracts,
+    derive_listing_episodes,
+    episode_eligibility,
     first_full_boundary,
     pure_crypto_symbols,
     require_exact_membership,
@@ -143,8 +145,13 @@ def _build(arguments: argparse.Namespace) -> Mapping[str, object]:
     boundaries = weekly_reconstitution_times(
         volume.index.min() + pd.Timedelta(days=180), OOS_END, weekday=0
     )
-    eligible = pd.DataFrame(False, index=pd.DatetimeIndex(boundaries), columns=volume.columns)
-    eligible.loc[:, [column for column in volume.columns if str(column) in allowed]] = True
+    eligible = episode_eligibility(
+        derive_listing_episodes(bars),
+        boundaries,
+        lookback_days=180,
+        interval_hours=8,
+    ).reindex(index=pd.DatetimeIndex(boundaries), columns=volume.columns, fill_value=False)
+    eligible.loc[:, [column for column in volume.columns if str(column) not in allowed]] = False
     membership = build_membership(
         volume,
         eligible=eligible,

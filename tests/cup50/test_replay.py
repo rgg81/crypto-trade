@@ -9,7 +9,6 @@ import pytest
 from crypto_trade.cup50.availability import UnavailabilityWindow
 from crypto_trade.cup50.replay import (
     REBALANCE_COLUMN,
-    StrategyFailureError,
     _evaluate_targets_reference,
     apply_strategy_parameters,
     evaluate_targets,
@@ -231,10 +230,10 @@ def test_audited_midweek_unavailability_settles_at_preceding_close() -> None:
             settlement_price=101.0,
         ),
     )
-    # The next transaction bar and boundary mark genuinely do not exist. The terminal mark remains
+    # A zero-trade placeholder does not make the contract executable. The terminal mark remains
     # available after the contract returns, so terminal semantic coverage is still independently
     # testable.
-    snapshot.bars.drop(snapshot.bars.index[snapshot.bars["open_time"] == boundary], inplace=True)
+    snapshot.bars.loc[snapshot.bars["open_time"] == boundary, "quote_volume"] = 0.0
     snapshot.mark_prices.drop(
         snapshot.mark_prices.index[snapshot.mark_prices["mark_time"] == boundary], inplace=True
     )
@@ -389,7 +388,7 @@ def test_array_executor_is_bit_exact_to_frozen_reference_and_can_suppress_events
         assert suppressed.final_state == reference.final_state
 
 
-def test_infeasible_participation_cap_is_a_candidate_failure() -> None:
+def test_participation_limited_deleveraging_is_not_a_candidate_failure() -> None:
     snapshot = _snapshot()
     snapshot.funding.loc[1, "funding_rate"] = 0.75
     snapshot.bars.loc[snapshot.bars["open_time"] == snapshot.window_start, "quote_volume"] = 1e9
@@ -407,8 +406,13 @@ def test_infeasible_participation_cap_is_a_candidate_failure() -> None:
         },
         index=decisions,
     )
-    with pytest.raises(StrategyFailureError, match="participation capacity"):
-        evaluate_targets(targets, snapshot=snapshot, cost_multiplier=0.0)
+    result = evaluate_targets(targets, snapshot=snapshot, cost_multiplier=0.0)
+
+    # The second boundary has no executable capacity. The target cap remains binding on requests,
+    # while an organizer-owned, participation-limited carried position is allowed to work down on
+    # later boundaries instead of incorrectly disqualifying the strategy.
+    assert result.returns.iloc[1]["gross_exposure"] > 0.20
+    assert result.returns.iloc[1]["turnover"] == 0.0
 
 
 def test_full_flat_target_path_has_exact_zero_execution_result() -> None:

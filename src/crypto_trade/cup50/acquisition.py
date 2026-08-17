@@ -8,6 +8,7 @@ import datetime as dt
 import hashlib
 import json
 import shutil
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -46,8 +47,19 @@ def _canonical(payload: object) -> bytes:
 def _fetch(endpoint: str, params: Mapping[str, object]) -> tuple[object, bytes]:
     url = f"{endpoint}?{urllib.parse.urlencode(params)}"
     request = urllib.request.Request(url, headers={"User-Agent": "cup50-acquisition-v1"})
-    with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
-        raw = response.read()
+    for attempt in range(5):
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
+                raw = response.read()
+            break
+        except urllib.error.HTTPError:
+            raise
+        except (TimeoutError, urllib.error.URLError):
+            if attempt == 4:
+                raise
+            time.sleep(0.5 * (2**attempt))
+    else:  # pragma: no cover - the final attempt either returns or raises
+        raise AssertionError("unreachable REST retry state")
     payload = json.loads(raw)
     return payload, _canonical(payload)
 
@@ -373,10 +385,21 @@ def _execution_gaps(
 
 
 def _download_verified_archive(url: str) -> tuple[bytes, bytes, str]:
-    with urllib.request.urlopen(url, timeout=30) as response:  # noqa: S310
-        archive = response.read()
-    with urllib.request.urlopen(f"{url}.CHECKSUM", timeout=30) as response:  # noqa: S310
-        checksum = response.read()
+    def download(resource: str) -> bytes:
+        for attempt in range(5):
+            try:
+                with urllib.request.urlopen(resource, timeout=30) as response:  # noqa: S310
+                    return response.read()
+            except urllib.error.HTTPError:
+                raise
+            except (TimeoutError, urllib.error.URLError):
+                if attempt == 4:
+                    raise
+                time.sleep(0.5 * (2**attempt))
+        raise AssertionError("unreachable archive retry state")
+
+    archive = download(url)
+    checksum = download(f"{url}.CHECKSUM")
     expected = checksum.decode().strip().split()[0].lower()
     observed = hashlib.sha256(archive).hexdigest()
     if expected != observed:

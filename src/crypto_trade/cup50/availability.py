@@ -56,12 +56,20 @@ def load_unavailability_audit(
         evidence = item.get("evidence")
         if not isinstance(evidence, Mapping):
             raise ValueError("unavailability windows require checksum evidence")
-        for key in ("daily_1h_archive_sha256", "daily_1m_archive_sha256"):
+        def valid_digest(key: str) -> bool:
             digest = str(evidence.get(key, ""))
-            if len(digest) != 64 or any(
+            return len(digest) == 64 and not any(
                 character not in "0123456789abcdef" for character in digest
-            ):
-                raise ValueError("unavailability archive evidence requires a SHA-256 digest")
+            )
+
+        lower_interval_evidence = valid_digest("daily_1h_archive_sha256") and valid_digest(
+            "daily_1m_archive_sha256"
+        )
+        canonical_evidence = valid_digest("monthly_8h_archive_sha256")
+        if not lower_interval_evidence and not canonical_evidence:
+            raise ValueError(
+                "unavailability requires lower-interval or canonical archive SHA-256 evidence"
+            )
         last_observation = pd.Timestamp(evidence.get("last_observation_close_time"))
         if last_observation.tzinfo is None:
             raise ValueError("last unavailability observation must be UTC-aware")

@@ -46,10 +46,13 @@ transaction opens, execution marks, fills, costs, positions, equity, or PnL. A s
 Targets decided at `t` fill at the transaction open at `t`. Funding belongs to `(t, t+8h]`, so a
 settlement at OOS start is IS and the settlement at 2026-08-01 00:00 UTC is in the last July
 interval. Fee is 5 bps and slippage 2.5 bps per side, independently at 1x/2x/3x cost. Gross and
-absolute net exposure are capped at 1.0, symbols at 0.20, and participation at 0.001. The common
-risk unit targets 10% annual volatility causally from 90 trailing days. Team volatility targeting
-is forbidden. Organizer-owned unavailability settlement is applied identically to every lane and
-cost run and cannot be influenced by a strategy.
+absolute net targets are capped at 1.0, symbols at 0.20, and participation is capped at 0.001.
+Market drift or a partial fill can leave the carried book temporarily above a target cap when the
+participation ceiling prevents immediate deleveraging. The evaluator applies all remaining bar
+capacity toward the capped book at every boundary; this organizer-owned execution shortfall is not
+a candidate failure. The common risk unit targets 10% annual volatility causally from 90 trailing
+days. Team volatility targeting is forbidden. Organizer-owned unavailability settlement is
+applied identically to every lane and cost run and cannot be influenced by a strategy.
 
 ## Research field
 
@@ -91,7 +94,11 @@ round-half-even at 1e-6.
 Activation binds the charter/config, transitive evaluator path, CLI, dependency lock, pure-crypto
 audit, data manifests, scorer, test transcript, clean commit, and content-addressed sandbox image.
 Acquisition, sealed data, private universe artifacts, caches, and reports are quarantined before
-research. A material policy defect after feedback starts requires a new tournament version.
+research. A material policy defect normally requires a new tournament version. The initial CUP-50
+release was invalidated before any sealed candidate read after an organizer-owned
+participation/exposure feasibility defect disqualified every IS trial. At the owner's direction,
+that failed release remains preserved as evidence and CUP-50 is remediated in place without
+changing any candidate source, parameters, seed, or nomination.
 
 All twelve dispositions and the observation order freeze before sealed restoration. A durable
 batch marker precedes the first sealed read and every point has durable start/terminal records. An
