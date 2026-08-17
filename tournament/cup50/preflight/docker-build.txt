@@ -1,0 +1,57 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 492B done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for docker.io/library/python@sha256:ffb752e139c0a19692a43af8d8523b274222dd68eebad5d583b45c2201c6e30a
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [1/4] FROM docker.io/library/python@sha256:ffb752e139c0a19692a43af8d8523b274222dd68eebad5d583b45c2201c6e30a
+#4 DONE 0.2s
+
+#5 [internal] load build context
+#5 transferring context: 207B done
+#5 DONE 0.2s
+
+#6 [2/4] COPY requirements.lock /tmp/requirements.lock
+#6 DONE 0.1s
+
+#7 [3/4] RUN python -m pip install --requirement /tmp/requirements.lock     && rm /tmp/requirements.lock
+#7 1.257 Collecting numpy==2.2.6 (from -r /tmp/requirements.lock (line 2))
+#7 1.357   Downloading numpy-2.2.6-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (62 kB)
+#7 1.457 Collecting pandas==3.0.0 (from -r /tmp/requirements.lock (line 3))
+#7 1.483   Downloading pandas-3.0.0-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (79 kB)
+#7 1.553 Collecting pyarrow==23.0.1 (from -r /tmp/requirements.lock (line 4))
+#7 1.579   Downloading pyarrow-23.0.1-cp313-cp313-manylinux_2_28_x86_64.whl.metadata (3.1 kB)
+#7 1.593 Collecting python-dateutil==2.9.0.post0 (from -r /tmp/requirements.lock (line 5))
+#7 1.619   Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl.metadata (8.4 kB)
+#7 1.633 Collecting six==1.17.0 (from -r /tmp/requirements.lock (line 6))
+#7 1.662   Downloading six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+#7 1.694 Downloading numpy-2.2.6-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (16.5 MB)
+#7 2.072    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 16.5/16.5 MB 47.4 MB/s  0:00:00
+#7 2.107 Downloading pandas-3.0.0-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (10.9 MB)
+#7 2.355    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 10.9/10.9 MB 43.5 MB/s  0:00:00
+#7 2.384 Downloading pyarrow-23.0.1-cp313-cp313-manylinux_2_28_x86_64.whl (47.6 MB)
+#7 3.154    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 47.6/47.6 MB 62.3 MB/s  0:00:00
+#7 3.180 Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+#7 3.209 Downloading six-1.17.0-py2.py3-none-any.whl (11 kB)
+#7 3.346 Installing collected packages: six, pyarrow, numpy, python-dateutil, pandas
+#7 9.293
+#7 9.294 Successfully installed numpy-2.2.6 pandas-3.0.0 pyarrow-23.0.1 python-dateutil-2.9.0.post0 six-1.17.0
+#7 9.295 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+#7 DONE 9.6s
+
+#8 [4/4] WORKDIR /workspace/team
+#8 DONE 0.1s
+
+#9 exporting to image
+#9 exporting layers
+#9 exporting layers 0.9s done
+#9 writing image sha256:e4848b9718798b1479afc76975c7574e8795e1f7e0222015df29b4a2dabbd7f0 done
+#9 naming to docker.io/library/cup50-evaluator:2026-08-17 done
+#9 DONE 0.9s

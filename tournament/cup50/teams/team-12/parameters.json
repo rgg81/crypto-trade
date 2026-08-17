@@ -1,0 +1,1 @@
+{"centre":{"funding_events":63,"reversal_bars":21,"trend_bars":189},"dimensions":[{"kind":"integer","name":"funding_events"},{"kind":"integer","name":"reversal_bars"},{"kind":"integer","name":"trend_bars"}]}

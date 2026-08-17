@@ -1441,6 +1441,64 @@ def append_vol_ceiling_rows_to_comparison(
     )
 
 
+def append_trend_scale_rows_to_comparison(
+    comparison_csv_path: Path,
+    trend_scale_fire_rate_is: float,
+    trend_scale_fire_rate_oos: float,
+    trend_scale_avg_mult_is: float,
+    trend_scale_avg_mult_oos: float,
+) -> None:
+    """Append the trend-scale diagnostics using the comparison.csv schema.
+
+    The runner has emitted these diagnostics since iter-v1/012.  Keeping the
+    writer beside the other comparison helpers makes importing the runner
+    independent of whether that optional axis is active for a particular run.
+    """
+
+    def _ratio(oos_v: float, is_v: float) -> str:
+        if is_v == 0:
+            return "—"
+        return f"{oos_v / is_v:.4f}"
+
+    new_rows = [
+        [
+            "trend_scale_fire_rate_is",
+            f"{trend_scale_fire_rate_is:.6f}",
+            f"{trend_scale_fire_rate_oos:.6f}",
+            _ratio(trend_scale_fire_rate_oos, trend_scale_fire_rate_is),
+        ],
+        [
+            "trend_scale_fire_rate_oos",
+            f"{trend_scale_fire_rate_is:.6f}",
+            f"{trend_scale_fire_rate_oos:.6f}",
+            _ratio(trend_scale_fire_rate_oos, trend_scale_fire_rate_is),
+        ],
+        [
+            "trend_scale_avg_mult_is",
+            f"{trend_scale_avg_mult_is:.6f}",
+            f"{trend_scale_avg_mult_oos:.6f}",
+            _ratio(trend_scale_avg_mult_oos, trend_scale_avg_mult_is),
+        ],
+        [
+            "trend_scale_avg_mult_oos",
+            f"{trend_scale_avg_mult_is:.6f}",
+            f"{trend_scale_avg_mult_oos:.6f}",
+            _ratio(trend_scale_avg_mult_oos, trend_scale_avg_mult_is),
+        ],
+    ]
+
+    with open(comparison_csv_path, "a", newline="") as f:
+        csv.writer(f).writerows(new_rows)
+
+    print(
+        "[reporting_v1] comparison.csv updated: "
+        f"trend_scale_fire_rate_is={trend_scale_fire_rate_is:.4f} "
+        f"trend_scale_fire_rate_oos={trend_scale_fire_rate_oos:.4f} "
+        f"trend_scale_avg_mult_is={trend_scale_avg_mult_is:.4f} "
+        f"trend_scale_avg_mult_oos={trend_scale_avg_mult_oos:.4f} appended."
+    )
+
+
 def append_n_seeds_used_to_comparison(
     comparison_csv_path: Path,
     n_seeds_used_mean: float,

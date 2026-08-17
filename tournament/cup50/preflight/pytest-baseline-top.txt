@@ -1,0 +1,927 @@
+........................................................................ [  4%]
+........................................................................ [  8%]
+........................................................................ [ 12%]
+........................................................................ [ 16%]
+............FF.......................................................... [ 20%]
+........................................................................ [ 25%]
+.........................................................F....F........F [ 29%]
+.......F..............................F........F........................ [ 33%]
+........................................................................ [ 37%]
+..........................F............................................. [ 41%]
+...FF................F.................................................. [ 45%]
+.....F......F........................................................... [ 50%]
+...F...................................F...................F............ [ 54%]
+....................F.F..sF.F...s.F.............s.................F..... [ 58%]
+F................F................................F.FF.................. [ 62%]
+....................................FF.F..............................Fs [ 66%]
+................Fs................................Fss................... [ 70%]
+.................ss..............s..................s................... [ 75%]
+........................................................................ [ 79%]
+..................ss.................................................... [ 83%]
+..................................................................FFFFFF [ 87%]
+FFF..................................................................... [ 91%]
+........................................................................ [ 95%]
+.......................................................................  [100%]
+=================================== FAILURES ===================================
+_______________________________ test_list_groups _______________________________
+
+    def test_list_groups():
+        groups = list_groups()
+        # iter-v1/023 added funding_v1 (10 groups); iter-v1/025 added open_interest_v1 (11 groups).
+        # iter-v1/034 added basis_v1 (12 groups); iter-v1/040 added composed_v1 (13 groups).
+        # iter-v1/047 added statistical_v1 (14 groups), then REVERTED at closeout
+        # (NEG-CLEAN-PRE-EDA: F5 |IC|=0.81 vs stat_skew_20) → back to 13 groups.
+        # iter-v1/049 added longshort_v1 (14 groups).
+        # iter-v1/050 added cross_btc_v1 (15 groups).
+>       assert len(groups) == 15
+E       AssertionError: assert 18 == 15
+E        +  where 18 = len(['basis_v1', 'calendar', 'composed_v1', 'composed_v1_085', 'cross_btc_v1', 'entropy_cusum', ...])
+
+tests/test_features.py:66: AssertionError
+_________________________ test_registry_has_all_groups _________________________
+
+    def test_registry_has_all_groups():
+        # iter-v1/023 added funding_v1; iter-v1/025 added open_interest_v1.
+        # iter-v1/034 added basis_v1; iter-v1/040 added composed_v1.
+        # iter-v1/047 added statistical_v1, then REVERTED at closeout (NEG-CLEAN-PRE-EDA).
+        # iter-v1/049 added longshort_v1; iter-v1/050 added cross_btc_v1.
+>       assert len(GROUP_REGISTRY) == 15
+E       AssertionError: assert 18 == 15
+E        +  where 18 = len({'basis_v1': <function add_basis_v1_features at 0x75149e2ff880>, 'calendar': <function add_calendar_features at 0x7514...osed_v1_features at 0x75149e108860>, 'composed_v1_085': <function add_composed_v1_085_features at 0x75149e108a40>, ...})
+
+tests/test_features.py:92: AssertionError
+__________ TestV1ExcludedSymbolsUpdate.test_v2_symbols_still_excluded __________
+
+self = <tests.test_iteration_v1_017_universe_expansion.TestV1ExcludedSymbolsUpdate object at 0x75149e1ae9e0>
+
+    def test_v2_symbols_still_excluded(self) -> None:
+        """Remaining v2 symbols (XRPUSDT, DOGEUSDT, NEARUSDT) must remain excluded."""
+        for sym in ("XRPUSDT", "DOGEUSDT", "NEARUSDT"):
+>           assert sym in V1_EXCLUDED_SYMBOLS, f"v2 symbol {sym} must remain in V1_EXCLUDED_SYMBOLS"
+E           AssertionError: v2 symbol XRPUSDT must remain in V1_EXCLUDED_SYMBOLS
+E           assert 'XRPUSDT' in ('DOGEUSDT', 'NEARUSDT', 'BCHUSDT', 'LDOUSDT', 'TRXUSDT')
+
+tests/test_iteration_v1_017_universe_expansion.py:81: AssertionError
+_ TestAssertV1UniverseAcceptsIter017Universe.test_assert_rejects_v2_symbol_xrp _
+
+self = <tests.test_iteration_v1_017_universe_expansion.TestAssertV1UniverseAcceptsIter017Universe object at 0x75149e1aed70>
+
+    def test_assert_rejects_v2_symbol_xrp(self) -> None:
+        """assert_v1_universe must reject XRPUSDT (still v2-reserved)."""
+>       with pytest.raises(AssertionError, match="v1 cannot trade v2/v3 symbols"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'AssertionError'>
+
+tests/test_iteration_v1_017_universe_expansion.py:115: Failed
+______________ TestLinkNotExcluded.test_v2_symbols_still_excluded ______________
+
+self = <tests.test_iteration_v1_018_link_only.TestLinkNotExcluded object at 0x75149e1c3750>
+
+    def test_v2_symbols_still_excluded(self) -> None:
+        """v2 symbols (excluding SOLUSDT) must remain excluded (regression guard).
+
+        NOTE: SOLUSDT was removed from V1_EXCLUDED_SYMBOLS at iter-v1/017 to enable
+        Model F universe-expansion dispatch. XRP, DOGE, NEAR remain excluded.
+        """
+        for sym in ("XRPUSDT", "DOGEUSDT", "NEARUSDT"):
+>           assert sym in V1_EXCLUDED_SYMBOLS, f"v2 symbol {sym} must remain in V1_EXCLUDED_SYMBOLS"
+E           AssertionError: v2 symbol XRPUSDT must remain in V1_EXCLUDED_SYMBOLS
+E           assert 'XRPUSDT' in ('DOGEUSDT', 'NEARUSDT', 'BCHUSDT', 'LDOUSDT', 'TRXUSDT')
+
+tests/test_iteration_v1_018_link_only.py:94: AssertionError
+_ TestAssertV1UniverseAcceptsIter018Universe.test_assert_rejects_v2_symbol_xrp _
+
+self = <tests.test_iteration_v1_018_link_only.TestAssertV1UniverseAcceptsIter018Universe object at 0x75149e1e48d0>
+
+    def test_assert_rejects_v2_symbol_xrp(self) -> None:
+        """assert_v1_universe must reject XRPUSDT (v2-reserved in V1_EXCLUDED_SYMBOLS).
+
+        NOTE: SOLUSDT was removed from V1_EXCLUDED_SYMBOLS at iter-v1/017.
+        XRP, DOGE, NEAR remain excluded as representative v2 symbols.
+        """
+>       with pytest.raises(AssertionError, match="v1 cannot trade v2/v3 symbols"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'AssertionError'>
+
+tests/test_iteration_v1_018_link_only.py:140: Failed
+______________ TestBtcNotExcluded.test_v2_symbols_still_excluded _______________
+
+self = <tests.test_iteration_v1_020_btc_only.TestBtcNotExcluded object at 0x75149e0491d0>
+
+    def test_v2_symbols_still_excluded(self) -> None:
+        """v2 symbols (excluding SOLUSDT) must remain excluded (regression guard).
+
+        NOTE: SOLUSDT was removed from V1_EXCLUDED_SYMBOLS at iter-v1/017 to enable
+        Model F universe-expansion dispatch. XRP, DOGE, NEAR remain excluded.
+        """
+        for sym in ("XRPUSDT", "DOGEUSDT", "NEARUSDT"):
+>           assert sym in V1_EXCLUDED_SYMBOLS, f"v2 symbol {sym} must remain in V1_EXCLUDED_SYMBOLS"
+E           AssertionError: v2 symbol XRPUSDT must remain in V1_EXCLUDED_SYMBOLS
+E           assert 'XRPUSDT' in ('DOGEUSDT', 'NEARUSDT', 'BCHUSDT', 'LDOUSDT', 'TRXUSDT')
+
+tests/test_iteration_v1_020_btc_only.py:114: AssertionError
+_ TestAssertV1UniverseAcceptsIter020Universe.test_assert_rejects_v2_symbol_xrp _
+
+self = <tests.test_iteration_v1_020_btc_only.TestAssertV1UniverseAcceptsIter020Universe object at 0x75149e1e5150>
+
+    def test_assert_rejects_v2_symbol_xrp(self) -> None:
+        """assert_v1_universe must reject XRPUSDT (v2-reserved in V1_EXCLUDED_SYMBOLS)."""
+>       with pytest.raises(AssertionError, match="v1 cannot trade v2/v3 symbols"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'AssertionError'>
+
+tests/test_iteration_v1_020_btc_only.py:160: Failed
+_______ TestIter028FeatureColumnsPruned.test_pruned_columns_count_is_43 ________
+
+self = <tests.test_iteration_v1_028_d_specialist.TestIter028FeatureColumnsPruned object at 0x75149e0bb110>
+
+    def test_pruned_columns_count_is_43(self) -> None:
+        # iter-v1/040: SWAP basis_zscore_30 → regime_momentum_signed_5d; count 43→44.
+        # iter-v1/049: ADD long_short_zscore_30; count 44→45.
+        # iter-v1/050: ADD dot_vs_btc_ret_ratio_30; count 45→46.
+        # iter-v1/057: ADD ltc_vs_btc_ret_ratio_30; 48→49.
+        # Test tracks live constant (was 43 at /028 runtime; now 49 at /057).
+        from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
+
+>       assert len(V1_FEATURE_COLUMNS_PRUNED) == 49
+E       AssertionError: assert 48 == 49
+E        +  where 48 = len(('btc_funding_spread_30_90', 'cal_dow_norm', 'cal_hour_norm', 'dot_vs_btc_ret_ratio_30', 'eth_vs_btc_ret_ratio_30', 'funding_rate_zscore_30', ...))
+
+tests/test_iteration_v1_028_d_specialist.py:250: AssertionError
+_____ TestIter030M2Dispatch.test_model_e_uses_run_model_not_run_meta_model _____
+
+self = <tests.test_iteration_v1_030.TestIter030M2Dispatch object at 0x75149df15810>
+
+    def test_model_e_uses_run_model_not_run_meta_model(self) -> None:
+        """The /030 elif branch must call run_model() for DOT (Model E), not run_meta_model()."""
+        src = _get_030_dispatch_source()
+        # DOT + run_model (not run_meta_model) pattern for Model E
+>       assert "DOTUSDT" in src, "DOTUSDT must appear in /030 elif branch"
+E       AssertionError: DOTUSDT must appear in /030 elif branch
+E       assert 'DOTUSDT' in 'iteration_label == "v1-030" and len(symbols) == 1 and symbols[0] == "ETHUSDT":\n        # iter-v1/030 EXPLORATION (ET...state mirrors _compute_trend_state\n        # EXACTLY (searchsorted past-only close[t-1]); the vol gate uses an open_t'
+
+tests/test_iteration_v1_030.py:88: AssertionError
+________ TestIter030M2Dispatch.test_m2_excluded_for_model_e_in_dispatch ________
+
+self = <tests.test_iteration_v1_030.TestIter030M2Dispatch object at 0x75149df15940>
+
+    def test_m2_excluded_for_model_e_in_dispatch(self) -> None:
+        """The /030 elif branch must reference Model E EXCLUDED."""
+        src = _get_030_dispatch_source()
+>       assert "EXCLUDED" in src, (
+            "run_baseline_v1.py /030 elif must document Model E EXCLUDED from M2 "
+            "per LM Master §3 binding call"
+        )
+E       AssertionError: run_baseline_v1.py /030 elif must document Model E EXCLUDED from M2 per LM Master §3 binding call
+E       assert 'EXCLUDED' in 'iteration_label == "v1-030" and len(symbols) == 1 and symbols[0] == "ETHUSDT":\n        # iter-v1/030 EXPLORATION (ET...state mirrors _compute_trend_state\n        # EXACTLY (searchsorted past-only close[t-1]); the vol gate uses an open_t'
+
+tests/test_iteration_v1_030.py:94: AssertionError
+_ TestIter030M2ThresholdPinned.test_metalabeling_strategy_veto_threshold_is_0_5 _
+
+self = <tests.test_iteration_v1_030.TestIter030M2ThresholdPinned object at 0x75149df35810>
+
+    def test_metalabeling_strategy_veto_threshold_is_0_5(self) -> None:
+        """MetaLabelingStrategy.get_signal vetoes when M2 confidence < 0.5."""
+        from crypto_trade.strategies.ml.metalabeling import MetaLabelingStrategy
+
+        src = inspect.getsource(MetaLabelingStrategy.get_signal)
+>       assert "0.5" in src, "MetaLabelingStrategy.get_signal must use 0.5 as veto threshold"
+E       AssertionError: MetaLabelingStrategy.get_signal must use 0.5 as veto threshold
+E       assert '0.5' in '    def get_signal(self, symbol: str, open_time: int) -> Signal:\n        """M1 predicts direction; if M1 fires, M2 v...    print(f"  [M2] {ts_str} {symbol} → PASSED (M2 conf={m2_confidence:.3f} >= {thr:.2f})")\n        return m1_signal\n'
+
+tests/test_iteration_v1_030.py:354: AssertionError
+_______________ test_bundle_iter33_confirmation_ensemble_size_10 _______________
+
+    def test_bundle_iter33_confirmation_ensemble_size_10():
+        """V1_CONFIRMATION_ENSEMBLE_SIZE must equal 10 (CONFIRMATION standard).
+
+        Brief Section 0.5 + Section 10.2: ENSEMBLE_SIZE=10 inner (non-negotiable
+        per feedback_v1_seed_count_non_negotiable.md).
+        """
+        source = Path("run_baseline_v1.py").read_text()
+
+        # Constant must be defined as 10
+>       assert "V1_CONFIRMATION_ENSEMBLE_SIZE: int = 10" in source, (
+            "V1_CONFIRMATION_ENSEMBLE_SIZE: int = 10 not found in run_baseline_v1.py. "
+            "CONFIRMATION standard requires ENSEMBLE_SIZE=10 inner seeds."
+        )
+E       AssertionError: V1_CONFIRMATION_ENSEMBLE_SIZE: int = 10 not found in run_baseline_v1.py. CONFIRMATION standard requires ENSEMBLE_SIZE=10 inner seeds.
+E       assert 'V1_CONFIRMATION_ENSEMBLE_SIZE: int = 10' in '"""v1 baseline runner — refactored 2026-05-23.\n\nThe refactored v1 runner. Mirrors the v3 runner\'s structural patte...                 baseline_oos_sharpe=baseline_sharpe,\n                )\n\n\nif __name__ == "__main__":\n    main()\n'
+
+tests/test_iteration_v1_033.py:437: AssertionError
+____________________ test_v1_034_pruned_features_length_44 _____________________
+
+    def test_v1_034_pruned_features_length_44() -> None:
+        """V1_FEATURE_COLUMNS_PRUNED must have exactly 48 features after /052 ADD.
+
+        History: /034 added basis_zscore_30 (43→44); /040 swapped to regime_momentum (44);
+        /049 added long_short_zscore_30 (44→45); /050 added dot_vs_btc_ret_ratio_30 (45→46);
+        /052 added btc_funding_rate_8h_impulse + btc_funding_spread_30_90 (46→48).
+        """
+        from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
+
+        n = len(V1_FEATURE_COLUMNS_PRUNED)
+>       assert n == 47, (
+            f"V1_FEATURE_COLUMNS_PRUNED should have 48 features after iter-v1/052 adds "
+            f"btc_funding_rate_8h_impulse + btc_funding_spread_30_90 (46 → 48). Got {n}."
+        )
+E       AssertionError: V1_FEATURE_COLUMNS_PRUNED should have 48 features after iter-v1/052 adds btc_funding_rate_8h_impulse + btc_funding_spread_30_90 (46 → 48). Got 48.
+E       assert 48 == 47
+
+tests/test_iteration_v1_034.py:117: AssertionError
+_____________________ test_v1_040_pruned_features_count_44 _____________________
+
+    def test_v1_040_pruned_features_count_44() -> None:
+        """len(V1_FEATURE_COLUMNS_PRUNED) must be 45 after iter-v1/049 ADD.
+
+        iter-v1/040 performed a pure SWAP: DROP basis_zscore_30 (−1) + ADD
+        regime_momentum_signed_5d (+1) → count stayed at 44.
+        iter-v1/049 added long_short_zscore_30 (+1) → count is now 45.
+        """
+        from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
+
+>       assert len(V1_FEATURE_COLUMNS_PRUNED) == 49, (
+            f"V1_FEATURE_COLUMNS_PRUNED has {len(V1_FEATURE_COLUMNS_PRUNED)} features; expected 49. "
+            "iter-v1/050 adds dot_vs_btc_ret_ratio_30 (+1): 45 → 46. "
+            "iter-v1/052 adds btc_funding_rate_8h_impulse + btc_funding_spread_30_90 (+2): 46 → 48. "
+            "iter-v1/055 adds eth_vs_btc_ret_ratio_30 (+1): 47 → 48 (after /054 DROP). "
+            "iter-v1/057 adds ltc_vs_btc_ret_ratio_30 (+1): 48 → 49."
+        )
+E       AssertionError: V1_FEATURE_COLUMNS_PRUNED has 48 features; expected 49. iter-v1/050 adds dot_vs_btc_ret_ratio_30 (+1): 45 → 46. iter-v1/052 adds btc_funding_rate_8h_impulse + btc_funding_spread_30_90 (+2): 46 → 48. iter-v1/055 adds eth_vs_btc_ret_ratio_30 (+1): 47 → 48 (after /054 DROP). iter-v1/057 adds ltc_vs_btc_ret_ratio_30 (+1): 48 → 49.
+E       assert 48 == 49
+E        +  where 48 = len(('btc_funding_spread_30_90', 'cal_dow_norm', 'cal_hour_norm', 'dot_vs_btc_ret_ratio_30', 'eth_vs_btc_ret_ratio_30', 'funding_rate_zscore_30', ...))
+
+tests/test_iteration_v1_040.py:98: AssertionError
+_______________________ test_v1_042_lgbm_path_unchanged ________________________
+
+    def test_v1_042_lgbm_path_unchanged() -> None:
+        """LightGbmStrategy must still be imported in run_baseline_v1.py (regression guard).
+
+        All prior iterations (/034-/041) use LightGbmStrategy implicitly. Adding --model
+        flag must NOT remove the LightGbmStrategy import or break any prior dispatch.
+        """
+        import run_baseline_v1  # noqa: F401
+
+        src = inspect.getsource(run_baseline_v1)
+>       assert "from crypto_trade.strategies.ml.lgbm import LightGbmStrategy" in src, (
+            "LightGbmStrategy import not found in run_baseline_v1.py. "
+            "Adding --model xgboost must NOT remove the LightGbmStrategy import — "
+            "all prior iterations (/034-/041) depend on it."
+        )
+E       AssertionError: LightGbmStrategy import not found in run_baseline_v1.py. Adding --model xgboost must NOT remove the LightGbmStrategy import — all prior iterations (/034-/041) depend on it.
+E       assert 'from crypto_trade.strategies.ml.lgbm import LightGbmStrategy' in '"""v1 baseline runner — refactored 2026-05-23.\n\nThe refactored v1 runner. Mirrors the v3 runner\'s structural patte...                 baseline_oos_sharpe=baseline_sharpe,\n                )\n\n\nif __name__ == "__main__":\n    main()\n'
+
+tests/test_iteration_v1_042.py:259: AssertionError
+_______________ test_v1_044_bundle_config_invalid_component_name _______________
+
+    def test_v1_044_bundle_config_invalid_component_name() -> None:
+        """_parse_bundle_config() must raise ValueError for unknown component."""
+        import importlib.util
+
+        _runner_path = Path(__file__).parent.parent / "run_baseline_v1.py"
+        spec = importlib.util.spec_from_file_location("_runner_v1_t3", _runner_path)
+        assert spec is not None and spec.loader is not None
+        mod = importlib.util.module_from_spec(spec)
+        try:
+            spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        except SystemExit:
+            pass
+
+        parse_fn = getattr(mod, "_parse_bundle_config")
+
+        import pytest
+
+>       with pytest.raises(ValueError, match="Unknown component"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_iteration_v1_044.py:129: Failed
+___________________ test_skew_zscore_21_reverted_from_pruned ___________________
+
+    def test_skew_zscore_21_reverted_from_pruned():
+        """Post-closeout: skew_zscore_21 MUST NOT be in V1_FEATURE_COLUMNS_PRUNED.
+
+        Count check: pruned set is 44 post-/047 revert. iter-v1/048 (microstructure
+        trade_count_zscore_30) also closed NEG-CLEAN-PRE-EDA and reverted 45 → 44,
+        so the steady-state count was 44. iter-v1/049 added long_short_zscore_30 → 45.
+        """
+        assert "skew_zscore_21" not in V1_FEATURE_COLUMNS_PRUNED, (
+            "skew_zscore_21 must be REVERTED from V1_FEATURE_COLUMNS_PRUNED "
+            "(iter-v1/047 NEG-CLEAN-PRE-EDA: F5 |IC|=0.8132 vs stat_skew_20)"
+        )
+>       assert len(V1_FEATURE_COLUMNS_PRUNED) == 49, (
+            f"Expected 49 pruned features (post iter-v1/058 ADD btc_oi_delta_5_z30), "
+            f"got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+        )
+E       AssertionError: Expected 49 pruned features (post iter-v1/058 ADD btc_oi_delta_5_z30), got 48
+E       assert 48 == 49
+E        +  where 48 = len(('btc_funding_spread_30_90', 'cal_dow_norm', 'cal_hour_norm', 'dot_vs_btc_ret_ratio_30', 'eth_vs_btc_ret_ratio_30', 'funding_rate_zscore_30', ...))
+
+tests/test_iteration_v1_047.py:49: AssertionError
+__________________ test_statistical_v1_not_in_group_registry ___________________
+
+    def test_statistical_v1_not_in_group_registry():
+        """statistical_v1 group is de-registered from GROUP_REGISTRY post-revert."""
+        from crypto_trade.features import GROUP_REGISTRY  # noqa: PLC0415
+
+        assert "statistical_v1" not in GROUP_REGISTRY, (
+            "statistical_v1 must be DE-REGISTERED from GROUP_REGISTRY "
+            "(iter-v1/047 NEG-CLEAN-PRE-EDA revert)"
+        )
+        # Count is 15 post-/050 (14 post-/049 + 1 cross_btc_v1 added at /050).
+>       assert len(GROUP_REGISTRY) == 15, (
+            f"GROUP_REGISTRY must have exactly 15 groups post-/050, got {len(GROUP_REGISTRY)}"
+        )
+E       AssertionError: GROUP_REGISTRY must have exactly 15 groups post-/050, got 18
+E       assert 18 == 15
+E        +  where 18 = len({'basis_v1': <function add_basis_v1_features at 0x75149e2ff880>, 'calendar': <function add_calendar_features at 0x7514...osed_v1_features at 0x75149e108860>, 'composed_v1_085': <function add_composed_v1_085_features at 0x75149e108a40>, ...})
+
+tests/test_iteration_v1_047.py:77: AssertionError
+_______________ test_trade_count_zscore_30_reverted_from_pruned ________________
+
+    def test_trade_count_zscore_30_reverted_from_pruned():
+        """Post-closeout: trade_count_zscore_30 MUST NOT be in V1_FEATURE_COLUMNS_PRUNED."""
+        assert "trade_count_zscore_30" not in V1_FEATURE_COLUMNS_PRUNED, (
+            "trade_count_zscore_30 must be REVERTED from V1_FEATURE_COLUMNS_PRUNED "
+            "(iter-v1/048 NEG-CLEAN-PRE-EDA: F5 |IC|=0.9063 vs vol_volume_rel_20)"
+        )
+>       assert len(V1_FEATURE_COLUMNS_PRUNED) == 49, (
+            f"Expected 49 pruned features (post iter-v1/058 ADD btc_oi_delta_5_z30), "
+            f"got {len(V1_FEATURE_COLUMNS_PRUNED)}"
+        )
+E       AssertionError: Expected 49 pruned features (post iter-v1/058 ADD btc_oi_delta_5_z30), got 48
+E       assert 48 == 49
+E        +  where 48 = len(('btc_funding_spread_30_90', 'cal_dow_norm', 'cal_hour_norm', 'dot_vs_btc_ret_ratio_30', 'eth_vs_btc_ret_ratio_30', 'funding_rate_zscore_30', ...))
+
+tests/test_iteration_v1_048.py:53: AssertionError
+_________________ test_microstructure_v1_not_in_group_registry _________________
+
+    def test_microstructure_v1_not_in_group_registry():
+        """microstructure_v1 group is de-registered from GROUP_REGISTRY post-revert."""
+        from crypto_trade.features import GROUP_REGISTRY  # noqa: PLC0415
+
+        assert "microstructure_v1" not in GROUP_REGISTRY, (
+            "microstructure_v1 must be DE-REGISTERED from GROUP_REGISTRY "
+            "(iter-v1/048 NEG-CLEAN-PRE-EDA revert)"
+        )
+        # Count is 15 post-/050 (14 post-/049 + 1 cross_btc_v1 added at /050).
+>       assert len(GROUP_REGISTRY) == 15, (
+            f"GROUP_REGISTRY must have exactly 15 groups post-/050, got {len(GROUP_REGISTRY)}"
+        )
+E       AssertionError: GROUP_REGISTRY must have exactly 15 groups post-/050, got 18
+E       assert 18 == 15
+E        +  where 18 = len({'basis_v1': <function add_basis_v1_features at 0x75149e2ff880>, 'calendar': <function add_calendar_features at 0x7514...osed_v1_features at 0x75149e108860>, 'composed_v1_085': <function add_composed_v1_085_features at 0x75149e108a40>, ...})
+
+tests/test_iteration_v1_048.py:84: AssertionError
+___________________ test_v1_feature_columns_pruned_length_45 ___________________
+
+    def test_v1_feature_columns_pruned_length_45() -> None:
+        """V1_FEATURE_COLUMNS_PRUNED must have exactly 46 features after iter-v1/050 ADD."""
+        from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
+
+        n = len(V1_FEATURE_COLUMNS_PRUNED)
+>       assert n == 49, (
+            f"V1_FEATURE_COLUMNS_PRUNED expected 49 features (post iter-v1/058 ADD); got {n}. "
+            "History: ...→ 45 (/049) → 46 (/050) → 48 (/052) → 47 (/054) → 48 (/055) "
+            "→ 49 (/057) → 48 (/057 revert) → 49 (/058 ADD btc_oi_delta_5_z30)."
+        )
+E       AssertionError: V1_FEATURE_COLUMNS_PRUNED expected 49 features (post iter-v1/058 ADD); got 48. History: ...→ 45 (/049) → 46 (/050) → 48 (/052) → 47 (/054) → 48 (/055) → 49 (/057) → 48 (/057 revert) → 49 (/058 ADD btc_oi_delta_5_z30).
+E       assert 48 == 49
+
+tests/test_iteration_v1_049.py:114: AssertionError
+_____________________________ test_pruned_size_46 ______________________________
+
+    def test_pruned_size_46() -> None:
+        """V1_FEATURE_COLUMNS_PRUNED must have exactly 46 features (unchanged from /050).
+
+        Brief Section 3: no V1_FEATURE_COLUMNS_PRUNED change at /051.
+        History: 40 → 42 (/023) → 43 (/025) → 44 (/034→/040) → 45 (/049) → 46 (/050 ADD)
+                 → 48 (/052 ADD btc_funding_rate_8h_impulse + btc_funding_spread_30_90).
+        /051 = multi-seed re-validation only; no feature changes at /051.
+        /052 subsequently extended to 48; the live constant reflects post-/052 state.
+        """
+        from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED  # noqa: PLC0415
+
+        n = len(V1_FEATURE_COLUMNS_PRUNED)
+>       assert n == 49, (
+            f"V1_FEATURE_COLUMNS_PRUNED expected 49 features (post iter-v1/058 ADD); got {n}. "
+            "History: ...→ 46 (/050 ADD dot_vs_btc_ret_ratio_30) "
+            "→ 48 (/052 ADD) → 47 (/054 DROP) → 48 (/055 ADD) "
+            "→ 49 (/057 ADD) → 48 (/057 REVERT) → 49 (/058 ADD btc_oi_delta_5_z30)."
+        )
+E       AssertionError: V1_FEATURE_COLUMNS_PRUNED expected 49 features (post iter-v1/058 ADD); got 48. History: ...→ 46 (/050 ADD dot_vs_btc_ret_ratio_30) → 48 (/052 ADD) → 47 (/054 DROP) → 48 (/055 ADD) → 49 (/057 ADD) → 48 (/057 REVERT) → 49 (/058 ADD btc_oi_delta_5_z30).
+E       assert 48 == 49
+
+tests/test_iteration_v1_051.py:164: AssertionError
+_____________________________ test_pruned_size_48 ______________________________
+
+    def test_pruned_size_48() -> None:
+        """V1_FEATURE_COLUMNS_PRUNED must have exactly 48 features at iter-v1/052.
+
+        History: 40 (baseline) → 42 (/023) → 43 (/025) → 44 (/034→/040) → 45 (/049)
+                 → 46 (/050 ADD dot_vs_btc_ret_ratio_30)
+                 → 48 (/052 ADD btc_funding_rate_8h_impulse + btc_funding_spread_30_90).
+        """
+        from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED  # noqa: PLC0415
+
+        n = len(V1_FEATURE_COLUMNS_PRUNED)
+>       assert n == 49, (
+            f"V1_FEATURE_COLUMNS_PRUNED expected 49 features (post iter-v1/057 ADD); "
+            f"got {n}. "
+            "History: ...→ 46 (/050 ADD dot_vs_btc_ret_ratio_30) → 48 (/052 ADD 2 cols) "
+            "→ 47 (/054 DROP impulse) → 48 (/055 ADD eth ratio) → 49 (/057 ADD ltc ratio)."
+        )
+E       AssertionError: V1_FEATURE_COLUMNS_PRUNED expected 49 features (post iter-v1/057 ADD); got 48. History: ...→ 46 (/050 ADD dot_vs_btc_ret_ratio_30) → 48 (/052 ADD 2 cols) → 47 (/054 DROP impulse) → 48 (/055 ADD eth ratio) → 49 (/057 ADD ltc ratio).
+E       assert 48 == 49
+
+tests/test_iteration_v1_052.py:155: AssertionError
+_____________________________ test_pruned_size_47 ______________________________
+
+    def test_pruned_size_47() -> None:
+        """V1_FEATURE_COLUMNS_PRUNED must have exactly 47 features at iter-v1/054.
+
+        History: 40 (baseline) → 42 (/023) → 43 (/025) → 44 (/034→/040) → 45 (/049)
+                 → 46 (/050 ADD dot_vs_btc_ret_ratio_30)
+                 → 48 (/052 ADD btc_funding_rate_8h_impulse + btc_funding_spread_30_90)
+                 → 48 (/053 UNCHANGED — VALIDATION sub-axis)
+                 → 47 (/054 DROP btc_funding_rate_8h_impulse — INERT multi-seed confirmed)
+        """
+        from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED  # noqa: PLC0415
+
+        n = len(V1_FEATURE_COLUMNS_PRUNED)
+>       assert n == 49, (
+            f"V1_FEATURE_COLUMNS_PRUNED expected 49 features (post iter-v1/058 ADD); got {n}. "
+            "History: /052 ADD (46→48); /054 DROP impulse (47); /055 ADD eth ratio (48); "
+            "/057 ADD ltc ratio (49) then REVERTED at closeout (48); "
+            "/058 ADD btc_oi_delta_5_z30 (48→49)."
+        )
+E       AssertionError: V1_FEATURE_COLUMNS_PRUNED expected 49 features (post iter-v1/058 ADD); got 48. History: /052 ADD (46→48); /054 DROP impulse (47); /055 ADD eth ratio (48); /057 ADD ltc ratio (49) then REVERTED at closeout (48); /058 ADD btc_oi_delta_5_z30 (48→49).
+E       assert 48 == 49
+
+tests/test_iteration_v1_054.py:95: AssertionError
+____________________ test_baseline_link_ltc_anchor_present _____________________
+
+    def test_baseline_link_ltc_anchor_present() -> None:
+        """LINK + LTC trades must be present in BASELINE_V1 reports for anchor extraction."""
+        baseline_is = REPO_ROOT / "reports-v1" / "iteration_v1-baseline" / "in_sample" / "trades.csv"
+        baseline_oos = (
+            REPO_ROOT / "reports-v1" / "iteration_v1-baseline" / "out_of_sample" / "trades.csv"
+        )
+
+>       assert baseline_is.exists(), (
+            f"BASELINE_V1 in_sample/trades.csv not found at {baseline_is}. "
+            "Run `uv run python run_baseline_v1.py --baseline-mode` first."
+        )
+E       AssertionError: BASELINE_V1 in_sample/trades.csv not found at /tmp/cup50-baseline-checkout/reports-v1/iteration_v1-baseline/in_sample/trades.csv. Run `uv run python run_baseline_v1.py --baseline-mode` first.
+E       assert False
+E        +  where False = exists()
+E        +    where exists = PosixPath('/tmp/cup50-baseline-checkout/reports-v1/iteration_v1-baseline/in_sample/trades.csv').exists
+
+tests/test_iteration_v1_056.py:300: AssertionError
+__________________________ test_feature_col_count_btc __________________________
+
+    def test_feature_col_count_btc() -> None:
+        """C1-BTC specialist must use 47 feature cols (btc_funding_rate_8h_impulse DROPPED,
+        eth_vs_btc_ret_ratio_30 excluded for BTC-only stack).
+
+        V1_FEATURE_COLUMNS_PRUNED is 48 (includes eth_vs_btc_ret_ratio_30 from /055).
+        The C1-BTC dispatch branch excludes eth_vs_btc_ret_ratio_30 (all-NaN for BTC rows)
+        to produce the 47-col BTC-only stack: same as /054's impulse-drop-confirmed stack.
+        """
+        from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
+
+        assert "btc_funding_spread_30_90" in V1_FEATURE_COLUMNS_PRUNED, (
+            "btc_funding_spread_30_90 missing from V1_FEATURE_COLUMNS_PRUNED. "
+            "This feature must be RETAINED (rank 4-10/48 at /053 — STABLE)."
+        )
+        assert "btc_funding_rate_8h_impulse" not in V1_FEATURE_COLUMNS_PRUNED, (
+            "btc_funding_rate_8h_impulse IS in V1_FEATURE_COLUMNS_PRUNED — it must be DROPPED. "
+            "The /054 IMPULSE-DROP-CONFIRMED verdict permanently removed this feature. "
+            "Check src/crypto_trade/features_v1/__init__.py."
+        )
+        assert "eth_vs_btc_ret_ratio_30" in V1_FEATURE_COLUMNS_PRUNED, (
+            "eth_vs_btc_ret_ratio_30 expected in V1_FEATURE_COLUMNS_PRUNED (added at /055). "
+            "C1-BTC dispatch branch excludes it (ETH cross-asset; NaN for BTC rows)."
+        )
+
+        # Verify the derived BTC-only stack is correct.
+        # Exclude ETH and LTC cross-asset features (NaN for BTC rows):
+        # At /058: V1_FEATURE_COLUMNS_PRUNED has 49 cols; ltc_vs_btc_ret_ratio_30 was
+        # REVERTED at /057 closeout (NOT in pruned set); only eth_vs_btc_ret_ratio_30 excluded.
+        # 49 - 1 (eth only) = 48 BTC-only cols (btc_oi_delta_5_z30 ADDED at /058 is included).
+        _btc_excl = {"eth_vs_btc_ret_ratio_30", "ltc_vs_btc_ret_ratio_30"}
+        btc_cols = [c for c in V1_FEATURE_COLUMNS_PRUNED if c not in _btc_excl]
+>       assert len(btc_cols) == 48, (
+            f"After excluding eth_vs_btc_ret_ratio_30 and ltc_vs_btc_ret_ratio_30, "
+            f"expected 48 BTC-only cols (49 total - 1 eth; ltc was reverted at /057), "
+            f"got {len(btc_cols)}. "
+            "btc_oi_delta_5_z30 was added at /058 — verify it is in V1_FEATURE_COLUMNS_PRUNED."
+        )
+E       AssertionError: After excluding eth_vs_btc_ret_ratio_30 and ltc_vs_btc_ret_ratio_30, expected 48 BTC-only cols (49 total - 1 eth; ltc was reverted at /057), got 47. btc_oi_delta_5_z30 was added at /058 — verify it is in V1_FEATURE_COLUMNS_PRUNED.
+E       assert 47 == 48
+E        +  where 47 = len(['btc_funding_spread_30_90', 'cal_dow_norm', 'cal_hour_norm', 'dot_vs_btc_ret_ratio_30', 'funding_rate_zscore_30', 'funding_rate_zscore_90', ...])
+
+tests/test_iteration_v1_056.py:389: AssertionError
+________________________ test_feature_col_count_eth_dot ________________________
+
+    def test_feature_col_count_eth_dot() -> None:
+        """V1_FEATURE_COLUMNS_PRUNED must have 48 cols for C2-ETH and C3-DOT sub-runs."""
+        from crypto_trade.features_v1 import V1_FEATURE_COLUMNS_PRUNED
+
+        n_cols = len(V1_FEATURE_COLUMNS_PRUNED)
+>       assert n_cols == 49, (
+            f"Expected 49 feature cols (V1_FEATURE_COLUMNS_PRUNED post /057 ADD), got {n_cols}. "
+            "C2-ETH and C3-DOT dispatch branches expect 49 cols "
+            "(ltc_vs_btc_ret_ratio_30 added at /057; LTC-only NaN for ETH/DOT)."
+        )
+E       AssertionError: Expected 49 feature cols (V1_FEATURE_COLUMNS_PRUNED post /057 ADD), got 48. C2-ETH and C3-DOT dispatch branches expect 49 cols (ltc_vs_btc_ret_ratio_30 added at /057; LTC-only NaN for ETH/DOT).
+E       assert 48 == 49
+
+tests/test_iteration_v1_056.py:413: AssertionError
+________________________ test_v1_064_cohort_is_eth_only ________________________
+
+    def test_v1_064_cohort_is_eth_only() -> None:
+        """V1_ITER064_UNIVERSE must be ('ETHUSDT',) — ETH-only single-coin SPECIALIST."""
+>       from crypto_trade.features_v1 import V1_ITER064_UNIVERSE
+E       ImportError: cannot import name 'V1_ITER064_UNIVERSE' from 'crypto_trade.features_v1' (/tmp/cup50-baseline-checkout/src/crypto_trade/features_v1/__init__.py)
+
+tests/test_iteration_v1_064.py:25: ImportError
+____________ test_v1_064_dispatch_branch_sets_specialist_mode_true _____________
+
+    def test_v1_064_dispatch_branch_sets_specialist_mode_true() -> None:
+        """run_baseline_v1 dispatch branch for 'v1-064' wires specialist_mode=True.
+
+        The branch condition is: `iteration_label == "v1-064" and set(symbols) == {"ETHUSDT"}`.
+        We verify by inspecting the source code that the branch block contains
+        `specialist_mode=True` — this is a structural code-path test, not a full execution.
+        """
+        import inspect
+
+        import run_baseline_v1
+
+        source = inspect.getsource(run_baseline_v1)
+
+        # The dispatch branch key must be present.
+>       assert '"v1-064"' in source, 'run_baseline_v1 does not contain dispatch branch for "v1-064".'
+E       AssertionError: run_baseline_v1 does not contain dispatch branch for "v1-064".
+E       assert '"v1-064"' in '"""v1 baseline runner — refactored 2026-05-23.\n\nThe refactored v1 runner. Mirrors the v3 runner\'s structural patte...                 baseline_oos_sharpe=baseline_sharpe,\n                )\n\n\nif __name__ == "__main__":\n    main()\n'
+
+tests/test_iteration_v1_064.py:63: AssertionError
+_________________ test_v1_064_risk_config_matches_baseline_eth _________________
+
+    def test_v1_064_risk_config_matches_baseline_eth() -> None:
+        """Dispatch branch for 'v1-064' uses Model A ETH risk config: atr_tp=2.9, atr_sl=1.45.
+
+        Key differences from /063 DOT (Model E):
+            /063: atr_tp=3.5, atr_sl=1.75, R1=ON K=3/C=27, R2=ON trigger=7%/anchor=15%/floor=0.33
+            /064: atr_tp=2.9, atr_sl=1.45, R1=OFF, R2=OFF
+
+        Both match their respective BASELINE_V1 cells (the "match-to-baseline" mandate).
+        """
+        import inspect
+
+        import run_baseline_v1
+
+        source = inspect.getsource(run_baseline_v1)
+
+        start_idx = source.find('"v1-064"')
+>       assert start_idx != -1, 'Could not find "v1-064" in run_baseline_v1 source.'
+E       AssertionError: Could not find "v1-064" in run_baseline_v1 source.
+E       assert -1 != -1
+
+tests/test_iteration_v1_064.py:175: AssertionError
+_________________________ test_atomusdt_parquet_exists _________________________
+
+    def test_atomusdt_parquet_exists() -> None:
+        """ATOMUSDT feature parquet exists at data/features/ATOMUSDT_8h_features.parquet."""
+        import pathlib
+
+        parquet_path = (
+            pathlib.Path(__file__).parent.parent / "data" / "features" / "ATOMUSDT_8h_features.parquet"
+        )
+>       assert parquet_path.exists(), (
+            f"ATOMUSDT feature parquet not found at {parquet_path}. "
+            "No fetch/regen needed: parquet must exist from prior EDA (table_09 audit)."
+        )
+E       AssertionError: ATOMUSDT feature parquet not found at /tmp/cup50-baseline-checkout/data/features/ATOMUSDT_8h_features.parquet. No fetch/regen needed: parquet must exist from prior EDA (table_09 audit).
+E       assert False
+E        +  where False = exists()
+E        +    where exists = PosixPath('/tmp/cup50-baseline-checkout/data/features/ATOMUSDT_8h_features.parquet').exists
+
+tests/test_iteration_v1_075.py:213: AssertionError
+_________________________ test_aaveusdt_parquet_exists _________________________
+
+    def test_aaveusdt_parquet_exists() -> None:
+        """AAVEUSDT feature parquet exists at data/features/AAVEUSDT_8h_features.parquet."""
+        import pathlib
+
+        parquet_path = (
+            pathlib.Path(__file__).parent.parent / "data" / "features" / "AAVEUSDT_8h_features.parquet"
+        )
+>       assert parquet_path.exists(), (
+            f"AAVEUSDT feature parquet not found at {parquet_path}. "
+            "No fetch/regen needed: parquet must exist from prior EDA (table_09 audit)."
+        )
+E       AssertionError: AAVEUSDT feature parquet not found at /tmp/cup50-baseline-checkout/data/features/AAVEUSDT_8h_features.parquet. No fetch/regen needed: parquet must exist from prior EDA (table_09 audit).
+E       assert False
+E        +  where False = exists()
+E        +    where exists = PosixPath('/tmp/cup50-baseline-checkout/data/features/AAVEUSDT_8h_features.parquet').exists
+
+tests/test_iteration_v1_076.py:214: AssertionError
+_________________________ test_crvusdt_parquet_exists __________________________
+
+    def test_crvusdt_parquet_exists() -> None:
+        """CRVUSDT feature parquet exists at data/features/CRVUSDT_8h_features.parquet."""
+        parquet_path = (
+            Path(__file__).parent.parent / "data" / "features" / "CRVUSDT_8h_features.parquet"
+        )
+>       assert parquet_path.exists(), (
+            f"CRVUSDT feature parquet not found at {parquet_path}. "
+            "Regenerate with: uv run crypto-trade features --symbols CRVUSDT --interval 8h "
+            "--track v1 --format parquet"
+        )
+E       AssertionError: CRVUSDT feature parquet not found at /tmp/cup50-baseline-checkout/data/features/CRVUSDT_8h_features.parquet. Regenerate with: uv run crypto-trade features --symbols CRVUSDT --interval 8h --track v1 --format parquet
+E       assert False
+E        +  where False = exists()
+E        +    where exists = PosixPath('/tmp/cup50-baseline-checkout/data/features/CRVUSDT_8h_features.parquet').exists
+
+tests/test_iteration_v1_084.py:562: AssertionError
+_________________ TestDeriveEnsembleSeeds.test_size_11_raises __________________
+
+self = <tests.test_runner_cli_v1.TestDeriveEnsembleSeeds object at 0x75149ded7ce0>
+
+    def test_size_11_raises(self) -> None:
+        from run_baseline_v1 import _derive_ensemble_seeds
+
+>       with pytest.raises(ValueError, match="ENSEMBLE_SIZE must be in"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_runner_cli_v1.py:69: Failed
+____ TestEnsembleSizeOverrideParsing.test_exploration_default_ensemble_size ____
+
+self = <tests.test_runner_cli_v1.TestEnsembleSizeOverrideParsing object at 0x75149dc9a850>
+
+    def test_exploration_default_ensemble_size(self) -> None:
+        """Without --ensemble-size, EXPLORATION gives default 3."""
+>       from run_baseline_v1 import V1_EXPLORATION_ENSEMBLE_SIZE
+E       ImportError: cannot import name 'V1_EXPLORATION_ENSEMBLE_SIZE' from 'run_baseline_v1' (/tmp/cup50-baseline-checkout/run_baseline_v1.py)
+
+tests/test_runner_cli_v1.py:136: ImportError
+__ TestEnsembleSizeOverrideParsing.test_exploration_ensemble_size_override_5 ___
+
+self = <tests.test_runner_cli_v1.TestEnsembleSizeOverrideParsing object at 0x75149dc9a990>
+
+    def test_exploration_ensemble_size_override_5(self) -> None:
+        """--exploration --ensemble-size 5 gives ensemble_size=5 (iter-v1/001 use case)."""
+>       result = self._parse_and_resolve(
+            ["--exploration", "--iteration", "1", "--ensemble-size", "5", "--n-trials", "50"]
+        )
+
+tests/test_runner_cli_v1.py:143:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <tests.test_runner_cli_v1.TestEnsembleSizeOverrideParsing object at 0x75149dc9a990>
+argv = ['--exploration', '--iteration', '1', '--ensemble-size', '5', '--n-trials', ...]
+
+    def _parse_and_resolve(self, argv: list[str]) -> dict:
+        """Parse argv and run the mode-resolution + override block.
+
+        Returns a dict with resolved ``ensemble_size`` and ``n_trials``.
+        Raises SystemExit if argparse or mode validation fires.
+        """
+        import argparse
+
+>       from run_baseline_v1 import (
+            ENSEMBLE_SEEDS,
+            V1_CONFIRMATION_ENSEMBLE_SIZE,
+            V1_EXPLORATION_ENSEMBLE_SIZE,
+        )
+E       ImportError: cannot import name 'V1_CONFIRMATION_ENSEMBLE_SIZE' from 'run_baseline_v1' (/tmp/cup50-baseline-checkout/run_baseline_v1.py)
+
+tests/test_runner_cli_v1.py:88: ImportError
+___ TestEnsembleSizeOverrideParsing.test_confirmation_default_ensemble_size ____
+
+self = <tests.test_runner_cli_v1.TestEnsembleSizeOverrideParsing object at 0x75149dcc0770>
+
+    def test_confirmation_default_ensemble_size(self) -> None:
+        """Without --ensemble-size, CONFIRMATION gives default 10."""
+>       from run_baseline_v1 import V1_CONFIRMATION_ENSEMBLE_SIZE
+E       ImportError: cannot import name 'V1_CONFIRMATION_ENSEMBLE_SIZE' from 'run_baseline_v1' (/tmp/cup50-baseline-checkout/run_baseline_v1.py)
+
+tests/test_runner_cli_v1.py:151: ImportError
+___ TestEnsembleSizeOverrideParsing.test_confirmation_ensemble_size_override ___
+
+self = <tests.test_runner_cli_v1.TestEnsembleSizeOverrideParsing object at 0x75149dcc0640>
+
+    def test_confirmation_ensemble_size_override(self) -> None:
+        """--confirmation --ensemble-size 5 gives ensemble_size=5."""
+>       result = self._parse_and_resolve(
+            ["--confirmation", "--iteration", "10", "--ensemble-size", "5"]
+        )
+
+tests/test_runner_cli_v1.py:158:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <tests.test_runner_cli_v1.TestEnsembleSizeOverrideParsing object at 0x75149dcc0640>
+argv = ['--confirmation', '--iteration', '10', '--ensemble-size', '5']
+
+    def _parse_and_resolve(self, argv: list[str]) -> dict:
+        """Parse argv and run the mode-resolution + override block.
+
+        Returns a dict with resolved ``ensemble_size`` and ``n_trials``.
+        Raises SystemExit if argparse or mode validation fires.
+        """
+        import argparse
+
+>       from run_baseline_v1 import (
+            ENSEMBLE_SEEDS,
+            V1_CONFIRMATION_ENSEMBLE_SIZE,
+            V1_EXPLORATION_ENSEMBLE_SIZE,
+        )
+E       ImportError: cannot import name 'V1_CONFIRMATION_ENSEMBLE_SIZE' from 'run_baseline_v1' (/tmp/cup50-baseline-checkout/run_baseline_v1.py)
+
+tests/test_runner_cli_v1.py:88: ImportError
+________ TestEnsembleSizeOverrideParsing.test_ensemble_size_0_rejected _________
+
+self = <tests.test_runner_cli_v1.TestEnsembleSizeOverrideParsing object at 0x75149dcc56d0>
+
+    def test_ensemble_size_0_rejected(self) -> None:
+        with pytest.raises(SystemExit, match="must be in"):
+>           self._parse_and_resolve(["--exploration", "--iteration", "1", "--ensemble-size", "0"])
+
+tests/test_runner_cli_v1.py:165:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <tests.test_runner_cli_v1.TestEnsembleSizeOverrideParsing object at 0x75149dcc56d0>
+argv = ['--exploration', '--iteration', '1', '--ensemble-size', '0']
+
+    def _parse_and_resolve(self, argv: list[str]) -> dict:
+        """Parse argv and run the mode-resolution + override block.
+
+        Returns a dict with resolved ``ensemble_size`` and ``n_trials``.
+        Raises SystemExit if argparse or mode validation fires.
+        """
+        import argparse
+
+>       from run_baseline_v1 import (
+            ENSEMBLE_SEEDS,
+            V1_CONFIRMATION_ENSEMBLE_SIZE,
+            V1_EXPLORATION_ENSEMBLE_SIZE,
+        )
+E       ImportError: cannot import name 'V1_CONFIRMATION_ENSEMBLE_SIZE' from 'run_baseline_v1' (/tmp/cup50-baseline-checkout/run_baseline_v1.py)
+
+tests/test_runner_cli_v1.py:88: ImportError
+________ TestEnsembleSizeOverrideParsing.test_ensemble_size_11_rejected ________
+
+self = <tests.test_runner_cli_v1.TestEnsembleSizeOverrideParsing object at 0x75149ded79b0>
+
+    def test_ensemble_size_11_rejected(self) -> None:
+        with pytest.raises(SystemExit, match="must be in"):
+>           self._parse_and_resolve(["--exploration", "--iteration", "1", "--ensemble-size", "11"])
+
+tests/test_runner_cli_v1.py:169:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <tests.test_runner_cli_v1.TestEnsembleSizeOverrideParsing object at 0x75149ded79b0>
+argv = ['--exploration', '--iteration', '1', '--ensemble-size', '11']
+
+    def _parse_and_resolve(self, argv: list[str]) -> dict:
+        """Parse argv and run the mode-resolution + override block.
+
+        Returns a dict with resolved ``ensemble_size`` and ``n_trials``.
+        Raises SystemExit if argparse or mode validation fires.
+        """
+        import argparse
+
+>       from run_baseline_v1 import (
+            ENSEMBLE_SEEDS,
+            V1_CONFIRMATION_ENSEMBLE_SIZE,
+            V1_EXPLORATION_ENSEMBLE_SIZE,
+        )
+E       ImportError: cannot import name 'V1_CONFIRMATION_ENSEMBLE_SIZE' from 'run_baseline_v1' (/tmp/cup50-baseline-checkout/run_baseline_v1.py)
+
+tests/test_runner_cli_v1.py:88: ImportError
+_ TestEnsembleSizeOverrideParsing.test_baseline_mode_ignores_ensemble_size_override _
+
+self = <tests.test_runner_cli_v1.TestEnsembleSizeOverrideParsing object at 0x75149ded7f00>
+
+    def test_baseline_mode_ignores_ensemble_size_override(self) -> None:
+        """--baseline-mode sacred values (5 seeds, 50 trials) are never overridden."""
+>       result = self._parse_and_resolve(["--baseline-mode", "--ensemble-size", "3"])
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_runner_cli_v1.py:173:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <tests.test_runner_cli_v1.TestEnsembleSizeOverrideParsing object at 0x75149ded7f00>
+argv = ['--baseline-mode', '--ensemble-size', '3']
+
+    def _parse_and_resolve(self, argv: list[str]) -> dict:
+        """Parse argv and run the mode-resolution + override block.
+
+        Returns a dict with resolved ``ensemble_size`` and ``n_trials``.
+        Raises SystemExit if argparse or mode validation fires.
+        """
+        import argparse
+
+>       from run_baseline_v1 import (
+            ENSEMBLE_SEEDS,
+            V1_CONFIRMATION_ENSEMBLE_SIZE,
+            V1_EXPLORATION_ENSEMBLE_SIZE,
+        )
+E       ImportError: cannot import name 'V1_CONFIRMATION_ENSEMBLE_SIZE' from 'run_baseline_v1' (/tmp/cup50-baseline-checkout/run_baseline_v1.py)
+
+tests/test_runner_cli_v1.py:88: ImportError
+___________ TestEnsembleSizeOverrideParsing.test_no_mode_flag_raises ___________
+
+self = <tests.test_runner_cli_v1.TestEnsembleSizeOverrideParsing object at 0x75149dd92d50>
+
+    def test_no_mode_flag_raises(self) -> None:
+        with pytest.raises(SystemExit):
+>           self._parse_and_resolve(["--ensemble-size", "5"])
+
+tests/test_runner_cli_v1.py:179:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <tests.test_runner_cli_v1.TestEnsembleSizeOverrideParsing object at 0x75149dd92d50>
+argv = ['--ensemble-size', '5']
+
+    def _parse_and_resolve(self, argv: list[str]) -> dict:
+        """Parse argv and run the mode-resolution + override block.
+
+        Returns a dict with resolved ``ensemble_size`` and ``n_trials``.
+        Raises SystemExit if argparse or mode validation fires.
+        """
+        import argparse
+
+>       from run_baseline_v1 import (
+            ENSEMBLE_SEEDS,
+            V1_CONFIRMATION_ENSEMBLE_SIZE,
+            V1_EXPLORATION_ENSEMBLE_SIZE,
+        )
+E       ImportError: cannot import name 'V1_CONFIRMATION_ENSEMBLE_SIZE' from 'run_baseline_v1' (/tmp/cup50-baseline-checkout/run_baseline_v1.py)
+
+tests/test_runner_cli_v1.py:88: ImportError
+=============================== warnings summary ===============================
+../../home/roberto/crypto-trade/.worktrees/quant-portfolio-blind-top50/.venv/lib/python3.13/site-packages/pandas_ta/__init__.py:37
+  /home/roberto/crypto-trade/.worktrees/quant-portfolio-blind-top50/.venv/lib/python3.13/site-packages/pandas_ta/__init__.py:37: Pandas4Warning: The 'mode.copy_on_write' option is deprecated. Copy-on-Write can no longer be disabled (it is always enabled with pandas >= 3.0), and setting the option has no impact. This option will be removed in pandas 4.0.
+    from pandas_ta.core import AnalysisIndicators
+
+tests/test_backtest.py::TestGenerateHtmlReport::test_creates_file
+tests/test_backtest.py::TestGenerateHtmlReport::test_creates_file
+tests/test_backtest.py::TestGenerateHtmlReport::test_creates_file
+  /home/roberto/crypto-trade/.worktrees/quant-portfolio-blind-top50/.venv/lib/python3.13/site-packages/seaborn/categorical.py:700: PendingDeprecationWarning: vert: bool will be deprecated in a future version. Use orientation: {'vertical', 'horizontal'} instead.
+    artists = ax.bxp(**boxplot_kws)
+
+tests/test_iteration_v1_032.py::test_v1_iter032_reproducibility_same_hp_same_predictions
+tests/test_iteration_v1_032.py::test_v1_iter032_reproducibility_same_hp_same_predictions
+  /home/roberto/crypto-trade/.worktrees/quant-portfolio-blind-top50/.venv/lib/python3.13/site-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_features.py::test_list_groups - AssertionError: assert 18 =...
+FAILED tests/test_features.py::test_registry_has_all_groups - AssertionError:...
+FAILED tests/test_iteration_v1_017_universe_expansion.py::TestV1ExcludedSymbolsUpdate::test_v2_symbols_still_excluded
+FAILED tests/test_iteration_v1_017_universe_expansion.py::TestAssertV1UniverseAcceptsIter017Universe::test_assert_rejects_v2_symbol_xrp
+FAILED tests/test_iteration_v1_018_link_only.py::TestLinkNotExcluded::test_v2_symbols_still_excluded
+FAILED tests/test_iteration_v1_018_link_only.py::TestAssertV1UniverseAcceptsIter018Universe::test_assert_rejects_v2_symbol_xrp
+FAILED tests/test_iteration_v1_020_btc_only.py::TestBtcNotExcluded::test_v2_symbols_still_excluded
+FAILED tests/test_iteration_v1_020_btc_only.py::TestAssertV1UniverseAcceptsIter020Universe::test_assert_rejects_v2_symbol_xrp
+FAILED tests/test_iteration_v1_028_d_specialist.py::TestIter028FeatureColumnsPruned::test_pruned_columns_count_is_43
+FAILED tests/test_iteration_v1_030.py::TestIter030M2Dispatch::test_model_e_uses_run_model_not_run_meta_model
+FAILED tests/test_iteration_v1_030.py::TestIter030M2Dispatch::test_m2_excluded_for_model_e_in_dispatch
+FAILED tests/test_iteration_v1_030.py::TestIter030M2ThresholdPinned::test_metalabeling_strategy_veto_threshold_is_0_5
+FAILED tests/test_iteration_v1_033.py::test_bundle_iter33_confirmation_ensemble_size_10
+FAILED tests/test_iteration_v1_034.py::test_v1_034_pruned_features_length_44
+FAILED tests/test_iteration_v1_040.py::test_v1_040_pruned_features_count_44
+FAILED tests/test_iteration_v1_042.py::test_v1_042_lgbm_path_unchanged - Asse...
+FAILED tests/test_iteration_v1_044.py::test_v1_044_bundle_config_invalid_component_name
+FAILED tests/test_iteration_v1_047.py::test_skew_zscore_21_reverted_from_pruned
+FAILED tests/test_iteration_v1_047.py::test_statistical_v1_not_in_group_registry
+FAILED tests/test_iteration_v1_048.py::test_trade_count_zscore_30_reverted_from_pruned
+FAILED tests/test_iteration_v1_048.py::test_microstructure_v1_not_in_group_registry
+FAILED tests/test_iteration_v1_049.py::test_v1_feature_columns_pruned_length_45
+FAILED tests/test_iteration_v1_051.py::test_pruned_size_46 - AssertionError: ...
+FAILED tests/test_iteration_v1_052.py::test_pruned_size_48 - AssertionError: ...
+FAILED tests/test_iteration_v1_054.py::test_pruned_size_47 - AssertionError: ...
+FAILED tests/test_iteration_v1_056.py::test_baseline_link_ltc_anchor_present
+FAILED tests/test_iteration_v1_056.py::test_feature_col_count_btc - Assertion...
+FAILED tests/test_iteration_v1_056.py::test_feature_col_count_eth_dot - Asser...
+FAILED tests/test_iteration_v1_064.py::test_v1_064_cohort_is_eth_only - Impor...
+FAILED tests/test_iteration_v1_064.py::test_v1_064_dispatch_branch_sets_specialist_mode_true
+FAILED tests/test_iteration_v1_064.py::test_v1_064_risk_config_matches_baseline_eth
+FAILED tests/test_iteration_v1_075.py::test_atomusdt_parquet_exists - Asserti...
+FAILED tests/test_iteration_v1_076.py::test_aaveusdt_parquet_exists - Asserti...
+FAILED tests/test_iteration_v1_084.py::test_crvusdt_parquet_exists - Assertio...
+FAILED tests/test_runner_cli_v1.py::TestDeriveEnsembleSeeds::test_size_11_raises
+FAILED tests/test_runner_cli_v1.py::TestEnsembleSizeOverrideParsing::test_exploration_default_ensemble_size
+FAILED tests/test_runner_cli_v1.py::TestEnsembleSizeOverrideParsing::test_exploration_ensemble_size_override_5
+FAILED tests/test_runner_cli_v1.py::TestEnsembleSizeOverrideParsing::test_confirmation_default_ensemble_size
+FAILED tests/test_runner_cli_v1.py::TestEnsembleSizeOverrideParsing::test_confirmation_ensemble_size_override
+FAILED tests/test_runner_cli_v1.py::TestEnsembleSizeOverrideParsing::test_ensemble_size_0_rejected
+FAILED tests/test_runner_cli_v1.py::TestEnsembleSizeOverrideParsing::test_ensemble_size_11_rejected
+FAILED tests/test_runner_cli_v1.py::TestEnsembleSizeOverrideParsing::test_baseline_mode_ignores_ensemble_size_override
+FAILED tests/test_runner_cli_v1.py::TestEnsembleSizeOverrideParsing::test_no_mode_flag_raises
+43 failed, 1671 passed, 13 skipped, 6 warnings in 14.36s

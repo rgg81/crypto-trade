@@ -1,0 +1,6 @@
+# Exact evaluator runtime resolved by the CUP-50 pre-activation environment.
+numpy==2.2.6
+pandas==3.0.0
+pyarrow==23.0.1
+python-dateutil==2.9.0.post0
+six==1.17.0

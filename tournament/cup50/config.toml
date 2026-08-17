@@ -1,0 +1,97 @@
+schema_version = 2
+name = "cup50"
+policy_status = "pre-activation"
+charter_path = "TOURNAMENT-CHARTER-CUP50.md"
+teams = [
+  "team-01", "team-02", "team-03", "team-04", "team-05", "team-06",
+  "team-07", "team-08", "team-09", "team-10", "team-11", "team-12",
+]
+
+[paths]
+tournament_root = "tournament/cup50"
+team_root = "tournament/cup50/teams"
+private_root = "tournament/cup50/private"
+reports_root = "reports-cup50"
+trial_journal = "tournament/cup50/trials.jsonl"
+observation_journal = "tournament/cup50/private/observation.jsonl"
+nomination_root = "tournament/cup50/nominations"
+field_freeze = "tournament/cup50/field-freeze.json"
+activation_freeze = "tournament/cup50/activation-freeze.json"
+release = "reports-cup50/leaderboard.json"
+common_risk_policy = "tournament/cup50/risk-policy.json"
+
+[data]
+acquisition_root = "data/cup50/acquisition-complete-v3"
+is_root = "data/cup50/is"
+team_is_root = "data/cup50/team-is"
+sealed_root = "data/cup50/sealed"
+archive_reuse_policy = "checksum-verified-raw-bytes-only"
+
+[splits]
+is_start = "2021-03-15T00:00:00Z"
+oos_start = "2024-02-01T00:00:00Z"
+oos_end = "2026-08-01T00:00:00Z"
+
+[universe]
+target_size = 50
+lookback_days = 180
+bars_per_complete_day = 3
+reconstitution_weekday = 0
+liquidity_measure = "median-daily-usdt-quote-volume"
+hysteresis = false
+classification_policy = "pure-crypto-fail-closed-v1"
+
+[execution]
+interval_hours = 8
+initial_equity = 100000.0
+taker_fee_bps_per_side = 5.0
+slippage_bps_per_side = 2.5
+cost_multipliers = [1, 2, 3]
+max_gross_exposure = 1.0
+max_abs_net_exposure = 1.0
+max_symbol_exposure = 0.20
+max_bar_participation = 0.001
+unavailability_policy = "causal-no-replacement-last-close-v1"
+
+[risk_unit]
+target_annualized_volatility = 0.10
+lookback_days = 90
+minimum_scale = 0.20
+maximum_scale = 3.0
+team_volatility_targeting = "forbidden"
+
+[research]
+official_trial_budget = 12
+minimum_official_trials = 0
+maximum_dimensions = 10
+controls = "preregistered-permanently-non-promoteable"
+strategy_history_days = 180
+
+[scoring]
+return_weight = 1.0
+drawdown_penalty = 0.50
+underdeployment_penalty = 0.10
+concentration_penalty = 0.05
+generalization_weight = 0.85
+all_window_weight = 0.15
+rounding = "decimal-half-even-1e-6"
+qualification_gates = "none"
+
+[paper]
+minimum_days = 365
+launch = "first-canonical-8h-boundary-strictly-after-release"
+data_policy = "public-only-append-invariant"
+
+[mandates]
+team-01 = "slow-trend"
+team-02 = "breakout-trend"
+team-03 = "volume-confirmed-trend"
+team-04 = "residual-cross-sectional-momentum"
+team-05 = "liquidity-shock-reversal"
+team-06 = "defensive-low-risk-selection"
+team-07 = "funding-carry"
+team-08 = "funding-crowding-reversal"
+team-09 = "taker-flow-pressure"
+team-10 = "relative-value-convergence"
+team-11 = "calendar-settlement-seasonality"
+team-12 = "preregistered-simple-regime-ensemble"

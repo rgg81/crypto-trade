@@ -75,9 +75,10 @@ class TestV1ExcludedSymbolsUpdate:
         for sym in ("BCHUSDT", "LDOUSDT", "TRXUSDT"):
             assert sym in V1_EXCLUDED_SYMBOLS, f"v3 symbol {sym} must remain in V1_EXCLUDED_SYMBOLS"
 
-    def test_v2_symbols_still_excluded(self) -> None:
-        """Remaining v2 symbols (XRPUSDT, DOGEUSDT, NEARUSDT) must remain excluded."""
-        for sym in ("XRPUSDT", "DOGEUSDT", "NEARUSDT"):
+    def test_later_unreserved_xrp_and_remaining_v2_exclusions(self) -> None:
+        """XRP was un-reserved at iter-v1/088; DOGE and NEAR remain excluded."""
+        assert "XRPUSDT" not in V1_EXCLUDED_SYMBOLS
+        for sym in ("DOGEUSDT", "NEARUSDT"):
             assert sym in V1_EXCLUDED_SYMBOLS, f"v2 symbol {sym} must remain in V1_EXCLUDED_SYMBOLS"
 
     def test_bnbusdt_not_excluded(self) -> None:
@@ -110,10 +111,9 @@ class TestAssertV1UniverseAcceptsIter017Universe:
         with pytest.raises(AssertionError, match="v1 cannot trade v2/v3 symbols"):
             assert_v1_universe(("BTCUSDT", "ETHUSDT", "BCHUSDT"))
 
-    def test_assert_rejects_v2_symbol_xrp(self) -> None:
-        """assert_v1_universe must reject XRPUSDT (still v2-reserved)."""
-        with pytest.raises(AssertionError, match="v1 cannot trade v2/v3 symbols"):
-            assert_v1_universe(("BTCUSDT", "ETHUSDT", "XRPUSDT"))
+    def test_assert_accepts_later_unreserved_xrp(self) -> None:
+        """iter-v1/088 made XRP a valid v1 symbol."""
+        assert_v1_universe(("BTCUSDT", "ETHUSDT", "XRPUSDT"))
 
     def test_assert_accepts_bnb(self) -> None:
         """assert_v1_universe must now accept BNBUSDT (un-reserved at iter-v1/087)."""

@@ -86,6 +86,12 @@ reports-cup20/
 # activation record and held on disk exactly like data/cup20/sealed/, never committed.
 tournament/cup20/private/
 
+# CUP-50 organizer-only and derived surfaces. Sealed membership, observations, integrity staging,
+# forward caches, and reports must never enter a team-visible source checkout.
+reports-cup50/
+tournament/cup50/private/
+paper-cup50/
+
 # Notebook outputs and checkpoints
 notebooks/output/
 notebooks/.ipynb_checkpoints/

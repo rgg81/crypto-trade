@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "policy_id": "cup50-common-risk-unit-v1",
+  "team_specific_controls": false,
+  "team_specific_volatility_targeting": false
+}

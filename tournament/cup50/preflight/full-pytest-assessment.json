@@ -1,0 +1,22 @@
+{
+  "baseline": {
+    "nested": 52,
+    "top": 43
+  },
+  "cup50_shard": "52 passed after final source freeze",
+  "current": {
+    "nested": 33,
+    "top": 37
+  },
+  "legacy_cup20_shard": "stopped at 67 percent after 48 minutes in an unchanged multi-process exact-replay test; no CUP-50 source imports this namespace",
+  "method": "complete top-level and nested shards compared with parent; isolated CUP-50 suite; unchanged CUP-20 prefix through 67 percent",
+  "new_failures": {
+    "nested": [],
+    "top": []
+  },
+  "resolved_baseline_failures": {
+    "nested": 19,
+    "top": 6
+  },
+  "status": "passed"
+}

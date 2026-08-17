@@ -84,13 +84,14 @@ class TestLinkNotExcluded:
             f"it is a v1 baseline symbol. V1_EXCLUDED_SYMBOLS={V1_EXCLUDED_SYMBOLS}"
         )
 
-    def test_v2_symbols_still_excluded(self) -> None:
-        """v2 symbols (excluding SOLUSDT) must remain excluded (regression guard).
+    def test_later_unreserved_xrp_and_remaining_v2_exclusions(self) -> None:
+        """DOGE and NEAR remain excluded after XRP was un-reserved at iter-v1/088.
 
         NOTE: SOLUSDT was removed from V1_EXCLUDED_SYMBOLS at iter-v1/017 to enable
-        Model F universe-expansion dispatch. XRP, DOGE, NEAR remain excluded.
+        Model F universe-expansion dispatch. XRP was later removed at iter-v1/088.
         """
-        for sym in ("XRPUSDT", "DOGEUSDT", "NEARUSDT"):
+        assert "XRPUSDT" not in V1_EXCLUDED_SYMBOLS
+        for sym in ("DOGEUSDT", "NEARUSDT"):
             assert sym in V1_EXCLUDED_SYMBOLS, f"v2 symbol {sym} must remain in V1_EXCLUDED_SYMBOLS"
 
     def test_v3_symbols_still_excluded(self) -> None:
@@ -131,14 +132,13 @@ class TestAssertV1UniverseAcceptsIter018Universe:
         with pytest.raises(AssertionError, match="v1 cannot trade v2/v3 symbols"):
             assert_v1_universe(("LINKUSDT", "BCHUSDT"))
 
-    def test_assert_rejects_v2_symbol_xrp(self) -> None:
-        """assert_v1_universe must reject XRPUSDT (v2-reserved in V1_EXCLUDED_SYMBOLS).
+    def test_assert_accepts_later_unreserved_xrp(self) -> None:
+        """assert_v1_universe accepts XRP after iter-v1/088.
 
         NOTE: SOLUSDT was removed from V1_EXCLUDED_SYMBOLS at iter-v1/017.
-        XRP, DOGE, NEAR remain excluded as representative v2 symbols.
+        DOGE and NEAR remain excluded; XRP was later un-reserved.
         """
-        with pytest.raises(AssertionError, match="v1 cannot trade v2/v3 symbols"):
-            assert_v1_universe(("LINKUSDT", "XRPUSDT"))
+        assert_v1_universe(("LINKUSDT", "XRPUSDT"))
 
     def test_assert_accepts_bnb(self) -> None:
         """assert_v1_universe must now accept BNBUSDT (un-reserved at iter-v1/087)."""

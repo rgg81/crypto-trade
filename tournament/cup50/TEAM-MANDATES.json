@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "namespace": "cup50",
+  "team-01": "slow-trend",
+  "team-02": "breakout-trend",
+  "team-03": "volume-confirmed-trend",
+  "team-04": "residual-cross-sectional-momentum",
+  "team-05": "liquidity-shock-reversal",
+  "team-06": "defensive-low-risk-selection",
+  "team-07": "funding-carry",
+  "team-08": "funding-crowding-reversal",
+  "team-09": "taker-flow-pressure",
+  "team-10": "relative-value-convergence",
+  "team-11": "calendar-settlement-seasonality",
+  "team-12": "preregistered-simple-regime-ensemble"
+}
