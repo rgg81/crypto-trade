@@ -11,7 +11,12 @@ from crypto_trade.cup50.config import OOS_END
 from crypto_trade.cup50_desk.authority import WINNER_TEAM_ID, verify_lineage
 from crypto_trade.cup50_desk.live_data import CacheGenerationError, current_generation
 from crypto_trade.cup50_desk.schedule import ready_boundary
-from crypto_trade.cup50_desk.tick import _event_rows, _historical_stream, verify_historical_prefix
+from crypto_trade.cup50_desk.tick import (
+    _event_rows,
+    _historical_stream,
+    _return_rows,
+    verify_historical_prefix,
+)
 
 
 def test_corrected_winner_lineage_is_team02() -> None:
@@ -59,6 +64,54 @@ def test_funding_at_seam_is_historical_and_right_edge_belongs_to_interval() -> N
     )
     assert result["notional"].tolist() == [2.0]
     assert result["phase"].tolist() == ["bridge"]
+
+
+def test_terminal_return_is_withheld_until_the_following_tick() -> None:
+    first = OOS_END
+    second = first + pd.Timedelta(hours=8)
+    returns = pd.DataFrame(
+        {
+            "right_boundary": [second, second + pd.Timedelta(hours=8)],
+            "price_return": [0.01, 0.02],
+            "funding_return": [0.0, 0.0],
+            "gross_return": [0.01, 0.02],
+            "fees_slippage": [0.001, 0.001],
+            "net_return": [0.009, 0.019],
+            "turnover": [0.1, 0.2],
+            "gross_exposure": [0.3, 0.4],
+            "equity": [100_900.0, 102_817.1],
+        },
+        index=pd.DatetimeIndex([first, second], name="decision_time"),
+    )
+    result = SimpleNamespace(returns=returns)
+
+    at_second = _return_rows(result, first, second)
+    assert at_second["decision_time"].tolist() == [first]
+
+    later = _return_rows(result, first, second + pd.Timedelta(hours=8))
+    assert later["decision_time"].tolist() == [first, second]
+
+
+def test_terminal_events_are_withheld_until_the_following_tick() -> None:
+    boundary = OOS_END + pd.Timedelta(hours=8)
+    events = pd.DataFrame(
+        [
+            {
+                "timestamp": boundary,
+                "symbol": "BTCUSDT",
+                "event_type": "trade",
+                "notional": 1.0,
+            },
+            {
+                "timestamp": boundary + pd.Timedelta(hours=8),
+                "symbol": "BTCUSDT",
+                "event_type": "funding",
+                "notional": 2.0,
+            },
+        ]
+    )
+    result = _event_rows(SimpleNamespace(events=events), boundary, boundary)
+    assert result["timestamp"].tolist() == [boundary]
 
 
 def test_historical_prefix_is_exact_not_toleranced(tmp_path: Path) -> None:

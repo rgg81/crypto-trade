@@ -183,8 +183,19 @@ def replay_winner(snapshot: Any, *, root: Path) -> Any:
     )
 
 
-def _return_rows(result: Any, launch: pd.Timestamp) -> pd.DataFrame:
-    frame = result.returns.loc[result.returns.index >= OOS_END].reset_index()
+def _return_rows(
+    result: Any, launch: pd.Timestamp, boundary: pd.Timestamp
+) -> pd.DataFrame:
+    """Return only settled, append-stable intervals.
+
+    The evaluator's row at ``boundary`` is its terminal row.  With no next transaction bar in
+    the half-open snapshot it prices that interval at the current bar's close; the following
+    replay correctly prices the same interval at the next bar's open.  CUP-20 therefore withholds
+    the terminal row until the following tick, and CUP-50 must do the same.  Publishing it here
+    would guarantee an append-invariance failure on every healthy next boundary.
+    """
+    index = pd.DatetimeIndex(result.returns.index)
+    frame = result.returns.loc[(index >= OOS_END) & (index < boundary)].reset_index()
     frame.insert(
         2,
         "phase",
@@ -193,11 +204,17 @@ def _return_rows(result: Any, launch: pd.Timestamp) -> pd.DataFrame:
     return frame.loc[:, RETURN_SCHEMA.columns]
 
 
-def _event_rows(result: Any, launch: pd.Timestamp) -> pd.DataFrame:
+def _event_rows(
+    result: Any, launch: pd.Timestamp, boundary: pd.Timestamp | None = None
+) -> pd.DataFrame:
     if result.events.empty:
         return pd.DataFrame(columns=EVENT_SCHEMA.columns)
     frame = result.events.copy()
     frame["timestamp"] = pd.to_datetime(frame["timestamp"], utc=True)
+    if boundary is not None:
+        # Events after the current decision belong to the evaluator's terminal interval.  Like
+        # its return row, they are not stable until the next replay supplies the following open.
+        frame = frame.loc[frame["timestamp"] <= boundary].copy()
     left = frame["timestamp"].dt.ceil("8h") - INTERVAL
     trade_like = frame["event_type"].isin({"trade", "risk_reduction"})
     left.loc[trade_like] = frame.loc[trade_like, "timestamp"].dt.floor("8h")
@@ -302,9 +319,9 @@ def persist_tick(
     phase = _phase(decision, launch)
     ledgers = paper / LEDGER_DIRNAME
     ledgers.mkdir(parents=True, exist_ok=True)
-    returns = _return_rows(normal, launch)
-    events = _event_rows(normal, launch)
-    positions = _position_rows(normal, decision + INTERVAL, phase)
+    returns = _return_rows(normal, launch, decision)
+    events = _event_rows(normal, launch, decision)
+    positions = _position_rows(normal, decision, phase)
     targets = _target_rows(replay, launch)
     paths = {
         FORWARD_RETURNS: ledgers / f"{FORWARD_RETURNS}.parquet",
@@ -337,9 +354,11 @@ def persist_tick(
         .sort_values(["liquidity_rank", "symbol"])["symbol"]
         .astype(str)
     )
-    latest_return = returns.loc[returns["decision_time"] == decision].iloc[0]
+    settled_decision = decision - INTERVAL
+    latest_return = returns.loc[returns["decision_time"] == settled_decision].iloc[0]
+    current_decision = normal.returns.loc[decision]
     boundary_record: dict[str, Any] = {
-        "schema_version": 1,
+        "schema_version": 2,
         "namespace": "cup50-team02-paper-boundary",
         "boundary": decision.isoformat(),
         "right_boundary": (decision + INTERVAL).isoformat(),
@@ -355,10 +374,14 @@ def persist_tick(
         "membership_boundary": active_boundary.isoformat(),
         "membership_count": len(members),
         "members": list(members),
+        "settled_through": decision.isoformat(),
+        "latest_settled_decision_time": settled_decision.isoformat(),
         "equity": float(latest_return["equity"]),
-        "net_return": float(latest_return["net_return"]),
-        "gross_exposure": float(latest_return["gross_exposure"]),
-        "turnover": float(latest_return["turnover"]),
+        "latest_settled_net_return": float(latest_return["net_return"]),
+        # Exposure and turnover are decided at this boundary and do not depend on the terminal
+        # interval's eventual endpoint price.  The terminal PnL itself is deliberately withheld.
+        "gross_exposure": float(current_decision["gross_exposure"]),
+        "turnover": float(current_decision["turnover"]),
         "position_count": len(normal.final_state.quantities),
         "positions": dict(sorted(normal.final_state.quantities.items())),
     }
