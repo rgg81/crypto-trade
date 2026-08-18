@@ -1,0 +1,20 @@
+{
+  "candidate_sources_or_parameters_changed": false,
+  "corrected_release_sha256": "7a9238f3fe7ee22d73b207c07b39c2c4b0beb73f03a9bab912445c7ff59b2b23",
+  "corrected_winner_team_id": "team-02",
+  "incident": "missing-is-top-three-qualification-stage",
+  "limitation": "The correction is retrospective; it cannot recreate pre-OOS finalist blindness.",
+  "namespace": "cup50",
+  "original_release_sha256": "d670f98bf43a0911c876cd53c463464632299d81e89b34d236cf677bd58889ed",
+  "qualifiers": [
+    "team-09",
+    "team-04",
+    "team-02"
+  ],
+  "recorded_at_utc": "2026-08-17T22:49:18.419665Z",
+  "schema_version": 1,
+  "scores_recomputed": false,
+  "sealed_evidence_was_already_observed": true,
+  "status": "corrected-in-place-at-owner-direction",
+  "team_12_paper_revocation_sha256": "06b48e81553ca1035461fb87e9c1af6f9ab3082fd64401eb9239ef4b4fe31d72"
+}
