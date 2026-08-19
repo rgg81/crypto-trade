@@ -17,7 +17,10 @@ from typing import Any
 
 from crypto_trade.tournament.layout_v4 import TOP40_V4_LAYOUT
 
-SCHEMA_VERSION = "top40-v4-r1-lifecycle-journal-v1"
+_SCHEMA_PREFIX = (
+    TOP40_V4_LAYOUT.name if TOP40_V4_LAYOUT.name.endswith("-r2") else "top40-v4-r1"
+)
+SCHEMA_VERSION = f"{_SCHEMA_PREFIX}-lifecycle-journal-v1"
 GENESIS_SHA256 = "0" * 64
 MAX_RECORD_BYTES = 1_048_576
 
@@ -134,6 +137,10 @@ _EVENT_KEYS = {
         }
     ),
 }
+if TOP40_V4_LAYOUT.name.endswith("-r2"):
+    _EVENT_KEYS["is_accepted"] = frozenset(
+        {*_EVENT_KEYS["is_accepted"], "research_session"}
+    )
 
 
 class JournalError(ValueError):
@@ -195,7 +202,10 @@ def _identifier(value: object, label: str) -> str:
 
 def _team(value: object) -> str:
     if not isinstance(value, str) or value not in TOP40_V4_LAYOUT.team_ids:
-        raise JournalError("team_id must be team-01 through team-12")
+        raise JournalError(
+            f"team_id must be {TOP40_V4_LAYOUT.team_ids[0]} through "
+            f"{TOP40_V4_LAYOUT.team_ids[-1]}"
+        )
     return value
 
 
@@ -238,13 +248,37 @@ def _validate_payload(event_type: str, payload: object) -> Mapping[str, Any]:
             _hash(payload[key], key)
     if event_type == "is_accepted":
         trial = payload["trial_number"]
-        if type(trial) is not int or not 1 <= trial <= 12:
-            raise JournalError("trial_number must be in 1..12")
+        if type(trial) is not int or not 1 <= trial <= TOP40_V4_LAYOUT.maximum_trials:
+            raise JournalError(
+                f"trial_number must be in 1..{TOP40_V4_LAYOUT.maximum_trials}"
+            )
         _text(payload["purpose"], "purpose")
         if not isinstance(payload["metadata"], Mapping) or not isinstance(
             payload["authority"], Mapping
         ):
             raise JournalError("accepted trial metadata and authority must be objects")
+        if TOP40_V4_LAYOUT.name.endswith("-r2"):
+            authority = payload["authority"]
+            session = payload["research_session"]
+            if not isinstance(session, Mapping) or set(session) != {
+                "path",
+                "sha256",
+                "source_bundle_sha256",
+            }:
+                raise JournalError("accepted trial research session is malformed")
+            _hash(session["sha256"], "research_session.sha256")
+            _hash(
+                session["source_bundle_sha256"],
+                "research_session.source_bundle_sha256",
+            )
+            if session["source_bundle_sha256"] != authority.get("source_bundle_sha256"):
+                raise JournalError("research session differs from accepted source authority")
+            expected_path = (
+                f"tournament/top40-v4-r2/research-sessions/{payload['team_id']}/"
+                f"{session['source_bundle_sha256']}.json"
+            )
+            if session["path"] != expected_path:
+                raise JournalError("research session path differs from accepted identity")
     if event_type.endswith("failed"):
         key = "failure" if event_type == "is_failed" else "failure_code"
         _text(payload[key], key)
@@ -265,11 +299,14 @@ def _validate_payload(event_type: str, payload: object) -> Mapping[str, Any]:
         advancing = payload["advancing"]
         if (
             not isinstance(advancing, list)
-            or len(advancing) > 5
+            or len(advancing) > TOP40_V4_LAYOUT.advance_count
             or any(not isinstance(team_id, str) for team_id in advancing)
             or len(set(advancing)) != len(advancing)
         ):
-            raise JournalError("advancing must be a unique list of at most five teams")
+            raise JournalError(
+                "advancing must be a unique list of at most "
+                f"{TOP40_V4_LAYOUT.advance_count} teams"
+            )
         for team_id in advancing:
             _team(team_id)
     if event_type == "release_authorized":

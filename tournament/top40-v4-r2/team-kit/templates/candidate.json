@@ -1,0 +1,22 @@
+{
+  "candidate_id": "replace-with-directory-name",
+  "control_profile": "replace-with-preregistered-control-description",
+  "falsifier": "replace-with-specific-prospective-falsifier",
+  "formation_horizon": "replace-with-completed-data-horizon",
+  "hypothesis": "replace-with-causal-economic-hypothesis",
+  "material_parameters": {
+    "example_numeric_coordinate": 1.0
+  },
+  "mechanism": "replace-with-independently-chosen-mechanism",
+  "neighborhood_coordinates": {
+    "example_numeric_coordinate": 1.0
+  },
+  "neighborhood_id": "replace-or-use-null",
+  "parent_candidate_id": null,
+  "rebalance_horizon": "replace-with-exact-decision-and-hold-rule",
+  "schema_version": 1,
+  "tags": [
+    "baseline"
+  ],
+  "team_id": "replace-with-team-id"
+}

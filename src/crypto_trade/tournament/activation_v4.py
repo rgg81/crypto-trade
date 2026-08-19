@@ -13,19 +13,30 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from crypto_trade.tournament import pure_crypto_universe_v6, top40_v4
+from crypto_trade.tournament import (
+    pure_crypto_universe_v4_r2,
+    pure_crypto_universe_v6,
+    snapshot,
+    top40_v4,
+)
 from crypto_trade.tournament.layout_v4 import TOP40_V4_LAYOUT
 
-SCHEMA_VERSION = "top40-v4-r1-activation-freeze-v1"
-TEST_OUTPUT_PATH = "tournament/top40-v4-r1/activation-tests.out"
+_IS_R2 = TOP40_V4_LAYOUT.name.endswith("-r2")
+_SCHEMA_PREFIX = TOP40_V4_LAYOUT.name if _IS_R2 else "top40-v4-r1"
+SCHEMA_VERSION = f"{_SCHEMA_PREFIX}-activation-freeze-v1"
+TEST_OUTPUT_PATH = f"{TOP40_V4_LAYOUT.tournament_root}/activation-tests.out"
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _GIT_OBJECT_ID = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})")
+_REVIEW_RECORD_PATH = "tournament/top40-v4-r2/adversarial-review.json"
+_REVIEW_REPORT_PATHS = (
+    "tournament/top40-v4-r2/reviews/leakage-cleanroom.md",
+    "tournament/top40-v4-r2/reviews/lifecycle-holdout.md",
+    "tournament/top40-v4-r2/reviews/evaluator-compatibility.md",
+)
 
-FROZEN_SCOPE = (
+_COMMON_FROZEN_SCOPE = (
     ".python-version",
-    "TOURNAMENT-CHARTER-TOP40-V4-R1.md",
     "pyproject.toml",
-    "scripts/top40_v4_tournament.py",
     "src/crypto_trade/tournament/_strategy_worker_v4.py",
     "src/crypto_trade/tournament/activation_v4.py",
     "src/crypto_trade/tournament/amendment_integrity_v2.py",
@@ -42,21 +53,71 @@ FROZEN_SCOPE = (
     "src/crypto_trade/tournament/scoring_v4.py",
     "src/crypto_trade/tournament/source_archive_v4.py",
     "src/crypto_trade/tournament/top40_v4.py",
-    "tests/tournament/test_top40_v4.py",
-    "tests/tournament/test_v4_team_bundles.py",
-    "tournament/top40/data_manifest.json",
-    "tournament/top40-v4-r1/README.md",
-    "tournament/top40-v4-r1/ROBUSTNESS-POLICY.md",
-    "tournament/top40-v4-r1/TEAM-MANDATES.md",
-    "tournament/top40-v4-r1/TEAM-PLAYBOOK.md",
-    "tournament/top40-v4-r1/config.toml",
     "uv.lock",
 )
 
-TARGETED_TESTS = (
-    "tests/tournament/test_top40_v4.py",
-    "tests/tournament/test_v4_team_bundles.py",
-)
+if _IS_R2:
+    FROZEN_SCOPE = (
+        *_COMMON_FROZEN_SCOPE,
+        "TOURNAMENT-CHARTER-TOP40-V4-R2.md",
+        "scripts/top40_v4_r2_team_broker.py",
+        "scripts/top40_v4_r2_tournament.py",
+        "reports-top40-v4-r2/common/btc_daily_returns.csv",
+        "reports-top40-v4-r2/common/btc_regimes.csv",
+        "src/crypto_trade/tournament/isolation_v4.py",
+        "src/crypto_trade/tournament/pure_crypto_universe_v4_r2.py",
+        "src/crypto_trade/tournament/research_runtime_v4.py",
+        "src/crypto_trade/tournament/snapshot.py",
+        "tests/tournament/test_top40_v4_r2.py",
+        "tournament/top40-v4-r2/CLEANROOM-POLICY.md",
+        "tournament/top40-v4-r2/README.md",
+        "tournament/top40-v4-r2/ROBUSTNESS-POLICY.md",
+        "tournament/top40-v4-r2/SNAPSHOT-BUILD.toml",
+        "tournament/top40-v4-r2/STRATEGY-API.md",
+        "tournament/top40-v4-r2/TEAM-PLAYBOOK.md",
+        "tournament/top40-v4-r2/config.toml",
+        "tournament/top40-v4-r2/data-manifest.json",
+        "tournament/top40-v4-r2/team-kit/RULES.md",
+        "tournament/top40-v4-r2/team-kit/STRATEGY-API.md",
+        "tournament/top40-v4-r2/team-kit/templates/candidate.json",
+        "tournament/top40-v4-r2/team-kit/templates/cleanroom-attestation.json",
+        "tournament/top40-v4-r2/team-kit/templates/research-certificate.json",
+        "tournament/top40-v4-r2/team-kit/templates/risk-policy.json",
+        _REVIEW_RECORD_PATH,
+        *_REVIEW_REPORT_PATHS,
+        "tournament/top40-v4-r2/templates/candidate.json",
+        "tournament/top40-v4-r2/templates/cleanroom-attestation.json",
+        "tournament/top40-v4-r2/templates/research-certificate.json",
+        "tournament/top40-v4-r2/templates/risk-policy.json",
+        *tuple(
+            f"tournament/top40-v4-r2/teams/{team_id}/{filename}"
+            for team_id in TOP40_V4_LAYOUT.team_ids
+            for filename in ("ACCESS-POLICY.json", "TEAM-BRIEF.md")
+        ),
+        *tuple(
+            f"tournament/top40-v4-r2/teams/{team_id}/candidates/README.md"
+            for team_id in TOP40_V4_LAYOUT.team_ids
+        ),
+    )
+    TARGETED_TESTS = ("tests/tournament/test_top40_v4_r2.py",)
+else:
+    FROZEN_SCOPE = (
+        *_COMMON_FROZEN_SCOPE,
+        "TOURNAMENT-CHARTER-TOP40-V4-R1.md",
+        "scripts/top40_v4_tournament.py",
+        "tests/tournament/test_top40_v4.py",
+        "tests/tournament/test_v4_team_bundles.py",
+        "tournament/top40-v4-r1/README.md",
+        "tournament/top40-v4-r1/ROBUSTNESS-POLICY.md",
+        "tournament/top40-v4-r1/TEAM-MANDATES.md",
+        "tournament/top40-v4-r1/TEAM-PLAYBOOK.md",
+        "tournament/top40-v4-r1/config.toml",
+        "tournament/top40/data_manifest.json",
+    )
+    TARGETED_TESTS = (
+        "tests/tournament/test_top40_v4.py",
+        "tests/tournament/test_v4_team_bundles.py",
+    )
 
 
 class ActivationError(ValueError):
@@ -197,14 +258,18 @@ def _run_tests(root: Path) -> tuple[bytes, int]:
             "MKL_NUM_THREADS": "1",
         }
     )
-    completed = subprocess.run(
-        _test_command(),
-        cwd=root,
-        env=environment,
-        check=False,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-    )
+    if _IS_R2:
+        environment["CRYPTO_TRADE_TOP40_V4_EDITION"] = "r2"
+    with tempfile.TemporaryDirectory(prefix="top40-v4-uv-cache-") as uv_cache:
+        environment["UV_CACHE_DIR"] = uv_cache
+        completed = subprocess.run(
+            _test_command(),
+            cwd=root,
+            env=environment,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
     return completed.stdout, int(completed.returncode)
 
 
@@ -242,7 +307,11 @@ def _implementation_commit(root: Path) -> str:
 
 
 def _audit_sha256(root: Path, config: Mapping[str, Any]) -> str:
-    report = pure_crypto_universe_v6.audit_report_bytes(root)
+    report = (
+        pure_crypto_universe_v4_r2.audit_report_bytes(root, config)
+        if _IS_R2
+        else pure_crypto_universe_v6.audit_report_bytes(root)
+    )
     digest = _sha256(report)
     expected = str(config["universe"]["a6_authority"]["audit_report_sha256"])
     if digest != expected:
@@ -253,6 +322,119 @@ def _audit_sha256(root: Path, config: Mapping[str, Any]) -> str:
     return digest
 
 
+def _validate_snapshot_window(root: Path, config: Mapping[str, Any]) -> None:
+    """Refuse activation when the bound snapshot omits any configured holdout month."""
+
+    manifest_relative = str(config["data"]["manifest_path"])
+    manifest_path = _file(root, manifest_relative)
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest_end = str(manifest["window"]["hard_end_exclusive"]).replace("+00:00", "Z")
+    except (KeyError, TypeError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ActivationError("snapshot manifest has no canonical hard-end authority") from exc
+    configured_end = str(config["data"]["hard_end_exclusive"])
+    holdout_end = str(config["splits"]["historical_oos"]["end_exclusive"])
+    if manifest_end != configured_end or configured_end != holdout_end:
+        raise ActivationError(
+            "snapshot does not cover the complete configured historical holdout; "
+            f"manifest={manifest_end}, configured={configured_end}, holdout={holdout_end}"
+        )
+
+
+def _verify_full_snapshot_once(root: Path, config: Mapping[str, Any]) -> str | None:
+    """Perform the expensive raw-source replay once at activation, never per team trial."""
+
+    if not _IS_R2:
+        return None
+    manifest_path = _file(root, str(config["data"]["manifest_path"]))
+    try:
+        snapshot.verify_snapshot_manifest(manifest_path)
+    except (OSError, TypeError, ValueError) as exc:
+        raise ActivationError("full July-inclusive snapshot verification failed") from exc
+    digest = _sha256(manifest_path.read_bytes())
+    if digest != config["data"]["manifest_sha256"]:
+        raise ActivationError("verified snapshot manifest differs from the config")
+    return digest
+
+
+def _review_scope_head(root: Path) -> str:
+    excluded = {_REVIEW_RECORD_PATH, *_REVIEW_REPORT_PATHS}
+    previous = "0" * 64
+    for sequence, relative in enumerate(
+        (path for path in FROZEN_SCOPE if path not in excluded), start=1
+    ):
+        payload = _file(root, relative).read_bytes()
+        previous = _sha256(
+            _canonical(
+                {
+                    "sequence": sequence,
+                    "path": relative,
+                    "size": len(payload),
+                    "sha256": _sha256(payload),
+                    "previous_sha256": previous,
+                }
+            )
+        )
+    return previous
+
+
+def _validate_adversarial_review(root: Path) -> Mapping[str, Any] | None:
+    if not _IS_R2:
+        return None
+    record = _read_object(_file(root, _REVIEW_RECORD_PATH))
+    if set(record) != {
+        "schema_version",
+        "tournament",
+        "status",
+        "reviewed_scope_head_sha256",
+        "reports",
+    }:
+        raise ActivationError("adversarial review record schema changed")
+    if (
+        record["schema_version"] != 1
+        or record["tournament"] != TOP40_V4_LAYOUT.name
+        or record["status"] != "passed-after-remediation"
+        or record["reviewed_scope_head_sha256"] != _review_scope_head(root)
+    ):
+        raise ActivationError("adversarial review does not bind the activation implementation")
+    reports = record["reports"]
+    expected_reports = {
+        "leakage-cleanroom": "tournament/top40-v4-r2/reviews/leakage-cleanroom.md",
+        "lifecycle-holdout": "tournament/top40-v4-r2/reviews/lifecycle-holdout.md",
+        "evaluator-compatibility": (
+            "tournament/top40-v4-r2/reviews/evaluator-compatibility.md"
+        ),
+    }
+    if not isinstance(reports, list) or len(reports) != 3:
+        raise ActivationError("adversarial review must contain exactly three reports")
+    seen: set[str] = set()
+    for report in reports:
+        if not isinstance(report, Mapping) or set(report) != {
+            "scope",
+            "path",
+            "sha256",
+            "status",
+            "unresolved_findings",
+        }:
+            raise ActivationError("adversarial review report binding is malformed")
+        scope = report["scope"]
+        path = report["path"]
+        if (
+            scope not in expected_reports
+            or scope in seen
+            or path != expected_reports[scope]
+            or report["status"] != "passed"
+            or type(report["unresolved_findings"]) is not int
+            or report["unresolved_findings"] != 0
+            or _sha256(_file(root, str(path)).read_bytes()) != report["sha256"]
+        ):
+            raise ActivationError("adversarial review report did not pass or changed")
+        seen.add(str(scope))
+    if seen != set(expected_reports):
+        raise ActivationError("adversarial review scopes are incomplete")
+    return record
+
+
 def activate(root: str | Path) -> Mapping[str, Any]:
     root_path = Path(root).resolve()
     freeze_path = root_path / TOP40_V4_LAYOUT.activation_freeze_path
@@ -260,6 +442,9 @@ def activate(root: str | Path) -> Mapping[str, Any]:
         raise ActivationError("V4 activation is one-time and already exists")
     implementation_commit = _implementation_commit(root_path)
     loaded = top40_v4.load_config(root=root_path)
+    _validate_snapshot_window(root_path, loaded.raw)
+    full_snapshot_sha256 = _verify_full_snapshot_once(root_path, loaded.raw)
+    review = _validate_adversarial_review(root_path)
     entries, head = _scope(root_path, implementation_commit=implementation_commit)
     audit_sha256 = _audit_sha256(root_path, loaded.raw)
     output, exit_code = _run_tests(root_path)
@@ -291,6 +476,12 @@ def activate(root: str | Path) -> Mapping[str, Any]:
             "output_sha256": _sha256(output),
         },
     }
+    if review is not None:
+        unsigned["adversarial_review_sha256"] = _sha256(
+            _file(root_path, _REVIEW_RECORD_PATH).read_bytes()
+        )
+    if full_snapshot_sha256 is not None:
+        unsigned["full_snapshot_manifest_sha256"] = full_snapshot_sha256
     unsigned["record_sha256"] = _sha256(_canonical(unsigned))
     _write_atomic(freeze_path, _pretty(unsigned), exclusive=True)
     return unsigned
@@ -324,6 +515,8 @@ def _read_object(path: Path) -> Mapping[str, Any]:
 def validate(root: str | Path, *, verify_universe_snapshot: bool = True) -> Mapping[str, Any]:
     root_path = Path(root).resolve()
     loaded = top40_v4.load_config(root=root_path)
+    _validate_snapshot_window(root_path, loaded.raw)
+    review = _validate_adversarial_review(root_path)
     freeze_path = root_path / TOP40_V4_LAYOUT.activation_freeze_path
     if not freeze_path.is_file() or freeze_path.is_symlink():
         raise ActivationError("V4 is not activated")
@@ -341,6 +534,10 @@ def validate(root: str | Path, *, verify_universe_snapshot: bool = True) -> Mapp
         "tests",
         "record_sha256",
     }
+    if review is not None:
+        expected_keys.add("adversarial_review_sha256")
+    if _IS_R2:
+        expected_keys.add("full_snapshot_manifest_sha256")
     if set(record) != expected_keys:
         raise ActivationError("V4 activation freeze schema changed")
     unsigned = dict(record)
@@ -349,6 +546,14 @@ def validate(root: str | Path, *, verify_universe_snapshot: bool = True) -> Mapp
         raise ActivationError("V4 activation record hash is invalid")
     if _sha256(_canonical(unsigned)) != claimed:
         raise ActivationError("V4 activation record was modified")
+    if review is not None and record["adversarial_review_sha256"] != _sha256(
+        _file(root_path, _REVIEW_RECORD_PATH).read_bytes()
+    ):
+        raise ActivationError("V4 adversarial review binding changed")
+    if _IS_R2 and record["full_snapshot_manifest_sha256"] != loaded.raw["data"][
+        "manifest_sha256"
+    ]:
+        raise ActivationError("V4 full-snapshot activation binding changed")
     if (
         record["schema_version"] != SCHEMA_VERSION
         or record["tournament_id"] != TOP40_V4_LAYOUT.name

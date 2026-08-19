@@ -20,12 +20,16 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-SCHEMA_VERSION = "top40-v4-r1-candidate-source-archive-v1"
-ARCHIVE_NAMESPACE = "reports-top40-v4-r1/source-archives/sha256"
+from crypto_trade.tournament.layout_v4 import TOP40_V4_LAYOUT
+
+_SCHEMA_PREFIX = (
+    TOP40_V4_LAYOUT.name if TOP40_V4_LAYOUT.name.endswith("-r2") else "top40-v4-r1"
+)
+SCHEMA_VERSION = f"{_SCHEMA_PREFIX}-candidate-source-archive-v1"
+ARCHIVE_NAMESPACE = f"{TOP40_V4_LAYOUT.reports_root}/source-archives/sha256"
 MAX_ARCHIVE_BYTES = 16 * 1024 * 1024
 
 _SHA256 = re.compile(r"[0-9a-f]{64}")
-_TEAM_ID = re.compile(r"team-(?:0[1-9]|1[0-2])")
 _IDENTIFIER = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}")
 _ARCHIVE_KEYS = frozenset(
     {
@@ -155,11 +159,11 @@ def _decode_archive(payload: bytes, *, relative_path: str, sha256: str) -> Sourc
     if value["schema_version"] != SCHEMA_VERSION:
         raise SourceArchiveError("source archive schema_version is not V4")
     team_id = value["team_id"]
-    if not isinstance(team_id, str) or _TEAM_ID.fullmatch(team_id) is None:
+    if not isinstance(team_id, str) or team_id not in TOP40_V4_LAYOUT.team_ids:
         raise SourceArchiveError("source archive team_id is invalid")
     candidate_id = _require_identifier(value["candidate_id"], "candidate_id")
     candidate_root = _relative_path(value["candidate_root"], "candidate_root")
-    required_prefix = f"tournament/top40-v4-r1/teams/{team_id}"
+    required_prefix = f"{TOP40_V4_LAYOUT.tournament_root}/teams/{team_id}"
     if candidate_root != required_prefix and not candidate_root.startswith(required_prefix + "/"):
         raise SourceArchiveError("candidate_root is outside its V4 team namespace")
     entrypoint = _relative_path(value["entrypoint"], "entrypoint")

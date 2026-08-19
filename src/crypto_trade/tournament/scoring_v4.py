@@ -15,6 +15,11 @@ import numpy as np
 import pandas as pd
 
 from crypto_trade.tournament import metrics_v3, runner_v4
+from crypto_trade.tournament.layout_v4 import TOP40_V4_LAYOUT
+
+_SCHEMA_PREFIX = (
+    TOP40_V4_LAYOUT.name if TOP40_V4_LAYOUT.name.endswith("-r2") else "top40-v4-r1"
+)
 
 
 class ScoringError(ValueError):
@@ -263,7 +268,7 @@ def summarize_run(
         seed=int(statistics["bootstrap_seed"]),
     )
     packet: dict[str, Any] = {
-        "schema_version": "top40-v4-r1-run-summary-v1",
+        "schema_version": f"{_SCHEMA_PREFIX}-run-summary-v1",
         "stage": result.stage,
         "team_id": result.team_id,
         "candidate_identity": {
@@ -408,7 +413,11 @@ def assess_historical_oos(packet: Mapping[str, Any], config: Mapping[str, Any]) 
     base = window["base_metrics"]
     double = window["double_cost_metrics"]
     diagnostics = packet["diagnostics"]
-    quarters = int(round(float(base["positive_quarter_fraction"]) * 8.0))
+    split = config["splits"]["historical_oos"]
+    start = pd.Timestamp(str(split["start"]))
+    end_inclusive = pd.Timestamp(str(split["end_exclusive"])) - pd.Timedelta(nanoseconds=1)
+    quarter_count = len(pd.period_range(start=start, end=end_inclusive, freq="Q"))
+    quarters = int(round(float(base["positive_quarter_fraction"]) * quarter_count))
     gates = {
         "positive_base_return": float(base["annualized_return"])
         > float(floors["minimum_base_annualized_return_exclusive"]),

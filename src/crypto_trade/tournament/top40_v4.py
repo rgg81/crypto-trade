@@ -5,6 +5,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import math
+import re
 import tomllib
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -13,6 +14,8 @@ from typing import Any
 from crypto_trade.tournament.layout_v4 import TOP40_V4_LAYOUT
 
 TEAM_IDS = TOP40_V4_LAYOUT.team_ids
+_IS_R2 = TOP40_V4_LAYOUT.name.endswith("-r2")
+_SHA256 = re.compile(r"[0-9a-f]{64}")
 
 _TOP_LEVEL_KEYS = frozenset(
     {
@@ -33,21 +36,22 @@ _TOP_LEVEL_KEYS = frozenset(
         "historical_oos",
         "ensemble",
         "mandates",
+        *({"isolation"} if _IS_R2 else set()),
     }
 )
 
 _EXPECTED_PATHS = {
-    "tournament_root": "tournament/top40-v4-r1",
-    "reports_root": "reports-top40-v4-r1",
-    "team_root": "tournament/top40-v4-r1/teams",
-    "research_journal": "tournament/top40-v4-r1/research-journal.jsonl",
-    "nomination_registry": "tournament/top40-v4-r1/nomination-registry.json",
-    "selection_freeze": "tournament/top40-v4-r1/selection-freeze.json",
-    "activation_freeze": "tournament/top40-v4-r1/activation-freeze.json",
-    "source_archive_root": "reports-top40-v4-r1/source-archives/sha256",
-    "is_reports_root": "reports-top40-v4-r1/is",
-    "private_final_root": "tournament/top40-v4-r1/private/historical-oos",
-    "final_release_root": "reports-top40-v4-r1/historical-oos",
+    "tournament_root": TOP40_V4_LAYOUT.tournament_root,
+    "reports_root": TOP40_V4_LAYOUT.reports_root,
+    "team_root": f"{TOP40_V4_LAYOUT.tournament_root}/teams",
+    "research_journal": TOP40_V4_LAYOUT.journal_path,
+    "nomination_registry": TOP40_V4_LAYOUT.nomination_registry_path,
+    "selection_freeze": TOP40_V4_LAYOUT.selection_freeze_path,
+    "activation_freeze": TOP40_V4_LAYOUT.activation_freeze_path,
+    "source_archive_root": f"{TOP40_V4_LAYOUT.reports_root}/source-archives/sha256",
+    "is_reports_root": f"{TOP40_V4_LAYOUT.reports_root}/is",
+    "private_final_root": f"{TOP40_V4_LAYOUT.tournament_root}/private/historical-oos",
+    "final_release_root": f"{TOP40_V4_LAYOUT.reports_root}/historical-oos",
 }
 
 _EXPECTED_FOLDS = (
@@ -71,6 +75,27 @@ _EXPECTED_MANDATES = {
     "team-10": "dynamic-cointegration-relative-value",
     "team-11": "utc-weekday-seasonality",
     "team-12": "simple-preregistered-regime-ensemble",
+}
+if _IS_R2:
+    _EXPECTED_MANDATES = {team_id: "open-independent-mechanism" for team_id in TEAM_IDS}
+
+_EXPECTED_ISOLATION = {
+    "policy": "deny-by-default-offline-os-clean-room-v2",
+    "prior_tournament_artifacts_visible": False,
+    "other_team_artifacts_visible": False,
+    "sealed_data_visible": False,
+    "research_network_enabled": False,
+    "research_process": "ephemeral-os-enforced-permission-profile",
+    "organizer_broker": "offline-asynchronous-lane-local-results",
+    "global_broker_lease": "blocking-process-wide-one-team-at-a-time",
+    "broker_recovery": "idempotent-phase-resume-from-organizer-launch-authority",
+    "nomination_gate_failure": "terminal-evidence-backed-retirement",
+    "executable_mount": "python-source-only-from-content-addressed-archive",
+    "candidate_cleanroom_attestation_required": True,
+    "team_access_policy_filename": "ACCESS-POLICY.json",
+    "team_brief_filename": "TEAM-BRIEF.md",
+    "full_surface_audit_at_activation_and_close": True,
+    "lane_surface_audit_before_lane_result_command": True,
 }
 
 
@@ -120,9 +145,12 @@ def validate_config(raw: Mapping[str, Any]) -> None:
     _expect(raw, ("schema_version",), 1)
     _expect(raw, ("name",), TOP40_V4_LAYOUT.name)
     _expect(raw, ("policy_status",), "active-pending-activation")
-    _expect(raw, ("charter_path",), "TOURNAMENT-CHARTER-TOP40-V4-R1.md")
+    charter = "TOURNAMENT-CHARTER-TOP40-V4-R2.md" if _IS_R2 else "TOURNAMENT-CHARTER-TOP40-V4-R1.md"
+    _expect(raw, ("charter_path",), charter)
     if tuple(_sequence(raw.get("teams"), "teams")) != TEAM_IDS:
-        raise ValueError("V4 config must contain exactly team-01 through team-12")
+        raise ValueError(
+            f"V4 config must contain exactly {TEAM_IDS[0]} through {TEAM_IDS[-1]}"
+        )
     paths = _mapping(raw.get("paths"), "paths")
     if dict(paths) != _EXPECTED_PATHS:
         raise ValueError("V4 config paths differ from the isolated V4 namespace")
@@ -133,25 +161,36 @@ def validate_config(raw: Mapping[str, Any]) -> None:
         ("data", "instrument"): "linear-usdt-perpetual",
         ("data", "transaction_interval"): "8h",
         ("data", "warmup_start"): "2020-01-01T00:00:00Z",
-        ("data", "hard_end_exclusive"): "2026-07-01T00:00:00Z",
-        ("data", "manifest_path"): "tournament/top40/data_manifest.json",
-        ("data", "manifest_sha256"): (
-            "077eb036d262befec80f7013084fe6906859f7c3bbe2f8c193c9d9ec68e367c3"
+        ("data", "hard_end_exclusive"): (
+            "2026-08-01T00:00:00Z" if _IS_R2 else "2026-07-01T00:00:00Z"
+        ),
+        ("data", "manifest_path"): (
+            "tournament/top40-v4-r2/data-manifest.json"
+            if _IS_R2
+            else "tournament/top40/data_manifest.json"
         ),
         ("splits", "is", "start"): "2020-02-03T00:00:00Z",
         ("splits", "is", "end_exclusive"): "2024-07-01T00:00:00Z",
         ("splits", "historical_oos", "start"): "2024-07-01T00:00:00Z",
-        ("splits", "historical_oos", "end_exclusive"): "2026-07-01T00:00:00Z",
+        ("splits", "historical_oos", "end_exclusive"): (
+            "2026-08-01T00:00:00Z" if _IS_R2 else "2026-07-01T00:00:00Z"
+        ),
         ("splits", "historical_oos", "globally_pristine"): False,
         ("splits", "historical_oos", "candidate_relative_oos"): True,
-        ("splits", "live_forward", "start"): "2026-08-01T00:00:00Z",
+        ("splits", "live_forward", "start"): (
+            "2026-09-01T00:00:00Z" if _IS_R2 else "2026-08-01T00:00:00Z"
+        ),
         ("splits", "live_forward", "minimum_observation_days"): 365,
         ("universe", "size"): 40,
         ("universe", "reconstitution"): "weekly-monday-00:00-utc",
         ("universe", "liquidity_measure"): "frozen-median-daily-quote-volume",
         ("universe", "trailing_days"): 30,
         ("universe", "minimum_history_days"): 30,
-        ("universe", "membership_path"): "data/top40/snapshot-v1/membership.parquet",
+        ("universe", "membership_path"): (
+            "data/top40/snapshot-v2/membership.parquet"
+            if _IS_R2
+            else "data/top40/snapshot-v1/membership.parquet"
+        ),
         ("universe", "eligibility_mode"): "fail-closed-a6-native-crypto",
         ("universe", "allowed_economic_exposure"): "native-crypto-only",
         ("universe", "unknown_classification_is_ineligible"): True,
@@ -182,10 +221,10 @@ def validate_config(raw: Mapping[str, Any]) -> None:
         ("regimes", "positive_sharpe_comparison"): "strictly-greater-than-zero",
         ("statistics", "bootstrap_samples"): 2000,
         ("statistics", "bootstrap_block_days"): 10,
-        ("statistics", "bootstrap_seed"): 20260719,
+        ("statistics", "bootstrap_seed"): 20260819 if _IS_R2 else 20260719,
         ("statistics", "maximum_drawdown_is_positive_magnitude"): True,
-        ("research", "strategy_seed"): 20260719,
-        ("research", "maximum_accepted_trials_per_team"): 12,
+        ("research", "strategy_seed"): 20260819 if _IS_R2 else 20260719,
+        ("research", "maximum_accepted_trials_per_team"): TOP40_V4_LAYOUT.maximum_trials,
         ("research", "minimum_accepted_trials_before_nomination"): 8,
         ("research", "maximum_mechanism_pivots_per_team"): 1,
         ("research", "accepted_failure_consumes_trial"): True,
@@ -235,7 +274,8 @@ def validate_config(raw: Mapping[str, Any]) -> None:
             "maximum_top_five_day_absolute_return_share_inclusive",
         ): 0.35,
         ("selection", "floors", "maximum_fold_positive_pnl_share_inclusive"): 0.60,
-        ("selection", "ranking", "advance_count"): 5,
+        ("selection", "ranking", "advance_count"): TOP40_V4_LAYOUT.advance_count,
+        ("selection", "ranking", "eligible_population"): "one-qualified-nominee-per-team",
         ("selection", "ranking", "advance_all_when_fewer"): True,
         ("selection", "ranking", "lower_floors_to_fill_bracket"): False,
         ("historical_oos", "maximum_observations_per_finalist"): 1,
@@ -245,6 +285,8 @@ def validate_config(raw: Mapping[str, Any]) -> None:
         ("historical_oos", "retry_allowed"): False,
         ("historical_oos", "replacement_allowed"): False,
         ("historical_oos", "atomic_release"): True,
+        ("splits", "historical_oos", "raw_data_visible_to_teams"): False,
+        ("splits", "historical_oos", "feedback"): "one-atomic-simultaneous-release",
         (
             "historical_oos",
             "winner_eligibility",
@@ -261,9 +303,12 @@ def validate_config(raw: Mapping[str, Any]) -> None:
             "minimum_double_cost_sharpe_exclusive",
         ): 0.0,
         ("historical_oos", "winner_eligibility", "maximum_drawdown_inclusive"): 0.30,
-        ("historical_oos", "winner_eligibility", "minimum_positive_quarters"): 4,
+        ("historical_oos", "winner_eligibility", "minimum_positive_quarters"): (
+            5 if _IS_R2 else 4
+        ),
         ("ensemble", "weight_method"): "capped-inverse-is-daily-volatility",
-        ("ensemble", "maximum_constituent_weight"): 0.30,
+        ("ensemble", "role"): "additional-reporting-portfolio",
+        ("ensemble", "maximum_constituent_weight"): 0.25 if _IS_R2 else 0.30,
         ("ensemble", "minimum_constituents"): 2,
         ("ensemble", "weights_use_is_only"): True,
         ("ensemble", "failed_constituent_weight"): "cash-no-redistribution",
@@ -271,8 +316,17 @@ def validate_config(raw: Mapping[str, Any]) -> None:
         ("ensemble", "oos_reweighting_allowed"): False,
         ("ensemble", "winner_eligible"): False,
     }
+    if _IS_R2:
+        critical[("selection", "floors", "minimum_field_adjusted_confidence_inclusive")] = 0.90
     for path, expected in critical.items():
         _expect(raw, path, expected)
+    manifest_sha256 = _mapping(raw.get("data"), "data").get("manifest_sha256")
+    if not isinstance(manifest_sha256, str) or _SHA256.fullmatch(manifest_sha256) is None:
+        raise ValueError("V4 config data.manifest_sha256 must be a lowercase SHA-256")
+    if not _IS_R2 and manifest_sha256 != (
+        "077eb036d262befec80f7013084fe6906859f7c3bbe2f8c193c9d9ec68e367c3"
+    ):
+        raise ValueError("V4 config data.manifest_sha256 differs from the frozen contract")
 
     _expect(
         raw,
@@ -318,7 +372,48 @@ def validate_config(raw: Mapping[str, Any]) -> None:
         "expected_audit_status": "passed",
         "required_before_and_after_every_result_command": True,
     }
-    if dict(_mapping(_mapping(raw["universe"], "universe")["a6_authority"], "a6")) != a6_expected:
+    a6_actual = dict(
+        _mapping(_mapping(raw["universe"], "universe")["a6_authority"], "a6")
+    )
+    if _IS_R2:
+        expected_keys = set(a6_expected)
+        if set(a6_actual) != expected_keys:
+            raise ValueError("V4-R2 A6 pure-crypto authority fields differ from the contract")
+        semantic = {
+            "policy_id": "top40-v4-r2-pure-crypto-usdt-perpetual-v1",
+            "audit_module_path": (
+                "src/crypto_trade/tournament/pure_crypto_universe_v4_r2.py"
+            ),
+            "audit_dependency_path": "src/crypto_trade/tournament/amendment_integrity_v2.py",
+            "data_manifest_path": "tournament/top40-v4-r2/data-manifest.json",
+            "expected_violations": 0,
+            "expected_audit_status": "passed",
+            "required_before_and_after_every_result_command": True,
+        }
+        if any(a6_actual.get(key) != value for key, value in semantic.items()):
+            raise ValueError("V4-R2 A6 semantic authority differs from the frozen contract")
+        for key in (
+            "policy_sha256",
+            "audit_module_sha256",
+            "audit_dependency_sha256",
+            "audit_report_sha256",
+            "data_manifest_sha256",
+            "membership_sha256",
+            "contract_metadata_sha256",
+            "exchange_info_sha256",
+        ):
+            if not isinstance(a6_actual.get(key), str) or _SHA256.fullmatch(a6_actual[key]) is None:
+                raise ValueError(f"V4-R2 A6 {key} must be a lowercase SHA-256")
+        if a6_actual["data_manifest_sha256"] != manifest_sha256:
+            raise ValueError("V4-R2 manifest hashes disagree across config authorities")
+        for key in (
+            "expected_contract_metadata_symbols",
+            "expected_distinct_membership_symbols",
+            "expected_membership_rows",
+        ):
+            if type(a6_actual.get(key)) is not int or a6_actual[key] <= 0:
+                raise ValueError(f"V4-R2 A6 {key} must be a positive integer")
+    elif a6_actual != a6_expected:
         raise ValueError("V4 A6 pure-crypto authority differs from the frozen contract")
 
     folds = _sequence(_mapping(raw.get("selection"), "selection").get("folds"), "folds")
@@ -363,6 +458,8 @@ def validate_config(raw: Mapping[str, Any]) -> None:
     )
     if dict(_mapping(raw.get("mandates"), "mandates")) != _EXPECTED_MANDATES:
         raise ValueError("V4 team mandates differ from the frozen contract")
+    if _IS_R2 and dict(_mapping(raw.get("isolation"), "isolation")) != _EXPECTED_ISOLATION:
+        raise ValueError("V4-R2 isolation policy differs from the frozen contract")
 
     for table_name, keys in (
         ("execution", ("initial_equity_usdt", "max_gross_exposure")),

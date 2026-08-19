@@ -25,7 +25,11 @@ import numpy as np
 import pandas as pd
 
 import crypto_trade.tournament.top40_v4 as tournament_contract
-from crypto_trade.tournament import pure_crypto_universe_v6, source_archive_v4
+from crypto_trade.tournament import (
+    pure_crypto_universe_v4_r2,
+    pure_crypto_universe_v6,
+    source_archive_v4,
+)
 from crypto_trade.tournament.engine_v2 import (
     EvaluationResult,
     EvaluatorConfig,
@@ -46,7 +50,6 @@ from crypto_trade.tournament.metrics_v3 import (
 from crypto_trade.tournament.protocol import REBALANCE_INSTRUCTION_COLUMN, DecisionContext
 from crypto_trade.tournament.risk_policy import risk_policy_from_dict
 
-_TEAM_ID = re.compile(r"team-(?:0[1-9]|1[0-2])")
 _CANDIDATE_ID = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}")
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _INTERVAL = pd.Timedelta(hours=8)
@@ -144,6 +147,11 @@ _EVALUATOR_AUTHORITY_PATHS = (
     "src/crypto_trade/tournament/metrics_v3.py",
     "src/crypto_trade/tournament/protocol.py",
     "src/crypto_trade/tournament/pure_crypto_universe_v6.py",
+    *(
+        ("src/crypto_trade/tournament/pure_crypto_universe_v4_r2.py",)
+        if TOP40_V4_LAYOUT.name.endswith("-r2")
+        else ()
+    ),
     "src/crypto_trade/tournament/risk_policy.py",
     "src/crypto_trade/tournament/scoring_v4.py",
     "src/crypto_trade/tournament/source_archive_v4.py",
@@ -320,7 +328,11 @@ def _pure_crypto_preflight(root: Path, config: Mapping[str, Any]) -> str:
         if _sha256_file(path) != authority[hash_field]:
             raise ValueError(f"A6 {hash_field} differs from the configured authority")
 
-    report_bytes = pure_crypto_universe_v6.audit_report_bytes(root)
+    report_bytes = (
+        pure_crypto_universe_v4_r2.audit_report_bytes(root, config)
+        if TOP40_V4_LAYOUT.name.endswith("-r2")
+        else pure_crypto_universe_v6.audit_report_bytes(root)
+    )
     report_sha256 = hashlib.sha256(report_bytes).hexdigest()
     if report_sha256 != authority["audit_report_sha256"]:
         raise ValueError("A6 deterministic audit report hash differs from the V4 config")
@@ -501,25 +513,23 @@ def _run_team_impl(
     if _authorization is not _ORGANIZER_RUN_AUTHORIZATION:
         raise PermissionError(
             "full-window tournament evaluation is a trusted organizer operation; "
-            "use scripts/top40_v4_tournament.py"
+            f"use {TOP40_V4_LAYOUT.orchestrator_script}"
         )
     if _source_archive is None:
         raise ValueError("V4 runner requires a verified immutable source archive")
     root_path = Path(root).resolve()
     if not root_path.is_dir():
         raise ValueError(f"tournament root is not a directory: {root_path}")
-    if not _TEAM_ID.fullmatch(team_id):
-        raise ValueError("team_id must be team-01 through team-12")
+    TOP40_V4_LAYOUT.require_team(team_id)
 
     entrypoint_path, entrypoint_relative = _resolve_team_entrypoint(root_path, team_id, entrypoint)
     risk_policy_path = _resolve_team_risk_policy(root_path, team_id, entrypoint_path)
     canonical_config_path = _resolve_root_file(root_path, config_path, "config")
     canonical_manifest_path = _resolve_root_file(root_path, manifest_path, "manifest")
-    expected_manifest_path = (root_path / "tournament/top40/data_manifest.json").resolve()
+    edition_manifest = tournament_contract.load_config(root=root_path).raw["data"]["manifest_path"]
+    expected_manifest_path = (root_path / str(edition_manifest)).resolve()
     if canonical_manifest_path != expected_manifest_path:
-        raise ValueError(
-            "manifest_path must be the shared immutable tournament/top40/data_manifest.json"
-        )
+        raise ValueError("manifest_path must match the edition's immutable data authority")
     initial_config_sha256 = _sha256_file(canonical_config_path)
     initial_strategy_sha256 = _sha256_file(entrypoint_path)
     initial_risk_policy_sha256 = _sha256_file(risk_policy_path)
@@ -801,6 +811,7 @@ class _TeamTreeFile:
     size: int
     sha256: str
     staged: bool
+    content: bytes
 
 
 @dataclasses.dataclass(frozen=True)
@@ -817,19 +828,163 @@ class SourceBundleCapture:
         return tuple(item.manifest_entry for item in self.files)
 
 
-def _stable_file_bytes(path: Path) -> bytes:
-    """Read a bounded regular file and reject replacement or mutation during the read."""
-    before = path.stat()
-    with path.open("rb") as handle:
-        content = handle.read(_TEAM_TREE_MAX_FILE_BYTES + 1)
-    after = path.stat()
-    before_identity = (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
-    after_identity = (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
-    if before_identity != after_identity:
-        raise StrategySandboxError(f"team source file changed while reading: {path.name}")
+def _stable_file_bytes(
+    path: Path | str,
+    *,
+    dir_fd: int | None = None,
+    display_name: str | None = None,
+) -> bytes:
+    """Read one bounded, unlinked regular file through a no-follow descriptor.
+
+    Path-level ``stat/open/stat`` sequences are vulnerable to a symlink or FIFO substitution
+    between calls.  The descriptor identity is therefore authoritative and must still match the
+    final lexical directory entry after the read.
+    """
+
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
+    try:
+        if dir_fd is None:
+            descriptor = os.open(path, flags)
+        else:
+            descriptor = os.open(path, flags, dir_fd=dir_fd)
+        with os.fdopen(descriptor, "rb") as handle:
+            before = os.fstat(handle.fileno())
+            if (
+                not stat.S_ISREG(before.st_mode)
+                or before.st_nlink != 1
+                or before.st_size > _TEAM_TREE_MAX_FILE_BYTES
+            ):
+                raise StrategySandboxError(
+                    "team source must be one bounded, unlinked regular file: "
+                    f"{display_name or Path(path).name}"
+                )
+            content = handle.read(_TEAM_TREE_MAX_FILE_BYTES + 1)
+            after = os.fstat(handle.fileno())
+        current = (
+            Path(path).lstat()
+            if dir_fd is None
+            else os.stat(path, dir_fd=dir_fd, follow_symlinks=False)
+        )
+    except StrategySandboxError:
+        raise
+    except OSError as exc:
+        raise StrategySandboxError(
+            f"cannot safely read team source file: {display_name or Path(path).name}"
+        ) from exc
+    before_identity = (
+        before.st_dev,
+        before.st_ino,
+        before.st_size,
+        before.st_mtime_ns,
+        before.st_nlink,
+    )
+    after_identity = (
+        after.st_dev,
+        after.st_ino,
+        after.st_size,
+        after.st_mtime_ns,
+        after.st_nlink,
+    )
+    current_identity = (
+        current.st_dev,
+        current.st_ino,
+        current.st_size,
+        current.st_mtime_ns,
+        current.st_nlink,
+    )
+    if (
+        before_identity != after_identity
+        or after_identity != current_identity
+        or not stat.S_ISREG(current.st_mode)
+        or stat.S_ISLNK(current.st_mode)
+    ):
+        raise StrategySandboxError(
+            f"team source file changed while reading: {display_name or Path(path).name}"
+        )
     if len(content) > _TEAM_TREE_MAX_FILE_BYTES:
-        raise StrategySandboxError(f"team source text file exceeds 2 MiB: {path.name}")
+        raise StrategySandboxError(
+            f"team source text file exceeds 2 MiB: {display_name or Path(path).name}"
+        )
     return content
+
+
+def _directory_identity(value: os.stat_result) -> tuple[int, int]:
+    if not stat.S_ISDIR(value.st_mode):
+        raise StrategySandboxError("candidate source path contains a non-directory component")
+    return value.st_dev, value.st_ino
+
+
+class _PinnedDirectory:
+    """Pin every component of an absolute directory path with no-follow descriptors."""
+
+    def __init__(self, path: Path) -> None:
+        if not path.is_absolute():
+            raise StrategySandboxError("candidate source directory must be absolute")
+        self.path = path
+        self._fds: list[int] = []
+        self._identities: list[tuple[int, int]] = []
+
+    @staticmethod
+    def _flags() -> int:
+        return (
+            os.O_RDONLY
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_DIRECTORY", 0)
+        )
+
+    def _open_chain(self) -> tuple[list[int], list[tuple[int, int]]]:
+        descriptors: list[int] = []
+        identities: list[tuple[int, int]] = []
+        try:
+            descriptor = os.open(self.path.anchor, self._flags())
+            descriptors.append(descriptor)
+            identities.append(_directory_identity(os.fstat(descriptor)))
+            for component in self.path.parts[1:]:
+                descriptor = os.open(component, self._flags(), dir_fd=descriptor)
+                descriptors.append(descriptor)
+                identities.append(_directory_identity(os.fstat(descriptor)))
+        except (OSError, StrategySandboxError) as exc:
+            for opened in reversed(descriptors):
+                os.close(opened)
+            if isinstance(exc, StrategySandboxError):
+                raise
+            raise StrategySandboxError(
+                f"cannot pin candidate source directory: {self.path.name}"
+            ) from exc
+        return descriptors, identities
+
+    def __enter__(self) -> _PinnedDirectory:
+        self._fds, self._identities = self._open_chain()
+        return self
+
+    @property
+    def fd(self) -> int:
+        if not self._fds:
+            raise RuntimeError("candidate source directory is not pinned")
+        return self._fds[-1]
+
+    def verify(self) -> None:
+        descriptors, identities = self._open_chain()
+        try:
+            if identities != self._identities:
+                raise StrategySandboxError(
+                    "candidate source directory changed during source traversal"
+                )
+        finally:
+            for descriptor in reversed(descriptors):
+                os.close(descriptor)
+
+    def __exit__(self, *_args: object) -> None:
+        for descriptor in reversed(self._fds):
+            os.close(descriptor)
+        self._fds = []
+        self._identities = []
 
 
 def _timestamp_target_structure(value: object) -> bool:
@@ -893,48 +1048,97 @@ def _team_tree_files(source: Path, *, recursive: bool = True) -> list[_TeamTreeF
     directory.  Its ``incumbents/`` and ``challengers/`` children are sibling candidates and must
     never perturb its identity.  A selected nested candidate owns its complete recursive tree.
     """
+    source_path = source.absolute()
     files: list[_TeamTreeFile] = []
     total_size = 0
-    candidates = source.rglob("*") if recursive else source.iterdir()
-    for path in sorted(candidates, key=lambda candidate: candidate.as_posix()):
-        relative = path.relative_to(source)
-        relative_text = relative.as_posix()
-        if relative_text in _MUTABLE_TEAM_OUTPUTS:
-            continue
-        if "__pycache__" in relative.parts or path.suffix.lower() == ".pyc":
-            raise StrategySandboxError(f"generated Python cache is forbidden: {relative}")
-        if path.is_symlink():
-            raise StrategySandboxError(f"team tree cannot contain symlinks: {relative}")
-        if path.is_dir():
-            continue
-        if not path.is_file():
-            raise StrategySandboxError(f"team tree contains a non-regular file: {relative}")
-        suffix = path.suffix.lower()
-        if suffix not in _TEAM_TEXT_SUFFIXES:
+
+    def walk(directory_fd: int, prefix: PurePosixPath) -> None:
+        nonlocal total_size
+        try:
+            names = sorted(os.listdir(directory_fd))
+        except OSError as exc:
             raise StrategySandboxError(
-                f"opaque/prefit file type is forbidden in canonical team tree: {relative}"
+                "cannot enumerate pinned candidate source directory"
+            ) from exc
+        for name in names:
+            relative = prefix / name
+            relative_text = relative.as_posix()
+            if relative_text in _MUTABLE_TEAM_OUTPUTS:
+                continue
+            try:
+                current = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+            except OSError as exc:
+                raise StrategySandboxError(
+                    f"cannot inspect candidate source entry: {relative_text}"
+                ) from exc
+            suffix = Path(name).suffix.lower()
+            if "__pycache__" in relative.parts or suffix == ".pyc":
+                raise StrategySandboxError(f"generated Python cache is forbidden: {relative}")
+            if stat.S_ISLNK(current.st_mode):
+                raise StrategySandboxError(f"team tree cannot contain symlinks: {relative}")
+            if stat.S_ISDIR(current.st_mode):
+                if not recursive:
+                    continue
+                try:
+                    child_fd = os.open(name, _PinnedDirectory._flags(), dir_fd=directory_fd)
+                except OSError as exc:
+                    raise StrategySandboxError(
+                        f"cannot pin candidate source subdirectory: {relative_text}"
+                    ) from exc
+                try:
+                    if _directory_identity(os.fstat(child_fd)) != _directory_identity(current):
+                        raise StrategySandboxError(
+                            f"candidate source subdirectory changed: {relative_text}"
+                        )
+                    walk(child_fd, relative)
+                    final = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+                    if _directory_identity(final) != _directory_identity(current):
+                        raise StrategySandboxError(
+                            f"candidate source subdirectory changed: {relative_text}"
+                        )
+                except OSError as exc:
+                    raise StrategySandboxError(
+                        f"candidate source subdirectory changed: {relative_text}"
+                    ) from exc
+                finally:
+                    os.close(child_fd)
+                continue
+            if not stat.S_ISREG(current.st_mode):
+                raise StrategySandboxError(f"team tree contains a non-regular file: {relative}")
+            if suffix not in _TEAM_TEXT_SUFFIXES:
+                raise StrategySandboxError(
+                    f"opaque/prefit file type is forbidden in canonical team tree: {relative}"
+                )
+            content = _stable_file_bytes(
+                name,
+                dir_fd=directory_fd,
+                display_name=relative_text,
             )
-        content = _stable_file_bytes(path)
-        total_size += len(content)
-        if total_size > _TEAM_TREE_MAX_TOTAL_BYTES:
-            raise StrategySandboxError("canonical team source tree exceeds 10 MiB")
-        _validate_team_text(relative_text, suffix, content)
-        # Every fingerprinted byte is staged.  This makes the worker-visible candidate boundary
-        # exactly the archived/fingerprinted boundary, while the worker still imports only the
-        # selected entrypoint.
-        staged = True
-        if path.name in _STAGED_CONFIG_NAMES and len(content) > _STAGED_CONFIG_MAX_BYTES:
-            raise StrategySandboxError(f"staged strategy config exceeds 64 KiB: {relative}")
-        files.append(
-            _TeamTreeFile(
-                relative=relative_text,
-                path=path,
-                size=len(content),
-                sha256=hashlib.sha256(content).hexdigest(),
-                staged=staged,
+            total_size += len(content)
+            if total_size > _TEAM_TREE_MAX_TOTAL_BYTES:
+                raise StrategySandboxError("canonical team source tree exceeds 10 MiB")
+            _validate_team_text(relative_text, suffix, content)
+            # R2 separates the complete evidence archive from the executable mount.  Notes,
+            # attestations, certificates, and tests remain fingerprinted evidence but can never
+            # be opened by strategy code.  R1 retains its worker-visible bundle semantics.
+            staged = True if not TOP40_V4_LAYOUT.name.endswith("-r2") else suffix == ".py"
+            if name in _STAGED_CONFIG_NAMES and len(content) > _STAGED_CONFIG_MAX_BYTES:
+                raise StrategySandboxError(f"staged strategy config exceeds 64 KiB: {relative}")
+            files.append(
+                _TeamTreeFile(
+                    relative=relative_text,
+                    path=source_path.joinpath(*relative.parts),
+                    size=len(content),
+                    sha256=hashlib.sha256(content).hexdigest(),
+                    staged=staged,
+                    content=content,
+                )
             )
-        )
-    return files
+
+    with _PinnedDirectory(source_path) as pinned:
+        walk(pinned.fd, PurePosixPath())
+        pinned.verify()
+    return sorted(files, key=lambda item: item.relative)
 
 
 def _team_tree_fingerprint(files: Sequence[_TeamTreeFile]) -> str:
@@ -973,11 +1177,7 @@ def capture_source_bundle(
     before = _team_tree_files(source, recursive=recursive)
     captured: list[source_archive_v4.SourceFile] = []
     for item in before:
-        content = _stable_file_bytes(item.path)
-        if len(content) != item.size or hashlib.sha256(content).hexdigest() != item.sha256:
-            raise StrategySandboxError(
-                f"team source file changed during source archive capture: {item.relative}"
-            )
+        content = item.content
         captured.append(
             source_archive_v4.SourceFile(
                 path=item.relative,
@@ -1265,7 +1465,15 @@ def _copy_team_source_bundle(
             continue
         target = destination / item.relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(item.path, target)
+        try:
+            with target.open("xb") as handle:
+                handle.write(item.content)
+                handle.flush()
+                os.fsync(handle.fileno())
+        except OSError as exc:
+            raise StrategySandboxError(
+                f"cannot stage pinned team source: {item.relative}"
+            ) from exc
         staged_content = _stable_file_bytes(target)
         if (
             len(staged_content) != item.size
@@ -1284,7 +1492,16 @@ def _copy_team_source_bundle(
     staged_manifest = tuple(
         {"path": item.relative, "size": item.size, "sha256": item.sha256} for item in staged
     )
-    if _team_tree_fingerprint(staged) != fingerprint or staged_manifest != manifest:
+    expected_staged_manifest = tuple(
+        {"path": item.relative, "size": item.size, "sha256": item.sha256}
+        for item in before
+        if item.staged
+    )
+    if (
+        _team_tree_fingerprint(staged)
+        != source_archive_v4.bundle_fingerprint(expected_staged_manifest)
+        or staged_manifest != expected_staged_manifest
+    ):
         raise StrategySandboxError("staged worker tree differs from the immutable candidate tree")
     return fingerprint
 
@@ -1303,7 +1520,13 @@ def _stage_archived_source_bundle(
     if fingerprint != expected_fingerprint or manifest != tuple(expected_entries):
         raise StrategySandboxError("archived worker source differs from frozen authority")
     destination.mkdir(parents=True, exist_ok=False)
-    for item in files:
+    staged_files = tuple(
+        item
+        for item in files
+        if not TOP40_V4_LAYOUT.name.endswith("-r2")
+        or Path(item.path).suffix.lower() == ".py"
+    )
+    for item in staged_files:
         _validate_team_text(item.path, Path(item.path).suffix.lower(), item.content)
         target = destination / item.path
         if not target.resolve().is_relative_to(destination.resolve()):
@@ -1318,7 +1541,12 @@ def _stage_archived_source_bundle(
     staged_manifest = tuple(
         {"path": item.relative, "size": item.size, "sha256": item.sha256} for item in staged
     )
-    if staged_manifest != manifest or _team_tree_fingerprint(staged) != fingerprint:
+    expected_staged_manifest = tuple(item.manifest_entry for item in staged_files)
+    if (
+        staged_manifest != expected_staged_manifest
+        or _team_tree_fingerprint(staged)
+        != source_archive_v4.bundle_fingerprint(expected_staged_manifest)
+    ):
         raise StrategySandboxError("materialized worker bundle differs from archive")
     return fingerprint
 
@@ -1418,7 +1646,7 @@ def _launch_strategy_worker(
 ) -> tuple[_StrategyWorkerClient, tempfile.TemporaryDirectory[str]]:
     repository_parent = _runner_repository_parent()
     site_packages = _current_venv_site_packages(repository_parent)
-    sandbox = tempfile.TemporaryDirectory(prefix=f"top40-v4-r1-{team_id}-")
+    sandbox = tempfile.TemporaryDirectory(prefix=f"{TOP40_V4_LAYOUT.name}-{team_id}-")
     sandbox_root = Path(sandbox.name)
     bundle = sandbox_root / "bundle"
     runtime_site_packages = sandbox_root / "runtime-site-packages"

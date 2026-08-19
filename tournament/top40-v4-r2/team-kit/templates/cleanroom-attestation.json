@@ -1,0 +1,11 @@
+{
+  "access_policy_followed": true,
+  "candidate_id": "replace-with-directory-name",
+  "legacy_tournament_artifacts_accessed": false,
+  "other_team_artifacts_accessed": false,
+  "schema_version": 1,
+  "sealed_data_accessed": false,
+  "team_id": "replace-with-team-id",
+  "timestamp_target_table_embedded": false,
+  "tournament": "quant-portfolio-blind-top40-v4-r2"
+}

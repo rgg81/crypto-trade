@@ -23,17 +23,27 @@ import pandas as pd
 
 from crypto_trade.tournament import (
     activation_v4,
+    isolation_v4,
     journal_v4,
     metrics_v3,
+    research_runtime_v4,
     runner_v4,
     scoring_v4,
     source_archive_v4,
     top40_v4,
 )
 from crypto_trade.tournament.layout_v4 import TOP40_V4_LAYOUT
+from crypto_trade.tournament.protocol import REBALANCE_INSTRUCTION_COLUMN
 
 CONFIG_PATH = TOP40_V4_LAYOUT.config_path
-DATA_MANIFEST_PATH = "tournament/top40/data_manifest.json"
+DATA_MANIFEST_PATH = (
+    f"{TOP40_V4_LAYOUT.tournament_root}/data-manifest.json"
+    if TOP40_V4_LAYOUT.name.endswith("-r2")
+    else "tournament/top40/data_manifest.json"
+)
+_SCHEMA_PREFIX = (
+    TOP40_V4_LAYOUT.name if TOP40_V4_LAYOUT.name.endswith("-r2") else "top40-v4-r1"
+)
 _SAFE_ID = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}")
 _SAFE_TAG = re.compile(r"[a-z][a-z0-9-]{0,63}")
 _SHA256 = re.compile(r"[0-9a-f]{64}")
@@ -318,10 +328,9 @@ def _result_lock(root: Path) -> Iterator[None]:
     _ensure_directory(root, path.parent)
     descriptor = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
     try:
-        try:
-            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError as exc:
-            raise ResultCommandBusyError("another V4 result command is active") from exc
+        # Organizer commands queue silently.  Team processes are never alive while the broker
+        # owns this lock, so a distinct busy error cannot become a cross-lane progress oracle.
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
         os.ftruncate(descriptor, 0)
         os.write(descriptor, f"pid={os.getpid()}\n".encode("ascii"))
         os.fsync(descriptor)
@@ -359,6 +368,8 @@ def _candidate_metadata(
     config: Mapping[str, Any],
     team_id: str,
     entrypoint: str,
+    *,
+    capture: runner_v4.SourceBundleCapture | None = None,
 ) -> tuple[Mapping[str, Any], str]:
     TOP40_V4_LAYOUT.require_team(team_id)
     entry = _path(root, entrypoint)
@@ -368,9 +379,7 @@ def _candidate_metadata(
     except ValueError:
         candidate_parts = ()
     if (
-        not entry.is_file()
-        or entry.is_symlink()
-        or len(candidate_parts) != 3
+        len(candidate_parts) != 3
         or candidate_parts[0] != "candidates"
         or candidate_parts[2] != "strategy.py"
         or _SAFE_ID.fullmatch(candidate_parts[1]) is None
@@ -379,9 +388,37 @@ def _candidate_metadata(
             "candidate entrypoint must be candidates/<candidate-id>/strategy.py "
             "inside its team lane"
         )
+    candidate_id_from_path = candidate_parts[1]
     metadata_path = entry.parent / "candidate.json"
     relative = metadata_path.relative_to(root).as_posix()
-    metadata = _strict_object(root, relative)
+    if capture is None:
+        if not entry.is_file() or entry.is_symlink():
+            raise OrchestratorError("candidate entrypoint is missing or unsafe")
+        metadata = _strict_object(root, relative)
+        isolation_v4.validate_candidate_attestation(
+            root,
+            team_id=team_id,
+            candidate_id=candidate_id_from_path,
+            candidate_root=entry.parent,
+        )
+    else:
+        if (
+            capture.entrypoint != "strategy.py"
+            or capture.candidate_root != entry.parent.relative_to(root).as_posix()
+        ):
+            raise OrchestratorError("captured candidate identity differs from its entrypoint")
+        captured = {item.path: item.content for item in capture.files}
+        try:
+            metadata_payload = captured["candidate.json"]
+        except KeyError as exc:
+            raise OrchestratorError("captured candidate.json is missing") from exc
+        metadata = _strict_object_bytes(metadata_payload, relative)
+        isolation_v4.validate_captured_candidate(
+            team_id=team_id,
+            candidate_id=candidate_id_from_path,
+            candidate_root=capture.candidate_root,
+            files=capture.files,
+        )
     if set(metadata) != _METADATA_KEYS or metadata.get("schema_version") != 1:
         raise OrchestratorError("candidate.json has missing or unexpected V4 fields")
     if metadata.get("team_id") != team_id:
@@ -402,7 +439,8 @@ def _candidate_metadata(
         or len(set(tags)) != len(tags)
     ):
         raise OrchestratorError("candidate tags must be a unique nonempty safe list")
-    if mechanism != expected_mechanism and "mechanism-pivot" not in tags:
+    open_lane = expected_mechanism == "open-independent-mechanism"
+    if not open_lane and mechanism != expected_mechanism and "mechanism-pivot" not in tags:
         raise OrchestratorError("candidate mechanism differs from its lane without a pivot tag")
     for key in (
         "hypothesis",
@@ -447,9 +485,11 @@ def _derive_authority(
     team_id: str,
     entrypoint: str,
 ) -> tuple[CandidateAuthority, Mapping[str, Any]]:
-    metadata, _metadata_path = _candidate_metadata(root, loaded.raw, team_id, entrypoint)
-    candidate_id = str(metadata["candidate_id"])
     capture = runner_v4.capture_source_bundle(root, team_id, entrypoint)
+    metadata, _metadata_path = _candidate_metadata(
+        root, loaded.raw, team_id, entrypoint, capture=capture
+    )
+    candidate_id = str(metadata["candidate_id"])
     archive = source_archive_v4.write_source_archive(
         root,
         team_id=team_id,
@@ -459,8 +499,12 @@ def _derive_authority(
         source_bundle_sha256=capture.sha256,
         files=capture.files,
     )
-    entry_path = _path(root, entrypoint)
-    risk_path = entry_path.parent / "risk_policy.json"
+    captured = {item.path: item for item in capture.files}
+    try:
+        strategy_source = captured["strategy.py"]
+        risk_source = captured["risk_policy.json"]
+    except KeyError as exc:
+        raise OrchestratorError("captured candidate is missing executable authority") from exc
     authority = CandidateAuthority(
         team_id=team_id,
         candidate_id=candidate_id,
@@ -469,8 +513,8 @@ def _derive_authority(
         source_bundle_sha256=capture.sha256,
         source_archive_path=archive.path,
         source_archive_sha256=archive.sha256,
-        strategy_sha256=_sha256_file(entry_path),
-        risk_policy_sha256=_sha256_file(risk_path),
+        strategy_sha256=strategy_source.sha256,
+        risk_policy_sha256=risk_source.sha256,
         config_sha256=loaded.sha256,
         dependency_lock_sha256=_sha256_file(root / "uv.lock"),
         data_manifest_sha256=_sha256_file(_path(root, DATA_MANIFEST_PATH)),
@@ -495,23 +539,31 @@ def _validate_authority_current(
     return authority
 
 
+@research_runtime_v4.serialized_r2_command
 def activate(root: str | Path) -> Mapping[str, Any]:
     root_path = _safe_root(root)
     with _result_lock(root_path):
+        isolation_v4.audit_surface(root_path)
         top40_v4.load_config(root=root_path)
         journal_v4.initialize(_journal_path(root_path))
         return activation_v4.activate(root_path)
 
 
+@research_runtime_v4.serialized_r2_command
 def validate(root: str | Path, *, require_activation: bool = True) -> Mapping[str, Any]:
     root_path = _safe_root(root)
+    isolation = isolation_v4.audit_surface(root_path)
     loaded = top40_v4.load_config(root=root_path)
     activation = activation_v4.validate(root_path) if require_activation else None
     journal_path = _journal_path(root_path)
     state = journal_v4.read(journal_path) if journal_path.exists() else journal_v4.replay_bytes(b"")
     visible_head = state.head_sha256
     visible_records = state.record_count
-    if state.selection is not None and state.release is None:
+    if TOP40_V4_LAYOUT.name.endswith("-r2") and state.selection is None:
+        # Research lanes receive no field-wide progress oracle through validation output.
+        visible_head = journal_v4.GENESIS_SHA256
+        visible_records = 0
+    elif state.selection is not None and state.release is None:
         # The sealed phase exposes one constant boundary, never per-finalist starts, terminals,
         # timing, or completion order.
         visible_head = str(state.selection_record_sha256)
@@ -520,7 +572,7 @@ def validate(root: str | Path, *, require_activation: bool = True) -> Mapping[st
             for record in state.records
             if record["record_sha256"] == state.selection_record_sha256
         )
-    return {
+    result = {
         "ok": True,
         "tournament": TOP40_V4_LAYOUT.name,
         "config_sha256": loaded.sha256,
@@ -528,16 +580,24 @@ def validate(root: str | Path, *, require_activation: bool = True) -> Mapping[st
         "journal_head_sha256": visible_head,
         "journal_records": visible_records,
     }
+    if not TOP40_V4_LAYOUT.name.endswith("-r2"):
+        result["isolation"] = isolation
+    return result
 
 
+@research_runtime_v4.serialized_r2_command
 def status(root: str | Path) -> Mapping[str, Any]:
     root_path = _safe_root(root)
+    isolation_v4.audit_surface(root_path)
     loaded = top40_v4.load_config(root=root_path)
     activated = _path(root_path, TOP40_V4_LAYOUT.activation_freeze_path).exists()
     journal_path = _journal_path(root_path)
     state = journal_v4.read(journal_path) if journal_path.exists() else journal_v4.replay_bytes(b"")
     visible_head = state.head_sha256
-    if state.selection is not None and state.release is None:
+    if TOP40_V4_LAYOUT.name.endswith("-r2") and state.selection is None:
+        # Match validate(): pre-selection callers get no field-wide progress oracle.
+        visible_head = journal_v4.GENESIS_SHA256
+    elif state.selection is not None and state.release is None:
         visible_head = str(state.selection_record_sha256)
     release_integrity: bool | None = None
     if state.release is not None:
@@ -571,19 +631,25 @@ def status(root: str | Path) -> Mapping[str, Any]:
         "journal_head_sha256": visible_head,
     }
     if state.selection is None:
-        result["teams"] = {
-            team_id: {
-                "accepted_trials": state.trials_by_team[team_id],
-                "disposition": (
-                    "nominated"
-                    if team_id in state.nominations
-                    else "retired"
-                    if team_id in state.retired
-                    else "researching"
-                ),
+        if TOP40_V4_LAYOUT.name.endswith("-r2"):
+            result["research"] = {
+                "interim_disclosure": False,
+                "status": "lane state sealed until IS close",
             }
-            for team_id in TOP40_V4_LAYOUT.team_ids
-        }
+        else:
+            result["teams"] = {
+                team_id: {
+                    "accepted_trials": state.trials_by_team[team_id],
+                    "disposition": (
+                        "nominated"
+                        if team_id in state.nominations
+                        else "retired"
+                        if team_id in state.retired
+                        else "researching"
+                    ),
+                }
+                for team_id in TOP40_V4_LAYOUT.team_ids
+            }
     elif state.release is None:
         result["championship"] = {
             "finalist_count": len(state.selection["advancing"]),
@@ -624,6 +690,8 @@ def _close_interrupted_is_requests(root: Path) -> journal_v4.JournalState:
     """Convert requests left pending by process death into consumed failed trials."""
 
     state = journal_v4.read(_journal_path(root))
+    for request_hash, request in state.is_requests.items():
+        _write_trial_receipt(root, request_hash, request)
     pending = [
         (request_hash, request)
         for request_hash, request in state.is_requests.items()
@@ -645,6 +713,68 @@ def _close_interrupted_is_requests(root: Path) -> journal_v4.JournalState:
     return journal_v4.read(_journal_path(root))
 
 
+def _write_trial_receipt(
+    root: Path, request_hash: str, request: Mapping[str, Any]
+) -> str:
+    """Publish a score-free per-lane receipt for every durably accepted trial."""
+
+    event = request["payload"]
+    team_id = str(event["team_id"])
+    run_id = str(event["run_id"])
+    metadata = event["metadata"]
+    receipt = {
+        "schema_version": f"{_SCHEMA_PREFIX}-trial-receipt-v1",
+        "tournament": TOP40_V4_LAYOUT.name,
+        "team_id": team_id,
+        "trial_number": event["trial_number"],
+        "run_id": run_id,
+        "candidate_id": event["candidate_id"],
+        "request_record_sha256": request_hash,
+        "tags": metadata["tags"],
+        "accepted": True,
+    }
+    relative = f"{TOP40_V4_LAYOUT.reports_root}/is/{team_id}/receipts/{run_id}.json"
+    _write_atomic(root, relative, _pretty(receipt), replace=False)
+    return relative
+
+
+def _validate_open_lane_mechanism(
+    state: journal_v4.JournalState,
+    *,
+    team_id: str,
+    metadata: Mapping[str, Any],
+) -> None:
+    """Allow one explicit mechanism transition and keep both epochs internally consistent."""
+
+    if not TOP40_V4_LAYOUT.name.endswith("-r2"):
+        return
+    history = [
+        request["payload"]["metadata"]
+        for request in state.is_requests.values()
+        if request["payload"]["team_id"] == team_id
+    ]
+    mechanism = str(metadata["mechanism"])
+    pivot_tagged = "mechanism-pivot" in metadata["tags"]
+    if not history:
+        if pivot_tagged:
+            raise OrchestratorError("a lane cannot pivot before its first accepted mechanism")
+        return
+    transitions = sum(
+        str(previous["mechanism"]) != str(current["mechanism"])
+        for previous, current in zip(history, history[1:], strict=False)
+    )
+    current_mechanism = str(history[-1]["mechanism"])
+    if mechanism == current_mechanism:
+        if pivot_tagged and transitions == 0:
+            raise OrchestratorError("mechanism-pivot tag requires an actual mechanism change")
+        return
+    if not pivot_tagged:
+        raise OrchestratorError("an open lane mechanism change requires mechanism-pivot")
+    if transitions >= 1:
+        raise OrchestratorError("team already consumed its one mechanism pivot")
+
+
+@research_runtime_v4.serialized_r2_command
 def run_is(
     root: str | Path,
     team_id: str,
@@ -654,6 +784,7 @@ def run_is(
 ) -> Mapping[str, Any]:
     root_path = _safe_root(root)
     with _result_lock(root_path):
+        isolation_v4.audit_team_surface(root_path, team_id)
         # Candidate acceptance must be durable before any snapshot file is opened. The runner
         # performs the full frozen-universe audit after the accepted record is fsynced.
         activation_v4.validate(root_path, verify_universe_snapshot=False)
@@ -666,9 +797,16 @@ def run_is(
             raise OrchestratorError("team already has a terminal IS disposition")
         maximum = int(loaded.raw["research"]["maximum_accepted_trials_per_team"])
         if state.trials_by_team[team_id] >= maximum:
-            raise OrchestratorError("team exhausted its twelve accepted trials")
+            raise OrchestratorError(f"team exhausted its {maximum} accepted trials")
         _validate_text(purpose, "purpose")
         authority, metadata = _derive_authority(root_path, loaded, team_id, entrypoint)
+        research_session = research_runtime_v4.validate_candidate_receipt(
+            root_path,
+            team_id,
+            authority.candidate_id,
+            authority.source_bundle_sha256,
+        )
+        _validate_open_lane_mechanism(state, team_id=team_id, metadata=metadata)
         trial = state.trials_by_team[team_id] + 1
         run_id = f"{team_id.replace('-', '')}-is-{trial:02d}-{authority.source_bundle_sha256[:12]}"
         output = f"{TOP40_V4_LAYOUT.reports_root}/is/{team_id}/{run_id}"
@@ -683,8 +821,16 @@ def run_is(
                 "purpose": purpose,
                 "metadata": dict(metadata),
                 "authority": authority.as_dict(),
+                **(
+                    {"research_session": dict(research_session)}
+                    if TOP40_V4_LAYOUT.name.endswith("-r2")
+                    else {}
+                ),
                 "output_path": output,
             },
+        )
+        receipt_path = _write_trial_receipt(
+            root_path, str(request["record_sha256"]), request
         )
         try:
             result = _run_team(root_path, authority, stage="is", output=output)
@@ -725,6 +871,8 @@ def run_is(
             "candidate_id": authority.candidate_id,
             "trial_number": trial,
             "run_id": run_id,
+            "request_record_sha256": request["record_sha256"],
+            "receipt_path": receipt_path,
             "summary_path": summary_path,
             "selection": summary["selection"],
             "journal_record_sha256": terminal["record_sha256"],
@@ -755,6 +903,119 @@ def _candidate_success(
     if len(matches) != 1:
         raise OrchestratorError("candidate must have exactly one successful IS observation")
     return matches[0]
+
+
+def _verified_request_targets(
+    root: Path, state: journal_v4.JournalState, request_hash: str
+) -> pd.DataFrame:
+    terminal = state.is_terminals.get(request_hash)
+    if terminal is None or terminal["event_type"] != "is_succeeded":
+        raise OrchestratorError("exact sign-inversion evidence must have succeeded")
+    summary = _verified_summary(root, terminal)
+    runner = summary.get("runner")
+    if not isinstance(runner, Mapping):
+        raise OrchestratorError("sign-inversion summary lacks runner authority")
+    artifacts = runner.get("artifacts")
+    hashes = runner.get("artifact_sha256")
+    sizes = runner.get("artifact_sizes")
+    if not all(isinstance(value, Mapping) for value in (artifacts, hashes, sizes)):
+        raise OrchestratorError("sign-inversion target authority is incomplete")
+    relative = artifacts.get("targets")
+    expected_hash = hashes.get("targets")
+    expected_size = sizes.get("targets")
+    if (
+        not isinstance(relative, str)
+        or not isinstance(expected_hash, str)
+        or _SHA256.fullmatch(expected_hash) is None
+        or type(expected_size) is not int
+        or expected_size < 0
+    ):
+        raise OrchestratorError("sign-inversion target authority is malformed")
+    payload = _stable_authority_bytes(_path(root, relative))
+    if len(payload) != expected_size or _sha256(payload) != expected_hash:
+        raise OrchestratorError("sign-inversion target artifact changed")
+    try:
+        frame = pd.read_parquet(io.BytesIO(payload))
+    except (OSError, ValueError) as exc:
+        raise OrchestratorError("sign-inversion targets are not canonical parquet") from exc
+    if (
+        not isinstance(frame, pd.DataFrame)
+        or "timestamp" not in frame
+        or REBALANCE_INSTRUCTION_COLUMN not in frame
+        or frame.columns.duplicated().any()
+    ):
+        raise OrchestratorError("sign-inversion targets have an invalid schema")
+    timestamps = pd.to_datetime(frame.pop("timestamp"), utc=True, errors="coerce")
+    instructions = frame.pop(REBALANCE_INSTRUCTION_COLUMN)
+    numeric = frame.apply(pd.to_numeric, errors="coerce")
+    if (
+        timestamps.isna().any()
+        or timestamps.duplicated().any()
+        or not timestamps.is_monotonic_increasing
+        or instructions.isna().any()
+        or not pd.api.types.is_bool_dtype(instructions.dtype)
+        or numeric.isna().any().any()
+        or not np.isfinite(numeric.to_numpy(dtype=float)).all()
+    ):
+        raise OrchestratorError("sign-inversion targets are noncanonical")
+    numeric.index = pd.DatetimeIndex(timestamps)
+    numeric.insert(0, REBALANCE_INSTRUCTION_COLUMN, instructions.to_numpy(dtype=bool))
+    return numeric
+
+
+def _validate_exact_sign_inversions(
+    root: Path,
+    state: journal_v4.JournalState,
+    team_requests: Mapping[str, Mapping[str, Any]],
+    evidence: Mapping[str, Any],
+) -> None:
+    if not TOP40_V4_LAYOUT.name.endswith("-r2"):
+        return
+    baselines = {
+        str(team_requests[digest]["payload"]["candidate_id"]): digest
+        for digest in evidence["baseline"]
+    }
+    for inversion_hash in evidence["sign-inversion"]:
+        inversion_request = team_requests[inversion_hash]
+        inversion = inversion_request["payload"]["metadata"]
+        parent_id = inversion.get("parent_candidate_id")
+        baseline_hash = baselines.get(str(parent_id)) if parent_id is not None else None
+        if baseline_hash is None:
+            raise OrchestratorError(
+                "sign-inversion evidence must name a cited baseline as parent_candidate_id"
+            )
+        baseline_request = team_requests[baseline_hash]
+        baseline = baseline_request["payload"]["metadata"]
+        for key in ("mechanism", "formation_horizon", "rebalance_horizon", "control_profile"):
+            if inversion[key] != baseline[key]:
+                raise OrchestratorError(
+                    f"sign-inversion differs from its baseline in {key}"
+                )
+        if (
+            inversion_request["payload"]["authority"]["risk_policy_sha256"]
+            != baseline_request["payload"]["authority"]["risk_policy_sha256"]
+        ):
+            raise OrchestratorError("sign-inversion risk policy differs from its baseline")
+        baseline_targets = _verified_request_targets(root, state, baseline_hash)
+        inversion_targets = _verified_request_targets(root, state, inversion_hash)
+        if (
+            not baseline_targets.index.equals(inversion_targets.index)
+            or not baseline_targets.columns.equals(inversion_targets.columns)
+            or not baseline_targets[REBALANCE_INSTRUCTION_COLUMN].equals(
+                inversion_targets[REBALANCE_INSTRUCTION_COLUMN]
+            )
+            or not np.array_equal(
+                inversion_targets.drop(columns=REBALANCE_INSTRUCTION_COLUMN).to_numpy(
+                    dtype=float
+                ),
+                -baseline_targets.drop(columns=REBALANCE_INSTRUCTION_COLUMN).to_numpy(
+                    dtype=float
+                ),
+            )
+        ):
+            raise OrchestratorError(
+                "sign-inversion targets are not the exact negative of their cited baseline"
+            )
 
 
 def _certificate(
@@ -803,6 +1064,7 @@ def _certificate(
             cited_requests.add(digest)
     if cited_requests != set(team_requests):
         raise OrchestratorError("research certificate must cover every accepted team trial")
+    _validate_exact_sign_inversions(root, state, team_requests, evidence)
 
     records = [record["payload"]["metadata"] for record in team_requests.values()]
     research = config["research"]
@@ -879,7 +1141,7 @@ def _certificate(
 
 def _write_nomination_registry(root: Path, state: journal_v4.JournalState) -> None:
     registry = {
-        "schema_version": "top40-v4-r1-nomination-registry-v1",
+        "schema_version": f"{_SCHEMA_PREFIX}-nomination-registry-v1",
         "journal_head_sha256": state.head_sha256,
         "teams": {
             team_id: dict(record["payload"])
@@ -894,6 +1156,7 @@ def _write_nomination_registry(root: Path, state: journal_v4.JournalState) -> No
     )
 
 
+@research_runtime_v4.serialized_r2_command
 def nominate(
     root: str | Path,
     team_id: str,
@@ -902,6 +1165,7 @@ def nominate(
 ) -> Mapping[str, Any]:
     root_path = _safe_root(root)
     with _result_lock(root_path):
+        isolation_v4.audit_team_surface(root_path, team_id)
         activation_v4.validate(root_path)
         loaded = top40_v4.load_config(root=root_path)
         state = _close_interrupted_is_requests(root_path)
@@ -930,6 +1194,16 @@ def nominate(
             state, team_id, candidate_id
         )
         authority = _validate_authority_current(root_path, loaded, request["payload"]["authority"])
+        source_review = (
+            research_runtime_v4.validate_source_review(
+                root_path,
+                team_id,
+                candidate_id,
+                authority.source_bundle_sha256,
+            )
+            if TOP40_V4_LAYOUT.name.endswith("-r2")
+            else {}
+        )
         summary = dict(_verified_summary(root_path, terminal))
         certificate, certificate_sha256, neighborhood = _certificate(
             root_path,
@@ -950,13 +1224,14 @@ def nominate(
             failed = sorted(key for key, passed in selection["gates"].items() if not passed)
             raise OrchestratorError(f"candidate fails frozen IS gates: {', '.join(failed)}")
         nomination = {
-            "schema_version": "top40-v4-r1-nomination-v1",
+            "schema_version": f"{_SCHEMA_PREFIX}-nomination-v1",
             "team_id": team_id,
             "candidate_id": candidate_id,
             "trial_count": state.trials_by_team[team_id],
             "request_record_sha256": request_hash,
             "success_record_sha256": success_hash,
             "authority": authority.as_dict(),
+            **({"source_review": dict(source_review)} if source_review else {}),
             "summary_path": terminal["payload"]["summary_path"],
             "summary_sha256": terminal["payload"]["summary_sha256"],
             "certificate_path": certificate_path,
@@ -996,9 +1271,11 @@ def nominate(
         }
 
 
+@research_runtime_v4.serialized_r2_command
 def retire(root: str | Path, team_id: str, *, reason: str) -> Mapping[str, Any]:
     root_path = _safe_root(root)
     with _result_lock(root_path):
+        isolation_v4.audit_team_surface(root_path, team_id)
         activation_v4.validate(root_path)
         loaded = top40_v4.load_config(root=root_path)
         state = _close_interrupted_is_requests(root_path)
@@ -1103,9 +1380,11 @@ def _capped_inverse_vol_weights(
     return {team_id: float(weights[team_id]) for team_id in sorted(weights)}, float(cash)
 
 
+@research_runtime_v4.serialized_r2_command
 def close_is(root: str | Path) -> Mapping[str, Any]:
     root_path = _safe_root(root)
     with _result_lock(root_path):
+        isolation_v4.audit_surface(root_path)
         activation = activation_v4.validate(root_path)
         loaded = top40_v4.load_config(root=root_path)
         state = _close_interrupted_is_requests(root_path)
@@ -1124,22 +1403,61 @@ def close_is(root: str | Path) -> Mapping[str, Any]:
             )
             raise OrchestratorError(f"IS cannot close while teams are unresolved: {unresolved}")
         population: list[Mapping[str, Any]] = []
+        field_adjustment = TOP40_V4_LAYOUT.name.endswith("-r2")
+        total_field_trials = sum(state.trials_by_team.values()) if field_adjustment else 0
+        field_floor = (
+            float(
+                loaded.raw["selection"]["floors"][
+                    "minimum_field_adjusted_confidence_inclusive"
+                ]
+            )
+            if field_adjustment
+            else 0.0
+        )
         for team_id, record in sorted(state.nominations.items()):
-            nomination = _verified_nomination(root_path, record)
+            nomination = dict(_verified_nomination(root_path, record))
             if not nomination["selection"]["eligible"]:
                 raise OrchestratorError("nomination registry contains an ineligible candidate")
+            if field_adjustment:
+                summary_relative = str(nomination["summary_path"])
+                summary_payload = _stable_authority_bytes(_path(root_path, summary_relative))
+                if _sha256(summary_payload) != nomination["summary_sha256"]:
+                    raise OrchestratorError("nominee summary differs from its frozen hash")
+                summary = _strict_object_bytes(summary_payload, summary_relative)
+                field_confidence = scoring_v4.trial_adjusted_confidence(
+                    float(summary["bootstrap_probability_positive_mean"]), total_field_trials
+                )
+                nomination["field_selection"] = {
+                    "eligible": field_confidence >= field_floor,
+                    "adjusted_confidence": field_confidence,
+                    "accepted_trials_across_field": total_field_trials,
+                    "minimum_inclusive": field_floor,
+                }
             population.append(nomination)
         population.sort(key=lambda row: scoring_v4.is_ranking_key(row["selection"]))
         advance_count = int(loaded.raw["selection"]["ranking"]["advance_count"])
-        finalists = population[:advance_count]
-        advancing = [str(row["team_id"]) for row in finalists]
-        weights, cash_weight = _capped_inverse_vol_weights(
-            root_path,
-            finalists,
-            float(loaded.raw["ensemble"]["maximum_constituent_weight"]),
+        eligible_population = (
+            [row for row in population if row["field_selection"]["eligible"]]
+            if field_adjustment
+            else population
         )
+        finalists = eligible_population[:advance_count]
+        advancing = [str(row["team_id"]) for row in finalists]
+        minimum_constituents = (
+            int(loaded.raw["ensemble"]["minimum_constituents"])
+            if field_adjustment
+            else 1
+        )
+        if field_adjustment and len(finalists) < minimum_constituents:
+            weights, cash_weight = {}, 1.0
+        else:
+            weights, cash_weight = _capped_inverse_vol_weights(
+                root_path,
+                finalists,
+                float(loaded.raw["ensemble"]["maximum_constituent_weight"]),
+            )
         freeze = {
-            "schema_version": "top40-v4-r1-selection-freeze-v1",
+            "schema_version": f"{_SCHEMA_PREFIX}-selection-freeze-v1",
             "tournament": TOP40_V4_LAYOUT.name,
             "input_journal_head_sha256": state.head_sha256,
             "config_sha256": loaded.sha256,
@@ -1153,6 +1471,11 @@ def close_is(root: str | Path) -> Mapping[str, Any]:
                         "nomination_sha256"
                     ],
                     "selection": row["selection"],
+                    **(
+                        {"field_selection": row["field_selection"]}
+                        if field_adjustment
+                        else {}
+                    ),
                 }
                 for rank, row in enumerate(population, start=1)
             ],
@@ -1175,6 +1498,14 @@ def close_is(root: str | Path) -> Mapping[str, Any]:
             ],
             "ensemble": {
                 "method": loaded.raw["ensemble"]["weight_method"],
+                **(
+                    {
+                        "minimum_constituents": minimum_constituents,
+                        "available": len(finalists) >= minimum_constituents,
+                    }
+                    if field_adjustment
+                    else {}
+                ),
                 "constituent_weights": weights,
                 "cash_weight": cash_weight,
                 "failed_constituent_weight": "cash-no-redistribution",
@@ -1352,34 +1683,66 @@ def _ensemble_release(
     staging: Path,
     selection: Mapping[str, Any],
     state: journal_v4.JournalState,
+    config: Mapping[str, Any],
 ) -> Mapping[str, Any]:
+    historical = config["splits"]["historical_oos"]
     oos_index = pd.date_range(
-        "2024-07-01T00:00:00Z",
-        "2026-07-01T00:00:00Z",
+        str(historical["start"]),
+        str(historical["end_exclusive"]),
         inclusive="left",
         freq="1D",
     )
     weights = selection["ensemble"]["constituent_weights"]
+    active_weights: dict[str, float] = {}
+    dnf_to_cash: dict[str, float] = {}
+    for team_id, raw_weight in weights.items():
+        weight = float(raw_weight)
+        if _historical_summary_for_team(root, state, team_id) is None:
+            dnf_to_cash[str(team_id)] = weight
+        else:
+            active_weights[str(team_id)] = weight
+    frozen_cash_weight = float(selection["ensemble"]["cash_weight"])
+    effective_cash_weight = frozen_cash_weight + sum(dnf_to_cash.values())
+    if not math.isclose(
+        effective_cash_weight + sum(active_weights.values()),
+        1.0,
+        rel_tol=0.0,
+        abs_tol=1e-12,
+    ):
+        raise OrchestratorError("released ensemble active sleeves and cash do not sum to one")
     scenarios = {
         "base": "daily_returns",
         "double_cost": "double_cost_daily_returns",
         "triple_cost": "triple_cost_daily_returns",
     }
     packet: dict[str, Any] = {
-        "schema_version": "top40-v4-r1-historical-oos-ensemble-v1",
+        "schema_version": f"{_SCHEMA_PREFIX}-historical-oos-ensemble-v1",
         "role": "additional-reporting-portfolio",
+        **(
+            {
+                "available": selection["ensemble"]["available"],
+                "minimum_constituents": selection["ensemble"]["minimum_constituents"],
+            }
+            if TOP40_V4_LAYOUT.name.endswith("-r2")
+            else {}
+        ),
         "constituent_weights": weights,
-        "cash_weight": selection["ensemble"]["cash_weight"],
+        "active_constituent_weights": active_weights,
+        "dnf_constituent_weights_to_cash": dnf_to_cash,
+        "frozen_cash_weight": frozen_cash_weight,
+        "effective_cash_weight": effective_cash_weight,
+        # Compatibility alias with truthful released-state semantics.
+        "cash_weight": effective_cash_weight,
         "failed_constituent_weight": "cash-no-redistribution",
         "winner_eligible": False,
         "scenarios": {},
     }
     for scenario, artifact_name in scenarios.items():
         weighted: pd.Series | None = None
-        for team_id, raw_weight in weights.items():
+        for team_id, raw_weight in active_weights.items():
             summary = _historical_summary_for_team(root, state, team_id)
-            if summary is None:
-                continue
+            if summary is None:  # pragma: no cover - bound by active_weights above.
+                raise OrchestratorError("active ensemble sleeve lost its historical summary")
             relative = summary["runner"]["artifacts"][artifact_name]
             expected = summary["runner"]["artifact_sha256"][artifact_name]
             artifact = _path(root, str(relative))
@@ -1431,7 +1794,10 @@ def _release_bundle(
     root: Path,
     selection: Mapping[str, Any],
     state: journal_v4.JournalState,
+    config: Mapping[str, Any] | None = None,
 ) -> tuple[str, str, str]:
+    if config is None:
+        config = top40_v4.load_config(root=root).raw
     reports_root = _path(root, TOP40_V4_LAYOUT.reports_root)
     _ensure_directory(root, reports_root)
     staging_relative = f"{TOP40_V4_LAYOUT.reports_root}/.historical-oos-staging"
@@ -1458,14 +1824,14 @@ def _release_bundle(
                     team_destination / "result.json",
                     _pretty(
                         {
-                            "schema_version": "top40-v4-r1-historical-oos-dnf-v1",
+                            "schema_version": f"{_SCHEMA_PREFIX}-historical-oos-dnf-v1",
                             "team_id": team_id,
                             "candidate_id": finalist["candidate_id"],
                             "status": "DNF",
                         }
                     ),
                 )
-        ensemble = _ensemble_release(root, temporary, selection, state)
+        ensemble = _ensemble_release(root, temporary, selection, state, config)
         eligible = [
             packet
             for packet in packets.values()
@@ -1488,9 +1854,12 @@ def _release_bundle(
                 )
         bundle_sha256 = _sha256(_canonical({"files": file_entries}))
         manifest = {
-            "schema_version": "top40-v4-r1-historical-oos-release-v1",
+            "schema_version": f"{_SCHEMA_PREFIX}-historical-oos-release-v1",
             "evidence_label": "candidate-relative-historical-oos-not-globally-pristine",
-            "window": {"start": "2024-07-01T00:00:00Z", "end_exclusive": "2026-07-01T00:00:00Z"},
+            "window": {
+                "start": config["splits"]["historical_oos"]["start"],
+                "end_exclusive": config["splits"]["historical_oos"]["end_exclusive"],
+            },
             "selection_record_sha256": state.selection_record_sha256,
             "terminal_record_sha256s": [
                 state.historical_terminals[row["team_id"]]["record_sha256"]
@@ -1622,6 +1991,7 @@ def _recover_authorized_release(
     root: Path,
     selection: Mapping[str, Any],
     state: journal_v4.JournalState,
+    config: Mapping[str, Any] | None = None,
 ) -> Mapping[str, Any]:
     if state.release is None:
         raise OrchestratorError("historical release recovery has no authorization")
@@ -1633,7 +2003,11 @@ def _recover_authorized_release(
     except OrchestratorError:
         # If a crash lost only the private staging tree, rebuild it deterministically from the
         # journal-bound finalist packets and require byte-identical authorization hashes.
-        staging, release, manifest_sha256 = _release_bundle(root, selection, state)
+        if config is None:
+            # Preserve the narrow recovery seam used by the original edition and its fault tests.
+            staging, release, manifest_sha256 = _release_bundle(root, selection, state)
+        else:
+            staging, release, manifest_sha256 = _release_bundle(root, selection, state, config)
         manifest = _strict_object(root, f"{staging}/manifest.json")
         if (
             staging != state.release["staging_path"]
@@ -1655,11 +2029,13 @@ def _recover_authorized_release(
         return result
 
 
+@research_runtime_v4.serialized_r2_command
 def historical_release(root: str | Path) -> Mapping[str, Any]:
     """Consume each finalist once, then authorize and atomically publish the complete bundle."""
 
     root_path = _safe_root(root)
     with _result_lock(root_path):
+        isolation_v4.audit_surface(root_path)
         # Validate frozen code without opening the time-varying snapshot. Every finalist identity
         # is durably accepted below before the first full universe audit or runner invocation.
         activation_v4.validate(root_path, verify_universe_snapshot=False)
@@ -1667,7 +2043,7 @@ def historical_release(root: str | Path) -> Mapping[str, Any]:
         state = journal_v4.read(_journal_path(root_path))
         selection = _selection_freeze(root_path, state)
         if state.release is not None:
-            result = _recover_authorized_release(root_path, selection, state)
+            result = _recover_authorized_release(root_path, selection, state, loaded.raw)
             result["manifest_sha256"] = state.release["manifest_sha256"]
             return result
 
@@ -1785,7 +2161,9 @@ def historical_release(root: str | Path) -> Mapping[str, Any]:
                     raise
             state = journal_v4.read(_journal_path(root_path))
 
-        staging, release, manifest_sha256 = _release_bundle(root_path, selection, state)
+        staging, release, manifest_sha256 = _release_bundle(
+            root_path, selection, state, loaded.raw
+        )
         manifest = _strict_object(root_path, f"{staging}/manifest.json")
         _validate_staged_release(
             root_path,

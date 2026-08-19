@@ -1,0 +1,33 @@
+{
+  "candidate_cleanroom_attestation_required": true,
+  "default_access": "deny",
+  "deny_categories": [
+    "other-team-workspaces",
+    "prior-tournament-artifacts",
+    "sealed-organizer-data",
+    "repository-history",
+    "legacy-research-and-reports"
+  ],
+  "network_during_official_runs": false,
+  "network_during_research": false,
+  "organizer_broker": "offline-asynchronous-lane-local-results",
+  "read_allowlist": [
+    "tournament/top40-v4-r2/team-kit/",
+    "tournament/top40-v4-r2/teams/team-03/ACCESS-POLICY.json",
+    "tournament/top40-v4-r2/teams/team-03/TEAM-BRIEF.md",
+    "tournament/top40-v4-r2/teams/team-03/candidates/",
+    "tournament/top40-v4-r2/teams/team-03/feedback/",
+    "tournament/top40-v4-r2/teams/team-03/work/",
+    "tournament/top40-v4-r2/teams/team-03/outbox/"
+  ],
+  "research_process": "ephemeral-os-enforced-permission-profile",
+  "schema_version": 2,
+  "sealed_stage_feedback": "atomic-cohort-release-only",
+  "team_id": "team-03",
+  "tournament": "quant-portfolio-blind-top40-v4-r2",
+  "write_allowlist": [
+    "tournament/top40-v4-r2/teams/team-03/candidates/",
+    "tournament/top40-v4-r2/teams/team-03/work/",
+    "tournament/top40-v4-r2/teams/team-03/outbox/"
+  ]
+}

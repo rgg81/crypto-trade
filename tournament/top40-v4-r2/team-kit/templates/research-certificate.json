@@ -1,0 +1,14 @@
+{
+  "candidate_id": "replace-with-nominee-candidate-id",
+  "evidence": {
+    "baseline": ["replace-with-request-record-sha256"],
+    "control-ablation": ["replace-with-request-record-sha256"],
+    "formation-grid": ["replace-with-request-record-sha256"],
+    "local-neighborhood": ["replace-with-request-record-sha256"],
+    "rebalance-grid": ["replace-with-request-record-sha256"],
+    "role-check": ["replace-with-request-record-sha256"],
+    "sign-inversion": ["replace-with-request-record-sha256"]
+  },
+  "schema_version": 1,
+  "team_id": "replace-with-team-id"
+}
