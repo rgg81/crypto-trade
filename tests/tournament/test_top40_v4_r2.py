@@ -1157,6 +1157,74 @@ def test_private_model_runtime_does_not_follow_installation_marker_symlink(
     assert stat.S_IMODE(outside.stat().st_mode) == 0o644
 
 
+def test_private_model_runtime_resumes_partial_nested_cleanup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    organizer = tmp_path / "organizer-codex"
+    organizer.mkdir()
+    (organizer / "auth.json").write_bytes(b'{"auth":"fixture"}\n')
+    root = tmp_path / "root"
+    root.mkdir()
+    monkeypatch.setattr(research_runtime_v4, "_organizer_codex_home", lambda: organizer)
+    monkeypatch.setattr(research_runtime_v4, "_codex_binary", lambda: Path("/usr/bin/true"))
+    monkeypatch.setattr(
+        research_runtime_v4,
+        "_codex_version",
+        lambda _binary: research_runtime_v4._EXPECTED_CODEX_VERSION,
+    )
+    research_runtime_v4.ensure_private_model_runtime(root, "team-01")
+    runtime = root / research_runtime_v4._PRIVATE_MODEL_RUNTIME_RELATIVE / "team-01"
+
+    # Model a crash after some wrapper names and the private TMP lock were durably unlinked but
+    # before their now-partial parent directories were removed.
+    wrapper = runtime / "codex-home/tmp/arg0/codex-arg0ABCDEF"
+    wrapper.mkdir(parents=True, mode=0o700)
+    (runtime / "codex-home/tmp").chmod(0o700)
+    (runtime / "codex-home/tmp/arg0").chmod(0o700)
+    (wrapper / "apply_patch").symlink_to("/usr/bin/true")
+    (wrapper / "codex-linux-sandbox").symlink_to("/usr/bin/true")
+    sandbox_tmp = runtime / "tmp/codex-bwrap-synthetic-mount-targets-123"
+    sandbox_tmp.mkdir(mode=0o700)
+
+    research_runtime_v4.ensure_private_model_runtime(root, "team-01")
+    assert not (runtime / "codex-home/tmp").exists()
+    assert list((runtime / "tmp").iterdir()) == []
+
+
+def test_private_model_runtime_rejects_partial_wrapper_with_wrong_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    organizer = tmp_path / "organizer-codex"
+    organizer.mkdir()
+    (organizer / "auth.json").write_bytes(b'{"auth":"fixture"}\n')
+    root = tmp_path / "root"
+    root.mkdir()
+    monkeypatch.setattr(research_runtime_v4, "_organizer_codex_home", lambda: organizer)
+    monkeypatch.setattr(research_runtime_v4, "_codex_binary", lambda: Path("/usr/bin/true"))
+    monkeypatch.setattr(
+        research_runtime_v4,
+        "_codex_version",
+        lambda _binary: research_runtime_v4._EXPECTED_CODEX_VERSION,
+    )
+    research_runtime_v4.ensure_private_model_runtime(root, "team-01")
+    wrapper = (
+        root
+        / research_runtime_v4._PRIVATE_MODEL_RUNTIME_RELATIVE
+        / "team-01/codex-home/tmp/arg0/codex-arg0ABCDEF"
+    )
+    wrapper.mkdir(parents=True, mode=0o700)
+    (wrapper.parents[1]).chmod(0o700)
+    wrapper.parent.chmod(0o700)
+    (wrapper / "apply_patch").symlink_to("/bin/false")
+
+    with pytest.raises(
+        research_runtime_v4.ResearchRuntimeError,
+        match="wrapper target differs",
+    ):
+        research_runtime_v4.ensure_private_model_runtime(root, "team-01")
+    assert (wrapper / "apply_patch").is_symlink()
+
+
 def test_private_model_runtime_rejects_group_readable_client_state_before_cleanup(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

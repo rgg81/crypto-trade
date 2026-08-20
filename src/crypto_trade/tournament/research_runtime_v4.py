@@ -799,15 +799,22 @@ def _validate_private_model_surface(paths: Mapping[str, Path]) -> None:
                     or wrapper_root.is_symlink()
                     or wrapper_details.st_uid != os.geteuid()
                     or stat.S_IMODE(wrapper_details.st_mode) & 0o077
-                    or {entry.name for entry in wrapper_root.iterdir()} != expected_wrappers
+                    or {entry.name for entry in wrapper_root.iterdir()} - expected_wrappers
                 ):
                     raise ResearchRuntimeError("private Codex arg0 wrapper surface is unsafe")
-                _private_regular_file(wrapper_root / ".lock", maximum=1024)
+                if os.path.lexists(wrapper_root / ".lock"):
+                    _private_regular_file(wrapper_root / ".lock", maximum=1024)
                 binary = str(_codex_binary())
                 for name in expected_wrappers - {".lock"}:
                     link = wrapper_root / name
+                    if not os.path.lexists(link):
+                        continue
                     details = link.lstat()
-                    if not stat.S_ISLNK(details.st_mode) or os.readlink(link) != binary:
+                    if (
+                        not stat.S_ISLNK(details.st_mode)
+                        or details.st_uid != os.geteuid()
+                        or os.readlink(link) != binary
+                    ):
                         raise ResearchRuntimeError(
                             "private Codex arg0 wrapper target differs"
                         )
@@ -820,10 +827,11 @@ def _validate_private_model_surface(paths: Mapping[str, Path]) -> None:
             or entry.is_symlink()
             or details.st_uid != os.geteuid()
             or stat.S_IMODE(details.st_mode) & 0o077
-            or {child.name for child in entry.iterdir()} != {"lock"}
+            or {child.name for child in entry.iterdir()} - {"lock"}
         ):
             raise ResearchRuntimeError("private TMPDIR sandbox surface is unsafe")
-        _private_regular_file(entry / "lock", maximum=1024)
+        if os.path.lexists(entry / "lock"):
+            _private_regular_file(entry / "lock", maximum=1024)
 
 
 def _fsync_private_directory(path: Path) -> None:
@@ -918,14 +926,18 @@ def _reset_private_model_session_state(paths: Mapping[str, Path]) -> None:
                     "codex-execve-wrapper",
                     "codex-linux-sandbox",
                 ):
-                    (wrapper_root / name).unlink()
+                    child = wrapper_root / name
+                    if os.path.lexists(child):
+                        child.unlink()
                 wrapper_root.rmdir()
             arg0.rmdir()
         codex_tmp.rmdir()
 
     private_tmp = paths["tmp"]
     for entry in list(private_tmp.iterdir()):
-        (entry / "lock").unlink()
+        lock = entry / "lock"
+        if os.path.lexists(lock):
+            lock.unlink()
         entry.rmdir()
 
     _fsync_private_directory(codex_home)
