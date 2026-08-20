@@ -51,6 +51,10 @@ validation binds the receipt but does not expose or require post-start journal s
 The journal bootstrap exclusively creates a private empty file, or stably verifies an already
 empty owner-regular single-link file after an interrupted creation. It never invokes runtime tail
 recovery before the genesis gate, so corrupt or linked preactivation bytes are rejected unchanged.
+After activation, every recovery read and append pins the journal parent and existing file through
+no-follow descriptors, requires exact owner/mode/single-link topology, and repeats lexical inode
+checks while locked. R2 appends never recreate a missing journal; only an unterminated tail on the
+same verified live authority can be truncated after its complete prefix replays successfully.
 An interrupted pre-freeze test output is bounded non-authoritative scratch and is always replaced
 by a complete test rerun. Volatile result/broker lock files are excluded from the digest and are
 accepted only with their exact safe owner/topology and current canonical lock marker.

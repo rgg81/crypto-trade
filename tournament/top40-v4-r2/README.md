@@ -76,6 +76,8 @@ process exits. One blocking process-wide lease makes `run-all` and individual br
 strictly serial; they never overlap teams. The state machine resumes completed phases and skips
 terminal teams after a process or host restart. A resume first restores only absent frozen lane
 markers, so a host death after outbox publication cannot strand the lane; conflicting marker
-objects still fail closed. No team command reads the holdout. Heavy result
+objects still fail closed. The lifecycle journal is an existing pinned owner-only single-link
+authority for every runtime read and append; it is never recreated after activation. No team
+command reads the holdout. Heavy result
 commands serialize under one kernel lock. During the historical phase, `status` reveals only the
 frozen finalist count and a constant sealed state.

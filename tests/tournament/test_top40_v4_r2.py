@@ -1929,6 +1929,67 @@ def test_preactivation_status_and_validate_never_recover_the_journal(
         assert journal.read_bytes() == fragment
 
 
+@pytest.mark.parametrize("operation", ("read", "append"))
+def test_runtime_journal_rejects_hardlinks_without_mutation(
+    tmp_path: Path, operation: str
+) -> None:
+    journal = tmp_path / "research-journal.jsonl"
+    external = tmp_path / "external-authority"
+    original = b'{"unterminated":"external evidence"}' if operation == "read" else b""
+    external.write_bytes(original)
+    external.chmod(0o600)
+    os.link(external, journal)
+    with pytest.raises(journal_v4.JournalError, match="private regular"):
+        if operation == "read":
+            journal_v4.read(journal)
+        else:
+            journal_v4.append(journal, "is_accepted", {})
+    assert external.read_bytes() == original
+    assert journal.read_bytes() == original
+
+
+@pytest.mark.parametrize("operation", ("read", "append"))
+def test_runtime_journal_rejects_path_substitution_before_mutation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, operation: str
+) -> None:
+    journal = tmp_path / "research-journal.jsonl"
+    displaced = tmp_path / "opened-journal"
+    original = b'{"unterminated":"must remain"}' if operation == "read" else b""
+    replacement = b"replacement pathname evidence"
+    journal.write_bytes(original)
+    journal.chmod(0o600)
+    real_stat = os.stat
+    swapped = False
+
+    def substituting_stat(
+        path: object, *args: object, **kwargs: object
+    ) -> os.stat_result:
+        nonlocal swapped
+        if path == journal.name and kwargs.get("dir_fd") is not None and not swapped:
+            swapped = True
+            journal.rename(displaced)
+            journal.write_bytes(replacement)
+            journal.chmod(0o600)
+        return real_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(journal_v4.os, "stat", substituting_stat)
+    with pytest.raises(journal_v4.JournalError, match="authority changed"):
+        if operation == "read":
+            journal_v4.read(journal)
+        else:
+            journal_v4.append(journal, "is_accepted", {})
+    assert swapped is True
+    assert displaced.read_bytes() == original
+    assert journal.read_bytes() == replacement
+
+
+def test_r2_append_never_recreates_a_missing_runtime_journal(tmp_path: Path) -> None:
+    journal = tmp_path / "research-journal.jsonl"
+    with pytest.raises(journal_v4.JournalError, match="missing or unsafe"):
+        journal_v4.append(journal, "is_accepted", {})
+    assert not os.path.lexists(journal)
+
+
 def test_fresh_restart_activation_rejects_dirty_root_before_freeze(
     tmp_path: Path,
 ) -> None:

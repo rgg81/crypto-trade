@@ -671,16 +671,96 @@ def initialize(path: str | Path) -> JournalState:
     return replay_bytes(b"")
 
 
-def _open_journal(path: Path) -> int:
-    flags = os.O_RDWR | os.O_CREAT
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    descriptor = os.open(path, flags, 0o600)
-    metadata = os.fstat(descriptor)
-    if not stat.S_ISREG(metadata.st_mode):
-        os.close(descriptor)
-        raise JournalError("journal must be a regular file")
-    return descriptor
+def _journal_identity(value: os.stat_result) -> tuple[int, int, int, int, int]:
+    return (
+        value.st_dev,
+        value.st_ino,
+        value.st_size,
+        value.st_mtime_ns,
+        value.st_nlink,
+    )
+
+
+def _open_journal(path: Path) -> tuple[int, int, os.stat_result]:
+    """Pin an existing private journal without creating or following any pathname."""
+
+    parent_flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+    )
+    file_flags = (
+        os.O_RDWR
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
+    try:
+        parent_descriptor = os.open(path.parent, parent_flags)
+    except OSError as exc:
+        raise JournalError("cannot pin the lifecycle journal parent") from exc
+    try:
+        parent_before = os.fstat(parent_descriptor)
+        if (
+            not stat.S_ISDIR(parent_before.st_mode)
+            or parent_before.st_uid != os.geteuid()
+            or stat.S_IMODE(parent_before.st_mode) & 0o022
+        ):
+            raise JournalError("lifecycle journal parent is not owner-controlled")
+        try:
+            descriptor = os.open(path.name, file_flags, dir_fd=parent_descriptor)
+        except OSError as exc:
+            raise JournalError("lifecycle journal is missing or unsafe") from exc
+        try:
+            opened = os.fstat(descriptor)
+            if (
+                not stat.S_ISREG(opened.st_mode)
+                or opened.st_uid != os.geteuid()
+                or opened.st_nlink != 1
+                or stat.S_IMODE(opened.st_mode) != 0o600
+            ):
+                raise JournalError("lifecycle journal is not one private regular file")
+        except BaseException:
+            os.close(descriptor)
+            raise
+        return parent_descriptor, descriptor, parent_before
+    except BaseException:
+        os.close(parent_descriptor)
+        raise
+
+
+def _validate_open_journal(
+    path: Path,
+    parent_descriptor: int,
+    descriptor: int,
+    parent_before: os.stat_result,
+) -> None:
+    """Bind the locked descriptor to the same safe lexical journal and parent."""
+
+    try:
+        current = os.fstat(descriptor)
+        lexical = os.stat(path.name, dir_fd=parent_descriptor, follow_symlinks=False)
+        parent_current = os.fstat(parent_descriptor)
+        parent_lexical = path.parent.lstat()
+    except OSError as exc:
+        raise JournalError("lifecycle journal changed while locked") from exc
+    if (
+        not stat.S_ISREG(current.st_mode)
+        or current.st_uid != os.geteuid()
+        or current.st_nlink != 1
+        or stat.S_IMODE(current.st_mode) != 0o600
+        or not stat.S_ISREG(lexical.st_mode)
+        or lexical.st_uid != os.geteuid()
+        or stat.S_IMODE(lexical.st_mode) != 0o600
+        or _journal_identity(current) != _journal_identity(lexical)
+        or (parent_before.st_dev, parent_before.st_ino)
+        != (parent_current.st_dev, parent_current.st_ino)
+        or (parent_current.st_dev, parent_current.st_ino)
+        != (parent_lexical.st_dev, parent_lexical.st_ino)
+        or not stat.S_ISDIR(parent_lexical.st_mode)
+    ):
+        raise JournalError("lifecycle journal authority changed while locked")
 
 
 def _read_descriptor(descriptor: int) -> bytes:
@@ -713,15 +793,17 @@ def _recover_unterminated_tail(descriptor: int, payload: bytes) -> bytes:
 
 def read(path: str | Path) -> JournalState:
     journal = Path(path)
-    if not journal.exists():
-        raise JournalError("V4 lifecycle journal is missing")
-    descriptor = _open_journal(journal)
+    parent_descriptor, descriptor, parent_before = _open_journal(journal)
     try:
         fcntl.flock(descriptor, fcntl.LOCK_EX)
+        _validate_open_journal(journal, parent_descriptor, descriptor, parent_before)
         payload = _recover_unterminated_tail(descriptor, _read_descriptor(descriptor))
-        return replay_bytes(payload)
+        state = replay_bytes(payload)
+        _validate_open_journal(journal, parent_descriptor, descriptor, parent_before)
+        return state
     finally:
         os.close(descriptor)
+        os.close(parent_descriptor)
 
 
 def append(
@@ -732,11 +814,14 @@ def append(
     recorded_at_utc: str | None = None,
 ) -> Mapping[str, Any]:
     journal = Path(path)
-    journal.parent.mkdir(parents=True, exist_ok=True)
-    descriptor = _open_journal(journal)
+    if not TOP40_V4_LAYOUT.name.endswith("-r2") and not os.path.lexists(journal):
+        initialize(journal)
+    parent_descriptor, descriptor, parent_before = _open_journal(journal)
     try:
         fcntl.flock(descriptor, fcntl.LOCK_EX)
+        _validate_open_journal(journal, parent_descriptor, descriptor, parent_before)
         existing = _recover_unterminated_tail(descriptor, _read_descriptor(descriptor))
+        _validate_open_journal(journal, parent_descriptor, descriptor, parent_before)
         state = replay_bytes(existing)
         timestamp = recorded_at_utc or dt.datetime.now(dt.UTC).replace(microsecond=0).strftime(
             "%Y-%m-%dT%H:%M:%SZ"
@@ -765,9 +850,11 @@ def append(
                 raise JournalError("short journal append")
             written += count
         os.fsync(descriptor)
+        _validate_open_journal(journal, parent_descriptor, descriptor, parent_before)
         return MappingProxyType(record)
     finally:
         os.close(descriptor)
+        os.close(parent_descriptor)
 
 
 __all__ = [
