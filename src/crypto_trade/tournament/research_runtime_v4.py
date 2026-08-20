@@ -67,6 +67,7 @@ _SMOKE_PROMPT = (
 )
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _SAFE_ID = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}")
+_SESSION_ID = re.compile(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}")
 _PHASE = re.compile(r"(?:discovery|refinement|decision)")
 _UTC = re.compile(r"20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 _DATE_LITERAL = re.compile(r"\b20\d{2}[-/]\d{2}[-/]\d{2}\b")
@@ -2677,7 +2678,7 @@ def validate_frozen_model_smoke(root: str | Path) -> Mapping[str, object]:
     if (
         _codex_version(_codex_binary()) != _EXPECTED_CODEX_VERSION
         or not isinstance(receipt.get("codex_session_id"), str)
-        or len(str(receipt["codex_session_id"])) > 128
+        or _SESSION_ID.fullmatch(str(receipt["codex_session_id"])) is None
         or _SHA256.fullmatch(str(receipt.get("prompt_catalog_sha256"))) is None
         or record_sha256 != hashlib.sha256(_canonical(unsigned)).hexdigest()
     ):
