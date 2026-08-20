@@ -1,0 +1,12 @@
+{
+  "centre": {
+    "settlements": 21,
+    "z_guard": 2.5,
+    "top_k": 10
+  },
+  "dimensions": [
+    {"name": "settlements", "kind": "integer"},
+    {"name": "z_guard", "kind": "positive"},
+    {"name": "top_k", "kind": "integer"}
+  ]
+}

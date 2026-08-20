@@ -139,3 +139,80 @@ def test_field_close_refuses_a_nomination_with_no_qualification_verdict(tmp_path
             activation_sha256="b" * 64,
             signing_key=b"k" * 32,
         )
+
+
+def test_the_observation_order_is_derived_not_numeric() -> None:
+    """CUP-50 observed team-01 first and team-12 last; order should carry no information."""
+    from crypto_trade.cup50v2.config import TEAM_IDS
+    from crypto_trade.cup50v2.lifecycle import observation_order
+
+    order = observation_order(b"k" * 32, activation_sha256="a" * 64)
+    assert sorted(order) == sorted(TEAM_IDS)
+    assert order != TEAM_IDS
+    assert order == observation_order(b"k" * 32, activation_sha256="a" * 64)
+    assert order != observation_order(b"j" * 32, activation_sha256="a" * 64)
+    assert order != observation_order(b"k" * 32, activation_sha256="b" * 64)
+
+
+DECLARED = {
+    "schema_version": 1,
+    "candidate_id": "centre-v1",
+    "controls": {
+        "drawdown_brake": "none, deliberately: the common risk unit already sizes the book",
+        "stop_loss": "none, deliberately: a stop on a weekly book is a turnover tax",
+        "turnover_limit": "no-trade band of 0.05 gross, which caps churn without capping size",
+        "side_scaling": "short leg halved after a market drawdown, to survive the rebound",
+        "exposure_conditioning": "gross scales with signal agreement across horizons",
+        "position_concentration": "0.15 per name inside the seed, under the organizer's 0.20",
+    },
+    "rationale": (
+        "The lane's risk is a momentum crash, not a single bad name, so the controls address "
+        "the rebound and leave per-name risk to the common unit."
+    ),
+}
+
+
+def test_a_complete_risk_declaration_is_accepted() -> None:
+    from crypto_trade.cup50v2.qualification import verify_risk_declaration
+
+    verify_risk_declaration(DECLARED)
+
+
+def test_a_deliberate_absence_counts_as_a_decision() -> None:
+    """The point is to distinguish a choice from a default, not to require controls."""
+    from crypto_trade.cup50v2.qualification import REQUIRED_CONTROLS, verify_risk_declaration
+
+    nothing = {
+        **DECLARED,
+        "controls": {name: "none, deliberately: see rationale" for name in REQUIRED_CONTROLS},
+    }
+    verify_risk_declaration(nothing)
+
+
+@pytest.mark.parametrize("control", ["drawdown_brake", "stop_loss", "position_concentration"])
+def test_an_undecided_control_is_refused(control: str) -> None:
+    from crypto_trade.cup50v2.qualification import verify_risk_declaration
+
+    incomplete = {**DECLARED, "controls": dict(DECLARED["controls"])}
+    del incomplete["controls"][control]
+    with pytest.raises(ValueError, match="does not decide"):
+        verify_risk_declaration(incomplete)
+
+
+def test_the_shipped_template_cannot_itself_be_submitted() -> None:
+    """A team that ships the template unedited has declared nothing."""
+    import json
+    from pathlib import Path
+
+    from crypto_trade.cup50v2.qualification import verify_risk_declaration
+
+    template = json.loads(Path("tournament/cup50v2/RISK-DECLARATION-TEMPLATE.json").read_text())
+    with pytest.raises(ValueError, match="placeholder|rationale"):
+        verify_risk_declaration(template)
+
+
+def test_a_blank_rationale_is_refused() -> None:
+    from crypto_trade.cup50v2.qualification import verify_risk_declaration
+
+    with pytest.raises(ValueError, match="rationale"):
+        verify_risk_declaration({**DECLARED, "rationale": "n/a"})

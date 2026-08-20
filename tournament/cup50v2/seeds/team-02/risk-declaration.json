@@ -1,0 +1,13 @@
+{
+  "candidate_id": "seed",
+  "controls": {
+    "drawdown_brake": "REPLACE: describe it, or write 'none, deliberately' and say why",
+    "exposure_conditioning": "REPLACE: describe it, or write 'none, deliberately' and say why",
+    "position_concentration": "REPLACE: describe it, or write 'none, deliberately' and say why",
+    "side_scaling": "REPLACE: describe it, or write 'none, deliberately' and say why",
+    "stop_loss": "REPLACE: describe it, or write 'none, deliberately' and say why",
+    "turnover_limit": "REPLACE: describe it, or write 'none, deliberately' and say why"
+  },
+  "rationale": "REPLACE: one paragraph on why this set, and what it costs you when it is wrong.",
+  "schema_version": 1
+}

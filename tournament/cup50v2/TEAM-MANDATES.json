@@ -1,0 +1,143 @@
+{
+  "common": {
+    "deliverable": "one frozen candidate: strategy.py exposing build_strategy(), parameters.json declaring a centre and at most five tunable dimensions, risk-declaration.json, and RESEARCH-CERTIFICATE.md",
+    "forbidden": [
+      "reading any earlier tournament's directory, results, parameters or conclusions",
+      "any date literal after the in-sample end",
+      "team-level volatility targeting; the organizer owns book size",
+      "pre-fitted objects, cached data, or any state not reconstructed from the streamed context",
+      "reading another team's workspace, the sealed data, or any organizer-private surface"
+    ],
+    "owned_by_the_organizer": [
+      "fills at the transaction open, fees, slippage, funding and delisting settlement",
+      "weekly Top-50 membership and eligibility",
+      "the common risk unit that sizes every book to a common volatility target",
+      "gross, net, per-symbol and participation caps"
+    ],
+    "scored_on": "worst fold, worst regime and the whole path, at 1x/2x/3x cost, across the declared neighbourhood rather than the nominated point alone"
+  },
+  "lanes": {
+    "team-01": {
+      "guidance": [
+        "Blend several formation horizons rather than betting the lane on one.",
+        "Normalise each horizon by the volatility of its own holding period, or a wild name becomes the whole book.",
+        "Deploy less when horizons disagree; a trend book with nothing to trend on should be smaller, not louder."
+      ],
+      "lane": "multi-horizon-trend",
+      "objective": "Trade the persistence of medium-horizon price trends, in both directions.",
+      "thesis": "Crypto perpetuals are traded around the clock by leveraged retail flow with no closing auction to reset positioning. Trends are extended by margin that follows price and cut by liquidations that follow it down, so directional moves persist over weeks rather than mean-reverting within days. The lane's question is which horizons carry that persistence net of cost, and whether the book should stand down when no horizon agrees."
+    },
+    "team-02": {
+      "guidance": [
+        "Prefer a continuous position-in-range measure to a binary breakout flag; the binary version trades every time price touches the edge.",
+        "Consider whether a breakout against the longer trend deserves the same size as one with it.",
+        "Range compression before the break is a candidate precondition worth testing."
+      ],
+      "lane": "channel-position-breakout",
+      "objective": "Trade departures from an established price range.",
+      "thesis": "A range that has held for months accumulates resting orders and stop clusters on both sides. Price leaving it forces those stops and attracts momentum flow, so the exit tends to run rather than snap back. Position within the trailing range is a continuous, low-turnover way to express this: it says how close a name is to breaking out, not merely whether it has."
+    },
+    "team-03": {
+      "guidance": [
+        "Skip the most recent days of the formation window; the last week is reversal, not momentum.",
+        "Hysteresis between entry and exit ranks cuts turnover without changing the view.",
+        "A guard against the rebound after a market drawdown is expected, and its trigger must be causal."
+      ],
+      "lane": "residual-cross-sectional-momentum",
+      "objective": "Trade the cross-section of relative strength after removing the market factor.",
+      "thesis": "Almost all of an altcoin's variance is BTC beta, so raw cross-sectional momentum is largely a leveraged market bet that works until the market turns. The residual \u2014 how a name performed relative to what its beta implied \u2014 is the part that could be about the name. The lane's known hazard is the momentum crash: after a deep drawdown the shorts rebound hardest, and an unguarded book takes its worst loss precisely when the market recovers."
+    },
+    "team-04": {
+      "guidance": [
+        "Keep each sleeve simple enough that its behaviour is attributable; this lane is about the allocation, not about a better trend signal.",
+        "The regime read must use only closed bars, and its own parameters count as declared dimensions.",
+        "An allocation that adapts online to sleeve performance is a legitimate direction, and a harder one to keep causal."
+      ],
+      "lane": "regime-allocated-ensemble",
+      "objective": "Allocate across simple sleeves according to a causal read of the market state.",
+      "thesis": "No single mechanism is all-weather: trend earns in directional markets and bleeds in chop, carry earns while positioning is calm and gives it all back in a cascade, defensive books lag in euphoria. If the market state can be identified from information available before the decision, the allocation across sleeves is itself the strategy. The lane's hazard is that a regime map fitted to a sample is a lookahead in disguise."
+    },
+    "team-05": {
+      "guidance": [
+        "Extreme funding is a different state from high funding; treat the tail as a signal to stand aside, not to size up.",
+        "The funding leg and the price leg of the trade can be separated in analysis, and should be.",
+        "Funding term structure \u2014 how the rate is changing \u2014 may carry more than its level."
+      ],
+      "lane": "funding-carry-crowding-guarded",
+      "objective": "Receive the funding paid by crowded leverage, without standing in front of a cascade.",
+      "thesis": "Perpetual funding is the price leveraged traders pay to hold a position, and the side paying it is the crowded one. Receiving that flow is a real premium, but it is regime-coupled rather than all-weather: the same crowding that pays well marks the positioning that liquidates violently, and the carry earned over months can be lost in days. Six prior investigations in this repository have confirmed the coupling; the lane's job is to find whether a guard changes it."
+    },
+    "team-06": {
+      "guidance": [
+        "Define quality from more than volatility: liquidity depth, flow fragmentation, and stability of activity are all candidates.",
+        "Beta-neutralise explicitly, or the lane becomes a market-direction bet wearing a factor name.",
+        "Consider whether the short leg should be conditional on the market state."
+      ],
+      "lane": "defensive-quality-neutral",
+      "objective": "Own resilience and fund it by shorting fragility, with the market factor removed.",
+      "thesis": "In crypto the low-volatility anomaly runs backwards during euphoria: the most fragile, least liquid, most retail-fragmented names outperform violently in a mania and give it all back afterwards. A quality book that is long resilience and short fragility should therefore earn in bear and chop and lose in a melt-up, which is exactly a regime exposure the score will price. Neutralising the market factor is what separates this from a short-beta bet."
+    },
+    "team-07": {
+      "guidance": [
+        "Combine a fast and a slow flow window; they answer different questions.",
+        "Flow relative to price response is more informative than flow alone.",
+        "Trade size, inferable from volume and trade count, distinguishes retail churn from size."
+      ],
+      "lane": "taker-flow-pressure",
+      "objective": "Follow sustained aggression in the order flow, and fade it when price stops responding.",
+      "thesis": "Taker buy volume is the part of the tape that crossed the spread to get filled: it is either informed or reflexive, and both continue for days. The refinement that matters is absorption \u2014 when persistent buying meets a price that will not rise, the flow is being absorbed by a larger seller and the imbalance is a signal to fade rather than follow."
+    },
+    "team-08": {
+      "guidance": [
+        "Require both an extreme return and abnormal volume; either alone is a different event.",
+        "A fixed holding period is a legitimate exit and easier to defend than an optimised one.",
+        "Distinguish a shock with the trend from one against it; they are not the same trade."
+      ],
+      "lane": "volume-shock-event-reversal",
+      "objective": "Fade the overshoot in a single-bar liquidation cascade.",
+      "thesis": "A leveraged market liquidates in cascades: a move large enough to trigger margin calls forces selling that triggers more, and the print overshoots what the news warranted. The overshoot reverts over days. This is an event lane, not a continuous one \u2014 most bars are not events, and the book should be flat between them. Its hazard is that a genuine repricing looks identical to a cascade for one bar, and fading it is how a reversal book dies."
+    },
+    "team-09": {
+      "guidance": [
+        "Clusters must be re-derived periodically from returns, and the clustering itself must be deterministic given the seed.",
+        "Reversal is stronger when cross-sectional dispersion is high; conditioning on it is a legitimate direction.",
+        "Volume confirmation separates a laggard from a name being repriced."
+      ],
+      "lane": "cluster-relative-reversal",
+      "objective": "Fade short-term dislocation relative to a name's own peer group.",
+      "thesis": "One-week reversal is strong in altcoins, but a large part of any name's weekly move is its sector and the market. Fading the raw move is therefore mostly fading the market, which is a different and worse trade. Measuring dislocation relative to a cluster of correlated peers isolates the part that is idiosyncratic, and that is the part that reverts."
+    },
+    "team-10": {
+      "guidance": [
+        "Share of cross-sectional volume is the measure, not raw volume, which is dominated by market conditions.",
+        "Trade count share and volume share disagree in an informative way.",
+        "Attention that arrives without price confirmation is a different state from attention that follows price."
+      ],
+      "lane": "attention-flow",
+      "objective": "Trade the migration of retail attention between coins.",
+      "thesis": "Crypto retail attention is a scarce resource that rotates: a name's share of total volume rises as it becomes the story, and the rotation is slow enough to trade. Rising share tends to precede continuation over weeks and exhaustion over months, so the sign of the trade depends on the horizon over which attention is measured."
+    },
+    "team-11": {
+      "guidance": [
+        "The model may only be fitted from rows the streamed context has already delivered; there is no pre-fitted artifact and no training set outside the replay.",
+        "Rank-transform features cross-sectionally, or the model fits the market's volatility level instead of the cross-section.",
+        "Prefer heavy regularisation and few features; the sample is short and the noise is large."
+      ],
+      "lane": "walk-forward-learned-model",
+      "objective": "Learn the cross-sectional combination of causal features, refitting as the market changes.",
+      "thesis": "Every other lane fixes its combination rule in advance. This one asks whether a regularised model, refit on an expanding window of the team's own accumulated observations, adapts across regimes better than a fixed rule. The lane exists because prior investigations in this repository found cross-sectional machine-learned alpha inverting through regime shifts, twice; the interesting question is whether regularisation and honest refitting change that."
+    },
+    "team-12": {
+      "guidance": [
+        "Combine several breadth measures; any single one is noisy.",
+        "A dead zone around neutral keeps the book from trading its own noise.",
+        "Divergence between breadth and price is the classic signal and is worth testing explicitly."
+      ],
+      "lane": "breadth-market-state-timing",
+      "objective": "Time aggregate exposure from the breadth of the cross-section.",
+      "thesis": "Breadth turns before price: the number of names participating in an advance thins out well before the index rolls over, and broadens before it recovers, because the marginal name is more sensitive to flow than the aggregate. This is the only lane whose output is primarily a net directional exposure rather than a cross-sectional book, so it is also the lane most exposed to being wrong about direction."
+    }
+  },
+  "namespace": "cup50v2",
+  "schema_version": 1
+}

@@ -1,0 +1,13 @@
+{
+  "centre": {
+    "h_fast_days": 3,
+    "h_slow_days": 10,
+    "top_k": 10,
+    "absorb": 0.25
+  },
+  "dimensions": [
+    {"name": "h_slow_days", "kind": "integer"},
+    {"name": "top_k", "kind": "integer"},
+    {"name": "absorb", "kind": "positive"}
+  ]
+}

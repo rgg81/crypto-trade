@@ -1,0 +1,13 @@
+{
+  "centre": {
+    "trend_days": 63,
+    "xs_days": 90,
+    "carry_settlements": 21,
+    "vol_median_days": 365
+  },
+  "dimensions": [
+    {"name": "trend_days", "kind": "integer"},
+    {"name": "xs_days", "kind": "integer"},
+    {"name": "carry_settlements", "kind": "integer"}
+  ]
+}

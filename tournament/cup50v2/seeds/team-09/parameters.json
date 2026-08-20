@@ -1,0 +1,13 @@
+{
+  "centre": {
+    "clusters": 6,
+    "rev_days": 5,
+    "z_min": 1.0,
+    "top_k": 10
+  },
+  "dimensions": [
+    {"name": "rev_days", "kind": "integer"},
+    {"name": "z_min", "kind": "positive"},
+    {"name": "top_k", "kind": "integer"}
+  ]
+}

@@ -79,7 +79,8 @@ def _bars(symbols: list[str], start: str, days: int) -> pd.DataFrame:
 def test_frozen_config_and_exact_window() -> None:
     loaded = load_config("tournament/cup50v2/config.toml")
     assert loaded.raw["universe"]["target_size"] == 50
-    assert loaded.raw["research"]["strategy_history_days"] == 180
+    assert loaded.raw["research"]["strategy_history_days"] == 365
+    assert loaded.policy.research.strategy_history_days == 365
     assert IS_START == pd.Timestamp("2021-03-15T00:00:00Z")
     assert OOS_START == pd.Timestamp("2024-02-01T00:00:00Z")
     assert OOS_END == pd.Timestamp("2026-08-01T00:00:00Z")

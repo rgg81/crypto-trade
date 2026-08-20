@@ -1,0 +1,12 @@
+{
+  "centre": {
+    "fast_days": 14,
+    "slow_days": 90,
+    "top_k": 10
+  },
+  "dimensions": [
+    {"name": "fast_days", "kind": "integer"},
+    {"name": "slow_days", "kind": "integer"},
+    {"name": "top_k", "kind": "integer"}
+  ]
+}

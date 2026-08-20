@@ -9,6 +9,7 @@ import pytest
 from crypto_trade.cup50v2.availability import UnavailabilityWindow
 from crypto_trade.cup50v2.replay import (
     REBALANCE_COLUMN,
+    ExecutionConfig,
     _evaluate_targets_reference,
     apply_strategy_parameters,
     evaluate_targets,
@@ -127,10 +128,13 @@ def test_context_is_strict_and_hides_transaction_open() -> None:
     assert "mark_price" not in strategy.contexts[1].funding
 
 
-def test_context_is_limited_to_trailing_180_complete_days() -> None:
+def test_context_is_limited_to_the_declared_trailing_window() -> None:
+    """A year of context, so a mechanism needing a year of history is expressible at all."""
+    history_days = ExecutionConfig().strategy_history_days
+    assert history_days == 365
     snapshot = _snapshot()
     decision = snapshot.window_start
-    old_open = decision - pd.Timedelta(days=181)
+    old_open = decision - pd.Timedelta(days=history_days + 1)
     old = snapshot.bars.iloc[[0]].copy()
     old["open_time"] = old_open
     old["close_time"] = old_open + pd.Timedelta(hours=8) - pd.Timedelta(milliseconds=1)
@@ -150,7 +154,7 @@ def test_context_is_limited_to_trailing_180_complete_days() -> None:
     )
 
     visible = strategy.contexts[0].bars["AUSDT"]
-    assert (visible["close_time"] >= decision - pd.Timedelta(days=180)).all()
+    assert (visible["close_time"] >= decision - pd.Timedelta(days=history_days)).all()
 
 
 def test_mechanism_inapplicable_inputs_can_be_declared_empty() -> None:

@@ -1,0 +1,13 @@
+{
+  "centre": {
+    "k_sigma": 2.5,
+    "vol_mult": 3.0,
+    "hold_days": 5,
+    "max_open": 10
+  },
+  "dimensions": [
+    {"name": "k_sigma", "kind": "positive"},
+    {"name": "vol_mult", "kind": "positive"},
+    {"name": "hold_days", "kind": "integer"}
+  ]
+}

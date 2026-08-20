@@ -1,0 +1,10 @@
+{
+  "centre": {
+    "window_days": 60,
+    "top_k": 15
+  },
+  "dimensions": [
+    {"name": "window_days", "kind": "integer"},
+    {"name": "top_k", "kind": "integer"}
+  ]
+}

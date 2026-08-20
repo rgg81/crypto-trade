@@ -1,0 +1,14 @@
+{
+  "centre": {
+    "ma_days": 50,
+    "ret_days": 20,
+    "hl_days": 60,
+    "dead_zone": 0.20,
+    "basket": 20
+  },
+  "dimensions": [
+    {"name": "ma_days", "kind": "integer"},
+    {"name": "hl_days", "kind": "integer"},
+    {"name": "dead_zone", "kind": "fraction"}
+  ]
+}

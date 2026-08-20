@@ -52,3 +52,38 @@ def evaluate_eligibility(
             f"{rules.minimum_is_regime_score:.6f} bar",
         )
     return Eligibility(True, "cleared the pre-registered in-sample bar")
+
+
+REQUIRED_CONTROLS = (
+    "drawdown_brake",
+    "stop_loss",
+    "turnover_limit",
+    "side_scaling",
+    "exposure_conditioning",
+    "position_concentration",
+)
+_PLACEHOLDER = "replace"
+
+
+def verify_risk_declaration(declaration: Mapping[str, object]) -> None:
+    """Require a decision about every control, including the decision to have none.
+
+    CUP-20's risk template defaulted to all-disabled, so a team that never considered risk shipped
+    the same bytes as one that thought hard and chose nothing, and the artifact could not tell them
+    apart. Silence is not a declaration: "none, deliberately" is, and it is one sentence away.
+    """
+    if int(declaration.get("schema_version", 0)) != 1:
+        raise ValueError("risk declaration schema_version must be 1")
+    controls = declaration.get("controls")
+    if not isinstance(controls, Mapping):
+        raise ValueError("risk declaration is missing its controls")
+    missing = [name for name in REQUIRED_CONTROLS if name not in controls]
+    if missing:
+        raise ValueError(f"risk declaration does not decide: {sorted(missing)}")
+    for name in REQUIRED_CONTROLS:
+        stated = str(controls[name]).strip()
+        if len(stated) < 8 or _PLACEHOLDER in stated.lower():
+            raise ValueError(f"risk declaration for {name} is a placeholder, not a decision")
+    rationale = str(declaration.get("rationale", "")).strip()
+    if len(rationale) < 40 or _PLACEHOLDER in rationale.lower():
+        raise ValueError("risk declaration needs a rationale in the team's own words")

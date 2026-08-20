@@ -77,7 +77,11 @@ neighbourhood_scale_step = 1.25
 neighbourhood_logit_step = 1.5
 neighbourhood_signed_step = 0.20
 controls = "preregistered-permanently-non-promoteable"
-strategy_history_days = 180
+# A full year, not half of one. Several mechanisms need a year of context to be expressible at
+# all -- a 180-day z-score history, a one-year volatility median, a learner's warm-up -- and at
+# 180 those sit exactly on the edge of the window, so a neighbourhood probe two steps out would
+# silently truncate. The cost is context slicing, nothing else.
+strategy_history_days = 365
 
 [scoring]
 # Every number the scorer uses lives here and nowhere else. The activation record binds these

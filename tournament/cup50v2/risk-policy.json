@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "policy_id": "cup50v2-common-risk-unit-exante-v1",
+  "team_specific_controls": false,
+  "team_specific_volatility_targeting": false,
+  "rule": "The organizer sizes every book to a common annualised volatility target, ex ante, from an exponentially weighted covariance of the names the strategy has asked to hold, using only bars that closed before the decision. Teams own the shape of a book; the organizer owns its size. Without that split, a drawdown comparison across lanes measures who chose to trade smallest.",
+  "team_declaration_required": true
+}

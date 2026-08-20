@@ -41,6 +41,23 @@ def _digest(payload: object) -> str:
     return hashlib.sha256(_canonical(payload)).hexdigest()
 
 
+def observation_order(signing_key: bytes, *, activation_sha256: str) -> tuple[str, ...]:
+    """Derive the order lanes are observed in from the field-signing key.
+
+    CUP-50 observed team-01 through team-12 in numeric order. Order should carry no information:
+    an organizer who watches results arrive learns the low-numbered lanes first, and if anything
+    ever has to pause mid-batch, which lanes have been read is a fact about the schedule rather
+    than about the field.
+    """
+    ranked = sorted(
+        TEAM_IDS,
+        key=lambda team: hmac.new(
+            signing_key, f"{activation_sha256}:{team}".encode(), hashlib.sha256
+        ).hexdigest(),
+    )
+    return tuple(ranked)
+
+
 def freeze_field(
     destination: str | Path,
     *,
@@ -60,10 +77,9 @@ def freeze_field(
         raise FileExistsError("CUP-50 v2 field has already closed")
     if set(dispositions) != set(TEAM_IDS):
         raise ValueError("field close requires exactly twelve lane dispositions")
-    if (
-        tuple(sorted(observation_order)) != tuple(sorted(TEAM_IDS))
-        or len(set(observation_order)) != 12
-    ):
+    if tuple(sorted(observation_order)) != tuple(sorted(TEAM_IDS)) or len(
+        set(observation_order)
+    ) != len(TEAM_IDS):
         raise ValueError("observation order must contain every team exactly once")
     for team_id, disposition in dispositions.items():
         state = disposition.get("state")

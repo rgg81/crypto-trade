@@ -1,0 +1,12 @@
+{
+  "centre": {
+    "form_days": 90,
+    "skip_days": 3,
+    "top_k": 10,
+    "hold_k": 15
+  },
+  "dimensions": [
+    {"name": "form_days", "kind": "integer"},
+    {"name": "top_k", "kind": "integer"}
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "centre": {
+    "h_fast_days": 21,
+    "h_mid_days": 63,
+    "h_slow_days": 126,
+    "clip_limit": 2.0
+  },
+  "dimensions": [
+    {"name": "h_mid_days", "kind": "integer"},
+    {"name": "h_slow_days", "kind": "integer"},
+    {"name": "clip_limit", "kind": "positive"}
+  ]
+}

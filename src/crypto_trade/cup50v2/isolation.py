@@ -6,31 +6,54 @@ import ast
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 
+from crypto_trade.cup50v2.config import OOS_START
 from crypto_trade.cup50v2.snapshot import (
     load_snapshot,
     verify_semantic_coverage,
     verify_team_visible_snapshot,
 )
 
+# The in-sample window ends here; a date literal past it is what the scan measures against.
+IS_END_LITERAL = OOS_START.strftime("%Y-%m-%d")
+
 FORBIDDEN_PARTS = frozenset(
     {
         ".git",
         "private",
+        "private-stage",
         "sealed",
+        "acquisition",
         "reports-cup20",
+        "reports-cup50",
+        "reports-cup50v2",
         "reports-top40",
+        "paper-cup20",
+        "paper-cup50",
+        "paper-cup50v2",
+        "briefs",
+        "diary",
+        "analysis",
         "__pycache__",
         ".pytest_cache",
         ".ruff_cache",
     }
 )
-FORBIDDEN_NAMES = frozenset({"activation-freeze.json", "selection-freeze.json"})
+FORBIDDEN_NAMES = frozenset(
+    {"activation-freeze.json", "field-freeze.json", "selection-freeze.json"}
+)
+# Every earlier edition, including the one this namespace forked from. CUP-50 v2's own package
+# name contains "cup50", so the digits are matched possessively: without that the engine
+# backtracks to "cup5", the lookahead then sees "0v2" instead of "v2" and succeeds, and the scan
+# rejects every source that imports this tournament's own toolkit.
+PRIOR_NAMESPACE = re.compile(r"(?:cup|top)\d++(?!v2)")
+DATE_LITERAL = re.compile(r"\b20\d{2}-\d{2}-\d{2}\b")
 FORBIDDEN_CACHE_SUFFIXES = frozenset(
     {".arrow", ".csv", ".feather", ".joblib", ".parquet", ".pickle", ".pkl"}
 )
@@ -73,14 +96,24 @@ FORBIDDEN_CALLS = frozenset(
 )
 
 
-def _source_violations(path: Path, relative: Path) -> list[str]:
+def _source_violations(path: Path, relative: Path, *, cutoff: str) -> list[str]:
     if path.suffix != ".py":
         return []
     try:
-        tree = ast.parse(path.read_text(), filename=str(path))
-    except (OSError, SyntaxError, UnicodeError):
+        text = path.read_text()
+    except (OSError, UnicodeError):
         return [f"invalid-python:{relative.as_posix()}"]
     violations: list[str] = []
+    for match in PRIOR_NAMESPACE.finditer(text.lower()):
+        violations.append(f"prior-namespace:{relative.as_posix()}:{match.group(0)}")
+    for literal in sorted({m.group(0) for m in DATE_LITERAL.finditer(text) if m.group(0) > cutoff}):
+        # A date after the in-sample end is evidence the source was written knowing what came
+        # next. The scan does not need to prove intent, and it names the literal it found.
+        violations.append(f"post-cutoff-date:{relative.as_posix()}:{literal}")
+    try:
+        tree = ast.parse(text, filename=str(path))
+    except SyntaxError:
+        return [*violations, f"invalid-python:{relative.as_posix()}"]
     for node in ast.walk(tree):
         imports: list[str] = []
         if isinstance(node, ast.Import):
@@ -209,7 +242,8 @@ def export_evaluator_bundle(source: str | Path, destination: str | Path) -> dict
             shutil.rmtree(temporary)
 
 
-def scan_research_root(root: str | Path) -> tuple[str, ...]:
+def scan_research_root(root: str | Path, *, cutoff: str = IS_END_LITERAL) -> tuple[str, ...]:
+    """Every reason this workspace may not be evaluated, listed rather than raised."""
     base = Path(root).resolve()
     violations: list[str] = []
     for path in base.rglob("*"):
@@ -217,14 +251,14 @@ def scan_research_root(root: str | Path) -> tuple[str, ...]:
         lowered = {part.lower() for part in relative.parts}
         if lowered & FORBIDDEN_PARTS or path.name in FORBIDDEN_NAMES:
             violations.append(relative.as_posix())
-        if any(part.lower().startswith(("cup20", "top40")) for part in relative.parts):
+        if any(PRIOR_NAMESPACE.match(part.lower()) for part in relative.parts):
             violations.append(relative.as_posix())
         if path.is_file() and (
             path.suffix.lower() in FORBIDDEN_CACHE_SUFFIXES or path.stat().st_size > 2_000_000
         ):
             violations.append(relative.as_posix())
         if path.is_file():
-            violations.extend(_source_violations(path, relative))
+            violations.extend(_source_violations(path, relative, cutoff=cutoff))
         if path.is_symlink():
             resolved = path.resolve()
             if not resolved.is_relative_to(base):

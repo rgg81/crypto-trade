@@ -13,7 +13,7 @@ import pandas as pd
 class DecisionContextV2:
     """The complete and deliberately narrow view available to a strategy.
 
-    Bars for the current eligible symbols are drawn from the trailing 180 complete UTC days and
+    Bars for the current eligible symbols are drawn from the trailing 365 complete UTC days and
     have actual ``close_time < decision_time``; funding uses the same trailing window and has
     ``funding_time < decision_time``. Opens, execution marks, fills, positions, costs, equity, and
     PnL have no field in this interface.

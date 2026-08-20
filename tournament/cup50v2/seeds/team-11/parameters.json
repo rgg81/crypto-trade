@@ -1,0 +1,12 @@
+{
+  "centre": {
+    "ridge_lambda": 10.0,
+    "horizon_days": 7,
+    "top_k": 10
+  },
+  "dimensions": [
+    {"name": "ridge_lambda", "kind": "positive"},
+    {"name": "horizon_days", "kind": "integer"},
+    {"name": "top_k", "kind": "integer"}
+  ]
+}

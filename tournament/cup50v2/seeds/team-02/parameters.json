@@ -1,0 +1,11 @@
+{
+  "centre": {
+    "channel_days": 84,
+    "quintile": 0.20,
+    "ma_days": 20
+  },
+  "dimensions": [
+    {"name": "channel_days", "kind": "integer"},
+    {"name": "quintile", "kind": "fraction"}
+  ]
+}
