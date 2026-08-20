@@ -60,6 +60,7 @@ from crypto_trade.cup50v2.replay import (
     run_candidate,
     strategy_from_module,
 )
+from crypto_trade.cup50v2.reuse import reuse_acquisition
 from crypto_trade.cup50v2.scoring import score_point
 from crypto_trade.cup50v2.snapshot import (
     load_snapshot,
@@ -210,6 +211,16 @@ def _build(arguments: argparse.Namespace) -> Mapping[str, object]:
         "team_is_manifest": str(team_visible.manifest),
         "is_start": measured.isoformat(),
         "pure_crypto_audit": arguments.pure_crypto_audit_output,
+    }
+
+
+def _acquire_reuse(arguments: argparse.Namespace) -> Mapping[str, object]:
+    record = reuse_acquisition(arguments.source, arguments.destination, receipt=arguments.receipt)
+    return {
+        "command": "acquire-reuse",
+        "files": len(record["files"]),
+        "receipt_sha256": record["receipt_sha256"],
+        "source_manifest_sha256": record["source_manifest_sha256"],
     }
 
 
@@ -679,6 +690,12 @@ def _paper(arguments: argparse.Namespace) -> Mapping[str, object]:
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(prog="cup50v2", description="CUP-50 v2 tournament lifecycle")
     commands = root.add_subparsers(dest="command", required=True)
+
+    reuse = commands.add_parser("acquire-reuse")
+    reuse.add_argument("--source", required=True)
+    reuse.add_argument("--destination", required=True)
+    reuse.add_argument("--receipt", required=True)
+    reuse.set_defaults(handler=_acquire_reuse)
 
     acquire = commands.add_parser("acquire")
     acquire.add_argument("--source-acquisition", required=True)

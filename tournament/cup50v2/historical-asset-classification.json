@@ -1,0 +1,120 @@
+{
+  "entries": {
+    "1000BTTCUSDT": {
+      "classification": "crypto",
+      "name": "BitTorrent token"
+    },
+    "AERGOUSDT": {
+      "classification": "crypto",
+      "name": "Aergo"
+    },
+    "AKROUSDT": {
+      "classification": "crypto",
+      "name": "Akropolis"
+    },
+    "ANCUSDT": {
+      "classification": "crypto",
+      "name": "Anchor Protocol"
+    },
+    "ANTUSDT": {
+      "classification": "crypto",
+      "name": "Aragon"
+    },
+    "AUDIOUSDT": {
+      "classification": "crypto",
+      "name": "Audius"
+    },
+    "BDXNUSDT": {
+      "classification": "crypto",
+      "name": "Bondex"
+    },
+    "BTCSTUSDT": {
+      "classification": "crypto",
+      "name": "Bitcoin Standard Hashrate Token"
+    },
+    "BTSUSDT": {
+      "classification": "crypto",
+      "name": "BitShares"
+    },
+    "BTTUSDT": {
+      "classification": "crypto",
+      "name": "BitTorrent token"
+    },
+    "BZRXUSDT": {
+      "classification": "crypto",
+      "name": "bZx Protocol token"
+    },
+    "COCOSUSDT": {
+      "classification": "crypto",
+      "name": "Cocos-BCX"
+    },
+    "DODOUSDT": {
+      "classification": "crypto",
+      "name": "DODO"
+    },
+    "EOSUSDT": {
+      "classification": "crypto",
+      "name": "EOS"
+    },
+    "FRONTUSDT": {
+      "classification": "crypto",
+      "name": "Frontier"
+    },
+    "GALUSDT": {
+      "classification": "crypto",
+      "name": "Galxe"
+    },
+    "HNTUSDT": {
+      "classification": "crypto",
+      "name": "Helium"
+    },
+    "KEEPUSDT": {
+      "classification": "crypto",
+      "name": "Keep Network"
+    },
+    "LENDUSDT": {
+      "classification": "crypto",
+      "name": "Aave legacy token"
+    },
+    "LUNAUSDT": {
+      "classification": "crypto",
+      "name": "Terra legacy token"
+    },
+    "MATICUSDT": {
+      "classification": "crypto",
+      "name": "Polygon legacy token"
+    },
+    "MBLUSDT": {
+      "classification": "crypto",
+      "name": "MovieBloc"
+    },
+    "NUUSDT": {
+      "classification": "crypto",
+      "name": "NuCypher"
+    },
+    "RNDRUSDT": {
+      "classification": "crypto",
+      "name": "Render legacy token"
+    },
+    "SRMUSDT": {
+      "classification": "crypto",
+      "name": "Serum"
+    },
+    "SXPUSDT": {
+      "classification": "crypto",
+      "name": "Solar"
+    },
+    "TOMOUSDT": {
+      "classification": "crypto",
+      "name": "TomoChain"
+    },
+    "YFIIUSDT": {
+      "classification": "crypto",
+      "name": "DFI.Money"
+    }
+  },
+  "namespace": "cup50v2",
+  "policy_id": "pure-crypto-fail-closed-v1",
+  "review_basis": "Organizer adjudication of asset identity for symbols whose base token is ambiguous from the ticker alone. Only native crypto tokens are positive; archive presence is not evidence, and no prior tournament membership, ranking, parameter, result or conclusion is used. Ported from the CUP-50 review because it is a statement about what a token is, not about how anything performed.",
+  "schema_version": 1
+}

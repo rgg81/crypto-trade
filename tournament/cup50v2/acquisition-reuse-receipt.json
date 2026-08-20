@@ -1,0 +1,77 @@
+{
+  "basis": "Raw Binance archive bytes only. No candidate source, parameter, ranking, result or conclusion from the source edition is adopted, and none is present in these files.",
+  "destination_root": "data/cup50v2/acquisition",
+  "files": [
+    {
+      "path": "archive_provenance.jsonl",
+      "sha256": "766aecb8e83fec630ebf9cb0d8ea21ce0e25f9ae7fd4066111f9d5dd6b0c2569",
+      "size": 29666646
+    },
+    {
+      "path": "bars.parquet",
+      "sha256": "9784f11e7aaf319822e578ae752fa831c98b46b2fc41ad67a66894217469a897",
+      "size": 92751302
+    },
+    {
+      "path": "contract_metadata.parquet",
+      "sha256": "85eed55257f897f494c6829ae0e58ecf22567f5ad3a633cb125e78f4d8dfd9ce",
+      "size": 16053
+    },
+    {
+      "path": "coverage-gap-provenance.jsonl",
+      "sha256": "d15f50c61c47a97d16a5f8dc32ea9332797e335f8ac69b1bca5bb9369ef64e73",
+      "size": 2751373
+    },
+    {
+      "path": "coverage.json",
+      "sha256": "683f98db2776ddf7421477c0ed69ea8bec0e2ce8334c159c860a755344c0e609",
+      "size": 612541
+    },
+    {
+      "path": "exchange_info.json",
+      "sha256": "087e57ac78ad885033f50364d592c4a59cd28f6c21de0b4cb4afc308f8ef6cc5",
+      "size": 1726189
+    },
+    {
+      "path": "funding.parquet",
+      "sha256": "33eef2d8d8ce9cad4976a86fd76e42fa09f81cba0010db963ae1a15be3a77da1",
+      "size": 11805804
+    },
+    {
+      "path": "mark_prices.parquet",
+      "sha256": "2d1e416a18802113fef2559b865bad5b0a0719a7bbdeb36c8b0aade3ecf717ca",
+      "size": 44086228
+    },
+    {
+      "path": "mark_rest_provenance.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "path": "membership.parquet",
+      "sha256": "e6c19f360e968f43e15631bd29910fa064331eb26d6a1c7f540a97de7c19efab",
+      "size": 175962
+    },
+    {
+      "path": "rest_provenance.jsonl",
+      "sha256": "c2a6429f4c89b4d223a0924b8c2efadf7bfafc41eb6858ddaa45916a03209961",
+      "size": 4869
+    },
+    {
+      "path": "reused-source-manifest.json",
+      "sha256": "05705c5a885497b106a4c6b3723395f8cb851a829da3f6965e1c4cb45b9aaf94",
+      "size": 2528
+    },
+    {
+      "path": "terminal-gap-provenance.jsonl",
+      "sha256": "8c24cd075a548761fd3619f2b695771ae2fb83d8136176bf514ad896bc51b58a",
+      "size": 38464
+    }
+  ],
+  "namespace": "cup50v2-acquisition-reuse",
+  "receipt_sha256": "8df5583a981b393a415f0ef80087919761e271ab50bd5fbedcc6c21871d1fa48",
+  "schema_version": 1,
+  "source_manifest_sha256": "6196d17fe20102ab9c65f46b1614fb95ccf198b72fdf41c4db8c98a17b0f89b7",
+  "source_namespace": "cup50-acquisition",
+  "source_root": "/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind-top50/data/cup50/acquisition-remediated-20260817"
+}

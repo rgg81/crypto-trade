@@ -25,14 +25,13 @@ _VOLUME_DAYS = 30
 
 
 def _voting_names(panel: pd.DataFrame, bars: int) -> pd.Series:
-    """Names with enough of the trailing window observed to cast a meaningful vote.
+    """Names with enough of the window observed to vote.
 
     Without this a name listed three days ago votes on a three-bar "50-day average" and counts for
-    exactly as much as a name with the whole window behind it, which quietly turns breadth into a
-    measure of how many new listings the universe happens to hold.
+    as much as a name with the whole window behind it, which quietly turns breadth into a measure
+    of how many new listings the universe happens to hold.
     """
-    counts = panel.tail(bars).notna().sum()
-    return counts >= max(_MINIMUM_NAMES, bars // 2)
+    return panel.tail(bars).notna().sum() >= max(_MINIMUM_NAMES, bars // 2)
 
 
 def _as_signal(votes: pd.Series) -> float:
@@ -57,10 +56,9 @@ def _breadth_positive_return(panel: pd.DataFrame, bars: int) -> float:
 
 
 def _breadth_new_extremes(panel: pd.DataFrame, bars: int) -> float:
-    """Net new highs less new lows, over the voting cross-section.
+    """Net new highs less new lows: already a net fraction on [-1, +1], so it is used as-is.
 
-    This one is already a net fraction on [-1, +1] rather than a fraction of the whole, so it is
-    used as-is; re-mapping it through 2*f-1 would report a quiet tape as maximally bearish.
+    Re-mapping it through 2*f-1 like the other two would report a quiet tape as maximally bearish.
     """
     window = panel.tail(bars)
     last = panel.iloc[-1]
@@ -131,11 +129,8 @@ class BreadthMarketStateTiming:
         return self._smoother.update(raw, context.eligible_symbols)
 
     def _flatten(self) -> dict[str, float]:
-        """Go flat now, and forget the book so the next signal ramps from zero.
-
-        Leaving the smoother's state behind would let a decayed book reappear at full size the
-        moment breadth recovers, which is not what was returned to the evaluator in between.
-        """
+        """Go flat now, and forget the book so the next signal ramps from zero rather than
+        resuming a stale one the evaluator was never actually holding."""
         self._smoother.current = {}
         self._smoother.emitted = {}
         return {}
@@ -146,9 +141,8 @@ class BreadthMarketStateTiming:
         if volume.empty:
             return []
         median = volume.tail(toolkit.bars_for_days(_VOLUME_DAYS)).median()
-        traded = median[median > 0.0]
-        tradable = [name for name in traded.index if name in panel.columns]
-        ordered = sorted(tradable, key=lambda name: (-float(median[name]), str(name)))
+        traded = [name for name in median[median > 0.0].index if name in panel.columns]
+        ordered = sorted(traded, key=lambda name: (-float(median[name]), str(name)))
         return ordered[: max(1, int(self.basket))]
 
 

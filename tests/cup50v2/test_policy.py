@@ -21,9 +21,17 @@ from crypto_trade.cup50v2.config import DEFAULT_CONFIG_PATH, active_policy, load
 from crypto_trade.cup50v2.neighbourhood import Dimension, generate_neighbourhood
 from crypto_trade.cup50v2.replay import ExecutionConfig
 from crypto_trade.cup50v2.scoring import CellScore, combine_costs, round_half_even, score_cell
-from crypto_trade.cup50v2.trials import TrialBinding, register_trial
+from crypto_trade.cup50v2.trials import TrialBinding, register_trial, source_bundle_digest
 
 DIGEST = "a" * 64
+
+
+def _source(tmp_path: Path) -> Path:
+    """A stand-in candidate bundle whose digest the ledger can re-check."""
+    path = tmp_path / "strategy.py"
+    if not path.exists():
+        path.write_text("build_strategy = None\n")
+    return path
 
 
 def _config(tmp_path: Path, **overrides: object) -> Path:
@@ -181,7 +189,12 @@ def test_moving_the_probe_step_moves_the_declared_points(tmp_path: Path) -> None
 
 def test_moving_the_trial_budget_moves_the_ledger_ceiling(tmp_path: Path) -> None:
     journal = tmp_path / "trials.jsonl"
-    policy = load_config(_config(tmp_path, **{"research.official_trial_budget": 2})).policy.research
+    policy = load_config(
+        _config(
+            tmp_path,
+            **{"research.official_trial_budget": 2, "research.minimum_official_trials": 1},
+        )
+    ).policy.research
 
     def binding(index: int) -> TrialBinding:
         return TrialBinding(
@@ -211,3 +224,112 @@ def test_no_scorer_constant_survives_as_a_literal() -> None:
     banned = (r"0\.85", r"0\.15", r"0\.50 \*", r"\{1: 0\.20", r"\(0\.40, 0\.25")
     for pattern in banned:
         assert not re.search(pattern, source), pattern
+
+
+def test_a_neighbourhood_probe_is_charged_but_can_never_be_nominated(tmp_path: Path) -> None:
+    """A probe is a look at the research window, so it costs; only a centre can be promoted."""
+    from crypto_trade.cup50v2.trials import (
+        charged_trial_count,
+        nomination_trial_binding,
+        record_trial_result,
+    )
+
+    journal = tmp_path / "trials.jsonl"
+
+    def binding(trial_id: str, kind: str) -> TrialBinding:
+        return TrialBinding(
+            team_id="team-02",
+            trial_id=trial_id,
+            kind=kind,
+            promoteable=kind == "official",
+            source_sha256=source_bundle_digest(_source(tmp_path)),
+            parameters={"lookback_bars": 10.0},
+            risk_policy_sha256=DIGEST,
+            seed=2,
+            data_sha256=DIGEST,
+            config_sha256=DIGEST,
+            scorer_sha256=DIGEST,
+            purpose="kind accounting",
+        )
+
+    for trial_id, kind in (("t1", "official"), ("t2", "neighbourhood"), ("t3", "ablation")):
+        registered = register_trial(journal, binding(trial_id, kind))
+        record_trial_result(
+            journal,
+            team_id="team-02",
+            trial_id=trial_id,
+            binding_sha256=str(registered["payload"]["binding_sha256"]),
+            source_path=_source(tmp_path),
+            result_sha256=DIGEST,
+            succeeded=True,
+        )
+
+    assert charged_trial_count(journal, "team-02") == 2  # the ablation is free
+    with pytest.raises(ValueError, match="not one promoteable official registration"):
+        nomination_trial_binding(journal, "team-02", "t2")
+    assert nomination_trial_binding(journal, "team-02", "t1")["trial_id"] == "t1"
+
+
+def test_a_nomination_needs_the_declared_minimum_of_completed_trials(tmp_path: Path) -> None:
+    from crypto_trade.cup50v2.trials import nomination_trial_binding, record_trial_result
+
+    journal = tmp_path / "trials.jsonl"
+    registered = register_trial(
+        journal,
+        TrialBinding(
+            team_id="team-02",
+            trial_id="only",
+            kind="official",
+            promoteable=True,
+            source_sha256=source_bundle_digest(_source(tmp_path)),
+            parameters={"lookback_bars": 10.0},
+            risk_policy_sha256=DIGEST,
+            seed=2,
+            data_sha256=DIGEST,
+            config_sha256=DIGEST,
+            scorer_sha256=DIGEST,
+            purpose="single trial",
+        ),
+    )
+    record_trial_result(
+        journal,
+        team_id="team-02",
+        trial_id="only",
+        binding_sha256=str(registered["payload"]["binding_sha256"]),
+        source_path=_source(tmp_path),
+        result_sha256=DIGEST,
+        succeeded=True,
+    )
+    with pytest.raises(ValueError, match="charged trials"):
+        nomination_trial_binding(journal, "team-02", "only", minimum_trials=3)
+
+
+def test_the_first_charged_trial_must_be_the_unmodified_seed(tmp_path: Path) -> None:
+    """Every later result is reported as a distance from the seed, so the seed has to be run."""
+    journal = tmp_path / "trials.jsonl"
+    seed = {
+        "source_sha256": source_bundle_digest(_source(tmp_path)),
+        "parameters": {"lookback_bars": 189.0},
+    }
+
+    def binding(trial_id: str, lookback: float) -> TrialBinding:
+        return TrialBinding(
+            team_id="team-02",
+            trial_id=trial_id,
+            kind="official",
+            promoteable=True,
+            source_sha256=source_bundle_digest(_source(tmp_path)),
+            parameters={"lookback_bars": lookback},
+            risk_policy_sha256=DIGEST,
+            seed=2,
+            data_sha256=DIGEST,
+            config_sha256=DIGEST,
+            scorer_sha256=DIGEST,
+            purpose="seed first",
+        )
+
+    with pytest.raises(ValueError, match="unmodified seed"):
+        register_trial(journal, binding("t1", 250.0), seed_binding=seed)
+    register_trial(journal, binding("official-seed-001", 189.0), seed_binding=seed)
+    # Once the seed is spent, the team is free.
+    register_trial(journal, binding("t2", 250.0), seed_binding=seed)
