@@ -837,6 +837,54 @@ def _fsync_private_directory(path: Path) -> None:
         os.close(descriptor)
 
 
+def _normalize_private_installation_id(paths: Mapping[str, Path]) -> None:
+    """Narrow Codex's explicit 0644 installation marker to owner-only before validation."""
+
+    path = paths["codex_home"] / "installation_id"
+    if not os.path.lexists(path):
+        return
+    flags = (
+        os.O_RDWR
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
+    try:
+        descriptor = os.open(path, flags)
+        before = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_uid != os.geteuid()
+            or before.st_nlink != 1
+            or before.st_size > 1024
+            or stat.S_IMODE(before.st_mode) not in {0o600, 0o644}
+        ):
+            raise ResearchRuntimeError("private Codex installation marker is unsafe")
+        os.fchmod(descriptor, 0o600)
+        os.fsync(descriptor)
+        after = os.fstat(descriptor)
+    except ResearchRuntimeError:
+        raise
+    except OSError as exc:
+        raise ResearchRuntimeError("private Codex installation marker is unsafe") from exc
+    finally:
+        if "descriptor" in locals():
+            os.close(descriptor)
+    current = path.lstat()
+    identities = {
+        (before.st_dev, before.st_ino, before.st_uid, before.st_nlink, before.st_size),
+        (after.st_dev, after.st_ino, after.st_uid, after.st_nlink, after.st_size),
+        (current.st_dev, current.st_ino, current.st_uid, current.st_nlink, current.st_size),
+    }
+    if (
+        len(identities) != 1
+        or not stat.S_ISREG(current.st_mode)
+        or stat.S_IMODE(current.st_mode) != 0o600
+    ):
+        raise ResearchRuntimeError("private Codex installation marker changed")
+    _fsync_private_directory(paths["codex_home"])
+
+
 def _reset_private_model_session_state(paths: Mapping[str, Path]) -> None:
     """Remove every bounded Codex client artifact before it can reach another phase."""
 
@@ -845,6 +893,7 @@ def _reset_private_model_session_state(paths: Mapping[str, Path]) -> None:
     # closed instead of being traversed or silently erased.
     _validate_private_model_permissions(paths)
     _validate_empty_skill_surface(paths)
+    _normalize_private_installation_id(paths)
     _validate_private_model_surface(paths)
 
     codex_home = paths["codex_home"]

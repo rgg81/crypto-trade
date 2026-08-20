@@ -18,7 +18,8 @@ system-skill marker. Bounded client databases, logs, queues, shell snapshots, wr
 scratch are accepted only long enough to validate and remove them after each Codex subprocess;
 none can reach a later phase. Unknown configuration, history, memory, plugin, skill, `.agents`, or
 scratch residue is rejected before any removal, and every admitted node is owner-only. Before every
-model launch, the organizer renders the exact
+model launch, the known Codex installation marker's explicit `0644` mode is narrowed through a
+no-follow descriptor to `0600`, then the complete surface is validated before cleanup. The organizer renders the exact
 model-visible prompt with the pinned CLI and rejects any skill instructions, `SKILL.md` locator, or
 host skill/plugin root. Physical probes separately deny the original host roots, the team's private
 auth file, and both reading and writing a peer team's private runtime. The frozen model, prompt,

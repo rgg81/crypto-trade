@@ -5,6 +5,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import stat
 import subprocess
 import sys
 import time
@@ -1088,8 +1089,10 @@ def test_private_model_runtime_clears_bounded_client_state_between_phases(
     )
 
     def prompt_probe(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        (codex_home / "installation_id").write_bytes(b"codex-explicit-public-mode")
         (codex_home / "memories_1.sqlite").write_bytes(b"phase-local-state")
         (codex_home / "shell_snapshots").mkdir()
+        (codex_home / "installation_id").chmod(0o644)
         (codex_home / "memories_1.sqlite").chmod(0o600)
         (codex_home / "shell_snapshots").chmod(0o700)
         return SimpleNamespace(returncode=0, stdout=b"catalog-probe", stderr=b"")
@@ -1118,6 +1121,40 @@ def test_private_model_runtime_clears_bounded_client_state_between_phases(
     research_runtime_v4.ensure_private_model_runtime(root, "team-01")
     assert not (codex_home / "state_5.sqlite").exists()
     assert not (codex_home / "memories_1.sqlite").exists()
+
+
+def test_private_model_runtime_does_not_follow_installation_marker_symlink(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    organizer = tmp_path / "organizer-codex"
+    organizer.mkdir()
+    (organizer / "auth.json").write_bytes(b'{"auth":"fixture"}\n')
+    root = tmp_path / "root"
+    root.mkdir()
+    monkeypatch.setattr(research_runtime_v4, "_organizer_codex_home", lambda: organizer)
+    monkeypatch.setattr(research_runtime_v4, "_codex_binary", lambda: Path("/usr/bin/true"))
+    monkeypatch.setattr(
+        research_runtime_v4,
+        "_codex_version",
+        lambda _binary: research_runtime_v4._EXPECTED_CODEX_VERSION,
+    )
+    research_runtime_v4.ensure_private_model_runtime(root, "team-01")
+    outside = tmp_path / "outside"
+    outside.write_bytes(b"must-not-change")
+    outside.chmod(0o644)
+    marker = (
+        root
+        / research_runtime_v4._PRIVATE_MODEL_RUNTIME_RELATIVE
+        / "team-01/codex-home/installation_id"
+    )
+    marker.symlink_to(outside)
+    with pytest.raises(
+        research_runtime_v4.ResearchRuntimeError,
+        match="installation marker is unsafe",
+    ):
+        research_runtime_v4.ensure_private_model_runtime(root, "team-01")
+    assert outside.read_bytes() == b"must-not-change"
+    assert stat.S_IMODE(outside.stat().st_mode) == 0o644
 
 
 def test_private_model_runtime_rejects_group_readable_client_state_before_cleanup(
