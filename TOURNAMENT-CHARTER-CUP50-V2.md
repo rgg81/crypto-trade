@@ -176,7 +176,11 @@ full, labelled as such. **No eligible lane means no winner**, and no desk opens.
 
 Activation binds the charter, config, transitive evaluator path, CLI, dependency lock, pure-crypto
 audit, data manifests, scorer, test transcript, a clean commit, and a content-addressed sandbox
-image. Acquisition, sealed data, private artifacts, caches and reports are quarantined before
+image. Its preflight requires the twelve-seed readiness field, a clean-room workspace scan, a
+sandbox isolation probe, determinism across worker counts and hash seeds, the full test suite and
+the linter. The forward desk's parity smoke is a precondition of launching a desk, not of running
+the field: the desk is downstream of the release and is not bound by this record, so requiring it
+here would force the desk to be built before any research happened, for no gain in integrity. Acquisition, sealed data, private artifacts, caches and reports are quarantined before
 research begins. Readiness requires all twelve seeds to complete a full in-sample replay at three
 cost levels: CUP-50's readiness strategy was flat, exercised no carried position, roster exit or
 participation limit, and three organizer defects survived into a live field.

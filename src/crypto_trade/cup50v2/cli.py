@@ -353,15 +353,21 @@ def _activate(arguments: argparse.Namespace) -> Mapping[str, object]:
     resolved_image = require_image_digest(arguments.sandbox_image, arguments.sandbox_image_digest)
     verify_receipt(arguments.quarantine_receipt)
     preflight = _json(arguments.preflight)
+    # What activation binds is the tournament: the policy, the evaluator, and the isolation the
+    # whole evaluation model rests on. The forward desk is downstream of the release and is not
+    # hash-bound here, so its parity smoke is a precondition of launching a desk rather than of
+    # running the field -- requiring it now would force the desk to be built before any research
+    # happens, for no integrity gain. The sandbox smoke takes its place, because if isolation is
+    # broken then every result the field produces is worthless.
     required_checks = {
         "focused_suite",
         "full_pytest",
         "ruff",
         "deterministic_worker_counts",
         "deterministic_hash_seeds",
-        "full_is_readiness_strategy",
+        "full_is_readiness_field",
         "clean_room_workspace_scan",
-        "paper_backtest_parity_smoke",
+        "sandbox_isolation_smoke",
     }
     if set(preflight) != required_checks or any(value != "passed" for value in preflight.values()):
         raise ValueError("activation preflight is incomplete or contains a failed check")

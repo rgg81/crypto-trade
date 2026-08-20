@@ -1,0 +1,1 @@
+{"network_reachable": false, "organizer_execution_visible": false, "output_writable": true, "protocol_importable": true, "protocol_read_only": true, "snapshot_files": ["bars.parquet", "contract_metadata.parquet", "funding.parquet", "manifest.json", "membership.parquet"], "team_read_only": true, "toolkit_importable": true}
