@@ -134,6 +134,7 @@ def _fresh_restart_fixture(tmp_path: Path) -> Path:
     journal = tmp_path / TOP40_V4_R2_LAYOUT.journal_path
     journal.parent.mkdir(parents=True, exist_ok=True)
     journal.write_bytes(b"")
+    journal.chmod(0o600)
     return tmp_path
 
 
@@ -1030,6 +1031,46 @@ def test_missing_lane_marker_is_restored_but_conflicts_fail_closed(tmp_path: Pat
     assert outbox_marker.read_bytes() == b"changed\n"
 
 
+@pytest.mark.parametrize("resume_path", ("consume", "broker-launch", "direct-launch"))
+def test_crash_missing_markers_are_restored_before_activation_validation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    resume_path: str,
+) -> None:
+    team = tmp_path / TOP40_V4_R2_LAYOUT.team_root("team-01")
+    for directory in ("outbox", "work"):
+        path = team / directory
+        path.mkdir(parents=True)
+        path.chmod(0o755)
+    if resume_path == "consume":
+        (team / "outbox/batch-1.json").write_text("{}\n", encoding="utf-8")
+
+    checked: list[bool] = []
+
+    def stop_after_marker_check(*_args: object, **_kwargs: object) -> None:
+        for directory in ("outbox", "work"):
+            marker = team / directory / ".keep"
+            assert marker.read_bytes() == b"\n"
+            assert stat.S_IMODE(marker.stat().st_mode) == 0o644
+            assert marker.stat().st_nlink == 1
+        checked.append(True)
+        raise activation_v4.ActivationError("stop after marker recovery")
+
+    monkeypatch.setattr(activation_v4, "validate", stop_after_marker_check)
+    with pytest.raises(activation_v4.ActivationError, match="stop after marker recovery"):
+        if resume_path == "direct-launch":
+            research_runtime_v4.launch_team_phase.__wrapped__(
+                tmp_path, "team-01", "discovery"
+            )
+        else:
+            broker = _broker_module()
+            if resume_path == "consume":
+                broker.consume_batch.__wrapped__(tmp_path, "team-01", "discovery")
+            else:
+                broker.launch_phase.__wrapped__(tmp_path, "team-01", "discovery")
+    assert checked == [True]
+
+
 def test_lane_audit_is_independent_of_peer_corruption(tmp_path: Path) -> None:
     for team_id in ("team-01", "team-02"):
         team = tmp_path / TOP40_V4_R2_LAYOUT.team_root(team_id)
@@ -1768,6 +1809,35 @@ def test_fresh_restart_activation_freezes_seed_binding(
     assert (
         root / TOP40_V4_R2_LAYOUT.result_lock_path
     ).read_bytes() == f"pid={os.getpid()}\n".encode()
+
+
+def test_canonical_activation_never_repairs_a_preactivation_journal(
+    tmp_path: Path,
+) -> None:
+    root = _fresh_restart_fixture(tmp_path / "fragment")
+    journal = root / TOP40_V4_R2_LAYOUT.journal_path
+    fragment = b'{"interrupted":"must remain evidence"}'
+    journal.write_bytes(fragment)
+    journal.chmod(0o600)
+    with pytest.raises(journal_v4.JournalError, match="byte-empty"):
+        orchestrator_v4.activate(root)
+    assert journal.read_bytes() == fragment
+    assert not (root / TOP40_V4_R2_LAYOUT.activation_freeze_path).exists()
+    assert not (root / activation_v4.TEST_OUTPUT_PATH).exists()
+
+    root = _fresh_restart_fixture(tmp_path / "hardlink")
+    journal = root / TOP40_V4_R2_LAYOUT.journal_path
+    journal.unlink()
+    external = root / "external-authority"
+    external.write_bytes(b"external bytes must never be truncated")
+    external.chmod(0o600)
+    os.link(external, journal)
+    with pytest.raises(journal_v4.JournalError, match="byte-empty"):
+        orchestrator_v4.activate(root)
+    assert external.read_bytes() == b"external bytes must never be truncated"
+    assert journal.read_bytes() == external.read_bytes()
+    assert not (root / TOP40_V4_R2_LAYOUT.activation_freeze_path).exists()
+    assert not (root / activation_v4.TEST_OUTPUT_PATH).exists()
 
 
 def test_fresh_restart_activation_rejects_dirty_root_before_freeze(

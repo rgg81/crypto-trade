@@ -28,11 +28,12 @@ environment; it resolves the frozen worker package before masking the repository
 runtime imports, installing Landlock/seccomp, and loading candidate code. Activation tests include
 a real namespaced startup under that exact sanitized environment.
 
-The model-visible rules now explicitly preserve organizer `.keep` markers. The launcher also
-recreates only a missing one-byte marker through a pinned owner-controlled directory descriptor;
-existing wrong bytes, modes, links, ownership, or substitutions remain hard failures. This keeps
-ordinary outbox publication from invalidating the activation scope without normalizing any
-candidate or broker payload.
+The model-visible rules now explicitly preserve organizer `.keep` markers. The launcher and every
+broker resume path also recreate only a missing one-byte marker through a pinned owner-controlled
+directory descriptor before activation validation; this remains available after a host death that
+bypasses the model subprocess's cleanup. Existing wrong bytes, modes, links, ownership, or
+substitutions remain hard failures. This keeps ordinary outbox publication from invalidating the
+activation scope without normalizing any candidate or broker payload.
 
 ## Installed-skill boundary incident and third clean restart
 

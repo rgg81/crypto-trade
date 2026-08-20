@@ -48,6 +48,9 @@ trees, exact frozen common reports, no research sessions or result/selection/rel
 only regular single-link files. The same score-blind seed digest must survive the activation tests
 and is then frozen into the activation record. This is a one-time bootstrap invariant; runtime
 validation binds the receipt but does not expose or require post-start journal state.
+The journal bootstrap exclusively creates a private empty file, or stably verifies an already
+empty owner-regular single-link file after an interrupted creation. It never invokes runtime tail
+recovery before the genesis gate, so corrupt or linked preactivation bytes are rejected unchanged.
 An interrupted pre-freeze test output is bounded non-authoritative scratch and is always replaced
 by a complete test rerun. Volatile result/broker lock files are excluded from the digest and are
 accepted only with their exact safe owner/topology and current canonical lock marker.

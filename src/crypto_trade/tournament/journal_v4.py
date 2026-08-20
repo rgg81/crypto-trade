@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import datetime as dt
 import fcntl
@@ -557,16 +558,116 @@ def _fsync_directory(path: Path) -> None:
 
 
 def initialize(path: str | Path) -> JournalState:
+    """Create or verify an exact empty journal without invoking crash-tail recovery.
+
+    Activation calls this before the frozen seed surface is admitted.  An existing journal is
+    therefore authority, not recoverable runtime state: reading it through :func:`read` could
+    truncate an unterminated suffix before activation has rejected the pathname or link topology.
+    Runtime recovery remains confined to ``read`` and ``append`` after activation.
+    """
+
     journal = Path(path)
     journal.parent.mkdir(parents=True, exist_ok=True)
+    parent_flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+    )
+    file_flags = (
+        os.O_RDWR
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
     try:
-        descriptor = os.open(journal, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    except FileExistsError:
-        return read(path)
-    else:
-        os.fsync(descriptor)
-        os.close(descriptor)
-        _fsync_directory(journal.parent)
+        parent_descriptor = os.open(journal.parent, parent_flags)
+    except OSError as exc:
+        raise JournalError("cannot pin the journal parent during initialization") from exc
+    created = False
+    try:
+        parent_before = os.fstat(parent_descriptor)
+        if (
+            not stat.S_ISDIR(parent_before.st_mode)
+            or parent_before.st_uid != os.geteuid()
+            or stat.S_IMODE(parent_before.st_mode) & 0o022
+        ):
+            raise JournalError("journal parent is not owner-controlled")
+        try:
+            descriptor = os.open(journal.name, file_flags, dir_fd=parent_descriptor)
+        except FileNotFoundError:
+            try:
+                descriptor = os.open(
+                    journal.name,
+                    file_flags | os.O_CREAT | os.O_EXCL,
+                    0o600,
+                    dir_fd=parent_descriptor,
+                )
+            except OSError as exc:
+                raise JournalError("cannot exclusively create the lifecycle journal") from exc
+            created = True
+        except OSError as exc:
+            raise JournalError("cannot safely open the lifecycle journal") from exc
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX)
+            before = os.fstat(descriptor)
+            if created:
+                os.fchmod(descriptor, 0o600)
+                before = os.fstat(descriptor)
+            if (
+                not stat.S_ISREG(before.st_mode)
+                or before.st_uid != os.geteuid()
+                or before.st_nlink != 1
+                or stat.S_IMODE(before.st_mode) != 0o600
+                or before.st_size != 0
+            ):
+                raise JournalError("activation requires one private byte-empty journal")
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            payload = os.read(descriptor, 1)
+            after = os.fstat(descriptor)
+            lexical = os.stat(
+                journal.name,
+                dir_fd=parent_descriptor,
+                follow_symlinks=False,
+            )
+
+            def identity(value: os.stat_result) -> tuple[int, int, int, int, int]:
+                return (
+                    value.st_dev,
+                    value.st_ino,
+                    value.st_size,
+                    value.st_mtime_ns,
+                    value.st_nlink,
+                )
+
+            if (
+                payload != b""
+                or identity(before) != identity(after)
+                or identity(after) != identity(lexical)
+                or not stat.S_ISREG(lexical.st_mode)
+                or lexical.st_uid != os.geteuid()
+                or stat.S_IMODE(lexical.st_mode) != 0o600
+            ):
+                raise JournalError("lifecycle journal changed during initialization")
+            parent_after = os.fstat(parent_descriptor)
+            parent_lexical = journal.parent.lstat()
+            if (
+                (parent_before.st_dev, parent_before.st_ino)
+                != (parent_after.st_dev, parent_after.st_ino)
+                or (parent_after.st_dev, parent_after.st_ino)
+                != (parent_lexical.st_dev, parent_lexical.st_ino)
+                or not stat.S_ISDIR(parent_lexical.st_mode)
+            ):
+                raise JournalError("journal parent changed during initialization")
+            if created:
+                os.fsync(descriptor)
+                os.fsync(parent_descriptor)
+        finally:
+            with contextlib.suppress(OSError):
+                fcntl.flock(descriptor, fcntl.LOCK_UN)
+            os.close(descriptor)
+    finally:
+        os.close(parent_descriptor)
     return replay_bytes(b"")
 
 

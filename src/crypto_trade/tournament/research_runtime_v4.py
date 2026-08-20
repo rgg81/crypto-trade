@@ -694,6 +694,37 @@ def _restore_writable_lane_markers(root: Path, team_id: str) -> tuple[str, ...]:
     )
 
 
+def _restore_writable_lane_markers_before_activation(
+    root: Path, team_id: str
+) -> tuple[str, ...]:
+    """Repair only a complete lane surface; let activation diagnose absent lane structure."""
+
+    TOP40_V4_LAYOUT.require_team(team_id)
+    parents = {
+        directory: root / TOP40_V4_LAYOUT.team_root(team_id) / directory
+        for directory in ("outbox", "work")
+    }
+    # Preactivation and schema-only test callers may not have a lane surface at all. Missing or
+    # substituted structure is never repaired here and remains activation's authority error.
+    if any(
+        not parent.is_dir()
+        or parent.is_symlink()
+        or not parent.resolve().is_relative_to(root)
+        for parent in parents.values()
+    ):
+        return ()
+    for parent in parents.values():
+        details = parent.lstat()
+        if details.st_uid != os.geteuid() or stat.S_IMODE(details.st_mode) & 0o022:
+            return ()
+    # Validate every existing marker before creating any missing marker. Thus a conflicting work
+    # marker cannot cause an absent outbox marker to be recreated on an already-invalid surface.
+    for directory, parent in parents.items():
+        if os.path.lexists(parent / ".keep"):
+            _restore_lane_marker(root, team_id, directory)
+    return _restore_writable_lane_markers(root, team_id)
+
+
 def _codex_binary() -> Path:
     resolved = shutil.which("codex")
     if resolved is None:
@@ -2952,6 +2983,11 @@ def launch_team_phase(
     if _PHASE.fullmatch(phase) is None:
         raise ResearchRuntimeError("team phase must be valid")
     root_path = Path(root).resolve()
+    # A host/process crash can bypass the model subprocess's ``finally`` after it has atomically
+    # published an outbox but removed a directory placeholder.  This direct entrypoint already
+    # owns the broker lease through its decorator, so restore only absent writable markers before
+    # activation compares the frozen surface.  Conflicting bytes or topology remain hard failures.
+    _restore_writable_lane_markers_before_activation(root_path, team_id)
     # This exported launcher is itself an authority boundary; it cannot rely on a broker caller
     # having performed the activation check before the shared lease was acquired.
     from crypto_trade.tournament import activation_v4

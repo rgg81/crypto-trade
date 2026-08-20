@@ -74,6 +74,8 @@ uv run python scripts/top40_v4_r2_tournament.py historical-release
 The broker runs one short-lived offline model session at a time and evaluates only after that
 process exits. One blocking process-wide lease makes `run-all` and individual broker commands
 strictly serial; they never overlap teams. The state machine resumes completed phases and skips
-terminal teams after a process or host restart. No team command reads the holdout. Heavy result
+terminal teams after a process or host restart. A resume first restores only absent frozen lane
+markers, so a host death after outbox publication cannot strand the lane; conflicting marker
+objects still fail closed. No team command reads the holdout. Heavy result
 commands serialize under one kernel lock. During the historical phase, `status` reveals only the
 frozen finalist count and a constant sealed state.
