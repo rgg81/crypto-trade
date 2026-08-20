@@ -101,8 +101,16 @@ def _source_violations(path: Path, relative: Path) -> list[str]:
     return violations
 
 
+PROTOCOL_EXPORT_MODULES = ("protocol.py", "toolkit.py")
+
+
 def export_protocol_bundle(source: str | Path, destination: str | Path) -> dict[str, object]:
-    """Create a minimal, immutable strategy-interface mount without organizer code."""
+    """Create a minimal, immutable strategy-interface mount without organizer code.
+
+    The toolkit rides along with the interface: every lane needs a causal panel, a volatility
+    estimate and a way to size a book, and twelve private implementations of those would make each
+    lane's result partly a measurement of its own plumbing.
+    """
     protocol = Path(source).resolve()
     target = Path(destination).resolve()
     if not protocol.is_file() or protocol.is_symlink() or protocol.name != "protocol.py":
@@ -116,13 +124,20 @@ def export_protocol_bundle(source: str | Path, destination: str | Path) -> dict[
         package.mkdir(parents=True)
         (temporary / "crypto_trade" / "__init__.py").write_text("")
         (package / "__init__.py").write_text("")
-        exported = package / "protocol.py"
-        shutil.copyfile(protocol, exported)
-        digest = hashlib.sha256(exported.read_bytes()).hexdigest()
+        files: dict[str, str] = {}
+        for name in PROTOCOL_EXPORT_MODULES:
+            origin = protocol.parent / name
+            if not origin.is_file() or origin.is_symlink():
+                raise ValueError(f"protocol export is missing {name}")
+            exported = package / name
+            shutil.copyfile(origin, exported)
+            files[f"crypto_trade/cup50v2/{name}"] = hashlib.sha256(
+                exported.read_bytes()
+            ).hexdigest()
         body: dict[str, object] = {
             "schema_version": 1,
             "namespace": "cup50v2-protocol-export",
-            "files": {"crypto_trade/cup50v2/protocol.py": digest},
+            "files": files,
         }
         body_bytes = json.dumps(body, sort_keys=True, separators=(",", ":")).encode() + b"\n"
         manifest = {**body, "manifest_sha256": hashlib.sha256(body_bytes).hexdigest()}

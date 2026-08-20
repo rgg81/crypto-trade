@@ -214,9 +214,10 @@ def test_clean_room_scan_and_container_contract(tmp_path) -> None:
     assert "forbidden-import:escape.py:pathlib" in scan_research_root(team)
 
 
-def test_protocol_export_contains_only_the_strategy_interface(tmp_path) -> None:
+def test_protocol_export_contains_only_the_interface_and_the_shared_toolkit(tmp_path) -> None:
     source = tmp_path / "protocol.py"
     source.write_text("VALUE = 1\n")
+    (tmp_path / "toolkit.py").write_text("HELPERS = 1\n")
     destination = tmp_path / "export"
 
     manifest = export_protocol_bundle(source, destination)
@@ -230,10 +231,23 @@ def test_protocol_export_contains_only_the_strategy_interface(tmp_path) -> None:
         "crypto_trade/cup50v2",
         "crypto_trade/cup50v2/__init__.py",
         "crypto_trade/cup50v2/protocol.py",
+        "crypto_trade/cup50v2/toolkit.py",
         "manifest.json",
     ]
+    # No organizer code rides along: nothing that scores, executes or reads the sealed side.
+    assert set(manifest["files"]) == {
+        "crypto_trade/cup50v2/protocol.py",
+        "crypto_trade/cup50v2/toolkit.py",
+    }
     with pytest.raises(FileExistsError):
         export_protocol_bundle(source, destination)
+
+
+def test_protocol_export_refuses_a_bundle_missing_the_toolkit(tmp_path) -> None:
+    source = tmp_path / "protocol.py"
+    source.write_text("VALUE = 1\n")
+    with pytest.raises(ValueError, match="missing toolkit.py"):
+        export_protocol_bundle(source, tmp_path / "export")
 
 
 def test_evaluator_export_rejects_imports_from_earlier_namespaces(tmp_path) -> None:
