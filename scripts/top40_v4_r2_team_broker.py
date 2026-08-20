@@ -496,44 +496,7 @@ def consume_decision(root: Path, team_id: str) -> Mapping[str, Any]:
 
 
 def _prompt(team_id: str, phase: str) -> str:
-    common = f"""You are the independent research team {team_id}. This is a fresh edition and you
-must not use or discuss any earlier tournament, remembered post-cutoff market prices, external
-web content, or inaccessible path. Read ACCESS-POLICY.json, TEAM-BRIEF.md, and the complete
-sanitized team kit. Obey them exactly. You have no evaluator or raw-data access. Do not finish
-until the requested outbox JSON and every referenced file are complete and schema-valid."""
-    if phase == "discovery":
-        return common + """
-
-Choose one original causal crypto mechanism independently. Create exactly eight preregistered
-candidates and outbox/batch-1.json. Allocate the eight trials efficiently across a transparent
-baseline, its exact sign inversion, formation/rebalance variants, controls and roles, and the
-start of a five-point numeric local neighborhood. Every candidate needs all five required files.
-Keep the first accepted candidate's mechanism text as the family label. A parented
-control-ablation or role-check may use more specific descriptive mechanism prose. Only a genuine
-family change uses mechanism-pivot, and at most one such pivot is allowed.
-Use only ordinary Python with numpy/pandas/math; no file loading, dynamic
-imports, encoded payloads, explicit calendar-date lookup, or opaque state. Use a unique declarative
-risk policy per intended control. Every strategy must use the compact stateless causal subset in
-RULES.md: exactly one target_weights method, no self/module/class/iterator state, helper delegation,
-decision-time branching, ordinal/packing arithmetic, or literal lookup. Ensure each strategy is
-causal, robust to short histories, and implements build_strategy()."""
-    if phase == "refinement":
-        return common + """
-
-Read feedback/discovery.json. Treat negative results honestly and do not infer any field-wide or
-sealed information. Create exactly four new preregistered candidates plus outbox/batch-2.json.
-Use them to complete all mandatory certificate cells, especially five distinct locally bracketed
-neighborhood coordinates around a prospective nominee, while preserving the one-pivot limit.
-Never edit an accepted candidate. The four candidates must be independent material trials, not
-post-hoc labels."""
-    return common + """
-
-Read both lane-local feedback packets. Do not edit candidates. Build
-work/research-certificate.json whose seven arrays use official request hashes, whose union covers
-all twelve trials, and whose tags truthfully support every cell. If one successful candidate
-appears capable of the frozen gates and has a bracketed stable neighborhood, write a nominate
-decision to outbox/decision.json. Otherwise retire honestly with a concise evidence-based reason.
-Do not claim or guess sealed performance."""
+    return research_runtime_v4.team_phase_prompt(team_id, phase)
 
 
 @research_runtime_v4.serialized_r2_command
@@ -541,7 +504,7 @@ def launch_phase(root: Path, team_id: str, phase: str) -> Mapping[str, Any]:
     activation_v4.validate(root)
     TOP40_V4_LAYOUT.require_team(team_id)
     _validate_launch_transition(root, team_id, phase)
-    return research_runtime_v4.launch_team_phase(root, team_id, phase, _prompt(team_id, phase))
+    return research_runtime_v4.launch_team_phase(root, team_id, phase)
 
 
 @research_runtime_v4.serialized_r2_command

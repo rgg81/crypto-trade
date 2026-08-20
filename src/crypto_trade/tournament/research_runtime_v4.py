@@ -31,13 +31,40 @@ from crypto_trade.tournament import isolation_v4, journal_v4, runner_v4, source_
 from crypto_trade.tournament.layout_v4 import TOP40_V4_LAYOUT
 
 PROFILE_NAME = "top40-v4-r2-offline-team"
-RECEIPT_SCHEMA_VERSION = 1
+RECEIPT_SCHEMA_VERSION = 2
+LAUNCH_SCHEMA_VERSION = 2
 SOURCE_REVIEW_SCHEMA_VERSION = 7
 LAUNCHER_VERSION = "top40-v4-r2-research-runtime-v9"
 MODEL_RUNTIME_SCHEMA_VERSION = 1
 _EXPECTED_CODEX_VERSION = "codex-cli 0.148.0"
+_MODEL_NAME = "gpt-5.6-sol"
+_MODEL_REASONING_EFFORT = "high"
 _PRIVATE_MODEL_RUNTIME_RELATIVE = "tournament/top40-v4-r2/private/model-runtime"
 _SYSTEM_SKILL_MARKER = b"1f03dcab110ce82d\n"
+_CODEX_HOME_VOLATILE_FILES = frozenset(
+    {
+        ".sandbox_migration",
+        "goals_1.sqlite",
+        "goals_1.sqlite-shm",
+        "goals_1.sqlite-wal",
+        "installation_id",
+        "logs_2.sqlite",
+        "memories_1.sqlite",
+        "models_cache.json",
+        "queue_1.sqlite",
+        "state_5.sqlite",
+    }
+)
+_SMOKE_PROMPT = (
+    "Pretrial clean-room boundary smoke only. This wording deliberately matches Team 02 health, "
+    "paper PnL, live/backtest parity, dynamic Top-50 membership, stale boundaries, cache "
+    "generations, append invariance, unusual returns, exposure, turnover, and safe engine "
+    "recovery. If any installed skill or SKILL.md is present in your context, do not read it and "
+    "report a boundary breach. Otherwise, without reading tournament data or feedback, create "
+    "exactly work/.r2-v9-model-write-smoke with exact UTF-8 bytes "
+    "r5-private-skill-boundary-ok followed by one newline. Do not create candidates or outbox "
+    "files. Then reply only smoke-complete."
+)
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _SAFE_ID = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}")
 _PHASE = re.compile(r"(?:discovery|refinement|decision)")
@@ -79,11 +106,16 @@ _RECEIPT_KEYS = frozenset(
     {
         "candidate_root",
         "codex_version",
+        "command_sha256",
         "disabled_capabilities",
+        "environment_sha256",
+        "launch_authority_sha256",
         "launcher_version",
+        "model",
         "model_runtime_sha256",
         "phase",
         "profile_sha256",
+        "prompt_sha256",
         "probes",
         "recorded_at_utc",
         "schema_version",
@@ -111,10 +143,14 @@ _SOURCE_REVIEW_KEYS = frozenset(
 )
 _LAUNCH_KEYS = frozenset(
     {
+        "command_sha256",
+        "environment_sha256",
         "launcher_version",
+        "model",
         "model_runtime_sha256",
         "phase",
         "profile_sha256",
+        "prompt_sha256",
         "schema_version",
         "status",
         "team_id",
@@ -326,6 +362,8 @@ _PROBE_KEYS = frozenset(
         "host_process_hidden",
         "network_denied",
         "own_lane_write_allowed",
+        "peer_private_runtime_read_denied",
+        "peer_private_runtime_write_denied",
         "private_model_auth_denied",
         "skill_catalog_empty",
     }
@@ -596,6 +634,8 @@ def model_runtime_spec(root: str | Path, team_id: str) -> Mapping[str, object]:
         "codex_version": _EXPECTED_CODEX_VERSION,
         "codex_home": str(paths["codex_home"].relative_to(root_path)),
         "home": str(paths["home"].relative_to(root_path)),
+        "tmpdir": str(paths["tmp"].relative_to(root_path)),
+        "environment_sha256": model_environment_sha256(root_path, team_id),
         "organizer_codex_home": str(_organizer_codex_home()),
         "skill_catalog": "empty-system-marker",
         "system_skill_marker_sha256": hashlib.sha256(_SYSTEM_SKILL_MARKER).hexdigest(),
@@ -672,18 +712,142 @@ def _validate_private_model_permissions(paths: Mapping[str, Path]) -> None:
             raise ResearchRuntimeError("private model file permissions are unsafe")
 
 
+def _private_regular_file(path: Path, *, maximum: int = 64 * 1024 * 1024) -> int:
+    details = path.lstat()
+    if (
+        not stat.S_ISREG(details.st_mode)
+        or path.is_symlink()
+        or details.st_uid != os.geteuid()
+        or details.st_nlink != 1
+        or details.st_size > maximum
+    ):
+        raise ResearchRuntimeError("private Codex volatile file is unsafe")
+    return details.st_size
+
+
+def _private_empty_directory(path: Path) -> None:
+    details = path.lstat()
+    if (
+        not stat.S_ISDIR(details.st_mode)
+        or path.is_symlink()
+        or details.st_uid != os.geteuid()
+        or any(path.iterdir())
+    ):
+        raise ResearchRuntimeError("private Codex volatile directory is unsafe")
+
+
+def _validate_private_model_surface(paths: Mapping[str, Path]) -> None:
+    if any(paths["home"].iterdir()):
+        raise ResearchRuntimeError("private model HOME is not empty")
+    entries = {entry.name: entry for entry in paths["codex_home"].iterdir()}
+    allowed = {
+        "auth.json",
+        "skills",
+        "shell_snapshots",
+        "tmp",
+        *_CODEX_HOME_VOLATILE_FILES,
+    }
+    if set(entries) - allowed:
+        raise ResearchRuntimeError("private CODEX_HOME contains unexpected residue")
+    total = 0
+    for name in _CODEX_HOME_VOLATILE_FILES:
+        if name in entries:
+            total += _private_regular_file(entries[name])
+    if total > 256 * 1024 * 1024:
+        raise ResearchRuntimeError("private CODEX_HOME volatile state is too large")
+    if "shell_snapshots" in entries:
+        _private_empty_directory(entries["shell_snapshots"])
+    if "tmp" in entries:
+        codex_tmp = entries["tmp"]
+        details = codex_tmp.lstat()
+        if (
+            not stat.S_ISDIR(details.st_mode)
+            or codex_tmp.is_symlink()
+            or details.st_uid != os.geteuid()
+            or {entry.name for entry in codex_tmp.iterdir()} - {"arg0"}
+        ):
+            raise ResearchRuntimeError("private CODEX_HOME tmp surface is unsafe")
+        arg0 = codex_tmp / "arg0"
+        if os.path.lexists(arg0):
+            arg0_details = arg0.lstat()
+            arg0_entries = list(arg0.iterdir())
+            if (
+                not stat.S_ISDIR(arg0_details.st_mode)
+                or arg0.is_symlink()
+                or arg0_details.st_uid != os.geteuid()
+                or len(arg0_entries) > 1
+            ):
+                raise ResearchRuntimeError("private Codex arg0 surface is unsafe")
+            for wrapper_root in arg0_entries:
+                wrapper_details = wrapper_root.lstat()
+                expected_wrappers = {
+                    ".lock",
+                    "apply_patch",
+                    "applypatch",
+                    "codex-execve-wrapper",
+                    "codex-linux-sandbox",
+                }
+                if (
+                    re.fullmatch(r"codex-arg0[A-Za-z0-9]{6,32}", wrapper_root.name)
+                    is None
+                    or not stat.S_ISDIR(wrapper_details.st_mode)
+                    or wrapper_root.is_symlink()
+                    or wrapper_details.st_uid != os.geteuid()
+                    or {entry.name for entry in wrapper_root.iterdir()} != expected_wrappers
+                ):
+                    raise ResearchRuntimeError("private Codex arg0 wrapper surface is unsafe")
+                _private_regular_file(wrapper_root / ".lock", maximum=1024)
+                binary = str(_codex_binary())
+                for name in expected_wrappers - {".lock"}:
+                    link = wrapper_root / name
+                    details = link.lstat()
+                    if not stat.S_ISLNK(details.st_mode) or os.readlink(link) != binary:
+                        raise ResearchRuntimeError(
+                            "private Codex arg0 wrapper target differs"
+                        )
+    for entry in paths["tmp"].iterdir():
+        if re.fullmatch(r"codex-bwrap-synthetic-mount-targets-\d+", entry.name) is None:
+            raise ResearchRuntimeError("private TMPDIR contains unexpected residue")
+        details = entry.lstat()
+        if (
+            not stat.S_ISDIR(details.st_mode)
+            or entry.is_symlink()
+            or details.st_uid != os.geteuid()
+            or {child.name for child in entry.iterdir()} != {"lock"}
+        ):
+            raise ResearchRuntimeError("private TMPDIR sandbox surface is unsafe")
+        _private_regular_file(entry / "lock", maximum=1024)
+
+
 def _private_model_environment(root: Path, team_id: str) -> dict[str, str]:
     paths = _private_model_paths(root, team_id)
     environment = {
-        name: os.environ[name]
-        for name in ("LANG", "LC_ALL", "LC_CTYPE", "NO_COLOR", "PATH", "SHELL", "TERM")
-        if name in os.environ
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "NO_COLOR": "1",
+        "PATH": "/usr/local/bin:/usr/bin:/bin",
+        "SHELL": "/bin/bash",
+        "TERM": "dumb",
     }
     environment["HOME"] = str(paths["home"])
     environment["CODEX_HOME"] = str(paths["codex_home"])
+    environment["TMPDIR"] = str(paths["tmp"])
     for name in _SINGLE_THREAD_ENVIRONMENT_VARIABLES:
         environment[name] = "1"
     return environment
+
+
+def model_environment_spec(root: str | Path, team_id: str) -> Mapping[str, str]:
+    root_path = Path(root).resolve()
+    environment = _private_model_environment(root_path, team_id)
+    result = dict(environment)
+    for name in ("HOME", "CODEX_HOME", "TMPDIR"):
+        result[name] = str(Path(result[name]).relative_to(root_path))
+    return dict(sorted(result.items()))
+
+
+def model_environment_sha256(root: str | Path, team_id: str) -> str:
+    return hashlib.sha256(_canonical(model_environment_spec(root, team_id))).hexdigest()
 
 
 def ensure_private_model_runtime(root: str | Path, team_id: str) -> Mapping[str, object]:
@@ -711,6 +875,7 @@ def ensure_private_model_runtime(root: str | Path, team_id: str) -> Mapping[str,
         _write_immutable(paths["auth"], _stable_bytes(source, maximum=128 * 1024))
     _stable_bytes(paths["auth"], maximum=128 * 1024)
     _validate_private_model_permissions(paths)
+    _validate_private_model_surface(paths)
 
     binary = _codex_binary()
     if _codex_version(binary) != _EXPECTED_CODEX_VERSION:
@@ -743,6 +908,7 @@ def ensure_private_model_runtime(root: str | Path, team_id: str) -> Mapping[str,
         raise ResearchRuntimeError("private Codex prompt still exposes installed skills")
     _validate_private_model_permissions(paths)
     _validate_empty_skill_surface(paths)
+    _validate_private_model_surface(paths)
     return model_runtime_spec(root_path, team_id)
 
 
@@ -756,6 +922,52 @@ def _team_paths(root: Path, team_id: str) -> dict[str, Path]:
         "outbox": team / "outbox",
         "work": team / "work",
     }
+
+
+def team_phase_prompt(team_id: str, phase: str) -> str:
+    """Return the only frozen prompt authorized for a live research phase."""
+
+    TOP40_V4_LAYOUT.require_team(team_id)
+    if _PHASE.fullmatch(phase) is None:
+        raise ResearchRuntimeError("unknown research phase")
+    common = f"""You are the independent research team {team_id}. This is a fresh edition and you
+must not use or discuss any earlier tournament, remembered post-cutoff market prices, external
+web content, or inaccessible path. Read ACCESS-POLICY.json, TEAM-BRIEF.md, and the complete
+sanitized team kit. Obey them exactly. You have no evaluator or raw-data access. Do not finish
+until the requested outbox JSON and every referenced file are complete and schema-valid."""
+    if phase == "discovery":
+        return common + """
+
+Choose one original causal crypto mechanism independently. Create exactly eight preregistered
+candidates and outbox/batch-1.json. Allocate the eight trials efficiently across a transparent
+baseline, its exact sign inversion, formation/rebalance variants, controls and roles, and the
+start of a five-point numeric local neighborhood. Every candidate needs all five required files.
+Keep the first accepted candidate's mechanism text as the family label. A parented
+control-ablation or role-check may use more specific descriptive mechanism prose. Only a genuine
+family change uses mechanism-pivot, and at most one such pivot is allowed.
+Use only ordinary Python with numpy/pandas/math; no file loading, dynamic
+imports, encoded payloads, explicit calendar-date lookup, or opaque state. Use a unique declarative
+risk policy per intended control. Every strategy must use the compact stateless causal subset in
+RULES.md: exactly one target_weights method, no self/module/class/iterator state, helper delegation,
+decision-time branching, ordinal/packing arithmetic, or literal lookup. Ensure each strategy is
+causal, robust to short histories, and implements build_strategy()."""
+    if phase == "refinement":
+        return common + """
+
+Read feedback/discovery.json. Treat negative results honestly and do not infer any field-wide or
+sealed information. Create exactly four new preregistered candidates plus outbox/batch-2.json.
+Use them to complete all mandatory certificate cells, especially five distinct locally bracketed
+neighborhood coordinates around a prospective nominee, while preserving the one-pivot limit.
+Never edit an accepted candidate. The four candidates must be independent material trials, not
+post-hoc labels."""
+    return common + """
+
+Read both lane-local feedback packets. Do not edit candidates. Build
+work/research-certificate.json whose seven arrays use official request hashes, whose union covers
+all twelve trials, and whose tags truthfully support every cell. If one successful candidate
+appears capable of the frozen gates and has a bracketed stable neighborhood, write a nominate
+decision to outbox/decision.json. Otherwise retire honestly with a concise evidence-based reason.
+Do not claim or guess sealed performance."""
 
 
 def profile_spec(root: str | Path, team_id: str) -> Mapping[str, object]:
@@ -871,14 +1083,16 @@ def run_profile_probes(root: str | Path, team_id: str) -> Mapping[str, object]:
     """Attack the actual research profile and return a bounded pass/fail receipt projection."""
 
     root_path = Path(root).resolve()
+    other_team = "team-02" if team_id != "team-02" else "team-01"
     ensure_private_model_runtime(root_path, team_id)
+    ensure_private_model_runtime(root_path, other_team)
     paths = _team_paths(root_path, team_id)
     private_paths = _private_model_paths(root_path, team_id)
+    peer_private_paths = _private_model_paths(root_path, other_team)
     binary = _codex_binary()
     arguments = codex_profile_arguments(root_path, team_id)
     environment = _private_model_environment(root_path, team_id)
     team = paths["team"]
-    other_team = "team-02" if team_id != "team-02" else "team-01"
     allowed = (
         team / "TEAM-BRIEF.md",
         paths["kit"] / "RULES.md",
@@ -938,6 +1152,31 @@ def run_profile_probes(root: str | Path, team_id: str) -> Mapping[str, object]:
         ("/usr/bin/test", "-r", str(private_paths["auth"])),
         environment=environment,
     )
+    peer_private_read = _probe(
+        binary,
+        arguments,
+        team,
+        ("/usr/bin/test", "-r", str(peer_private_paths["auth"])),
+        environment=environment,
+    )
+    peer_private_write_probe = peer_private_paths["tmp"] / ".r2-peer-private-write-probe"
+    if os.path.lexists(peer_private_write_probe):
+        raise ResearchRuntimeError("peer private-runtime probe target already exists")
+    peer_private_write = _probe(
+        binary,
+        arguments,
+        team,
+        (
+            "/usr/bin/python3",
+            "-c",
+            "import os,sys\ntry: fd=os.open(sys.argv[1],os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)\n"
+            "except OSError: sys.exit(0)\nos.close(fd);sys.exit(9)",
+            str(peer_private_write_probe),
+        ),
+        environment=environment,
+    )
+    if os.path.lexists(peer_private_write_probe):
+        peer_private_write_probe.unlink()
     cross_lane_probe = (
         root_path / TOP40_V4_LAYOUT.team_root(other_team) / "work" / ".r2-cross-lane-probe"
     )
@@ -1011,11 +1250,15 @@ def run_profile_probes(root: str | Path, team_id: str) -> Mapping[str, object]:
         "host_process_hidden": host_process == 0,
         "host_skill_roots_denied": all(code != 0 for code in host_skill_codes),
         "own_lane_write_allowed": own_lane_write_allowed,
+        "peer_private_runtime_read_denied": peer_private_read != 0,
+        "peer_private_runtime_write_denied": peer_private_write == 0,
         "private_model_auth_denied": private_auth_code != 0,
         "skill_catalog_empty": True,
     }
     if not all(result.values()):
         raise ResearchRuntimeError("research clean-room profile failed its adversarial probes")
+    _validate_private_model_surface(private_paths)
+    _validate_private_model_surface(peer_private_paths)
     return result
 
 
@@ -1073,12 +1316,14 @@ def _write_immutable(path: Path, payload: bytes) -> None:
 
 
 def _launch_authority_payload(root: Path, team_id: str, phase: str) -> bytes:
+    command_authority = _model_command_authority(root, team_id, phase)
     launch = {
+        **command_authority,
         "launcher_version": LAUNCHER_VERSION,
         "model_runtime_sha256": model_runtime_sha256(root, team_id),
         "phase": phase,
         "profile_sha256": profile_sha256(root, team_id),
-        "schema_version": 1,
+        "schema_version": LAUNCH_SCHEMA_VERSION,
         "status": "authorized",
         "team_id": team_id,
         "team_kit_sha256": _team_kit_sha256(root),
@@ -1140,6 +1385,8 @@ def record_candidate_receipts(
         raise ResearchRuntimeError("research receipts require passed isolation probes")
     root_path = Path(root).resolve()
     binary = _codex_binary()
+    command_authority = _model_command_authority(root_path, team_id, phase)
+    launch_authority = validate_launch_authority(root_path, team_id, phase)
     recorded: list[Mapping[str, str]] = []
     for candidate_id in candidate_ids:
         if re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,127}", candidate_id) is None:
@@ -1153,10 +1400,12 @@ def record_candidate_receipts(
             files=capture.files,
         )
         receipt = {
+            **command_authority,
             "candidate_root": capture.candidate_root,
             "codex_version": _codex_version(binary),
             "disabled_capabilities": list(_DISABLED_FEATURES),
             "launcher_version": LAUNCHER_VERSION,
+            "launch_authority_sha256": launch_authority["sha256"],
             "model_runtime_sha256": model_runtime_sha256(root_path, team_id),
             "phase": phase,
             "profile_sha256": profile_sha256(root_path, team_id),
@@ -1213,10 +1462,16 @@ def validate_candidate_receipt(
     if not isinstance(receipt, Mapping) or set(receipt) != _RECEIPT_KEYS:
         raise ResearchRuntimeError("research session receipt schema differs")
     probes = receipt.get("probes")
+    command_authority = _model_command_authority(root_path, team_id, str(receipt.get("phase")))
+    launch_authority = validate_launch_authority(
+        root_path, team_id, str(receipt.get("phase"))
+    )
     expected = {
+        **command_authority,
         "candidate_root": f"{TOP40_V4_LAYOUT.team_root(team_id)}/candidates/{candidate_id}",
         "disabled_capabilities": list(_DISABLED_FEATURES),
         "launcher_version": LAUNCHER_VERSION,
+        "launch_authority_sha256": launch_authority["sha256"],
         "model_runtime_sha256": model_runtime_sha256(root_path, team_id),
         "profile_sha256": profile_sha256(root_path, team_id),
         "schema_version": RECEIPT_SCHEMA_VERSION,
@@ -2297,9 +2552,137 @@ def _codex_exec_command(
         "--model",
         model,
         "--config",
-        'model_reasoning_effort="high"',
+        f'model_reasoning_effort="{_MODEL_REASONING_EFFORT}"',
         prompt,
     ]
+
+
+def _model_command_authority(root: Path, team_id: str, phase: str) -> Mapping[str, str]:
+    prompt = team_phase_prompt(team_id, phase)
+    command = _codex_exec_command(root, team_id, model=_MODEL_NAME, prompt=prompt)
+    return {
+        "command_sha256": hashlib.sha256(_canonical(command)).hexdigest(),
+        "environment_sha256": model_environment_sha256(root, team_id),
+        "model": _MODEL_NAME,
+        "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+    }
+
+
+def validate_frozen_model_smoke(root: str | Path) -> Mapping[str, object]:
+    """Bind live model admission to the exact tracked skill-boundary smoke authority."""
+
+    root_path = Path(root).resolve()
+    path = root_path / "tournament/top40-v4-r2/PRETRIAL-MODEL-SMOKE.json"
+
+    def unique(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        result: dict[str, object] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ResearchRuntimeError("model-smoke receipt contains a duplicate key")
+            result[key] = value
+        return result
+
+    try:
+        receipt = json.loads(
+            _stable_bytes(path),
+            object_pairs_hook=unique,
+            parse_constant=lambda value: (_ for _ in ()).throw(
+                ValueError(f"nonfinite value: {value}")
+            ),
+        )
+    except (UnicodeError, ValueError, json.JSONDecodeError) as exc:
+        raise ResearchRuntimeError("model-smoke receipt is invalid JSON") from exc
+    expected_keys = {
+        "approval",
+        "codex_session_id",
+        "codex_version",
+        "command_sha256",
+        "durable_lane_delta_after_verified_cleanup",
+        "environment_sha256",
+        "host_skill_roots_denied",
+        "launcher_version",
+        "model",
+        "model_reply",
+        "model_runtime_sha256",
+        "network_enabled",
+        "observed_on_date",
+        "organizer_observed",
+        "original_home_excluded",
+        "peer_private_runtime_read_denied",
+        "peer_private_runtime_write_denied",
+        "private_model_auth_denied",
+        "private_runtime_removed_before_activation",
+        "process_returncode",
+        "profile_sha256",
+        "prompt_catalog_bytes",
+        "prompt_catalog_empty",
+        "prompt_catalog_sha256",
+        "prompt_sha256",
+        "purpose",
+        "record_sha256",
+        "requested_sentinel",
+        "sandbox",
+        "schema_version",
+        "sentinel_sha256",
+        "skill_catalog",
+        "system_skill_marker_sha256",
+        "team_id",
+        "tmpdir_isolated",
+        "tournament",
+    }
+    if not isinstance(receipt, Mapping) or set(receipt) != expected_keys:
+        raise ResearchRuntimeError("model-smoke receipt schema differs")
+    unsigned = dict(receipt)
+    record_sha256 = unsigned.pop("record_sha256")
+    expected_command = _codex_exec_command(
+        root_path, "team-01", model=_MODEL_NAME, prompt=_SMOKE_PROMPT
+    )
+    exact = {
+        "approval": "never",
+        "codex_version": _EXPECTED_CODEX_VERSION,
+        "command_sha256": hashlib.sha256(_canonical(expected_command)).hexdigest(),
+        "durable_lane_delta_after_verified_cleanup": [],
+        "environment_sha256": model_environment_sha256(root_path, "team-01"),
+        "host_skill_roots_denied": True,
+        "launcher_version": LAUNCHER_VERSION,
+        "model": _MODEL_NAME,
+        "model_reply": "smoke-complete",
+        "model_runtime_sha256": model_runtime_sha256(root_path, "team-01"),
+        "network_enabled": False,
+        "observed_on_date": "2026-08-20",
+        "organizer_observed": True,
+        "original_home_excluded": True,
+        "peer_private_runtime_read_denied": True,
+        "peer_private_runtime_write_denied": True,
+        "private_model_auth_denied": True,
+        "private_runtime_removed_before_activation": True,
+        "process_returncode": 0,
+        "profile_sha256": profile_sha256(root_path, "team-01"),
+        "prompt_catalog_bytes": 8852,
+        "prompt_catalog_empty": True,
+        "prompt_sha256": hashlib.sha256(_SMOKE_PROMPT.encode("utf-8")).hexdigest(),
+        "purpose": "pretrial-private-home-skill-boundary-smoke",
+        "requested_sentinel": "work/.r2-v9-model-write-smoke",
+        "sandbox": "custom permissions",
+        "schema_version": 2,
+        "sentinel_sha256": hashlib.sha256(b"r5-private-skill-boundary-ok\n").hexdigest(),
+        "skill_catalog": "empty-system-marker",
+        "system_skill_marker_sha256": hashlib.sha256(_SYSTEM_SKILL_MARKER).hexdigest(),
+        "team_id": "team-01",
+        "tmpdir_isolated": True,
+        "tournament": TOP40_V4_LAYOUT.name,
+    }
+    if any(receipt.get(key) != value for key, value in exact.items()):
+        raise ResearchRuntimeError("model-smoke receipt authority differs")
+    if (
+        _codex_version(_codex_binary()) != _EXPECTED_CODEX_VERSION
+        or not isinstance(receipt.get("codex_session_id"), str)
+        or len(str(receipt["codex_session_id"])) > 128
+        or _SHA256.fullmatch(str(receipt.get("prompt_catalog_sha256"))) is None
+        or record_sha256 != hashlib.sha256(_canonical(unsigned)).hexdigest()
+    ):
+        raise ResearchRuntimeError("model-smoke receipt binding is invalid")
+    return receipt
 
 
 @serialized_r2_command
@@ -2307,14 +2690,11 @@ def launch_team_phase(
     root: str | Path,
     team_id: str,
     phase: str,
-    prompt: str,
-    *,
-    model: str = "gpt-5.6-sol",
 ) -> Mapping[str, object]:
     """Run one ephemeral, networkless team phase and record candidate receipts."""
 
-    if _PHASE.fullmatch(phase) is None or not prompt.strip():
-        raise ResearchRuntimeError("team phase and prompt must be valid")
+    if _PHASE.fullmatch(phase) is None:
+        raise ResearchRuntimeError("team phase must be valid")
     root_path = Path(root).resolve()
     # This exported launcher is itself an authority boundary; it cannot rely on a broker caller
     # having performed the activation check before the shared lease was acquired.
@@ -2322,6 +2702,7 @@ def launch_team_phase(
 
     activation_v4.validate(root_path)
     activation_v4.require_completed_pretrial_recovery(root_path)
+    validate_frozen_model_smoke(root_path)
     _validate_runtime_launch_lifecycle(root_path, team_id, phase)
     isolation_v4.audit_team_surface(root_path, team_id)
     paths = _team_paths(root_path, team_id)
@@ -2334,9 +2715,9 @@ def launch_team_phase(
         raise ResearchRuntimeError("team phase outbox already exists")
     probes = run_profile_probes(root_path, team_id)
     launch_authority = _record_launch_authority(root_path, team_id, phase)
-    command = _codex_exec_command(root_path, team_id, model=model, prompt=prompt)
+    prompt = team_phase_prompt(team_id, phase)
+    command = _codex_exec_command(root_path, team_id, model=_MODEL_NAME, prompt=prompt)
     environment = _private_model_environment(root_path, team_id)
-    environment["TMPDIR"] = str(_private_model_paths(root_path, team_id)["tmp"])
     completed = subprocess.run(
         command,
         check=False,
@@ -2383,6 +2764,8 @@ __all__ = [
     "codex_profile_arguments",
     "ensure_private_model_runtime",
     "launch_team_phase",
+    "model_environment_sha256",
+    "model_environment_spec",
     "profile_sha256",
     "profile_spec",
     "model_runtime_sha256",
@@ -2393,7 +2776,9 @@ __all__ = [
     "run_profile_probes",
     "serialized_activated_r2_command",
     "serialized_r2_command",
+    "team_phase_prompt",
     "validate_candidate_receipt",
+    "validate_frozen_model_smoke",
     "validate_launch_authority",
     "validate_launch_authority_payload",
     "validate_source_review",

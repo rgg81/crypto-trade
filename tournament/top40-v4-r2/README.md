@@ -45,8 +45,8 @@ are frozen in `FRESH-RESTART-AUTHORITY.json`; teams cannot read that organizer a
 predecessor artifact. Activation independently proves the physical restart is an exact seed-only
 genesis, repeats that proof across its test run, and binds the resulting chained surface digest
 into the activation freeze before any team can launch. Team-model commands additionally use an
-organizer-private, skill-empty, per-team Codex home whose runtime identity is bound into every
-launch.
+organizer-private, skill-empty, per-team Codex runtime; the exact model, prompt, argv, sanitized
+environment, and runtime identities are bound into every launch and candidate receipt.
 
 The isolated rebuild authority is `SNAPSHOT-BUILD.toml`; it publishes to `snapshot-v2` and an
 edition-local manifest, leaving every existing snapshot unchanged.

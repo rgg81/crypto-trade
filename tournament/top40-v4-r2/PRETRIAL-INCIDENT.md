@@ -20,11 +20,11 @@ trial zero.
 
 `FRESH-RESTART-AUTHORITY.json` schema 2 binds the stopped activation/test/journal/decision-launch
 hashes, the 49-record head, the exposed skill hash, the exact 478-file runtime artifact-surface
-digest, and the no-decision/no-nomination facts. The successor uses a new launcher and branch. Its
-each team's model process receives its own organizer-private skill-empty `HOME`/`CODEX_HOME`;
-launch admission binds
-that runtime identity and rejects any model-visible skill catalog, host skill/plugin readability,
-or private-auth readability. Activation again requires the exact seed-only 15-lane genesis, so no
+digest, and the no-decision/no-nomination facts. The successor uses a new launcher and branch. Each
+team's model process receives its own organizer-private skill-empty `HOME`, `CODEX_HOME`, and
+`TMPDIR`; launch admission binds the model, prompt, argv, sanitized environment, and runtime
+identity, and rejects any model-visible skill catalog, host or peer skill/runtime readability, or
+private-auth readability. Activation again requires the exact seed-only 15-lane genesis, so no
 stopped artifact can enter the new competition.
 
 The tracked v9 smoke receipt binds the exact private-runtime and permission-profile digests, the

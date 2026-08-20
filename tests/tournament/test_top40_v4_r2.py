@@ -194,6 +194,11 @@ def _patch_fresh_activation(
     monkeypatch.setattr(activation_v4, "_audit_sha256", lambda _root, _config: "4" * 64)
     monkeypatch.setattr(activation_v4, "_run_tests", lambda _root: next(results))
     monkeypatch.setattr(
+        research_runtime_v4,
+        "validate_frozen_model_smoke",
+        lambda _root: {"status": "passed"},
+    )
+    monkeypatch.setattr(
         activation_v4.top40_v4,
         "load_config",
         lambda **_kwargs: SimpleNamespace(raw={}, sha256="5" * 64),
@@ -1146,6 +1151,80 @@ def test_private_model_runtime_rejects_codex_version_drift(
         research_runtime_v4.ensure_private_model_runtime(root, "team-01")
 
 
+def test_model_environment_is_frozen_per_team_and_excludes_host_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("HOME", "/host/home/must-not-pass")
+    monkeypatch.setenv("CODEX_HOME", "/host/codex/must-not-pass")
+    monkeypatch.setenv("TMPDIR", "/host/tmp/must-not-pass")
+    environment = research_runtime_v4._private_model_environment(tmp_path, "team-03")
+    assert environment["HOME"] == str(
+        tmp_path / "tournament/top40-v4-r2/private/model-runtime/team-03/home"
+    )
+    assert environment["CODEX_HOME"] == str(
+        tmp_path / "tournament/top40-v4-r2/private/model-runtime/team-03/codex-home"
+    )
+    assert environment["TMPDIR"] == str(
+        tmp_path / "tournament/top40-v4-r2/private/model-runtime/team-03/tmp"
+    )
+    assert not any("/host/" in value for value in environment.values())
+    assert research_runtime_v4.model_environment_sha256(
+        tmp_path, "team-03"
+    ) != research_runtime_v4.model_environment_sha256(tmp_path, "team-04")
+
+
+def test_private_model_runtime_rejects_unexpected_home_residue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    organizer = tmp_path / "organizer-codex"
+    organizer.mkdir()
+    (organizer / "auth.json").write_bytes(b'{"auth":"fixture"}\n')
+    root = tmp_path / "root"
+    root.mkdir()
+    monkeypatch.setattr(research_runtime_v4, "_organizer_codex_home", lambda: organizer)
+    monkeypatch.setattr(research_runtime_v4, "_codex_binary", lambda: Path("/usr/bin/true"))
+    monkeypatch.setattr(
+        research_runtime_v4,
+        "_codex_version",
+        lambda _binary: research_runtime_v4._EXPECTED_CODEX_VERSION,
+    )
+    research_runtime_v4.ensure_private_model_runtime(root, "team-01")
+    home = root / research_runtime_v4._PRIVATE_MODEL_RUNTIME_RELATIVE / "team-01/home"
+    (home / ".agents").mkdir()
+    with pytest.raises(
+        research_runtime_v4.ResearchRuntimeError,
+        match="HOME is not empty",
+    ):
+        research_runtime_v4.ensure_private_model_runtime(root, "team-01")
+
+
+def test_frozen_model_smoke_semantics_bind_current_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    receipt = research_runtime_v4.validate_frozen_model_smoke(ROOT)
+    assert receipt["environment_sha256"] == research_runtime_v4.model_environment_sha256(
+        ROOT, "team-01"
+    )
+    original = (ROOT / activation_v4._PRETRIAL_SMOKE_RECEIPT_PATH).read_bytes()
+    mutated = json.loads(original)
+    mutated["prompt_catalog_empty"] = False
+    payload = (json.dumps(mutated, sort_keys=True) + "\n").encode()
+    monkeypatch.setattr(
+        research_runtime_v4,
+        "_stable_bytes",
+        lambda path, **_kwargs: (
+            payload
+            if path == ROOT / activation_v4._PRETRIAL_SMOKE_RECEIPT_PATH
+            else original
+        ),
+    )
+    with pytest.raises(
+        research_runtime_v4.ResearchRuntimeError,
+        match="receipt authority differs",
+    ):
+        research_runtime_v4.validate_frozen_model_smoke(ROOT)
+
+
 def test_pretrial_recovery_archives_old_then_new_authority_and_is_idempotent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1261,12 +1340,18 @@ def test_launch_authority_requires_exact_canonical_bytes(
     ) == recorded
 
     semantic = json.loads(canonical)
-    noncanonical = json.dumps(semantic, separators=(",", ":")).encode() + b"\n"
-    duplicate = canonical.replace(
-        b'{\n  "launcher_version"',
-        b'{\n  "schema_version": 1,\n  "launcher_version"',
-        1,
+    assert semantic["model"] == research_runtime_v4._MODEL_NAME
+    assert semantic["environment_sha256"] == research_runtime_v4.model_environment_sha256(
+        tmp_path, "team-01"
     )
+    assert semantic["prompt_sha256"] == hashlib.sha256(
+        research_runtime_v4.team_phase_prompt("team-01", "discovery").encode()
+    ).hexdigest()
+    assert semantic["command_sha256"] == research_runtime_v4._model_command_authority(
+        tmp_path, "team-01", "discovery"
+    )["command_sha256"]
+    noncanonical = json.dumps(semantic, separators=(",", ":")).encode() + b"\n"
+    duplicate = canonical.replace(b"{\n", b'{\n  "schema_version": 1,\n', 1)
     for payload in (noncanonical, duplicate):
         with pytest.raises(
             research_runtime_v4.ResearchRuntimeError,
@@ -2142,7 +2227,6 @@ def test_direct_launcher_requires_activation_before_any_team_process(
             tmp_path,
             "team-01",
             "discovery",
-            "authorized prompt",
         )
 
 
@@ -2158,7 +2242,6 @@ def test_direct_launcher_requires_completed_pretrial_incident_authority(
             tmp_path,
             "team-01",
             "discovery",
-            "authorized prompt",
         )
 
 

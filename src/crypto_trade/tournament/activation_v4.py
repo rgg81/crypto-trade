@@ -41,7 +41,10 @@ _PRETRIAL_INCIDENT_STAGE = f"{_PRETRIAL_INCIDENT_ROOT}/.{_PRETRIAL_INCIDENT_ID}.
 _PRETRIAL_INCIDENT_FINAL = f"{_PRETRIAL_INCIDENT_ROOT}/{_PRETRIAL_INCIDENT_ID}"
 _PRETRIAL_SMOKE_RECEIPT_PATH = "tournament/top40-v4-r2/PRETRIAL-MODEL-SMOKE.json"
 _PRETRIAL_SMOKE_RECEIPT_SHA256 = (
-    "b08089b771f4e95ac90bd369dac5474a3f1617d5640c6fde1b9424903d1ee1b7"
+    "c11c3e5bd22d809a7483188c6e24138183f2d21028a8f6d400936153607fc6d0"
+)
+_PRETRIAL_SMOKE_RECORD_SHA256 = (
+    "67b59accec854ee9f825f81580124eb97bfd21acdb132b1854500252ea83a4f9"
 )
 _FRESH_RESTART_AUTHORITY_PATH = "tournament/top40-v4-r2/FRESH-RESTART-AUTHORITY.json"
 _FRESH_RESTART_AUTHORITY_SHA256 = (
@@ -573,7 +576,7 @@ def _pretrial_incident_manifest(root: Path, path: Path) -> Mapping[str, Any]:
         != {
             "path": _PRETRIAL_SMOKE_RECEIPT_PATH,
             "sha256": _PRETRIAL_SMOKE_RECEIPT_SHA256,
-            "record_sha256": "ebbd03151348350767feac7acb9eebb0e57f15659353ea43cc51738292e87565",
+            "record_sha256": _PRETRIAL_SMOKE_RECORD_SHA256,
         }
     ):
         raise ActivationError("pretrial incident authority binding changed")
@@ -646,6 +649,14 @@ def _pretrial_incident_manifest(root: Path, path: Path) -> Mapping[str, Any]:
     smoke_receipt = _pretrial_file_bytes(root, _PRETRIAL_SMOKE_RECEIPT_PATH)
     if _sha256(smoke_receipt) != _PRETRIAL_SMOKE_RECEIPT_SHA256:
         raise ActivationError("pretrial model-smoke receipt changed")
+    smoke_object = _pretrial_object_bytes(smoke_receipt, "pretrial model-smoke receipt")
+    smoke_unsigned = dict(smoke_object)
+    smoke_record = smoke_unsigned.pop("record_sha256", None)
+    if (
+        smoke_record != _PRETRIAL_SMOKE_RECORD_SHA256
+        or smoke_record != _sha256(_canonical(smoke_unsigned))
+    ):
+        raise ActivationError("pretrial model-smoke record binding changed")
     final_entries = {entry.name for entry in path.parent.iterdir()}
     if final_entries != {
         "incident.json",
@@ -1410,7 +1421,7 @@ def complete_pretrial_recovery(root: str | Path) -> Mapping[str, Any]:
         "model_smoke_receipt": {
             "path": _PRETRIAL_SMOKE_RECEIPT_PATH,
             "sha256": _PRETRIAL_SMOKE_RECEIPT_SHA256,
-            "record_sha256": "ebbd03151348350767feac7acb9eebb0e57f15659353ea43cc51738292e87565",
+            "record_sha256": _PRETRIAL_SMOKE_RECORD_SHA256,
         },
     }
     manifest["record_sha256"] = _sha256(_canonical(manifest))
@@ -1637,6 +1648,9 @@ def activate(root: str | Path) -> Mapping[str, Any]:
                 root_path,
                 activation_tests_present=os.path.lexists(tests_path),
             )
+        from crypto_trade.tournament import research_runtime_v4
+
+        research_runtime_v4.validate_frozen_model_smoke(root_path)
     implementation_commit = _implementation_commit(root_path)
     loaded = top40_v4.load_config(root=root_path)
     _validate_snapshot_window(root_path, loaded.raw)
