@@ -539,7 +539,6 @@ def _validate_authority_current(
     return authority
 
 
-@research_runtime_v4.serialized_r2_command
 def activate(root: str | Path) -> Mapping[str, Any]:
     root_path = _safe_root(root)
     with _result_lock(root_path):
@@ -774,7 +773,7 @@ def _validate_open_lane_mechanism(
         raise OrchestratorError("team already consumed its one mechanism pivot")
 
 
-@research_runtime_v4.serialized_r2_command
+@research_runtime_v4.serialized_activated_r2_command
 def run_is(
     root: str | Path,
     team_id: str,
@@ -1156,7 +1155,7 @@ def _write_nomination_registry(root: Path, state: journal_v4.JournalState) -> No
     )
 
 
-@research_runtime_v4.serialized_r2_command
+@research_runtime_v4.serialized_activated_r2_command
 def nominate(
     root: str | Path,
     team_id: str,
@@ -1271,7 +1270,7 @@ def nominate(
         }
 
 
-@research_runtime_v4.serialized_r2_command
+@research_runtime_v4.serialized_activated_r2_command
 def retire(root: str | Path, team_id: str, *, reason: str) -> Mapping[str, Any]:
     root_path = _safe_root(root)
     with _result_lock(root_path):
@@ -1380,7 +1379,7 @@ def _capped_inverse_vol_weights(
     return {team_id: float(weights[team_id]) for team_id in sorted(weights)}, float(cash)
 
 
-@research_runtime_v4.serialized_r2_command
+@research_runtime_v4.serialized_activated_r2_command
 def close_is(root: str | Path) -> Mapping[str, Any]:
     root_path = _safe_root(root)
     with _result_lock(root_path):
@@ -2029,7 +2028,7 @@ def _recover_authorized_release(
         return result
 
 
-@research_runtime_v4.serialized_r2_command
+@research_runtime_v4.serialized_activated_r2_command
 def historical_release(root: str | Path) -> Mapping[str, Any]:
     """Consume each finalist once, then authorize and atomically publish the complete bundle."""
 

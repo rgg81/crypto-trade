@@ -74,6 +74,8 @@ reports-top40-v4-r2/source-archives/
 reports-top40-v4-r2/historical-oos/
 tournament/top40-v4-r2/broker.lock
 tournament/top40-v4-r2/result.lock
+tournament/top40-v4-r2/.result-command.lock
+tournament/top40-v4-r2/research-journal.jsonl
 tournament/top40-v4-r2/research-sessions/
 tournament/top40-v4-r2/private/
 tournament/top40-v4-r2/nominations/

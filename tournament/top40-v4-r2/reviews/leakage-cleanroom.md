@@ -14,7 +14,7 @@ projections. It rechecked every previously reported LC-01 through LC-06 attack c
 
 Executed evidence on the final implementation:
 
-- R2 contract/security suite: **53 passed**.
+- R2 contract/security suite: **55 passed**.
 - R1 compatibility suite: **24 passed**.
 - Ruff on the R2 clean-room, runner, orchestrator, broker, CLI, and tests: **passed**.
 - `git diff --check`: **passed**.
@@ -93,14 +93,33 @@ evaluation they expose only the fixed selection boundary until the atomic releas
 inspect only the requested lane, team feedback is lane-local, and result-lock contention queues
 without a distinct busy outcome.
 
-One blocking, re-entrant kernel lease encloses both canonical CLIs, every broker/model session,
-and every direct R2 orchestrator entrypoint. Its parent and lock node are opened
-descriptor-relatively with no-follow, owner, regular-file, single-link, and post-lock identity
-checks; a second process blocks rather than learning a busy state. The broker enforces the exact
-0/8/12-trial discovery/refinement/decision transitions, validates immutable prior feedback and
+After the one-time activation bootstrap, one blocking, re-entrant kernel lease encloses the broker
+CLI, every non-activation tournament CLI command, every broker/model session, and every direct R2
+model/evaluator orchestrator entrypoint. Its parent and lock node are opened descriptor-relatively
+with no-follow, owner, regular-file, single-link, and post-lock identity checks; a second process
+blocks rather than learning a busy state. The broker enforces the exact 0/8/12-trial
+discovery/refinement/decision transitions, validates immutable prior feedback and
 content-addressed outbox archives, rejects terminal/post-selection launches, and processes teams
 serially. The language-model subprocess must exit successfully before its outbox is captured or
 any evaluator runs.
+
+Activation is the sole bootstrap exception to the broker lease because its committed-scope pytest
+child must be able to acquire that lease. Activation remains enclosed by the organizer result
+lock, so it cannot overlap an evaluator mutation. Before the atomic freeze exists, every direct or
+brokered team launch fails activation validation before starting a model; after it exists, all
+model and evaluator commands use the lease. A redundant activation cannot rerun bootstrap tests
+or evaluate a candidate, and its organizer-only failure/output is outside every lane. The focused
+regression verifies that the activation CLI does not hold the parent broker lease across its child
+test process.
+
+Every result-bearing orchestrator entrypoint performs a fail-fast activation validation before it
+can acquire the broker lease, then repeats validation after acquiring its ordinary broker/result
+locks. The canonical organizer CLI supplies no outer lease for these commands and delegates to the
+same decorated entrypoints, preserving that order. Consequently a pre-activation direct or CLI
+result call cannot hold broker while waiting for activation's result lock, and a scope change
+between the precheck and lock acquisition still fails the authoritative in-lock validation. The
+cross-process regression exercises both paths while activation's result lock is held; both return
+without waiting on broker or running an evaluator.
 
 The exported low-level launcher now validates the frozen activation itself, while holding the
 same lease, before any model process or candidate receipt can be created. Refinement and decision

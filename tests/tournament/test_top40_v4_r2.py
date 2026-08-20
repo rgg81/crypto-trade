@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import importlib.util
 import json
@@ -46,6 +47,15 @@ def _r2_environment() -> dict[str, str]:
 def _broker_module():
     path = ROOT / "scripts/top40_v4_r2_team_broker.py"
     spec = importlib.util.spec_from_file_location("top40_v4_r2_team_broker_test", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _tournament_cli_module():
+    path = ROOT / "scripts/top40_v4_r2_tournament.py"
+    spec = importlib.util.spec_from_file_location("top40_v4_r2_tournament_test", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -441,6 +451,86 @@ def test_activation_test_process_is_explicitly_r2(
     assert output == b"passed\n"
     assert returncode == 0
     assert captured["env"]["CRYPTO_TRADE_TOP40_V4_EDITION"] == "r2"
+
+
+def test_activation_cli_bootstrap_does_not_hold_child_broker_lease(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cli = _tournament_cli_module()
+    calls: list[Path] = []
+    monkeypatch.setattr(
+        cli.orchestrator_v4,
+        "activate",
+        lambda root: calls.append(Path(root)) or {"activated": True},
+    )
+
+    @contextlib.contextmanager
+    def forbidden_lease(_root: Path):
+        raise AssertionError("activation must not hold the broker lease across child tests")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(cli.research_runtime_v4, "broker_lease", forbidden_lease)
+    assert cli.main(("--root", str(tmp_path), "activate")) == 0
+    assert calls == [tmp_path]
+    assert json.loads(capsys.readouterr().out) == {"activated": True}
+
+
+def test_pre_activation_result_call_cannot_invert_activation_lock_order(
+    tmp_path: Path,
+) -> None:
+    direct_script = """
+from pathlib import Path
+import sys
+from crypto_trade.tournament import orchestrator_v4
+try:
+    orchestrator_v4.run_is(
+        Path(sys.argv[1]),
+        'team-01',
+        'missing/strategy.py',
+        purpose='must fail before broker lease',
+    )
+except BaseException as exc:
+    print(type(exc).__name__, flush=True)
+else:
+    raise AssertionError('pre-activation result call unexpectedly succeeded')
+"""
+    with orchestrator_v4._result_lock(tmp_path):
+        commands = (
+            (sys.executable, "-c", direct_script, str(tmp_path)),
+            (
+                sys.executable,
+                "scripts/top40_v4_r2_tournament.py",
+                "--root",
+                str(tmp_path),
+                "is-run",
+                "team-01",
+                "missing/strategy.py",
+                "--purpose",
+                "must fail before broker lease",
+            ),
+        )
+        observations: list[tuple[int, str, str]] = []
+        for command in commands:
+            child = subprocess.Popen(
+                command,
+                cwd=ROOT,
+                env=_r2_environment(),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            try:
+                stdout, stderr = child.communicate(timeout=5)
+            finally:
+                if child.poll() is None:
+                    child.kill()
+                    child.wait(timeout=5)
+            observations.append((int(child.returncode), stdout, stderr))
+    direct, cli = observations
+    assert direct[0] == 0, direct[2]
+    assert direct[1].strip() in {"ActivationError", "FileNotFoundError", "ValueError"}
+    assert cli[0] == 2
+    assert "top40-v4-r2:" in cli[2]
 
 
 def test_verified_snapshot_contains_final_july_bar_and_excludes_august() -> None:

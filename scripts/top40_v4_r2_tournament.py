@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import sys
 from pathlib import Path
@@ -55,7 +56,15 @@ def main(argv: list[str] | None = None) -> int:
     arguments = _parser().parse_args(argv)
     root = Path(arguments.root)
     try:
-        with research_runtime_v4.broker_lease(root):
+        # Result entrypoints own their broker lease internally, after their activation precheck.
+        # Only the read-only isolation audit needs a lease supplied by this CLI. Activation is the
+        # bootstrap exception: its result lock serializes it while its test child acquires broker.
+        command_lease = (
+            research_runtime_v4.broker_lease(root)
+            if arguments.command == "audit-isolation"
+            else contextlib.nullcontext()
+        )
+        with command_lease:
             if arguments.command == "validate":
                 result = orchestrator_v4.validate(
                     root, require_activation=not arguments.pre_activation

@@ -445,6 +445,27 @@ def serialized_r2_command[ReturnT](
     return wrapped
 
 
+def serialized_activated_r2_command[ReturnT](
+    function: Callable[..., ReturnT],
+) -> Callable[..., ReturnT]:
+    """Fail pre-activation result calls before they can contend with activation's test child."""
+
+    leased = serialized_r2_command(function)
+
+    @functools.wraps(function)
+    def wrapped(root: str | Path, *args: object, **kwargs: object) -> ReturnT:
+        if TOP40_V4_LAYOUT.name.endswith("-r2"):
+            # Imported lazily to avoid the activation -> runner -> runtime import cycle. Every
+            # result function repeats validation after acquiring both locks, so this check is a
+            # deadlock-prevention precondition rather than the final authority decision.
+            from crypto_trade.tournament import activation_v4
+
+            activation_v4.validate(root, verify_universe_snapshot=False)
+        return leased(root, *args, **kwargs)
+
+    return wrapped
+
+
 def _canonical(value: object) -> bytes:
     return json.dumps(
         value,
@@ -2061,6 +2082,7 @@ __all__ = [
     "recover_candidate_receipts",
     "review_candidate_source",
     "run_profile_probes",
+    "serialized_activated_r2_command",
     "serialized_r2_command",
     "validate_candidate_receipt",
     "validate_launch_authority",

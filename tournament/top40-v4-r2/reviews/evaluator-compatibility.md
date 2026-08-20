@@ -1,14 +1,34 @@
 # Adversarial evaluator, data, and compatibility re-review
 
 Review scope: exact-current-byte Top-40 V4-R2 pre-activation implementation inspected on
-2026-08-20 after source-boundary, research-runtime, lifecycle/status, and broker remediation. The
-implementation was not modified by this review. No broad snapshot replay or full-window strategy
-run was performed.
+2026-08-20 after source-boundary, research-runtime, lifecycle/status, broker, and activation-lock
+remediation. The implementation was not modified by this review. No broad snapshot replay or
+full-window strategy run was performed.
 
 ## Gate status
 
-**PASSED.** Unresolved findings: **0**. The evaluator, data, candidate-source, scoring, activation,
-and R1-compatibility gates reviewed here are closed for tournament activation.
+**PASSED.** Unresolved findings: **0**. The activation, data, candidate-source, evaluator, scoring,
+release, and R1-compatibility gates reviewed here are closed for tournament activation.
+
+## Activation deadlock remediation verification
+
+The one-time activation bootstrap and post-activation command serialization now have a consistent,
+fail-closed boundary:
+
+- Activation is the sole bootstrap exception to the broker lease. It remains inside the organizer
+  result lock while checking committed scope, running the exact R2 tests, and exclusively publishing
+  the freeze; its pytest child can therefore acquire the broker lease without waiting on its parent.
+- `serialized_activated_r2_command` performs a no-snapshot activation validation before broker
+  acquisition for direct `run_is`, `nominate`, `retire`, `close_is`, and `historical_release`
+  calls. Each function repeats validation after broker and result-lock acquisition, so the precheck
+  prevents deadlock without becoming the final authorization decision.
+- The canonical organizer CLI no longer wraps those internally serialized entrypoints in an outer
+  broker lease. Read-only isolation audit retains its appropriate outer lease; activation remains
+  outside it.
+- The cross-process regression holds the activation result lock and checks both a direct `run_is`
+  child and the canonical CLI `is-run` child. Both reject the missing freeze within five seconds,
+  without waiting for the result lock or retaining the broker lease. Idle bootstrap and
+  post-activation global broker serialization regressions also pass.
 
 ## Remediation verification
 
@@ -87,7 +107,7 @@ The previously open candidate-directory substitution defect is closed in the fin
 
 ## Focused evidence
 
-- R2 focused suite on the exact reviewed bytes: **53 passed**.
+- R2 focused suite on the exact reviewed bytes: **55 passed**.
 - R1 focused contract suite in a clean default-edition process: **24 passed**.
 - Focused next-open, funding, cost, participation, forced-exit, risk, and past-only evaluator set:
   **12 passed**.
