@@ -26,6 +26,8 @@ from typing import Any
 
 import pandas as pd
 
+from crypto_trade.cup50v2.regimes import REGIMES, RegimePolicy
+
 SCHEMA_VERSION = 2
 NAME = "cup50v2"
 
@@ -58,6 +60,17 @@ FOLDS = (
     ("F5", pd.Timestamp("2026-02-01T00:00:00Z"), pd.Timestamp("2026-08-01T00:00:00Z")),
 )
 
+# The same machinery scores the in-sample window, so a team sees the shape it will be judged on and
+# the qualification bar can be stated in the same units as the result.
+IS_FOLDS = (
+    ("I1", IS_START, pd.Timestamp("2021-08-01T00:00:00Z")),
+    ("I2", pd.Timestamp("2021-08-01T00:00:00Z"), pd.Timestamp("2022-02-01T00:00:00Z")),
+    ("I3", pd.Timestamp("2022-02-01T00:00:00Z"), pd.Timestamp("2022-08-01T00:00:00Z")),
+    ("I4", pd.Timestamp("2022-08-01T00:00:00Z"), pd.Timestamp("2023-02-01T00:00:00Z")),
+    ("I5", pd.Timestamp("2023-02-01T00:00:00Z"), pd.Timestamp("2023-08-01T00:00:00Z")),
+    ("I6", pd.Timestamp("2023-08-01T00:00:00Z"), OOS_START),
+)
+
 _TOP_LEVEL = frozenset(
     {
         "schema_version",
@@ -73,6 +86,7 @@ _TOP_LEVEL = frozenset(
         "risk_unit",
         "research",
         "scoring",
+        "regimes",
         "paper",
         "mandates",
     }
@@ -156,12 +170,15 @@ class ScoringPolicy:
     volatility_reference: float
     activity_reference: float
     activity_exposure_floor: float
+    minimum_activity: float
     concentration_threshold: float
     concentration_top_days: int
     squash_scale: float
     cost_weights: Mapping[int, float]
     fold_weights: tuple[float, ...]
+    is_fold_weights: tuple[float, ...]
     generalization_weight: float
+    regime_weight: float
     all_window_weight: float
     neighbourhood_weights: tuple[float, ...]
     lower_quartile_fraction: int
@@ -182,6 +199,7 @@ class Policy:
     risk_unit: RiskUnitPolicy
     research: ResearchPolicy
     scoring: ScoringPolicy
+    regimes: RegimePolicy
     paper: PaperPolicy
 
 
@@ -365,6 +383,7 @@ def build_policy(raw: Mapping[str, Any]) -> Policy:
         activity_exposure_floor=_number(
             raw, ("scoring", "activity_exposure_floor"), minimum=0.0, maximum=1.0
         ),
+        minimum_activity=_number(raw, ("scoring", "minimum_activity"), minimum=0.0, maximum=1.0),
         concentration_threshold=_number(
             raw, ("scoring", "concentration_threshold"), minimum=0.0, maximum=1.0
         ),
@@ -376,9 +395,11 @@ def build_policy(raw: Mapping[str, Any]) -> Policy:
         squash_scale=_number(raw, ("scoring", "squash_scale"), minimum=1e-6, maximum=100.0),
         cost_weights=dict(zip(multipliers, cost_weights, strict=True)),
         fold_weights=_weights(raw, ("scoring", "fold_weights"), count=len(FOLDS)),
+        is_fold_weights=_weights(raw, ("scoring", "is_fold_weights"), count=len(IS_FOLDS)),
         generalization_weight=_number(
             raw, ("scoring", "generalization_weight"), minimum=0.0, maximum=1.0
         ),
+        regime_weight=_number(raw, ("scoring", "regime_weight"), minimum=0.0, maximum=1.0),
         all_window_weight=_number(raw, ("scoring", "all_window_weight"), minimum=0.0, maximum=1.0),
         neighbourhood_weights=_weights(raw, ("scoring", "neighbourhood_weights"), count=3),
         lower_quartile_fraction=int(
@@ -390,8 +411,19 @@ def build_policy(raw: Mapping[str, Any]) -> Policy:
             _number(raw, ("scoring", "rounding_places"), minimum=1, maximum=12, integral=True)
         ),
     )
-    if abs(scoring.generalization_weight + scoring.all_window_weight - 1.0) > 1e-12:
+    if (
+        abs(scoring.generalization_weight + scoring.regime_weight + scoring.all_window_weight - 1.0)
+        > 1e-12
+    ):
         raise ValueError("CUP-50 v2 point weights must sum to one")
+    regimes = RegimePolicy(
+        bull_threshold=_number(raw, ("regimes", "bull_threshold"), minimum=0.0, maximum=10.0),
+        bear_threshold=_number(raw, ("regimes", "bear_threshold"), minimum=-10.0, maximum=0.0),
+        minimum_days=int(
+            _number(raw, ("regimes", "minimum_days"), minimum=1, maximum=10_000, integral=True)
+        ),
+        weights=_weights(raw, ("regimes", "weights"), count=len(REGIMES)),
+    )
     paper = PaperPolicy(
         minimum_days=int(
             _number(raw, ("paper", "minimum_days"), minimum=1, maximum=10_000, integral=True)
@@ -403,6 +435,7 @@ def build_policy(raw: Mapping[str, Any]) -> Policy:
         risk_unit=risk_unit,
         research=research,
         scoring=scoring,
+        regimes=regimes,
         paper=paper,
     )
 

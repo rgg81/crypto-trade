@@ -12,7 +12,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from crypto_trade.cup50v2.config import IS_START, OOS_END, OOS_START
+from crypto_trade.cup50v2.config import IS_START, OOS_END, OOS_START, active_policy
+from crypto_trade.cup50v2.regimes import RegimePolicy, monthly_regime_labels
 
 DATASETS = ("bars", "funding", "mark_prices", "membership", "contract_metadata")
 TIME_COLUMNS = {
@@ -41,6 +42,10 @@ class Snapshot:
     window_start: pd.Timestamp
     window_end: pd.Timestamp
     sealed: bool
+    # Month -> regime, derived once at build from the equal-weight member index and carried inside
+    # the manifest digest. Recomputing them downstream would let a sealed-window label be inferred
+    # from a team-visible panel, and would let two callers disagree about what a month was.
+    regime_labels: Mapping[str, str] = dataclasses.field(default_factory=dict)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -167,6 +172,7 @@ def _write_snapshot(
     start: pd.Timestamp,
     end: pd.Timestamp,
     sealed: bool,
+    regime_labels: Mapping[str, str],
 ) -> SnapshotPaths:
     root.mkdir(parents=True, exist_ok=True)
     files: dict[str, Path] = {}
@@ -184,6 +190,7 @@ def _write_snapshot(
         "schema_version": 2,
         "namespace": "cup50v2",
         "sealed": sealed,
+        "regime_labels": dict(sorted(regime_labels.items())),
         "window": {
             "start": start.isoformat().replace("+00:00", "Z"),
             "end": end.isoformat().replace("+00:00", "Z"),
@@ -211,6 +218,7 @@ def write_split_snapshots(
     is_start: pd.Timestamp = IS_START,
     oos_start: pd.Timestamp = OOS_START,
     oos_end: pd.Timestamp = OOS_END,
+    regimes: RegimePolicy | None = None,
 ) -> tuple[SnapshotPaths, SnapshotPaths]:
     """Write research and sealed bytes with no sealed-only roster or metadata facts in IS."""
     first = _utc(is_start, "is_start")
@@ -257,9 +265,38 @@ def write_split_snapshots(
         name: _slice_time(name, frame, start=split, end=end, sealed=True)
         for name, frame in source.items()
     }
+    # Label every month once, from the full panel, so the research and sealed halves cannot
+    # disagree about a month that straddles the split and so the sealed labels are never derivable
+    # from the team-visible side.
+    rules = regimes if regimes is not None else active_policy().regimes
+    labels = monthly_regime_labels(source["bars"], source["membership"], policy=rules)
+    research_labels = {
+        month: regime
+        for month, regime in labels.items()
+        if pd.Timestamp(f"{month}-01T00:00:00Z") < split
+    }
+    sealed_labels = {
+        month: regime
+        for month, regime in labels.items()
+        if pd.Timestamp(f"{month}-01T00:00:00Z") >= split
+    }
     return (
-        _write_snapshot(research, Path(is_root), start=first, end=split, sealed=False),
-        _write_snapshot(sealed_frames, Path(sealed_root), start=split, end=end, sealed=True),
+        _write_snapshot(
+            research,
+            Path(is_root),
+            start=first,
+            end=split,
+            sealed=False,
+            regime_labels=research_labels,
+        ),
+        _write_snapshot(
+            sealed_frames,
+            Path(sealed_root),
+            start=split,
+            end=end,
+            sealed=True,
+            regime_labels=sealed_labels,
+        ),
     )
 
 
@@ -292,6 +329,9 @@ def write_team_visible_snapshot(research: Snapshot, *, root: str | Path) -> Team
         "schema_version": 2,
         "namespace": "cup50v2-team-visible-is",
         "source_is_manifest_sha256": research.manifest_sha256,
+        # In-sample labels only. A team may research against the market states it can see; the
+        # sealed months are a different file the export never reads.
+        "regime_labels": dict(sorted(research.regime_labels.items())),
         "window": {
             "start": research.window_start.isoformat().replace("+00:00", "Z"),
             "end": research.window_end.isoformat().replace("+00:00", "Z"),
@@ -349,6 +389,7 @@ def load_snapshot(root: str | Path) -> Snapshot:
         window_start=pd.Timestamp(manifest["window"]["start"]),
         window_end=pd.Timestamp(manifest["window"]["end"]),
         sealed=bool(manifest["sealed"]),
+        regime_labels=dict(manifest.get("regime_labels", {})),
     )
 
 
@@ -370,12 +411,20 @@ def stitch_snapshots(research: Snapshot, sealed: Snapshot) -> Snapshot:
     digest = hashlib.sha256(
         f"{research.manifest_sha256}:{sealed.manifest_sha256}".encode()
     ).hexdigest()
+    overlapping = {
+        month
+        for month in set(research.regime_labels) & set(sealed.regime_labels)
+        if research.regime_labels[month] != sealed.regime_labels[month]
+    }
+    if overlapping:
+        raise ValueError(f"snapshot partitions disagree on regime labels: {sorted(overlapping)}")
     return Snapshot(
         **frames,
         manifest_sha256=digest,
         window_start=research.window_start,
         window_end=sealed.window_end,
         sealed=True,
+        regime_labels={**research.regime_labels, **sealed.regime_labels},
     )
 
 

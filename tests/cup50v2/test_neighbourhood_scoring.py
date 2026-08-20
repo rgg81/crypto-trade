@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import math
-
 import pandas as pd
 import pytest
 
@@ -28,6 +26,13 @@ def _returns(value: float, exposure: float = 1.0) -> pd.DataFrame:
     )
 
 
+def _labels() -> dict[str, str]:
+    """Rotate the three regimes month by month so every one clears its minimum."""
+    months = pd.date_range(OOS_START, OOS_END, freq="MS", inclusive="left")
+    order = ("bull", "bear", "chop")
+    return {month.strftime("%Y-%m"): order[index % 3] for index, month in enumerate(months)}
+
+
 def test_neighbourhood_cardinality_and_transforms() -> None:
     assert len(generate_neighbourhood({"fixed": 2.0}, ()).points) == 1
     one = generate_neighbourhood({"lookback": 100.0}, [Dimension("lookback", "integer")])
@@ -51,18 +56,41 @@ def test_neighbourhood_cardinality_and_transforms() -> None:
         reject_inert_dimensions(one, lambda parameters: "same-target-stream")
 
 
-def test_flat_cell_penalty_and_monotonic_return() -> None:
+def test_a_book_that_never_deploys_scores_nothing() -> None:
+    """Not trading is not a low-risk book, it is an absent one.
+
+    Under CUP-50's rule a permanently flat path scored 50*(1+tanh(-0.15/0.10)) = 4.74, which beat
+    every lane that traded and lost, and two lanes collected it by declaring a lookback long enough
+    to disqualify every symbol.
+    """
     flat = score_cell(_returns(0.0, exposure=0.0), OOS_START, OOS_END)
-    expected = 50.0 * (1.0 + math.tanh(-0.15 / 0.10))
-    assert math.isclose(flat.q, expected)
+    assert flat.q == 0.0
     assert flat.concentration == 1.0
+    assert flat.q < score_cell(_returns(-0.0002), OOS_START, OOS_END).q
+
     profitable = score_cell(_returns(0.0002), OOS_START, OOS_END)
     costly = score_cell(_returns(-0.0002), OOS_START, OOS_END)
-    assert profitable.q > flat.q > costly.q
+    assert profitable.q > costly.q
+
+
+def test_a_barely_deployed_book_falls_off_the_cliff_at_the_declared_floor() -> None:
+    """The floor is on participation, so it cannot be gamed by trading a token amount."""
+    index = pd.date_range(OOS_START, OOS_END, freq="D", inclusive="left")
+    exposure = pd.Series(0.0, index=index)
+    exposure.iloc[: int(len(index) * 0.04)] = 0.9
+    frame = pd.DataFrame({"net_return": 0.0002, "gross_return": 0.0002, "gross_exposure": exposure})
+    assert score_cell(frame, OOS_START, OOS_END).q == 0.0
+
+    exposure.iloc[: int(len(index) * 0.30)] = 0.9
+    frame["gross_exposure"] = exposure
+    assert score_cell(frame, OOS_START, OOS_END).q > 0.0
 
 
 def test_point_weakest_fold_and_neighbourhood_formula() -> None:
-    point = score_point({1: _returns(0.0001), 2: _returns(0.0001), 3: _returns(0.0001)})
+    point = score_point(
+        {1: _returns(0.0001), 2: _returns(0.0001), 3: _returns(0.0001)},
+        regime_labels=_labels(),
+    )
     assert 0 < point.score <= 100
     values = [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0]
     neighbourhood = score_neighbourhood(values, centre_index=0)

@@ -586,7 +586,7 @@ def _observe(arguments: argparse.Namespace) -> Mapping[str, object]:
                 unavailability=unavailability,
                 record_events=False,
             )
-            score = score_point(replay.costs)
+            score = score_point(replay.costs, regime_labels=snapshot.regime_labels)
             centre_returns = replay.costs[3].returns
             centre_turnover = float(
                 centre_returns.loc[

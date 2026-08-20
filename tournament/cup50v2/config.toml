@@ -88,14 +88,20 @@ concentration_penalty = 0.05
 volatility_reference = 0.10
 activity_reference = 0.50
 activity_exposure_floor = 0.05
+# A cell that never deploys scores zero. CUP-50 paid 4.74 for a permanently flat path and
+# 0.008 for trading badly, so two lanes bought the flat score with a long enough lookback.
+minimum_activity = 0.05
 concentration_threshold = 0.25
 concentration_top_days = 5
 squash_scale = 0.10
 # Aligned with execution.cost_multipliers.
-cost_weights = [0.20, 0.30, 0.50]
+cost_weights = [0.45, 0.35, 0.20]
 # Applied to fold cost scores sorted ascending, so the weakest fold carries the most weight.
 fold_weights = [0.40, 0.25, 0.20, 0.10, 0.05]
-generalization_weight = 0.85
+# The in-sample window carries six folds, so it declares its own ascending weights.
+is_fold_weights = [0.35, 0.25, 0.15, 0.12, 0.08, 0.05]
+generalization_weight = 0.60
+regime_weight = 0.25
 all_window_weight = 0.15
 # Neighbourhood aggregate: median, lower-quartile point, declared centre.
 neighbourhood_weights = [0.50, 0.25, 0.25]
@@ -103,6 +109,15 @@ lower_quartile_fraction = 4
 rounding = "decimal-half-even-1e-6"
 rounding_places = 6
 qualification_gates = "none"
+
+[regimes]
+# A month is labelled from the return of an equal-weight index of that week's members. The rule is
+# public; the labels it produces on the sealed window are not.
+bull_threshold = 0.10
+bear_threshold = -0.10
+minimum_days = 60
+# Applied to regime cost scores sorted ascending: the worst regime carries the most weight.
+weights = [0.50, 0.30, 0.20]
 
 [paper]
 minimum_days = 365

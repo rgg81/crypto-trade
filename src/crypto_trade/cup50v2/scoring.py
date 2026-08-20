@@ -10,7 +10,16 @@ from collections.abc import Mapping, Sequence
 import numpy as np
 import pandas as pd
 
-from crypto_trade.cup50v2.config import FOLDS, OOS_END, OOS_START, ScoringPolicy, active_policy
+from crypto_trade.cup50v2.config import (
+    FOLDS,
+    IS_FOLDS,
+    IS_START,
+    OOS_END,
+    OOS_START,
+    ScoringPolicy,
+    active_policy,
+)
+from crypto_trade.cup50v2.regimes import REGIMES, RegimePolicy
 from crypto_trade.cup50v2.replay import EvaluationResultV2
 
 
@@ -42,9 +51,12 @@ class CellScore:
 class PointScore:
     score: float
     generalization: float
+    regime: float
     all_window: float
     fold_scores: Mapping[str, float]
     fold_cost_cells: Mapping[str, Mapping[int, CellScore]]
+    regime_scores: Mapping[str, float]
+    regime_cost_cells: Mapping[str, Mapping[int, CellScore]]
     all_cost_cells: Mapping[int, CellScore]
 
 
@@ -115,26 +127,24 @@ def _max_drawdown(returns: pd.Series) -> float:
     return float(np.max(1.0 - equity / peaks))
 
 
-def score_cell(
-    returns: pd.DataFrame,
-    start: pd.Timestamp,
-    end: pd.Timestamp,
-    *,
-    failed: bool = False,
-    policy: ScoringPolicy | None = None,
-) -> CellScore:
-    """Score one coherent candidate/window/cost cell exactly once."""
+_FAILED_CELL = CellScore(0.0, -1_000_000_000.0, 1.0, 0.0, 0.0, 0.0, 1.0, -1_000_000_000.0, True)
+
+
+def score_daily(daily: pd.DataFrame, *, policy: ScoringPolicy | None = None) -> CellScore:
+    """Score a set of scored days, which need not be contiguous.
+
+    Folds hand this a calendar slice; regimes hand it every day carrying one label. Growth,
+    activity, volatility and concentration are day-set statistics either way, and the drawdown is
+    the loss the book would have taken had those days run back to back.
+    """
     rules = _scoring(policy)
-    if failed:
-        return CellScore(0.0, -1_000_000_000.0, 1.0, 0.0, 0.0, 0.0, 1.0, -1_000_000_000.0, True)
-    daily = _daily_frame(returns, start, end)
     n = len(daily)
     if n == 0:
-        return CellScore(0.0, -1_000_000_000.0, 1.0, 0.0, 0.0, 0.0, 1.0, -1_000_000_000.0, True)
+        return _FAILED_CELL
     net = daily["net_return"].astype(float)
     gross = daily["gross_return"].astype(float)
     if (net <= -1.0).any():
-        return CellScore(0.0, -1_000_000_000.0, 1.0, 0.0, 0.0, 0.0, 1.0, -1_000_000_000.0, True)
+        return _FAILED_CELL
     growth = 365.0 / n * float(np.log1p(net).sum())
     drawdown = _max_drawdown(net)
     volatility = (
@@ -165,10 +175,28 @@ def score_cell(
         math.isfinite(value)
         for value in (growth, drawdown, volatility, activity, utilization, concentration, x)
     ):
-        return CellScore(0.0, -1_000_000_000.0, 1.0, 0.0, 0.0, 0.0, 1.0, -1_000_000_000.0, True)
+        return _FAILED_CELL
+    if activity < rules.minimum_activity:
+        # A book that never deploys is not a low-risk book, it is an absent one. CUP-50 paid it
+        # more than it paid genuine trading that lost money, and two lanes collected.
+        return CellScore(0.0, growth, drawdown, volatility, activity, utilization, concentration, x)
     q = 50.0 * (1.0 + math.tanh(x / rules.squash_scale))
     q = min(100.0, max(0.0, q))
     return CellScore(q, growth, drawdown, volatility, activity, utilization, concentration, x)
+
+
+def score_cell(
+    returns: pd.DataFrame,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    *,
+    failed: bool = False,
+    policy: ScoringPolicy | None = None,
+) -> CellScore:
+    """Score one coherent candidate/window/cost cell exactly once."""
+    if failed:
+        return _FAILED_CELL
+    return score_daily(_daily_frame(returns, start, end), policy=policy)
 
 
 def combine_costs(cells: Mapping[int, CellScore], *, policy: ScoringPolicy | None = None) -> float:
@@ -178,53 +206,161 @@ def combine_costs(cells: Mapping[int, CellScore], *, policy: ScoringPolicy | Non
     return sum(weights[cost] * cells[cost].q for cost in sorted(weights))
 
 
-def score_point(
+def _regime_days(daily: pd.DataFrame, labels: Mapping[str, str], regime: str) -> pd.DataFrame:
+    months = pd.DatetimeIndex(daily.index).strftime("%Y-%m")
+    selector = np.array([labels.get(month) == regime for month in months], dtype=bool)
+    return daily.loc[selector]
+
+
+def score_window(
     results: Mapping[int, EvaluationResultV2 | pd.DataFrame | None],
     *,
+    window: tuple[pd.Timestamp, pd.Timestamp],
+    folds: Sequence[tuple[str, pd.Timestamp, pd.Timestamp]],
+    fold_weights: Sequence[float],
+    regime_labels: Mapping[str, str],
     failed_cells: Sequence[tuple[str, int]] = (),
     policy: ScoringPolicy | None = None,
+    regime_policy: RegimePolicy | None = None,
 ) -> PointScore:
-    """Five chronological folds, weakest-first aggregation, then the full 30-month path."""
+    """Score one point over one window: weakest-fold, weakest-regime, and the whole path.
+
+    Folds ask whether a book survived each stretch of calendar time. Regimes ask whether it
+    survived each kind of market, which is the question the tournament is actually for, and which a
+    half-year fold cannot answer because every one of them mixes regimes.
+    """
     rules = _scoring(policy)
-    if set(results) != {1, 2, 3}:
+    regime_rules = regime_policy if regime_policy is not None else active_policy().regimes
+    costs = tuple(sorted(rules.cost_weights))
+    if set(results) != set(costs):
         raise ValueError("point scoring requires independent 1x, 2x, and 3x results")
     failure_set = set(failed_cells)
+    start, end = window
+
+    def frame_for(cost: int) -> pd.DataFrame | None:
+        value = results[cost]
+        return value.returns if isinstance(value, EvaluationResultV2) else value
+
     fold_scores: dict[str, float] = {}
     fold_cells: dict[str, dict[int, CellScore]] = {}
-    for name, start, end in FOLDS:
+    for name, fold_start, fold_end in folds:
         cells: dict[int, CellScore] = {}
-        for cost in (1, 2, 3):
-            value = results[cost]
-            frame = value.returns if isinstance(value, EvaluationResultV2) else value
-            is_failed = value is None or (name, cost) in failure_set
+        for cost in costs:
+            frame = frame_for(cost)
             cells[cost] = score_cell(
                 pd.DataFrame() if frame is None else frame,
-                start,
-                end,
-                failed=is_failed,
+                fold_start,
+                fold_end,
+                failed=results[cost] is None or (name, cost) in failure_set,
                 policy=rules,
             )
         fold_cells[name] = cells
         fold_scores[name] = combine_costs(cells, policy=rules)
     weakest = sorted(fold_scores.values())
     generalization = sum(
-        weight * value for weight, value in zip(rules.fold_weights, weakest, strict=True)
+        weight * value for weight, value in zip(fold_weights, weakest, strict=True)
     )
 
+    regime_scores: dict[str, float] = {}
+    regime_cells: dict[str, dict[int, CellScore]] = {}
+    for regime in REGIMES:
+        cells = {}
+        represented = True
+        for cost in costs:
+            frame = frame_for(cost)
+            if frame is None or (regime, cost) in failure_set:
+                cells[cost] = _FAILED_CELL
+                continue
+            days = _regime_days(_daily_frame(frame, start, end), regime_labels, regime)
+            if len(days) < regime_rules.minimum_days:
+                represented = False
+                break
+            cells[cost] = score_daily(days, policy=rules)
+        if not represented:
+            # Too little of this regime in the window to say anything; dropping it beats scoring a
+            # fortnight as if it were a market state.
+            continue
+        regime_cells[regime] = cells
+        regime_scores[regime] = combine_costs(cells, policy=rules)
+    if regime_scores:
+        ordered = sorted(regime_scores.values())
+        weights = regime_rules.weights[: len(ordered)]
+        total = sum(weights)
+        regime = sum(weight * value for weight, value in zip(weights, ordered, strict=True)) / total
+    else:
+        regime = 0.0
+
     all_cells: dict[int, CellScore] = {}
-    for cost in (1, 2, 3):
-        value = results[cost]
-        frame = value.returns if isinstance(value, EvaluationResultV2) else value
+    for cost in costs:
+        frame = frame_for(cost)
         all_cells[cost] = score_cell(
             pd.DataFrame() if frame is None else frame,
-            OOS_START,
-            OOS_END,
-            failed=value is None or ("ALL", cost) in failure_set,
+            start,
+            end,
+            failed=results[cost] is None or ("ALL", cost) in failure_set,
             policy=rules,
         )
     all_window = combine_costs(all_cells, policy=rules)
-    point = rules.generalization_weight * generalization + rules.all_window_weight * all_window
-    return PointScore(point, generalization, all_window, fold_scores, fold_cells, all_cells)
+    point = (
+        rules.generalization_weight * generalization
+        + rules.regime_weight * regime
+        + rules.all_window_weight * all_window
+    )
+    return PointScore(
+        point,
+        generalization,
+        regime,
+        all_window,
+        fold_scores,
+        fold_cells,
+        regime_scores,
+        regime_cells,
+        all_cells,
+    )
+
+
+def score_point(
+    results: Mapping[int, EvaluationResultV2 | pd.DataFrame | None],
+    *,
+    regime_labels: Mapping[str, str],
+    failed_cells: Sequence[tuple[str, int]] = (),
+    policy: ScoringPolicy | None = None,
+    regime_policy: RegimePolicy | None = None,
+) -> PointScore:
+    """Score a point on the sealed window: the result the leaderboard reports."""
+    rules = _scoring(policy)
+    return score_window(
+        results,
+        window=(OOS_START, OOS_END),
+        folds=FOLDS,
+        fold_weights=rules.fold_weights,
+        regime_labels=regime_labels,
+        failed_cells=failed_cells,
+        policy=rules,
+        regime_policy=regime_policy,
+    )
+
+
+def score_in_sample_point(
+    results: Mapping[int, EvaluationResultV2 | pd.DataFrame | None],
+    *,
+    regime_labels: Mapping[str, str],
+    failed_cells: Sequence[tuple[str, int]] = (),
+    policy: ScoringPolicy | None = None,
+    regime_policy: RegimePolicy | None = None,
+) -> PointScore:
+    """Score a point on the research window, in the units the qualification bar is stated in."""
+    rules = _scoring(policy)
+    return score_window(
+        results,
+        window=(IS_START, OOS_START),
+        folds=IS_FOLDS,
+        fold_weights=rules.is_fold_weights,
+        regime_labels=regime_labels,
+        failed_cells=failed_cells,
+        policy=rules,
+        regime_policy=regime_policy,
+    )
 
 
 def score_neighbourhood(

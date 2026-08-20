@@ -123,7 +123,7 @@ def test_moving_the_cost_weights_moves_the_cost_aggregate(tmp_path: Path) -> Non
             _config(tmp_path, **{"scoring.cost_weights": [0.5, 0.3, 0.2]})
         ).policy.scoring,
     )
-    assert baseline == pytest.approx(0.20 * 90 + 0.30 * 50 + 0.50 * 10)
+    assert baseline == pytest.approx(0.45 * 90 + 0.35 * 50 + 0.20 * 10)
     assert moved == pytest.approx(0.5 * 90 + 0.3 * 50 + 0.2 * 10)
 
 
