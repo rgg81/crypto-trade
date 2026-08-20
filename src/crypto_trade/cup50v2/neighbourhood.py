@@ -163,8 +163,17 @@ def freeze_nomination(
     source_bundle_sha256: str,
     neighbourhood: Neighbourhood,
     trial_id: str | None = None,
+    is_score: float | None = None,
+    is_point_scores: Sequence[float] | None = None,
+    is_regime_scores: Mapping[str, float] | None = None,
+    falsifiers: Sequence[Mapping[str, object]] | None = None,
 ) -> Mapping[str, object]:
-    """Atomically bind source and every numeric point before any official point is observed."""
+    """Atomically bind source, every numeric point, and the research-window evidence.
+
+    The in-sample score travels with the nomination because the qualification question has to be
+    answerable while the sealed window is still shut. CUP-50 froze a nomination that carried no
+    evidence, and so could only ask who qualified after it already knew who had won.
+    """
     destination = Path(path)
     if destination.exists():
         raise FileExistsError(f"nomination is already frozen: {destination}")
@@ -179,6 +188,12 @@ def freeze_nomination(
         "centre": dict(neighbourhood.centre),
         "centre_index": neighbourhood.centre_index,
         "points": [dict(point) for point in neighbourhood.points],
+        "is_score": None if is_score is None else float(is_score),
+        "is_point_scores": [] if is_point_scores is None else [float(v) for v in is_point_scores],
+        "is_regime_scores": {} if is_regime_scores is None else {
+            str(name): float(value) for name, value in is_regime_scores.items()
+        },
+        "falsifiers": [] if falsifiers is None else [dict(item) for item in falsifiers],
     }
     record = {**body, "freeze_sha256": hashlib.sha256(_canonical(body)).hexdigest()}
     destination.parent.mkdir(parents=True, exist_ok=True)

@@ -87,3 +87,42 @@ def verify_risk_declaration(declaration: Mapping[str, object]) -> None:
     rationale = str(declaration.get("rationale", "")).strip()
     if len(rationale) < 40 or _PLACEHOLDER in rationale.lower():
         raise ValueError("risk declaration needs a rationale in the team's own words")
+
+
+CERTIFICATE_SECTIONS = (
+    "Mechanism and lane alignment",
+    "Pre-registered regime expectations",
+    "Experiment ledger",
+    "Falsifiers and ablations",
+    "Cost",
+    "Risk declaration rationale",
+    "Known weaknesses",
+)
+_TEMPLATE_MARKERS = ("REPLACE", "> Template.", "must be answered in the team's own words")
+
+
+def verify_certificate(path) -> None:
+    """Require every section to exist and to have been written.
+
+    The check is presence and substance, never quality: a thin certificate is a team's own problem,
+    an absent one is the tournament's.
+    """
+    text = __import__("pathlib").Path(path).read_text()
+    lowered = text.lower()
+    missing = [section for section in CERTIFICATE_SECTIONS if section.lower() not in lowered]
+    if missing:
+        raise ValueError(f"research certificate is missing sections: {missing}")
+    for marker in _TEMPLATE_MARKERS:
+        if marker.lower() in lowered:
+            raise ValueError("research certificate still contains its template scaffolding")
+    for section in CERTIFICATE_SECTIONS:
+        start = lowered.index(section.lower())
+        following = [
+            lowered.index(other.lower())
+            for other in CERTIFICATE_SECTIONS
+            if lowered.index(other.lower()) > start
+        ]
+        end = min(following) if following else len(text)
+        body = text[start + len(section) : end].strip().strip("#").strip()
+        if len(body) < 120:
+            raise ValueError(f"research certificate section is not answered: {section}")

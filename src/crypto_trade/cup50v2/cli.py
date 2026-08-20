@@ -26,12 +26,20 @@ from crypto_trade.cup50v2.config import (
     TEAM_IDS,
     active_policy,
 )
+from crypto_trade.cup50v2.falsifiers import (
+    corruption_cut_points,
+    determinism,
+    future_corruption,
+    sign_inversion,
+)
 from crypto_trade.cup50v2.isolation import (
     export_evaluator_bundle,
     export_protocol_bundle,
     require_image_digest,
     require_isolation_available,
+    scan_research_root,
 )
+from crypto_trade.cup50v2.journal import append_record, read_records
 from crypto_trade.cup50v2.lifecycle import (
     CandidateFailureError,
     atomic_release,
@@ -57,6 +65,11 @@ from crypto_trade.cup50v2.paper import (
     healthcheck,
     verify_parity,
 )
+from crypto_trade.cup50v2.qualification import (
+    evaluate_eligibility,
+    verify_certificate,
+    verify_risk_declaration,
+)
 from crypto_trade.cup50v2.quarantine import create_receipt, verify_receipt
 from crypto_trade.cup50v2.replay import (
     StrategyFailureError,
@@ -68,8 +81,18 @@ from crypto_trade.cup50v2.replay import (
     run_candidate,
     strategy_from_module,
 )
+from crypto_trade.cup50v2.research_snapshot import (
+    EXECUTION_MODE,
+    research_snapshot_from_team_visible,
+)
 from crypto_trade.cup50v2.reuse import reuse_acquisition
-from crypto_trade.cup50v2.scoring import score_point
+from crypto_trade.cup50v2.scoring import (
+    round_half_even,
+    rounded_neighbourhood,
+    score_in_sample_point,
+    score_neighbourhood,
+    score_point,
+)
 from crypto_trade.cup50v2.snapshot import (
     load_snapshot,
     stitch_snapshots,
@@ -515,6 +538,128 @@ def _evaluate(arguments: argparse.Namespace) -> Mapping[str, object]:
     return {"status": "evaluated", "bundle_sha256": digest}
 
 
+def _research_eval(arguments: argparse.Namespace) -> Mapping[str, object]:
+    """An unlimited, journaled look at the research window, on approximate execution.
+
+    Costs a team nothing and can never be nominated. CUP-50 gave twelve charged trials and no other
+    way to run anything, so nothing was iterated and its field was twelve unchanged seeds; a
+    research loop that costs a trial is not a research loop.
+    """
+    if os.environ.get("CUP50V2_SANDBOX") != "network-none-read-only":
+        raise RuntimeError("research evaluation must run inside the isolated sandbox")
+    snapshot = research_snapshot_from_team_visible(
+        arguments.team_snapshot, regimes=active_policy().regimes
+    )
+    strategy = strategy_from_module(load_strategy_module(arguments.strategy))
+    parameters = _json(arguments.parameters).get("centre", {}) if arguments.parameters else {}
+    if parameters:
+        apply_strategy_parameters(strategy, parameters)
+    replay = run_candidate(
+        strategy,
+        snapshot=snapshot,
+        start=snapshot.window_start,
+        end=snapshot.window_end,
+        seed=int(arguments.seed),
+        record_events=False,
+    )
+    scored = score_in_sample_point(replay.costs, regime_labels=snapshot.regime_labels)
+    report = {
+        "schema_version": 1,
+        "namespace": "cup50v2",
+        "team_id": arguments.team_id,
+        "execution": EXECUTION_MODE,
+        "purpose": arguments.purpose,
+        "parameters": dict(parameters),
+        "seed": int(arguments.seed),
+        "score": _point_report(scored),
+        "diagnostics": _diagnostics(replay),
+        "caveat": (
+            "Approximate execution: fills are priced at the last visible close rather than the "
+            "transaction open. Direction, not the number."
+        ),
+    }
+    Path(arguments.output).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    append_record(
+        arguments.research_journal,
+        "research-eval",
+        {
+            "team_id": arguments.team_id,
+            "purpose": arguments.purpose,
+            "parameters": dict(parameters),
+            "seed": int(arguments.seed),
+            "source_sha256": source_bundle_digest(arguments.strategy),
+            "score": scored.score,
+        },
+    )
+    return {"command": "research-eval", "team_id": arguments.team_id, "score": scored.score}
+
+
+def _diagnostics(replay) -> Mapping[str, object]:
+    """What a team needs to see to fix something, all of it in sample."""
+    summary: dict[str, object] = {}
+    for multiplier, result in replay.costs.items():
+        returns = result.returns
+        gross = returns["gross_return"].to_numpy(dtype=float)
+        costs = float(returns["fees_slippage"].sum())
+        gross_total = float(np.abs(gross).sum())
+        summary[str(multiplier)] = {
+            "turnover": float(returns["turnover"].sum()),
+            "activity": float((returns["gross_exposure"] >= 0.05).mean()),
+            "mean_gross_exposure": float(returns["gross_exposure"].mean()),
+            "annualized_volatility": float(np.std(gross, ddof=1)) * math.sqrt(365 * 24 / 8),
+            "cost_share_of_gross": costs / gross_total if gross_total > 0 else None,
+            "final_equity": float(returns["equity"].iloc[-1]),
+        }
+    return summary
+
+
+def _point_report(scored) -> Mapping[str, object]:
+    return {
+        "score": scored.score,
+        "generalization": scored.generalization,
+        "regime": scored.regime,
+        "all_window": scored.all_window,
+        "fold_scores": dict(scored.fold_scores),
+        "regime_scores": dict(scored.regime_scores),
+    }
+
+
+def _critic_pack(arguments: argparse.Namespace) -> Mapping[str, object]:
+    """Assemble what the critic reviews, and nothing that would let it rank anyone.
+
+    The pack deliberately omits every score. A reviewer who can see a number starts reasoning about
+    whether a lane deserves to advance, and that is the scorer's job.
+    """
+    nomination = verify_nomination(arguments.nomination)
+    scrubbed = {
+        key: value
+        for key, value in nomination.items()
+        if key not in {"is_score", "is_point_scores", "is_regime_scores"}
+    }
+    pack = {
+        "schema_version": 1,
+        "namespace": "cup50v2",
+        "team_id": nomination["team_id"],
+        "nomination": scrubbed,
+        "falsifiers": nomination.get("falsifiers", []),
+        "risk_declaration": _json(arguments.risk_declaration),
+        "certificate_path": str(arguments.certificate),
+        "clean_room_scan": list(scan_research_root(arguments.research_root)),
+        "transcript_audit": _json(arguments.transcript_audit),
+        "trial_ledger": [
+            record["payload"]
+            for record in read_records(arguments.trial_journal)
+            if record["payload"].get("team_id") == nomination["team_id"]
+        ],
+        "instruction": (
+            "Return PASS or exactly one allowlisted disqualification code. No score is included "
+            "here, and performance is never an integrity finding."
+        ),
+    }
+    Path(arguments.output).write_text(json.dumps(pack, indent=2, sort_keys=True) + "\n")
+    return {"command": "critic-pack", "team_id": pack["team_id"], "output": str(arguments.output)}
+
+
 def _nominate(arguments: argparse.Namespace) -> Mapping[str, object]:
     source = Path(arguments.source_bundle)
     source_digest = source_bundle_digest(source)
@@ -532,6 +677,7 @@ def _nominate(arguments: argparse.Namespace) -> Mapping[str, object]:
         arguments.team_id,
         arguments.trial_id,
         source_sha256=source_digest,
+        minimum_trials=active_policy().research.minimum_official_trials,
     )
     payload = _json(arguments.parameters)
     if payload.get("centre") != binding["parameters"]:
@@ -559,14 +705,107 @@ def _nominate(arguments: argparse.Namespace) -> Mapping[str, object]:
         return hashlib.sha256(payload).hexdigest()
 
     reject_inert_dimensions(neighbourhood, target_digest)
-    return freeze_nomination(
+
+    verify_risk_declaration(_json(arguments.risk_declaration))
+    verify_certificate(Path(arguments.certificate))
+
+    # Score every declared point on the research window. CUP-50 replayed each point's target stream
+    # only to test inertness, so a nomination carried no evidence and the qualification question had
+    # to be answered later, after the sealed window had already been opened.
+    def replay_point(parameters: Mapping[str, float], *, invert: bool = False):
+        strategy = strategy_from_module(load_strategy_module(arguments.strategy))
+        apply_strategy_parameters(strategy, parameters)
+        wrapped = _InvertedStrategy(strategy) if invert else strategy
+        return run_candidate(
+            wrapped,
+            snapshot=snapshot,
+            start=IS_START,
+            end=OOS_START,
+            seed=int(binding["seed"]),
+            unavailability=unavailability,
+            record_events=False,
+        )
+
+    point_scores = []
+    centre_point = None
+    for index, parameters in enumerate(neighbourhood.points):
+        replay = replay_point(parameters)
+        scored = score_in_sample_point(replay.costs, regime_labels=snapshot.regime_labels)
+        point_scores.append(scored)
+        if index == neighbourhood.centre_index:
+            centre_point = scored
+    is_neighbourhood = rounded_neighbourhood(
+        score_neighbourhood(point_scores, centre_index=neighbourhood.centre_index)
+    )
+
+    signing_key = Path(arguments.falsifier_key).read_bytes()
+    inverted = replay_point(neighbourhood.points[neighbourhood.centre_index], invert=True)
+    inverted_score = score_in_sample_point(
+        inverted.costs, regime_labels=snapshot.regime_labels
+    ).score
+    outcomes = [sign_inversion(centre_point.score, inverted_score)]
+
+    def generate_stream(bars: pd.DataFrame) -> pd.DataFrame:
+        strategy = strategy_from_module(load_strategy_module(arguments.strategy))
+        apply_strategy_parameters(strategy, neighbourhood.points[neighbourhood.centre_index])
+        return generate_targets(
+            strategy,
+            bars=bars,
+            funding=snapshot.funding,
+            auxiliary={},
+            membership=snapshot.membership,
+            decision_times=decisions,
+            seed=int(binding["seed"]),
+            unavailability=unavailability,
+        )
+
+    outcomes.append(
+        future_corruption(
+            generate_stream,
+            snapshot.bars,
+            cut_points=corruption_cut_points(decisions, key=signing_key),
+        )
+    )
+    first = generate_stream(snapshot.bars)
+    second = generate_stream(snapshot.bars)
+    outcomes.append(determinism(first, second))
+    failed = [outcome for outcome in outcomes if not outcome.passed]
+    if failed:
+        raise ValueError(
+            "nomination refused by the falsification battery: "
+            + "; ".join(f"{outcome.name}: {outcome.detail}" for outcome in failed)
+        )
+
+    regime_scores = {
+        name: round_half_even(value) for name, value in centre_point.regime_scores.items()
+    }
+    record = freeze_nomination(
         arguments.output,
         team_id=arguments.team_id,
         candidate_id=arguments.candidate_id,
         source_bundle_sha256=arguments.source_bundle_sha256,
         neighbourhood=neighbourhood,
         trial_id=arguments.trial_id,
+        is_score=is_neighbourhood.official_score,
+        is_point_scores=list(is_neighbourhood.point_scores),
+        is_regime_scores=regime_scores,
+        falsifiers=[dataclasses.asdict(outcome) for outcome in outcomes],
     )
+    verdict = evaluate_eligibility(record)
+    return {**record, "eligible": verdict.eligible, "eligibility_reason": verdict.reason}
+
+
+class _InvertedStrategy:
+    """The candidate with every weight flipped, for the sign-inversion falsifier."""
+
+    def __init__(self, inner: object) -> None:
+        self._inner = inner
+
+    def target_weights(self, context, *, seed: int):
+        weights = self._inner.target_weights(context, seed=seed)
+        if not weights:
+            return weights
+        return {symbol: -float(value) for symbol, value in weights.items()}
 
 
 def _field_close(arguments: argparse.Namespace) -> Mapping[str, object]:
@@ -862,6 +1101,30 @@ def parser() -> argparse.ArgumentParser:
     nominate.add_argument("--trial-id", required=True)
     nominate.add_argument("--parameters", required=True)
     nominate.add_argument("--output", required=True)
+    research = commands.add_parser("research-eval")
+    research.add_argument("--team-id", required=True)
+    research.add_argument("--team-snapshot", required=True)
+    research.add_argument("--strategy", required=True)
+    research.add_argument("--parameters")
+    research.add_argument("--seed", type=int, default=0)
+    research.add_argument("--purpose", required=True)
+    research.add_argument("--research-journal", required=True)
+    research.add_argument("--output", required=True)
+    research.set_defaults(handler=_research_eval)
+
+    pack = commands.add_parser("critic-pack")
+    pack.add_argument("--nomination", required=True)
+    pack.add_argument("--risk-declaration", required=True)
+    pack.add_argument("--certificate", required=True)
+    pack.add_argument("--research-root", required=True)
+    pack.add_argument("--transcript-audit", required=True)
+    pack.add_argument("--trial-journal", required=True)
+    pack.add_argument("--output", required=True)
+    pack.set_defaults(handler=_critic_pack)
+
+    nominate.add_argument("--risk-declaration", required=True)
+    nominate.add_argument("--certificate", required=True)
+    nominate.add_argument("--falsifier-key", required=True)
     nominate.set_defaults(handler=_nominate)
 
     close = commands.add_parser("field-close")
