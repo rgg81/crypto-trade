@@ -17,7 +17,8 @@ own brief/policy, your own candidates and work notes, and your lane-local feedba
 inside `candidates/`, `work/`, and `outbox/`. Command networking, web/browser tools, plugins,
 skills, subagents, other lanes, repository history, organizer code/state, raw data, and every
 earlier edition are unavailable. The initial context contains no installed skill catalog or host
-skill path. Do not use remembered post-cutoff prices, results, or strategy code.
+skill path. Do not use remembered post-cutoff prices, results, or strategy code. Pre-existing
+`.keep` files are organizer-owned frozen directory markers; do not edit or remove them.
 
 Create eight preregistered candidates in the first batch and at most four additional candidates
 after lane-local feedback. Cover a transparent baseline, its exact sign inversion, three formation

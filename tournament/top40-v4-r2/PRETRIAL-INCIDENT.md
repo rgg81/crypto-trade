@@ -1,5 +1,39 @@
 # Pretrial executor incident
 
+## Evaluator-worker bootstrap incident and fourth clean restart
+
+The third clean restart activated successfully and Team 01 produced one eight-candidate discovery
+batch under the reviewed private model boundary. The organizer accepted those eight requests, but
+every evaluation stopped before strategy initialization with the same infrastructure exception:
+`StrategySandboxError: strategy worker communication failed`. A score-blind reproduction proved
+that the worker's deliberately reconstructed environment omitted the frozen `src` bootstrap path.
+The child therefore exited at `python -m crypto_trade.tournament._strategy_worker_v4` module
+resolution, before its namespace worker could initialize or run candidate code. Adding only the
+exact frozen worktree `src` path made the otherwise identical namespaced startup succeed.
+
+The eight infrastructure failures were normalized to Team 01 before the defect was diagnosed. A
+fresh refinement process was interrupted before it wrote an outbox or accepted another trial; its
+only candidate residue is four empty directories. No result artifact, score, nomination,
+selection, or historical release was created, and no holdout row was disclosed to the team. The
+entire third-restart worktree remains private and stopped, including its activation, 16-record
+journal, discovery/refinement launch receipts, discovery feedback/outbox archive, eight research
+receipts, eight source archives, eight score-free trial receipts, and interrupted private model
+runtime. None of those candidates, receipts, feedback, research context, or results is reused.
+
+`FRESH-RESTART-AUTHORITY.json` schema 3 binds those exact incident hashes, counts, the common
+failure signature/root cause, and a canonical digest over the declared 75-file competitive
+surface. The successor again starts all 15 lanes from the exact seed-only, byte-empty-journal
+genesis. The strategy worker receives only the exact worktree `src` bootstrap in its reconstructed
+environment; it resolves the frozen worker package before masking the repository, remapping
+runtime imports, installing Landlock/seccomp, and loading candidate code. Activation tests include
+a real namespaced startup under that exact sanitized environment.
+
+The model-visible rules now explicitly preserve organizer `.keep` markers. The launcher also
+recreates only a missing one-byte marker through a pinned owner-controlled directory descriptor;
+existing wrong bytes, modes, links, ownership, or substitutions remain hard failures. This keeps
+ordinary outbox publication from invalidating the activation scope without normalizing any
+candidate or broker payload.
+
 ## Installed-skill boundary incident and third clean restart
 
 The second clean restart completed Team 01 and Team 02's twelve accepted evaluations before an
@@ -18,7 +52,7 @@ is therefore preserved privately and aborted in full. No candidate, feedback, sc
 source archive, receipt, nomination, or decision from it is reused, and all 15 lanes restart from
 trial zero.
 
-`FRESH-RESTART-AUTHORITY.json` schema 2 binds the stopped activation/test/journal/decision-launch
+`FRESH-RESTART-AUTHORITY.json` schema 3 binds the stopped activation/test/journal/decision-launch
 hashes, the 49-record head, the exposed skill hash, the exact 478-file runtime artifact-surface
 digest, and the no-decision/no-nomination facts. The successor uses a new launcher and branch. Each
 team's model process receives its own organizer-private skill-empty `HOME`, `CODEX_HOME`, and
@@ -27,7 +61,7 @@ identity, and rejects any model-visible skill catalog, host or peer skill/runtim
 private-auth readability. Activation again requires the exact seed-only 15-lane genesis, so no
 stopped artifact can enter the new competition.
 
-The tracked v9 smoke receipt binds the exact private-runtime and permission-profile digests, the
+The tracked v10 smoke receipt binds the exact private-runtime and permission-profile digests, the
 post-reset model command, Codex 0.148.0 session, rendered empty-catalog probe, denial of both host
 skill roots and the private authentication file, and the exact lane-local sentinel. Its prompt
 deliberately matched the exposed Team-02 skill description; the model reported `smoke-complete`

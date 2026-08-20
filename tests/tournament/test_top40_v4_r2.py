@@ -961,6 +961,75 @@ def test_r2_worker_mount_contains_python_only(tmp_path: Path) -> None:
     }
 
 
+def test_r2_worker_sanitized_environment_binds_source_and_starts(tmp_path: Path) -> None:
+    bundle = tmp_path / "bundle"
+    runtime_site_packages = tmp_path / "runtime-site-packages"
+    empty_dir = tmp_path / "empty-dir"
+    empty_file = tmp_path / "empty-file"
+    for directory in (bundle, runtime_site_packages, empty_dir):
+        directory.mkdir()
+    empty_file.touch()
+    (bundle / "strategy.py").write_text(
+        "class Strategy:\n"
+        "    def target_weights(self, context, *, seed):\n"
+        "        return {}\n"
+        "def build_strategy():\n"
+        "    return Strategy()\n",
+        encoding="utf-8",
+    )
+    repository_parent = runner_v4._runner_repository_parent()
+    site_packages = runner_v4._current_venv_site_packages(repository_parent)
+    environment = runner_v4._strategy_worker_environment(ROOT, 20260713)
+    assert environment["PYTHONPATH"] == str((ROOT / "src").resolve())
+    assert "HOME" in environment and environment["HOME"] == "/nonexistent"
+    command = runner_v4._strategy_worker_command(
+        ROOT,
+        repository_parent,
+        bundle,
+        site_packages,
+        runtime_site_packages,
+        "strategy.py",
+        empty_dir,
+        empty_file,
+    )
+    completed = subprocess.run(
+        command,
+        cwd=tmp_path,
+        env=environment,
+        input="",
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    assert completed.returncode == 0, (completed.stdout, completed.stderr)
+
+
+def test_missing_lane_marker_is_restored_but_conflicts_fail_closed(tmp_path: Path) -> None:
+    team = tmp_path / TOP40_V4_R2_LAYOUT.team_root("team-01")
+    for directory in ("outbox", "work"):
+        path = team / directory
+        path.mkdir(parents=True)
+        path.chmod(0o755)
+    work_marker = team / "work/.keep"
+    work_marker.write_bytes(b"\n")
+    work_marker.chmod(0o644)
+
+    assert research_runtime_v4._restore_writable_lane_markers(tmp_path, "team-01") == (
+        "outbox",
+    )
+    outbox_marker = team / "outbox/.keep"
+    assert outbox_marker.read_bytes() == b"\n"
+    assert stat.S_IMODE(outbox_marker.stat().st_mode) == 0o644
+    assert outbox_marker.stat().st_nlink == 1
+    assert research_runtime_v4._restore_writable_lane_markers(tmp_path, "team-01") == ()
+
+    outbox_marker.write_bytes(b"changed\n")
+    with pytest.raises(research_runtime_v4.ResearchRuntimeError, match="frozen authority"):
+        research_runtime_v4._restore_writable_lane_markers(tmp_path, "team-01")
+    assert outbox_marker.read_bytes() == b"changed\n"
+
+
 def test_lane_audit_is_independent_of_peer_corruption(tmp_path: Path) -> None:
     for team_id in ("team-01", "team-02"):
         team = tmp_path / TOP40_V4_R2_LAYOUT.team_root(team_id)
@@ -1091,9 +1160,13 @@ def test_private_model_runtime_clears_bounded_client_state_between_phases(
     def prompt_probe(*_args: object, **_kwargs: object) -> SimpleNamespace:
         (codex_home / "installation_id").write_bytes(b"codex-explicit-public-mode")
         (codex_home / "memories_1.sqlite").write_bytes(b"phase-local-state")
+        (codex_home / "state_5.sqlite-shm").write_bytes(b"phase-local-shared-memory")
+        (codex_home / "state_5.sqlite-wal").write_bytes(b"phase-local-write-ahead-log")
         (codex_home / "shell_snapshots").mkdir()
         (codex_home / "installation_id").chmod(0o644)
         (codex_home / "memories_1.sqlite").chmod(0o600)
+        (codex_home / "state_5.sqlite-shm").chmod(0o600)
+        (codex_home / "state_5.sqlite-wal").chmod(0o600)
         (codex_home / "shell_snapshots").chmod(0o700)
         return SimpleNamespace(returncode=0, stdout=b"catalog-probe", stderr=b"")
 
@@ -1120,6 +1193,8 @@ def test_private_model_runtime_clears_bounded_client_state_between_phases(
     (codex_home / "state_5.sqlite").chmod(0o600)
     research_runtime_v4.ensure_private_model_runtime(root, "team-01")
     assert not (codex_home / "state_5.sqlite").exists()
+    assert not (codex_home / "state_5.sqlite-shm").exists()
+    assert not (codex_home / "state_5.sqlite-wal").exists()
     assert not (codex_home / "memories_1.sqlite").exists()
 
 
@@ -1451,6 +1526,14 @@ def test_fresh_restart_authority_is_an_explicit_alternative_to_incident_recovery
     authority = activation_v4.require_completed_pretrial_recovery(tmp_path)
     assert authority["feedback_disclosed"] is False
     assert authority["results_reused"] is False
+    worker_incident = authority["worker_bootstrap_incident"]
+    assert worker_incident["journal_records"] == 16
+    assert worker_incident["trials_accepted"] == 8
+    assert worker_incident["trials_failed"] == 8
+    assert worker_incident["trials_succeeded"] == 0
+    assert worker_incident["discovery_feedback_disclosed_to_team_01"] is True
+    assert worker_incident["holdout_rows_disclosed_to_team"] is False
+    assert worker_incident["results_reused"] is False
 
     old_launch = tmp_path / activation_v4._PRETRIAL_OLD_LAUNCH_PATH
     old_launch.parent.mkdir(parents=True)

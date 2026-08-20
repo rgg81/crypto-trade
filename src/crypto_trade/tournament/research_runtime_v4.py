@@ -34,7 +34,7 @@ PROFILE_NAME = "top40-v4-r2-offline-team"
 RECEIPT_SCHEMA_VERSION = 2
 LAUNCH_SCHEMA_VERSION = 2
 SOURCE_REVIEW_SCHEMA_VERSION = 7
-LAUNCHER_VERSION = "top40-v4-r2-research-runtime-v9"
+LAUNCHER_VERSION = "top40-v4-r2-research-runtime-v10"
 MODEL_RUNTIME_SCHEMA_VERSION = 1
 _EXPECTED_CODEX_VERSION = "codex-cli 0.148.0"
 _MODEL_NAME = "gpt-5.6-sol"
@@ -49,10 +49,18 @@ _CODEX_HOME_VOLATILE_FILES = frozenset(
         "goals_1.sqlite-wal",
         "installation_id",
         "logs_2.sqlite",
+        "logs_2.sqlite-shm",
+        "logs_2.sqlite-wal",
         "memories_1.sqlite",
+        "memories_1.sqlite-shm",
+        "memories_1.sqlite-wal",
         "models_cache.json",
         "queue_1.sqlite",
+        "queue_1.sqlite-shm",
+        "queue_1.sqlite-wal",
         "state_5.sqlite",
+        "state_5.sqlite-shm",
+        "state_5.sqlite-wal",
     }
 )
 _SMOKE_PROMPT = (
@@ -61,8 +69,8 @@ _SMOKE_PROMPT = (
     "generations, append invariance, unusual returns, exposure, turnover, and safe engine "
     "recovery. If any installed skill or SKILL.md is present in your context, do not read it and "
     "report a boundary breach. Otherwise, without reading tournament data or feedback, create "
-    "exactly work/.r2-v9-model-write-smoke with exact UTF-8 bytes "
-    "r5-private-skill-boundary-ok followed by one newline. Do not create candidates or outbox "
+    "exactly work/.r2-v10-model-write-smoke with exact UTF-8 bytes "
+    "r6-private-skill-boundary-ok followed by one newline. Do not create candidates or outbox "
     "files. Then reply only smoke-complete."
 )
 _SHA256 = re.compile(r"[0-9a-f]{64}")
@@ -575,6 +583,117 @@ def _stable_bytes(path: Path, *, maximum: int = 2 * 1024 * 1024) -> bytes:
     return payload
 
 
+def _restore_lane_marker(root: Path, team_id: str, directory: str) -> bool:
+    """Restore one missing frozen placeholder without repairing any conflicting object.
+
+    Team phases may create files inside ``outbox`` and ``work`` but the one-byte marker is part of
+    the activation scope. A model that removes only that placeholder must not strand an otherwise
+    valid phase. Existing wrong bytes, links, ownership, modes, or directory substitutions remain
+    hard failures; only an absent final name is created through the pinned parent descriptor.
+    """
+
+    if directory not in {"outbox", "work"}:
+        raise ResearchRuntimeError("lane marker directory is invalid")
+    TOP40_V4_LAYOUT.require_team(team_id)
+    parent = root / TOP40_V4_LAYOUT.team_root(team_id) / directory
+    if parent.is_symlink() or not parent.is_dir() or not parent.resolve().is_relative_to(root):
+        raise ResearchRuntimeError("lane marker parent is missing or unsafe")
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+    )
+    try:
+        parent_fd = os.open(parent, flags)
+    except OSError as exc:
+        raise ResearchRuntimeError("cannot pin lane marker parent") from exc
+    restored = False
+    try:
+        parent_before = os.fstat(parent_fd)
+        if (
+            not stat.S_ISDIR(parent_before.st_mode)
+            or parent_before.st_uid != os.geteuid()
+            or stat.S_IMODE(parent_before.st_mode) & 0o022
+        ):
+            raise ResearchRuntimeError("lane marker parent is not owner-controlled")
+        try:
+            os.stat(".keep", dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            create_flags = (
+                os.O_WRONLY
+                | os.O_CREAT
+                | os.O_EXCL
+                | getattr(os, "O_CLOEXEC", 0)
+                | getattr(os, "O_NOFOLLOW", 0)
+            )
+            try:
+                marker_fd = os.open(".keep", create_flags, 0o644, dir_fd=parent_fd)
+                with os.fdopen(marker_fd, "wb") as handle:
+                    os.fchmod(handle.fileno(), 0o644)
+                    if handle.write(b"\n") != 1:
+                        raise ResearchRuntimeError("lane marker write was short")
+                    handle.flush()
+                    os.fsync(handle.fileno())
+            except FileExistsError as exc:
+                raise ResearchRuntimeError("lane marker changed while restoring") from exc
+            os.fsync(parent_fd)
+            restored = True
+
+        read_flags = (
+            os.O_RDONLY
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0)
+        )
+        marker_fd = os.open(".keep", read_flags, dir_fd=parent_fd)
+        with os.fdopen(marker_fd, "rb") as handle:
+            marker_before = os.fstat(handle.fileno())
+            payload = handle.read(2)
+            marker_after = os.fstat(handle.fileno())
+        marker_final = os.stat(".keep", dir_fd=parent_fd, follow_symlinks=False)
+        marker_identity = lambda value: (  # noqa: E731 - compact exact identity tuple.
+            value.st_dev,
+            value.st_ino,
+            value.st_size,
+            value.st_mtime_ns,
+            value.st_nlink,
+        )
+        if (
+            not stat.S_ISREG(marker_final.st_mode)
+            or marker_final.st_uid != os.geteuid()
+            or marker_final.st_nlink != 1
+            or stat.S_IMODE(marker_final.st_mode) != 0o644
+            or payload != b"\n"
+            or marker_identity(marker_before) != marker_identity(marker_after)
+            or marker_identity(marker_after) != marker_identity(marker_final)
+        ):
+            raise ResearchRuntimeError("lane marker differs from its frozen authority")
+        parent_after = os.fstat(parent_fd)
+        lexical_parent = parent.lstat()
+        if (
+            (parent_before.st_dev, parent_before.st_ino)
+            != (parent_after.st_dev, parent_after.st_ino)
+            or (parent_after.st_dev, parent_after.st_ino)
+            != (lexical_parent.st_dev, lexical_parent.st_ino)
+            or not stat.S_ISDIR(lexical_parent.st_mode)
+        ):
+            raise ResearchRuntimeError("lane marker parent changed while restoring")
+    except OSError as exc:
+        raise ResearchRuntimeError("cannot restore lane marker safely") from exc
+    finally:
+        os.close(parent_fd)
+    return restored
+
+
+def _restore_writable_lane_markers(root: Path, team_id: str) -> tuple[str, ...]:
+    return tuple(
+        directory
+        for directory in ("outbox", "work")
+        if _restore_lane_marker(root, team_id, directory)
+    )
+
+
 def _codex_binary() -> Path:
     resolved = shutil.which("codex")
     if resolved is None:
@@ -1069,7 +1188,8 @@ def team_phase_prompt(team_id: str, phase: str) -> str:
 must not use or discuss any earlier tournament, remembered post-cutoff market prices, external
 web content, or inaccessible path. Read ACCESS-POLICY.json, TEAM-BRIEF.md, and the complete
 sanitized team kit. Obey them exactly. You have no evaluator or raw-data access. Do not finish
-until the requested outbox JSON and every referenced file are complete and schema-valid."""
+until the requested outbox JSON and every referenced file are complete and schema-valid. Leave
+every pre-existing .keep directory marker unchanged; it is organizer-owned frozen state."""
     if phase == "discovery":
         return common + """
 
@@ -2785,7 +2905,7 @@ def validate_frozen_model_smoke(root: str | Path) -> Mapping[str, object]:
         "model_reply": "smoke-complete",
         "model_runtime_sha256": model_runtime_sha256(root_path, "team-01"),
         "network_enabled": False,
-        "observed_on_date": "2026-08-20",
+        "observed_on_date": "2026-08-21",
         "organizer_observed": True,
         "original_home_excluded": True,
         "peer_private_runtime_read_denied": True,
@@ -2798,10 +2918,10 @@ def validate_frozen_model_smoke(root: str | Path) -> Mapping[str, object]:
         "prompt_catalog_empty": True,
         "prompt_sha256": hashlib.sha256(_SMOKE_PROMPT.encode("utf-8")).hexdigest(),
         "purpose": "pretrial-private-home-skill-boundary-smoke",
-        "requested_sentinel": "work/.r2-v9-model-write-smoke",
+        "requested_sentinel": "work/.r2-v10-model-write-smoke",
         "sandbox": "custom permissions",
         "schema_version": 2,
-        "sentinel_sha256": hashlib.sha256(b"r5-private-skill-boundary-ok\n").hexdigest(),
+        "sentinel_sha256": hashlib.sha256(b"r6-private-skill-boundary-ok\n").hexdigest(),
         "skill_catalog": "empty-system-marker",
         "system_skill_marker_sha256": hashlib.sha256(_SYSTEM_SKILL_MARKER).hexdigest(),
         "team_id": "team-01",
@@ -2865,9 +2985,15 @@ def launch_team_phase(
             timeout=7_200,
         )
     finally:
-        # A completed, failed, or interrupted phase never supplies hidden client state to the
-        # next phase. Authentication and the empty skill marker are the only durable client bytes.
-        ensure_private_model_runtime(root_path, team_id)
+        try:
+            # A completed, failed, or interrupted phase never supplies hidden client state to the
+            # next phase. Authentication and the empty skill marker are the only durable bytes.
+            ensure_private_model_runtime(root_path, team_id)
+        finally:
+            # The model may remove directory placeholders while atomically publishing its files.
+            # Restore absent marker names even when client-state cleanup itself reports a failure,
+            # but never overwrite or normalize a conflicting object.
+            _restore_writable_lane_markers(root_path, team_id)
     if completed.returncode != 0:
         raise ResearchRuntimeError("isolated team process did not complete successfully")
     request = json.loads(_stable_bytes(paths["outbox"] / outbox_name))

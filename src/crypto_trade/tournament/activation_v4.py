@@ -41,14 +41,14 @@ _PRETRIAL_INCIDENT_STAGE = f"{_PRETRIAL_INCIDENT_ROOT}/.{_PRETRIAL_INCIDENT_ID}.
 _PRETRIAL_INCIDENT_FINAL = f"{_PRETRIAL_INCIDENT_ROOT}/{_PRETRIAL_INCIDENT_ID}"
 _PRETRIAL_SMOKE_RECEIPT_PATH = "tournament/top40-v4-r2/PRETRIAL-MODEL-SMOKE.json"
 _PRETRIAL_SMOKE_RECEIPT_SHA256 = (
-    "c11c3e5bd22d809a7483188c6e24138183f2d21028a8f6d400936153607fc6d0"
+    "596bdbe528f3648f250c471feb591b40af2d3c84d195015d8b3a775e6786a6f8"
 )
 _PRETRIAL_SMOKE_RECORD_SHA256 = (
-    "67b59accec854ee9f825f81580124eb97bfd21acdb132b1854500252ea83a4f9"
+    "55d83cfa8c277a07b9f31db4341ba641f788139e91cba1fc16e2576929390660"
 )
 _FRESH_RESTART_AUTHORITY_PATH = "tournament/top40-v4-r2/FRESH-RESTART-AUTHORITY.json"
 _FRESH_RESTART_AUTHORITY_SHA256 = (
-    "aac191864a05460fa379e8b628a31e5739ce81141edf31c4a007d9470ccd146c"
+    "f71896a9cd2da6071441bd65f5eeb42f2c2b0c953de016998019d082bc234e68"
 )
 _FRESH_LANE_MARKER_PAYLOAD = b"\n"
 _PRETRIAL_OLD_ACTIVATION_FILE_SHA256 = (
@@ -730,10 +730,11 @@ def _fresh_restart_authority(root: Path) -> Mapping[str, Any]:
         "status",
         "successful_prefix",
         "tournament",
+        "worker_bootstrap_incident",
     }
     if (
         set(authority) != expected_keys
-        or authority.get("schema_version") != 2
+        or authority.get("schema_version") != 3
         or authority.get("tournament") != TOP40_V4_LAYOUT.name
         or authority.get("status")
         != "fresh-restart-after-private-aborted-incidents"
@@ -745,6 +746,7 @@ def _fresh_restart_authority(root: Path) -> Mapping[str, Any]:
     rejected = authority.get("rejected_preacceptance_residue")
     restart = authority.get("restart_attempt")
     skill_incident = authority.get("skill_boundary_incident")
+    worker_incident = authority.get("worker_bootstrap_incident")
     prefix = authority.get("successful_prefix")
     if (
         not isinstance(predecessor, Mapping)
@@ -855,6 +857,119 @@ def _fresh_restart_authority(root: Path) -> Mapping[str, Any]:
         )
     ):
         raise ActivationError("fresh restart skill-boundary incident changed")
+    expected_worker_keys = {
+        "activation_file_sha256",
+        "activation_record_sha256",
+        "activation_tests_sha256",
+        "artifact_surface",
+        "branch",
+        "candidate_directories_created",
+        "discovery_feedback_disclosed_to_team_01",
+        "discovery_feedback_sha256",
+        "discovery_launch_sha256",
+        "discovery_outbox_archive_sha256",
+        "failure_root_cause",
+        "failure_signature",
+        "holdout_rows_disclosed_to_team",
+        "implementation_commit",
+        "journal_file_sha256",
+        "journal_head_sha256",
+        "journal_records",
+        "launcher_version",
+        "nomination_created",
+        "private_model_runtime_residue_preserved",
+        "refinement_candidate_directories_created",
+        "refinement_launch_sha256",
+        "refinement_model_interrupted",
+        "refinement_outbox_created",
+        "research_receipt_sha256",
+        "research_provenance_reused",
+        "result_artifact_created",
+        "results_reused",
+        "source_archive_sha256",
+        "team_id",
+        "trial_receipt_sha256",
+        "trials_accepted",
+        "trials_failed",
+        "trials_succeeded",
+    }
+    worker_hash_fields = (
+        "activation_file_sha256",
+        "activation_record_sha256",
+        "activation_tests_sha256",
+        "discovery_feedback_sha256",
+        "discovery_launch_sha256",
+        "discovery_outbox_archive_sha256",
+        "journal_file_sha256",
+        "journal_head_sha256",
+        "refinement_launch_sha256",
+    )
+    worker_hash_lists = (
+        "research_receipt_sha256",
+        "source_archive_sha256",
+        "trial_receipt_sha256",
+    )
+    artifact_surface = (
+        worker_incident.get("artifact_surface")
+        if isinstance(worker_incident, Mapping)
+        else None
+    )
+    if (
+        not isinstance(worker_incident, Mapping)
+        or set(worker_incident) != expected_worker_keys
+        or worker_incident.get("branch")
+        != "quant-portfolio-blind-top40-v4-r1-v2-restart3"
+        or worker_incident.get("implementation_commit")
+        != "718249a8216245d7d6e29dd0af7f6f2318b189e7"
+        or worker_incident.get("team_id") != "team-01"
+        or worker_incident.get("launcher_version")
+        != "top40-v4-r2-research-runtime-v9"
+        or worker_incident.get("journal_records") != 16
+        or worker_incident.get("trials_accepted") != 8
+        or worker_incident.get("trials_failed") != 8
+        or worker_incident.get("trials_succeeded") != 0
+        or worker_incident.get("candidate_directories_created") != 12
+        or worker_incident.get("refinement_candidate_directories_created") != 4
+        or worker_incident.get("discovery_feedback_disclosed_to_team_01") is not True
+        or worker_incident.get("holdout_rows_disclosed_to_team") is not False
+        or worker_incident.get("nomination_created") is not False
+        or worker_incident.get("private_model_runtime_residue_preserved") is not True
+        or worker_incident.get("refinement_model_interrupted") is not True
+        or worker_incident.get("refinement_outbox_created") is not False
+        or worker_incident.get("research_provenance_reused") is not False
+        or worker_incident.get("result_artifact_created") is not False
+        or worker_incident.get("results_reused") is not False
+        or worker_incident.get("failure_root_cause")
+        != (
+            "sanitized-worker-environment-omitted-frozen-source-bootstrap-before-"
+            "python-module-resolution"
+        )
+        or worker_incident.get("failure_signature")
+        != "StrategySandboxError: strategy worker communication failed"
+        or any(
+            not isinstance(worker_incident.get(field), str)
+            or _SHA256.fullmatch(str(worker_incident[field])) is None
+            for field in worker_hash_fields
+        )
+        or any(
+            not isinstance(worker_incident.get(field), list)
+            or len(worker_incident[field]) != 8
+            or len(set(worker_incident[field])) != 8
+            or any(
+                not isinstance(value, str) or _SHA256.fullmatch(value) is None
+                for value in worker_incident[field]
+            )
+            for field in worker_hash_lists
+        )
+        or not isinstance(artifact_surface, Mapping)
+        or set(artifact_surface) != {"algorithm", "file_count", "sha256"}
+        or artifact_surface.get("algorithm")
+        != "sha256-canonical-json-sorted-path-size-sha256-over-declared-competitive-roots"
+        or artifact_surface.get("file_count") != 75
+        or not isinstance(artifact_surface.get("sha256"), str)
+        or _SHA256.fullmatch(str(artifact_surface["sha256"])) is None
+    ):
+        raise ActivationError("fresh restart worker-bootstrap incident changed")
     return authority
 
 

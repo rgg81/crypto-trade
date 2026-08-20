@@ -1611,11 +1611,16 @@ def _current_venv_site_packages(repository_parent: Path) -> Path:
     return purelib
 
 
-def _strategy_worker_environment(seed: int) -> dict[str, str]:
+def _strategy_worker_environment(root: Path, seed: int) -> dict[str, str]:
     if not 0 <= seed <= 2**32 - 1:
         raise StrategySandboxError("strategy seed is outside PYTHONHASHSEED's integer range")
+    source_root = (root / "src").resolve()
+    if not source_root.is_relative_to(root) or not source_root.is_dir():
+        raise StrategySandboxError("strategy worker source authority is missing or unsafe")
     # Do not inherit credentials, proxy settings, cloud configuration, or loader controls from
-    # the organizer. Every variable visible to team code is constructed explicitly here.
+    # the organizer. Every variable visible to team code is constructed explicitly here. Python
+    # must nevertheless locate the frozen worker module before that module masks the repository,
+    # rewrites sys.path to the staged runtime, installs Landlock/seccomp, and imports team code.
     environment = {
         "CUDA_VISIBLE_DEVICES": "",
         "HOME": "/nonexistent",
@@ -1625,6 +1630,7 @@ def _strategy_worker_environment(seed: int) -> dict[str, str]:
         "PYTHONDONTWRITEBYTECODE": "1",
         "PYTHONHASHSEED": str(seed),
         "PYTHONNOUSERSITE": "1",
+        "PYTHONPATH": str(source_root),
         "PYTHONUNBUFFERED": "1",
         "TZ": "UTC",
         "XDG_CACHE_HOME": "/nonexistent",
@@ -1688,7 +1694,7 @@ def _launch_strategy_worker(
             empty_dir,
             empty_file,
         )
-        environment = _strategy_worker_environment(seed)
+        environment = _strategy_worker_environment(root, seed)
         try:
             process = subprocess.Popen(
                 command,

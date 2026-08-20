@@ -49,7 +49,7 @@
     "trials_accepted": 0,
     "trials_evaluated": 0
   },
-  "schema_version": 2,
+  "schema_version": 3,
   "skill_boundary_incident": {
     "activation_file_sha256": "839a849904db69769e0ea79e0215ea670bbd72f8f595b1ba52eafafca55d39e9",
     "activation_record_sha256": "302528e9f29b1dea57cd524f14aa12c0fd0bc40767e66cdc297a36cfd79600bb",
@@ -74,6 +74,73 @@
     "team_01_retired": true,
     "team_01_trials_succeeded": 12,
     "team_02_trials_succeeded": 12
+  },
+  "worker_bootstrap_incident": {
+    "activation_file_sha256": "bf9bd30cb9c3b411da6cff7acfb807f131aaddccbd8504827fd3f50e4e024768",
+    "activation_record_sha256": "750ec2cfb4b6327369fed02cb95bc9c7bf7dffc880049a250874c0ed2faf99d2",
+    "activation_tests_sha256": "40929a4c70f3ad42a8777c7f1e32fae6634544577ecfb947e083e292c49d0957",
+    "artifact_surface": {
+      "algorithm": "sha256-canonical-json-sorted-path-size-sha256-over-declared-competitive-roots",
+      "file_count": 75,
+      "sha256": "8a7d2ef7618ee971b623b775af56311f41982e9ae9f666a148580cc7261ae120"
+    },
+    "branch": "quant-portfolio-blind-top40-v4-r1-v2-restart3",
+    "candidate_directories_created": 12,
+    "discovery_feedback_disclosed_to_team_01": true,
+    "discovery_feedback_sha256": "d44fe96f0e6cce945e2a36c16747a102f1aa719198e9366efd7b2301bb85a855",
+    "discovery_launch_sha256": "6779137de769cf2165b769452992701dfb266a852145b4426e4460cf220fb94b",
+    "discovery_outbox_archive_sha256": "66dc1bd8237c3c7f1c8039ea8b5eefbc18ef88dca479da6e026c2957505bef44",
+    "failure_root_cause": "sanitized-worker-environment-omitted-frozen-source-bootstrap-before-python-module-resolution",
+    "failure_signature": "StrategySandboxError: strategy worker communication failed",
+    "holdout_rows_disclosed_to_team": false,
+    "implementation_commit": "718249a8216245d7d6e29dd0af7f6f2318b189e7",
+    "journal_file_sha256": "406f3ea65c3f66c2a0ea76a5e82b118b89733d6a65da4a83c3e5da4961ac964b",
+    "journal_head_sha256": "fb7c0958f35ec1a0332406bb70cf51225689dbc7398e1b5dc6e9881f43ed016a",
+    "journal_records": 16,
+    "launcher_version": "top40-v4-r2-research-runtime-v9",
+    "nomination_created": false,
+    "private_model_runtime_residue_preserved": true,
+    "refinement_candidate_directories_created": 4,
+    "refinement_launch_sha256": "e526cba58f3d9e7b470a13a18d62a02c254af4930194a291cf39483bce392d9f",
+    "refinement_model_interrupted": true,
+    "refinement_outbox_created": false,
+    "research_receipt_sha256": [
+      "02cfc2fcc2ac9e336b258d9dd8a40b1ba8408d712e5df5961523c0ffc32edb91",
+      "1c7a9f98c993d8608cebac451894d55dffef0a88aeacef57c682194b9a79ac67",
+      "48dd6cd4015d08197f9f0582e6be3581aad8bbef35abc299dc4e035738759ea1",
+      "4c343518dbaa79e71887baa4d0531f0f0255d941eff0599139cd2836c81aa4ab",
+      "885f9b51e126f4f605913a5d4f2807cfc1524a259475f6a39e60590588b1753e",
+      "ab076d1c97bd00c9b0670c499b87bc042054517dca9171fc7ad231aa91b6a13f",
+      "c4205f75e6cd89258db31830c4b50905501423cce9c59f8823b2c580e4830e01",
+      "f0af43b508d93013beb7604a8b3da1c4e462403a76362db75ac23c0b096a4801"
+    ],
+    "research_provenance_reused": false,
+    "result_artifact_created": false,
+    "results_reused": false,
+    "source_archive_sha256": [
+      "046fc6a6a7c4734183523bc68b1e933fe4850a590e167e7825a5cebc15df3791",
+      "04a4581272d558164cb120e024b073f1a04fd4742863ecbe4116d299f3ad9aa1",
+      "12a7fab5ba4ba45c56bbeb5e067803eca120d11b6d90f7c32816a99993295147",
+      "22c93825a787b4fdefb955b643638bd53de306614f5002c41b695a0bc4c112e3",
+      "47f09015022ef08141913c50050500bdd4995f1d2d58a5e7fd27b4b25ea0559d",
+      "5446e96922c596b9fe4e80caca72df267b7fbc10094aba67c89f8ecbdb1c909a",
+      "7820d3cc0cf7120edf2d88fdf207bacea8ada5384b1018805054bccff67e63e9",
+      "c3bed599165d4c994ab224407ffe95abc2e1c2e6e310aa9829ff6e7e55ea53ca"
+    ],
+    "team_id": "team-01",
+    "trial_receipt_sha256": [
+      "14f42077f5ca694b451fcadb08c72616e336140395e8f8939316fbc975635b9e",
+      "35fa2a21875148d82b195cc8dbe2c21f3dbf271781d121eb0a153a7f3438dd56",
+      "40de5f604384a613111f7e482601f50b40692275596b4846f2b7170cbe775dae",
+      "58786e951b14714335ea265ac1a6e70081fd7704f19e04d238cbc44fbfcec3e9",
+      "710e03d53a9896378fe7b6eb5cea764f4c2caf6c3c9e79d9584f90e57eb54c74",
+      "9e199924fabc3aebc0301f371575303331694aaf4f6b0ea0fea107415890097e",
+      "c7597821b14ab906590acebbb2e7441c8e52a7bf37a5f324696f3194693ae28f",
+      "e6099ccb73e68df8135dfadbec534977616e198d89c7735eb73453e1814d39f2"
+    ],
+    "trials_accepted": 8,
+    "trials_failed": 8,
+    "trials_succeeded": 0
   },
   "status": "fresh-restart-after-private-aborted-incidents",
   "successful_prefix": [

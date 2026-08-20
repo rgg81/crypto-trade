@@ -63,7 +63,11 @@ The organizer checks the attestation, file types, hard links, symlinks, prohibit
 markers, and exact descriptor identity during source capture. Only Python files from that
 content-addressed archive are mounted for official execution; notes and configuration remain
 non-executable evidence. The worker masks the repository, network, process creation, credentials,
-and host writes. A false attestation is an integrity violation and cannot be repaired after a
+and host writes. Its reconstructed process environment contains the exact frozen worktree `src`
+path only for initial organizer-module resolution; before candidate import, the repository is
+masked, `sys.path` is rebuilt around the staged runtime, and Landlock confines reads to the staged
+candidate/runtime plus Python's non-repository base runtime. A real namespaced startup regression
+binds this bootstrap. A false attestation is an integrity violation and cannot be repaired after a
 result.
 
 Mounted Python is not general-purpose: the exact archive must pass the organizer's narrow,
