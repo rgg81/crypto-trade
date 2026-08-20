@@ -86,6 +86,7 @@ _TOP_LEVEL = frozenset(
         "risk_unit",
         "research",
         "scoring",
+        "qualification",
         "regimes",
         "paper",
         "mandates",
@@ -107,6 +108,7 @@ _FROZEN: dict[tuple[str, ...], object] = {
     ("risk_unit", "team_volatility_targeting"): "forbidden",
     ("research", "controls"): "preregistered-permanently-non-promoteable",
     ("scoring", "rounding"): "decimal-half-even-1e-6",
+    ("scoring", "qualification_gates"): "in-sample-bar-v1",
     ("paper", "launch"): "first-canonical-8h-boundary-strictly-after-release",
     ("paper", "data_policy"): "public-only-append-invariant",
     ("data", "archive_reuse_policy"): "checksum-verified-raw-bytes-only",
@@ -186,6 +188,12 @@ class ScoringPolicy:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class QualificationPolicy:
+    minimum_is_score: float
+    minimum_is_regime_score: float
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class PaperPolicy:
     minimum_days: int
 
@@ -199,6 +207,7 @@ class Policy:
     risk_unit: RiskUnitPolicy
     research: ResearchPolicy
     scoring: ScoringPolicy
+    qualification: QualificationPolicy
     regimes: RegimePolicy
     paper: PaperPolicy
 
@@ -416,6 +425,14 @@ def build_policy(raw: Mapping[str, Any]) -> Policy:
         > 1e-12
     ):
         raise ValueError("CUP-50 v2 point weights must sum to one")
+    qualification = QualificationPolicy(
+        minimum_is_score=_number(
+            raw, ("qualification", "minimum_is_score"), minimum=0.0, maximum=100.0
+        ),
+        minimum_is_regime_score=_number(
+            raw, ("qualification", "minimum_is_regime_score"), minimum=0.0, maximum=100.0
+        ),
+    )
     regimes = RegimePolicy(
         bull_threshold=_number(raw, ("regimes", "bull_threshold"), minimum=0.0, maximum=10.0),
         bear_threshold=_number(raw, ("regimes", "bear_threshold"), minimum=-10.0, maximum=0.0),
@@ -435,6 +452,7 @@ def build_policy(raw: Mapping[str, Any]) -> Policy:
         risk_unit=risk_unit,
         research=research,
         scoring=scoring,
+        qualification=qualification,
         regimes=regimes,
         paper=paper,
     )

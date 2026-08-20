@@ -110,7 +110,16 @@ neighbourhood_weights = [0.50, 0.25, 0.25]
 lower_quartile_fraction = 4
 rounding = "decimal-half-even-1e-6"
 rounding_places = 6
-qualification_gates = "none"
+qualification_gates = "in-sample-bar-v1"
+
+[qualification]
+# Pre-registered and hash-bound before any sealed read. CUP-50 promised no cut, ranked all twelve on
+# the sealed window, and then applied a top-three in-sample stage retrospectively; the correction
+# admits it "cannot recreate pre-OOS finalist blindness" and it demoted the highest-scoring entry.
+# A bar, not a rank: in-sample position carries almost no information about sealed position, but a
+# lane that showed no in-sample edge at all should not win on a single sealed draw.
+minimum_is_score = 45.0
+minimum_is_regime_score = 35.0
 
 [regimes]
 # A month is labelled from the return of an equal-weight index of that week's members. The rule is

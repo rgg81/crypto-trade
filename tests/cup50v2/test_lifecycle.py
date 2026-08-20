@@ -95,6 +95,8 @@ def test_field_authentication_start_before_point_and_crash_to_dnf(tmp_path) -> N
             "state": "nominated",
             "nomination_sha256": _digest(team),
             "point_ids": [f"{team}-p1"],
+            "eligible": True,
+            "eligibility_reason": "cleared the pre-registered in-sample bar",
         }
         for team in TEAM_IDS
     }
@@ -184,6 +186,8 @@ def test_private_evidence_compiles_complete_deterministic_leaderboard(tmp_path) 
             "candidate_id": f"candidate-{team}",
             "centre_index": 0,
             "point_ids": [f"{team}-p0"],
+            "eligible": True,
+            "eligibility_reason": "cleared the pre-registered in-sample bar",
         }
         for team in TEAM_IDS
     }

@@ -84,6 +84,10 @@ class RankedEntry:
     centre_turnover: float
     bundle_sha256: str
     dnf_reason: str = ""
+    # Cleared the pre-registered in-sample bar. Ineligible lanes are still observed and published
+    # in full; they simply cannot win.
+    eligible: bool = False
+    eligibility_reason: str = ""
 
 
 def _daily_frame(returns: pd.DataFrame, start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame:
@@ -406,7 +410,7 @@ def rounded_neighbourhood(
 def rank_entries(
     entries: Sequence[RankedEntry], *, policy: ScoringPolicy | None = None
 ) -> tuple[RankedEntry, ...]:
-    """Deterministic total order with every valid submission ahead of every DNF."""
+    """Deterministic total order: eligible, then observed-ineligible, then DNF."""
     rules = _scoring(policy)
     for entry in entries:
         fields = (
@@ -425,6 +429,7 @@ def rank_entries(
             entries,
             key=lambda entry: (
                 not entry.valid,
+                not entry.eligible,
                 -round_half_even(entry.official_score, policy=rules),
                 -round_half_even(entry.lower_quartile_score, policy=rules),
                 -round_half_even(entry.minimum_point_score, policy=rules),

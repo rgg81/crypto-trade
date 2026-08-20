@@ -49,7 +49,12 @@ def freeze_field(
     activation_sha256: str,
     signing_key: bytes,
 ) -> Mapping[str, object]:
-    """Freeze all twelve lane dispositions and order before sealed data is restored."""
+    """Freeze all twelve lane dispositions, verdicts and order before sealed data is restored.
+
+    The qualification verdict is part of what freezes here, so the bar is settled while the sealed
+    window is still shut. CUP-50 decided its cut after observation and could not undo the blindness
+    that cost.
+    """
     path = Path(destination)
     if path.exists():
         raise FileExistsError("CUP-50 v2 field has already closed")
@@ -64,6 +69,8 @@ def freeze_field(
         state = disposition.get("state")
         if state not in {"nominated", "dnf"}:
             raise ValueError(f"invalid disposition for {team_id}")
+        if state == "nominated" and "eligible" not in disposition:
+            raise ValueError(f"nominated lane {team_id} lacks its qualification verdict")
         if state == "nominated" and not disposition.get("nomination_sha256"):
             raise ValueError(f"nominated lane {team_id} lacks its nomination binding")
         if state == "nominated":
@@ -376,6 +383,8 @@ def compile_leaderboard(
             )
             continue
 
+        eligible = bool(disposition.get("eligible", False))
+        eligibility_reason = str(disposition.get("eligibility_reason", ""))
         point_ids = [str(value) for value in disposition["point_ids"]]
         point_scores: list[float] = []
         evidence_by_point: dict[str, Mapping[str, object]] = {}
@@ -440,10 +449,14 @@ def compile_leaderboard(
                 centre_3x_drawdown=round_half_even(drawdown_3x),
                 centre_turnover=round_half_even(turnover),
                 bundle_sha256=bundle_sha256,
+                eligible=eligible,
+                eligibility_reason=eligibility_reason,
             )
         )
     ordered = rank_entries(entries)
-    winner = next((entry.team_id for entry in ordered if entry.valid), None)
+    # A lane that never cleared the in-sample bar is scored, published and ranked, but the
+    # winner is drawn only from those that did. No eligible lane means no winner.
+    winner = next((entry.team_id for entry in ordered if entry.valid and entry.eligible), None)
     return {
         "entries": [dataclasses.asdict(entry) for entry in ordered],
         "winner_team_id": winner,
