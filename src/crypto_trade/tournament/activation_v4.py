@@ -47,6 +47,7 @@ _FRESH_RESTART_AUTHORITY_PATH = "tournament/top40-v4-r2/FRESH-RESTART-AUTHORITY.
 _FRESH_RESTART_AUTHORITY_SHA256 = (
     "bae6aa65e9689c6c19b302bd3284cdda118449187705b05314392ae5853b5431"
 )
+_FRESH_LANE_MARKER_PAYLOAD = b"\n"
 _PRETRIAL_OLD_ACTIVATION_FILE_SHA256 = (
     "d1b4aa7242b2085e9455ac7628672e7f6bc9826e3e4559f87f8d88a87db53aef"
 )
@@ -129,6 +130,11 @@ if _IS_R2:
         *tuple(
             f"tournament/top40-v4-r2/teams/{team_id}/candidates/README.md"
             for team_id in TOP40_V4_LAYOUT.team_ids
+        ),
+        *tuple(
+            f"tournament/top40-v4-r2/teams/{team_id}/{directory}/.keep"
+            for team_id in TOP40_V4_LAYOUT.team_ids
+            for directory in ("feedback", "outbox", "work")
         ),
     )
     TARGETED_TESTS = ("tests/tournament/test_top40_v4_r2.py",)
@@ -824,7 +830,9 @@ def _fresh_restart_seed_state(
         raise ActivationError("fresh restart result lock has no current owner marker")
     for team_id in TOP40_V4_LAYOUT.team_ids:
         for directory in ("feedback", "outbox", "work"):
-            if tournament_payloads[f"teams/{team_id}/{directory}/.keep"] != b"":
+            if tournament_payloads[f"teams/{team_id}/{directory}/.keep"] != (
+                _FRESH_LANE_MARKER_PAYLOAD
+            ):
                 raise ActivationError("fresh restart lane marker changed")
 
     digest_paths = {
@@ -909,14 +917,7 @@ def _fresh_restart_scope_binding(scope_entries: object) -> tuple[int, str]:
         if relative.startswith(f"{TOP40_V4_LAYOUT.reports_root}/")
     )
     ordered_paths = [*sorted(tournament_paths), *report_paths]
-    empty_runtime_paths = {
-        TOP40_V4_LAYOUT.journal_path,
-        *(
-            f"{TOP40_V4_LAYOUT.team_root(team_id)}/{directory}/.keep"
-            for team_id in TOP40_V4_LAYOUT.team_ids
-            for directory in ("feedback", "outbox", "work")
-        ),
-    }
+    empty_runtime_paths = {TOP40_V4_LAYOUT.journal_path}
     previous = "0" * 64
     for sequence, relative in enumerate(ordered_paths, start=1):
         if relative in empty_runtime_paths:

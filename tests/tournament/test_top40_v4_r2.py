@@ -130,16 +130,6 @@ def _fresh_restart_fixture(tmp_path: Path) -> Path:
         destination = tmp_path / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(source.read_bytes())
-    for team_id in TOP40_V4_R2_LAYOUT.team_ids:
-        for directory in ("feedback", "outbox", "work"):
-            marker = (
-                tmp_path
-                / TOP40_V4_R2_LAYOUT.team_root(team_id)
-                / directory
-                / ".keep"
-            )
-            marker.parent.mkdir(parents=True, exist_ok=True)
-            marker.write_bytes(b"")
     journal = tmp_path / TOP40_V4_R2_LAYOUT.journal_path
     journal.parent.mkdir(parents=True, exist_ok=True)
     journal.write_bytes(b"")
@@ -156,6 +146,9 @@ def _fresh_restart_scope_entries(root: Path) -> list[dict[str, object]]:
                 "ACCESS-POLICY.json",
                 "TEAM-BRIEF.md",
                 "candidates/README.md",
+                "feedback/.keep",
+                "outbox/.keep",
+                "work/.keep",
             )
         ),
         *(

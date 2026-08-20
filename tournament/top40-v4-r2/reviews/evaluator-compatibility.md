@@ -41,16 +41,20 @@ archive, nomination, selection, or release from the private predecessor.
 
 - Fresh activation scans the exact tournament and report directory surfaces before implementation
   lookup, snapshot verification, test-output publication, or freeze creation. It requires a byte-
-  empty journal; 15 exact lane roots; regular, single-link seed files; the complete
-  frozen tournament/report inventory; and no unexpected result, candidate, session, selection,
-  archive, private, symlink, hard-link, FIFO, or other residue.
+  empty journal; 15 exact lane roots; regular, single-link seed files, including all 45 tracked
+  one-byte newline `.keep` markers; the complete frozen tournament/report inventory; and no
+  unexpected result, candidate, session, selection, archive, private, symlink, hard-link, FIFO, or
+  other residue.
 - Only safe runtime transitions are admitted: an empty broker lock, the descriptor-verified current
   PID result-lock marker held by the activating process, and bounded regular activation-test
   scratch that is always rerun and atomically replaced. Result-lock opening uses no-follow,
   owner/link checks, descriptor-versus-lexical inode identity, and does not mutate a linked target.
 - The seed authority hashes 94 exact files: the restart authority, empty journal, six identity/seed
-  files for each of 15 lanes, and the two common report files. Activation freezes the authority
-  hash, mode, empty-journal hash, lane count, file count, and chained surface head.
+  files for each of 15 lanes, and the two common report files. All 45 marker paths are in
+  `FROZEN_SCOPE`; their committed size and SHA-256 feed the chain, while only the journal is
+  synthesized as empty genesis. Activation freezes the authority hash, mode, empty-journal hash,
+  lane count, file count, and independently recomputed chained surface head
+  `ad0594a4222679cd4ccf4abc54afb12381f8789aef3ab9b00361ddfd8bdaf9e0`.
 - The seed head is independently recomputed from the exact activation `scope_entries` before freeze
   publication and again during validation. The wider scope still binds every committed code,
   policy, team-kit, template, review, snapshot-manifest, and common-report byte through its normal

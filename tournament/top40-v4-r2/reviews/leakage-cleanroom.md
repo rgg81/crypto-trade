@@ -21,8 +21,9 @@ Executed evidence:
   runner, and tests: **passed**.
 - `git diff --check`: **passed**.
 - Organizer isolation audit: **passed**, exactly 15 lanes.
-- Physical inspection found all 15 lanes seed-only, no competitive restart residue, and no
-  symlink, FIFO, device, socket, or multiply-linked regular file in the R2 tournament surface.
+- Physical inspection found all 15 lanes seed-only, exactly 45 tracked one-byte newline lane
+  markers, no competitive restart residue, and no symlink, FIFO, device, socket, or
+  multiply-linked regular file in the R2 tournament surface.
 - The real Team-01 Codex 0.148 profile passed all six standard OS controls: sanitized reads and
   own-lane writes allowed; organizer/holdout/peer reads, peer writes, network, and host-process
   visibility denied. Direct profile probes also denied the restart authority and the nested
@@ -55,15 +56,20 @@ Activation independently proves the claim. Canonical activation creates the empt
 holding the hardened result lock, then exact-enumerates the entire R2 tournament and reports
 surfaces. Every expected file is regular, owner-controlled, single-linked, and stably read; every
 intermediate directory is non-symlinked; any unlisted node rejects. The admitted surface is limited
-to frozen tournament files, two frozen common reports, all 15 exact lane seeds and empty `.keep`
-markers, the byte-empty journal, and safe optional runtime locks. Candidate, outbox, feedback,
-work, research-session, old-launch, report, source-archive, nomination, selection, historical
+to frozen tournament files, two frozen common reports, all 15 exact lane seeds and their committed
+one-byte newline `.keep` markers, the byte-empty journal, and safe optional runtime locks.
+Candidate, outbox, feedback, work, research-session, old-launch, report, source-archive,
+nomination, selection, historical
 release, extra-file, symlink, hard-link, FIFO, and unsafe-node residue fails before tests or freeze.
 
 The exact seed scan repeats after focused tests. Pre-freeze `activation-tests.out` is bounded,
 single-link, non-authoritative scratch, excluded from the competitive digest, and always replaced
-by a complete rerun. A failing test writes no freeze. Activation freezes mode, authority hash,
-empty-journal hash, lane count 15, seed-file count 94, and chained surface head. Runtime validation
+by a complete rerun. A failing test writes no freeze. All 45 marker paths are themselves in
+`FROZEN_SCOPE`; their committed size and SHA-256 feed the seed chain rather than being synthesized
+as empty runtime rows. Only the journal is deliberately modeled as synthetic empty genesis.
+Activation freezes mode, authority hash, empty-journal hash, lane count 15, seed-file count 94,
+and chained surface head
+`ad0594a4222679cd4ccf4abc54afb12381f8789aef3ab9b00361ddfd8bdaf9e0`. Runtime validation
 reconstructs this binding from frozen scope while allowing legitimate post-start journal progress.
 
 Regressions cover clean canonical activation, dirty pre-test rejection, nonempty journal, lane and

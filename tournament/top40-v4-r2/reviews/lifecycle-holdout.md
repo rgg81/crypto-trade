@@ -6,17 +6,21 @@ Scope: exact current restart worktree on branch
 alternative, activation and crash lifecycle, runtime validation, mechanism epochs, broker error
 classification, seed state, July-2026 holdout, release accounting, and R1 compatibility.
 Method: source and runtime-state inspection plus focused low-CPU adversarial tests in temporary
-roots. No activation, team launch, candidate, journal record, result, selection, or release was
-created in the tournament; this report is the only reviewed file modified.
+roots. The organizer's attempted activation stopped at seed preflight; no activation freeze, test
+output, team launch, candidate, journal record, result, selection, or release was created. This
+report is the only reviewed file modified.
 
 ## Gate status
 
 **PASSED. Unresolved findings: 0.**
 
-The exact restart is score-blind and seed-only. The fresh activation path now proves that fact at
-the correct one-time boundary, binds it to the immutable activation scope, remains resumable across
-test-output crash windows, and permits normal runtime artifacts only after activation. The earlier
-static-authority, activation-test retry, and result-lock findings are closed.
+The exact restart is score-blind and seed-only. The first activation attempt correctly rejected a
+fixture-model mismatch before tests or freeze: the 45 tracked lane markers contain one LF byte,
+whereas the initial fresh gate expected zero bytes. Current exact code models, scans, commits, and
+binds the real marker bytes. The fresh activation path now proves genesis at the correct one-time
+boundary, remains resumable across test-output crash windows, and permits normal runtime artifacts
+only after activation. The earlier static-authority, activation-test retry, result-lock, and marker
+payload findings are closed.
 
 ## Fresh-restart and activation findings
 
@@ -27,17 +31,19 @@ static-authority, activation-test retry, and result-lock findings are closed.
   incident evidence. The authority explicitly forbids feedback disclosure and result reuse. No
   predecessor score value was read during this review.
 - The real restart is on the required distinct restart branch. It has no activation freeze,
-  activation-test output, research journal, research session, candidate, active outbox/feedback,
-  IS/source result, nomination, selection, or historical release. All 15 lanes contain their exact
-  frozen seed policy/brief/README and empty `.keep` markers; only the two frozen common reports are
-  present under the report root. Canonical pre-activation status reports the genesis head, zero
-  records, and no activation.
+  activation-test output, research session, candidate, active outbox/feedback, IS/source result,
+  nomination, selection, or historical release. The stopped canonical attempt created only the
+  expected byte-empty journal and safe current-owner result-lock marker. All 15 lanes contain their
+  exact frozen seed policy/brief/README and three tracked one-byte-LF `.keep` markers; only the two
+  frozen common reports are present under the report root. Canonical pre-activation status reports
+  the genesis head, zero records, and no activation.
 - Fresh activation exact-scans every expected frozen tournament/report seed file, all 45 lane
-  markers, and the byte-empty journal created by the canonical organizer. Exact directory entry
-  sets reject missing or extra residue. Files must be owner-controlled, regular, single-linked,
-  stable, and bounded; symlinks, hard links, special nodes, unsafe parents, nonempty journal/marker,
-  candidate/outbox/feedback/work residue, research receipts, results, selection, release, and
-  incident ambiguity all fail closed.
+  markers, and the byte-empty journal created by the canonical organizer. The markers are now in
+  `FROZEN_SCOPE` and must match their committed one-byte-LF payload; the journal alone is synthetic
+  empty state. Exact directory entry sets reject missing or extra residue. Files must be
+  owner-controlled, regular, single-linked, stable, and bounded; symlinks, hard links, special
+  nodes, unsafe parents, nonempty journals, noncanonical markers, candidate/outbox/feedback/work
+  residue, research receipts, results, selection, release, and incident ambiguity all fail closed.
 - The competitive seed surface is checked before activation work and again after focused tests.
   The only transition artifacts admitted are a safe broker lock, the canonical actively owned
   result-lock marker, and a safe prior activation-test scratch file. Test scratch is never
@@ -45,11 +51,11 @@ static-authority, activation-test retry, and result-lock findings are closed.
   now reaches a successful freeze; failures and crashes before publication leave no freeze and do
   not strand the next canonical attempt.
 - The activation record binds restart mode, exact authority hash, empty-journal hash, 15-lane
-  count, 94-file competitive surface count, and chained surface head. Activation compares that
-  head to the committed activation-scope entries before tests. Validation recomputes the expected
-  count and head from the immutable scope entries rather than accepting an arbitrary digest, then
-  repeats the normal record hash, branch, config, manifest, review, Git ancestry, current scope,
-  test-output, and universe checks.
+  count, 94-file competitive surface count, and chained surface head. All 45 marker size/hash pairs
+  now come from committed scope entries. Activation compares the resulting head to the committed
+  activation scope before tests. Validation recomputes the expected count and head from those
+  immutable entries rather than accepting an arbitrary digest, then repeats the normal record hash,
+  branch, config, manifest, review, Git ancestry, current scope, test-output, and universe checks.
 - Post-activation validation deliberately does not rescan the genesis runtime tree. This is the
   correct lifecycle split: accepted candidates, journal records, feedback, and results may then
   exist, while the immutable activation record continues to prove the earlier clean boundary.
@@ -98,6 +104,8 @@ Ruff                                                        passed
 git diff --check                                             passed
 canonical pre-activation validate/status         0 records / not activated
 fresh seed residue/link/transition mutations                 rejected
+real-root lock-held seed / scope binding        94 / ad0594... / exact
+empty marker mutation / committed LF markers            rejected / 45
 failed activation tests followed by retry           rerun / freeze succeeds
 canonical live result lock / linked lock targets      accepted / unchanged
 mechanism current-parent control / old parent        accepted / rejected
@@ -106,6 +114,6 @@ broker preacceptance / terminal / infrastructure   preserved / consumed / resuma
 holdout hard end                              2026-08-01T00:00:00Z
 ```
 
-The lifecycle/holdout gate is clear for the organizer to commit the reviewed frozen bytes and run
+The lifecycle/holdout gate is clear for the organizer to commit the reviewed frozen bytes and retry
 the separate canonical activation step. This review did not activate the tournament or start a
 team.
