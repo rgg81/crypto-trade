@@ -45,7 +45,7 @@ _PRETRIAL_SMOKE_RECEIPT_SHA256 = (
 )
 _FRESH_RESTART_AUTHORITY_PATH = "tournament/top40-v4-r2/FRESH-RESTART-AUTHORITY.json"
 _FRESH_RESTART_AUTHORITY_SHA256 = (
-    "8b65462489ecb3d59d5625584cd2f574f849dc073e4253225490427d0b90f871"
+    "f33d4ac0fdbea88a75b8c8d8cd6f4bbbd799a4095dfbb3e9147c1c1a483d3f0b"
 )
 _FRESH_LANE_MARKER_PAYLOAD = b"\n"
 _PRETRIAL_OLD_ACTIVATION_FILE_SHA256 = (
@@ -673,7 +673,9 @@ def _validate_fresh_restart_launch(root: Path) -> None:
     from crypto_trade.tournament import research_runtime_v4
 
     try:
-        research_runtime_v4.validate_launch_authority(root, "team-01", "discovery")
+        research_runtime_v4.validate_launch_authority_payload(
+            root, "team-01", "discovery", payload
+        )
     except research_runtime_v4.ResearchRuntimeError as exc:
         raise ActivationError("fresh restart launch authority is not current") from exc
 

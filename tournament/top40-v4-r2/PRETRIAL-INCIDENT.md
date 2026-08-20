@@ -24,11 +24,13 @@ discovery model had written its eight-candidate batch but before any candidate w
 evaluated. The fresh-authority validator treated every file at the historical Team-01 discovery
 receipt pathname as the superseded v7 receipt, including the valid current v8 receipt. The broker
 stopped fail-closed with a byte-empty journal, no result or feedback, and an unarchived outbox. That
-worktree is preserved unchanged. The restart authority binds its activation, current launch,
-outbox, and all eight content-addressed research receipts. No candidate or model output from that
-attempt is reused. The repaired validator rejects the exact superseded v7 hash and arbitrary
-residue, while accepting only a launch receipt that passes the current launcher/profile/team-kit
-identity check. This successor again starts all 15 lanes from the exact seed-only state.
+worktree retains the exact stopped runtime/model artifacts; its tracked branch later advanced in
+committed history to carry this recovery fix. The restart authority binds the stopped activation,
+current launch, outbox, and all eight content-addressed research receipts. No candidate or model
+output from that attempt is reused. The repaired validator rejects the exact superseded v7 hash
+and arbitrary residue, while accepting only a launch receipt that passes the current
+launcher/profile/team-kit identity check. This successor again starts all 15 lanes from the exact
+seed-only state.
 
 If activation stops after atomically writing `activation-tests.out` but before publishing a freeze,
 that bounded regular single-link file is treated only as non-authoritative scratch. The next

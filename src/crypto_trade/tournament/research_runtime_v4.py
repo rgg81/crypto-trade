@@ -822,7 +822,7 @@ def _write_immutable(path: Path, payload: bytes) -> None:
         os.close(directory)
 
 
-def _record_launch_authority(root: Path, team_id: str, phase: str) -> Mapping[str, str]:
+def _launch_authority_payload(root: Path, team_id: str, phase: str) -> bytes:
     launch = {
         "launcher_version": LAUNCHER_VERSION,
         "phase": phase,
@@ -833,35 +833,42 @@ def _record_launch_authority(root: Path, team_id: str, phase: str) -> Mapping[st
         "team_kit_sha256": _team_kit_sha256(root),
         "tournament": TOP40_V4_LAYOUT.name,
     }
-    payload = json.dumps(
+    return json.dumps(
         launch, allow_nan=False, ensure_ascii=True, indent=2, sort_keys=True
     ).encode("ascii") + b"\n"
+
+
+def _record_launch_authority(root: Path, team_id: str, phase: str) -> Mapping[str, str]:
+    payload = _launch_authority_payload(root, team_id, phase)
     relative = _launch_relative(team_id, phase)
     _write_immutable(root / relative, payload)
+    return {"path": relative, "sha256": hashlib.sha256(payload).hexdigest()}
+
+
+def validate_launch_authority_payload(
+    root: str | Path,
+    team_id: str,
+    phase: str,
+    payload: bytes,
+) -> Mapping[str, str]:
+    """Validate one already-stable launch capture against the exact canonical authority."""
+
+    root_path = Path(root).resolve()
+    relative = _launch_relative(team_id, phase)
+    if payload != _launch_authority_payload(root_path, team_id, phase):
+        raise ResearchRuntimeError("research launch authority differs")
     return {"path": relative, "sha256": hashlib.sha256(payload).hexdigest()}
 
 
 def validate_launch_authority(root: str | Path, team_id: str, phase: str) -> Mapping[str, str]:
     root_path = Path(root).resolve()
     relative = _launch_relative(team_id, phase)
-    payload = _stable_bytes(root_path / relative)
-    try:
-        launch = json.loads(payload)
-    except (UnicodeError, json.JSONDecodeError) as exc:
-        raise ResearchRuntimeError("research launch authority is invalid JSON") from exc
-    expected = {
-        "launcher_version": LAUNCHER_VERSION,
-        "phase": phase,
-        "profile_sha256": profile_sha256(root_path, team_id),
-        "schema_version": 1,
-        "status": "authorized",
-        "team_id": team_id,
-        "team_kit_sha256": _team_kit_sha256(root_path),
-        "tournament": TOP40_V4_LAYOUT.name,
-    }
-    if not isinstance(launch, Mapping) or set(launch) != _LAUNCH_KEYS or dict(launch) != expected:
-        raise ResearchRuntimeError("research launch authority differs")
-    return {"path": relative, "sha256": hashlib.sha256(payload).hexdigest()}
+    return validate_launch_authority_payload(
+        root_path,
+        team_id,
+        phase,
+        _stable_bytes(root_path / relative),
+    )
 
 
 def record_candidate_receipts(
@@ -2136,5 +2143,6 @@ __all__ = [
     "serialized_r2_command",
     "validate_candidate_receipt",
     "validate_launch_authority",
+    "validate_launch_authority_payload",
     "validate_source_review",
 ]

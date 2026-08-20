@@ -1,119 +1,127 @@
-# Independent adversarial fresh-restart lifecycle and holdout review
+# Independent adversarial successor-restart lifecycle and holdout review
 
 Review date: 2026-08-20
-Scope: exact current restart worktree on branch
-`quant-portfolio-blind-top40-v4-r1-v2-restart`; fresh-restart authority, pretrial
-alternative, activation and crash lifecycle, runtime validation, mechanism epochs, broker error
-classification, seed state, July-2026 holdout, release accounting, and R1 compatibility.
-Method: source and runtime-state inspection plus focused low-CPU adversarial tests in temporary
-roots. The organizer's attempted activation stopped at seed preflight; no activation freeze, test
-output, team launch, candidate, journal record, result, selection, or release was created. This
-report is the only reviewed file modified.
+Scope: exact current successor worktree on branch
+`quant-portfolio-blind-top40-v4-r1-v2-restart2`; stopped-r3 evidence, fresh-restart
+authority, current-launch transition, activation/restart lifecycle, fairness, July-2026 holdout, and
+R1 compatibility.
+Method: read-only inspection of r3/r4 runtime evidence, focused temporary-root mutation probes, and
+low-CPU regression tests. No activation, team launch, candidate, journal record, evaluation,
+feedback, result, selection, or release was created in r4; this report is the only reviewed file
+modified.
 
 ## Gate status
 
 **PASSED. Unresolved findings: 0.**
 
-The exact restart is score-blind and seed-only. The first activation attempt correctly rejected a
-fixture-model mismatch before tests or freeze: the 45 tracked lane markers contain one LF byte,
-whereas the initial fresh gate expected zero bytes. Current exact code models, scans, commits, and
-binds the real marker bytes. The fresh activation path now proves genesis at the correct one-time
-boundary, remains resumable across test-output crash windows, and permits normal runtime artifacts
-only after activation. The earlier static-authority, activation-test retry, result-lock, and marker
-payload findings are closed.
+R4 is an exact seed-only successor. R3 stopped after its discovery model produced a batch and eight
+content-addressed research receipts but before acceptance, evaluation, feedback, or archive. The
+new authority binds that stopped state without reusing any model output. The repaired launch check
+rejects the exact superseded v7 receipt, arbitrary residue, noncanonical/duplicate-key encodings,
+and a copied r3 v8 receipt, while allowing only the exact canonical bytes of a root-current v8
+receipt after the immutable genesis activation boundary.
 
-## Fresh-restart and activation findings
+## Stopped-r3 evidence and fresh authority
 
-- `FRESH-RESTART-AUTHORITY.json` has the exact hardcoded SHA-256
-  `bae6aa65e9689c6c19b302bd3284cdda118449187705b05314392ae5853b5431`. Its
-  predecessor activation, journal identity/count/head, two accepted/successful prefix records,
-  discovery outbox, rejected preacceptance receipt, and source archive bindings match the preserved
-  incident evidence. The authority explicitly forbids feedback disclosure and result reuse. No
-  predecessor score value was read during this review.
-- The real restart is on the required distinct restart branch. It has no activation freeze,
-  activation-test output, research session, candidate, active outbox/feedback, IS/source result,
-  nomination, selection, or historical release. The stopped canonical attempt created only the
-  expected byte-empty journal and safe current-owner result-lock marker. All 15 lanes contain their
-  exact frozen seed policy/brief/README and three tracked one-byte-LF `.keep` markers; only the two
-  frozen common reports are present under the report root. Canonical pre-activation status reports
-  the genesis head, zero records, and no activation.
-- Fresh activation exact-scans every expected frozen tournament/report seed file, all 45 lane
-  markers, and the byte-empty journal created by the canonical organizer. The markers are now in
-  `FROZEN_SCOPE` and must match their committed one-byte-LF payload; the journal alone is synthetic
-  empty state. Exact directory entry sets reject missing or extra residue. Files must be
-  owner-controlled, regular, single-linked, stable, and bounded; symlinks, hard links, special
-  nodes, unsafe parents, nonempty journals, noncanonical markers, candidate/outbox/feedback/work
-  residue, research receipts, results, selection, release, and incident ambiguity all fail closed.
-- The competitive seed surface is checked before activation work and again after focused tests.
-  The only transition artifacts admitted are a safe broker lock, the canonical actively owned
-  result-lock marker, and a safe prior activation-test scratch file. Test scratch is never
-  authoritative: every retry reruns and atomically replaces it. A focused failure-then-retry probe
-  now reaches a successful freeze; failures and crashes before publication leave no freeze and do
-  not strand the next canonical attempt.
-- The activation record binds restart mode, exact authority hash, empty-journal hash, 15-lane
-  count, 94-file competitive surface count, and chained surface head. All 45 marker size/hash pairs
-  now come from committed scope entries. Activation compares the resulting head to the committed
-  activation scope before tests. Validation recomputes the expected count and head from those
-  immutable entries rather than accepting an arbitrary digest, then repeats the normal record hash,
-  branch, config, manifest, review, Git ancestry, current scope, test-output, and universe checks.
-- Post-activation validation deliberately does not rescan the genesis runtime tree. This is the
-  correct lifecycle split: accepted candidates, journal records, feedback, and results may then
-  exist, while the immutable activation record continues to prove the earlier clean boundary.
-  Appearance/removal of an incident final after activation changes the required record schema and
-  fails closed; result and launcher entrypoints also require the exact fresh/incident authority
-  both before and under their serial leases.
-- Canonical activation is serialized by the result lock but remains outside the broker lease so
-  its focused-test child can acquire the broker without ABBA deadlock. The result lock now uses
-  no-follow directory/file opens, owner/regular/single-link checks before mutation, and a post-flock
-  lexical inode check. Hard-link and symlink probes reject before changing the aliased target.
-  Canonical activation with its live PID marker reaches the exact 94-file fresh binding.
-- Freeze publication remains exclusive, atomic, file-and-parent-fsynced, and one-shot. A concurrent
-  or resumed publisher cannot overwrite an existing freeze. Pre-activation result calls fail before
-  broker acquisition, preserving the established activation/result lock order.
+- `FRESH-RESTART-AUTHORITY.json` has the exact code-bound SHA-256
+  `f33d4ac0fdbea88a75b8c8d8cd6f4bbbd799a4095dfbb3e9147c1c1a483d3f0b`.
+  Its original two-trial predecessor evidence remains bound without score disclosure or result
+  reuse. Its separate `restart_attempt` object identifies r3's activation, activation record,
+  implementation commit, branch, current discovery launch, unarchived outbox, byte-empty journal,
+  and eight research receipts.
+- Independent comparison against the stopped r3 runtime matched every declared identity: activation
+  file `0082eab1...`, self-consistent activation record `ebd5b977...`, implementation commit
+  `79758b44...`, current discovery launch `d3f4da4c...`, batch outbox `fd620a26...`, and all
+  eight receipt hashes. The activation record also binds its exact activation-test output.
+- The r3 journal is byte-empty and replays to zero records. There is no feedback JSON, IS result,
+  source archive, or archived outbox. Thus there is no accepted/evaluated trial, disclosed
+  feedback, or result to carry forward. Candidate/model files remain only in the stopped r3 runtime;
+  none exists in r4.
+- The preservation statement is now exact: stopped runtime/model artifacts remain byte-for-byte
+  available, while r3's tracked branch later advanced in committed history to carry the recovery
+  fix. The authority no longer claims that the entire worktree stayed unchanged.
+- The authority file is exact-hash checked and schema checked. Its restart evidence requires false
+  feedback disclosure, an empty-journal hash, zero journal/accepted/evaluated counts, an unarchived
+  outbox, Team 01 identity, and eight well-formed receipt hashes. Any authority byte change fails
+  before activation.
 
-## Tournament lifecycle, broker, and holdout findings
+## R4 genesis, launch transition, and restart behavior
 
-- Mechanism history is ordered by accepted trial number. The first candidate establishes an epoch.
-  A descriptive `control-ablation` or `role-check` may differ in prose only when it names an already
-  accepted parent in the current epoch. Unparented and old-epoch controls reject. A real
-  `mechanism-pivot` must change mechanism, cannot be the first candidate, and is allowed once;
-  no-op and second pivots reject before acceptance. The rules and clean-room prompts disclose this
-  contract equally to all teams without predecessor information.
-- Batch consumption preserves the original preacceptance exception when no accepted journal record
-  exists. It consumes only a deterministic candidate-source rejection that has a durable terminal
-  disposition; accepted infrastructure failures without a terminal remain resumable. Decision
-  values and schemas are strict, launch authority and exact phase/trial prefixes are revalidated,
-  and completed feedback is reconstructed from the journal and immutable archived outbox.
-- All model/evaluator work remains protected by the owner-controlled process-wide broker lease and
-  runs serially. Direct-library and CLI paths repeat activation, incident/fresh authority, journal,
-  terminal, archive, and launch checks inside their locks. Seed-only restart therefore cannot
-  inherit a trial, terminal, nomination, or selection from the aborted predecessor.
-- The frozen hard end remains exclusively `2026-08-01T00:00:00Z`: every July 2026 daily bar and all
-  nine required holdout quarters are present, while August observations are excluded. Config and
-  manifest mutations that shorten the boundary fail activation.
-- Previously reviewed DNF-to-effective-cash disclosure, ensemble weight accounting, trial/field
-  adjustment, one-shot finalist handling, no-winner/empty release behavior, journal sequencing,
-  and atomic historical publication remain unchanged and covered by the focused suite.
+- R4 is on the distinct `restart2` branch required by the current layout. It contains all 15 exact
+  seed lanes, 45 committed one-byte-LF markers, the two frozen common reports, and no activation
+  freeze, activation-test output, journal, research session, candidate, active outbox/feedback,
+  result, nomination, selection, or release. Canonical pre-activation status/validation reports the
+  genesis head, zero records, and no activation.
+- Canonical activation will initialize the byte-empty journal and live result-lock marker, then
+  exact-scan the owner-controlled regular single-link seed surface before and after tests. The
+  activation record binds restart mode, exact authority hash, empty-journal hash, 15 lanes, 94
+  competitive files, and the scope-derived chained head. Activation remains clean-commit,
+  exact-branch, test-bound, atomic, exclusive, fsynced, one-shot, and crash-resumable.
+- With no discovery receipt, fresh authority is repeatedly valid. If the historical Team-01
+  discovery path exists, the validator first rejects the exact hardcoded v7 SHA-256. Every other
+  payload must byte-equal the shared canonical launch payload for exactly Team 01 discovery:
+  canonical schema/status/tournament, launcher v8, current root-specific profile hash, and current
+  team-kit hash. Semantically equivalent whitespace/order variants, duplicate keys, symlink,
+  hard-link, malformed, changed, and arbitrary nodes fail closed.
+- Fresh restart reads the launch pathname once through the stable regular/single-link capture, tests
+  the old-v7 hash on those bytes, and passes those same captured bytes to exact current validation.
+  It never reparses or rereads the pathname during that authority decision. A substitution after
+  capture cannot alter which bytes were validated; the normal pre-lease/under-lease repetition
+  catches a changed current pathname before a protected runtime action.
+- A copied r3 v8 launch fails in an r4 fixture because its root-specific profile identity differs.
+  An independently constructed exact current receipt passes the authority check, but the
+  pre-activation genesis scanner still rejects its research-session residue. Therefore a current
+  receipt cannot survive into an activation freeze; it becomes admissible only when the activated
+  organizer creates it at the normal first-launch transition.
+- The current launcher validates activation and fresh authority before recording a receipt.
+  `_write_immutable` makes an identical receipt idempotent, allowing a retry after a crash between
+  launch authorization and model completion. Once a legitimate v8 receipt exists, repeated
+  authority checks accept it so an outbox/receipt crash can resume. Broker consumption recreates
+  exact candidate receipts from the unarchived outbox before accepting any trial.
+- Result, launcher, and broker entrypoints repeat activation, fresh/incident authority, launch,
+  journal, phase, terminal, and archive checks under the established serial locks. Pre-activation
+  result calls fail before broker acquisition; no r3 candidate, receipt, outbox, trial, or feedback
+  is imported into r4. Every one of the 15 teams therefore restarts at trial zero under the same
+  disclosed mechanism rules.
+- The layout branch update and this reviewed report are frozen-scope changes, so canonical activation
+  will reject until the organizer commits the exact reviewed bytes. This is the intended final
+  clean-commit gate, not a runtime exception.
+
+## Fairness and holdout
+
+- Mechanism epochs remain trial-ordered. A parented `control-ablation` or `role-check` may use
+  descriptive prose only with a current-epoch accepted parent. Unparented/old-epoch controls,
+  first-candidate pivots, no-op pivots, and second pivots reject before acceptance.
+- Preacceptance broker errors remain unmasked and consume no trial. Only an accepted deterministic
+  source rejection with a durable terminal is consumed; infrastructure failures without a terminal
+  remain resumable. Strict decisions, immutable feedback/outbox reconstruction, DNF-to-cash
+  accounting, field adjustment, one-shot finalists, empty/no-winner behavior, and atomic release
+  remain unchanged.
+- The hard end is still exclusively `2026-08-01T00:00:00Z`. The manifest includes every July 2026
+  daily bar and all nine required holdout quarters and excludes August. Shortened-window and
+  config/manifest mutation tests fail closed.
 
 ## Focused verification executed
 
 ```text
-tests/tournament/test_top40_v4_r2.py                    106 passed
-tests/tournament/test_top40_v4.py                        24 passed
-Ruff                                                        passed
-git diff --check                                             passed
-canonical pre-activation validate/status         0 records / not activated
-fresh seed residue/link/transition mutations                 rejected
-real-root lock-held seed / scope binding        94 / ad0594... / exact
-empty marker mutation / committed LF markers            rejected / 45
-failed activation tests followed by retry           rerun / freeze succeeds
-canonical live result lock / linked lock targets      accepted / unchanged
-mechanism current-parent control / old parent        accepted / rejected
-mechanism no-op pivot / second pivot                rejected / rejected
-broker preacceptance / terminal / infrastructure   preserved / consumed / resumable
-holdout hard end                              2026-08-01T00:00:00Z
+tests/tournament/test_top40_v4_r2.py                         109 passed
+tests/tournament/test_top40_v4.py                             24 passed
+Ruff / git diff --check                                  passed / passed
+r4 pre-activation status                         0 records / not activated
+r3 activation / record / tests binding                         exact
+r3 journal / accepted / evaluated                          empty / 0 / 0
+r3 launch / outbox / eight receipts                             exact
+r3 feedback / results / outbox archive                         0 / 0 / 0
+fresh authority SHA-256                                f33d4ac0... exact
+absent current launch / repeated authority checks           accepted
+copied r3 v8 / arbitrary launch residue                     rejected
+noncanonical / duplicate-key current launch                 rejected
+single stable capture / pathname substitution            exact / isolated
+exact superseded v7 launch                                  rejected
+exact root-current v8 authority                             accepted
+root-current v8 before genesis seed gate                    rejected
+holdout hard end                               2026-08-01T00:00:00Z
 ```
 
-The lifecycle/holdout gate is clear for the organizer to commit the reviewed frozen bytes and retry
-the separate canonical activation step. This review did not activate the tournament or start a
-team.
+The lifecycle/restart/fairness/holdout gate is clear for the organizer to commit the reviewed bytes
+and run the separate canonical activation step. This review did not activate r4 or launch a team.

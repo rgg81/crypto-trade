@@ -2,30 +2,38 @@
 
 Review date: 2026-08-20
 Scope: exact current Top-40 V4-R2 fresh-restart bytes on branch
-`quant-portfolio-blind-top40-v4-r1-v2-restart`. This independent review covered the score-blind
-restart authority, clean genesis topology, activation/schema/hash binding, mechanism admission,
+`quant-portfolio-blind-top40-v4-r1-v2-restart2`. This independent review covered the score-blind
+successor authority, the preserved stopped-r3 attempt, current-v8-versus-superseded-v7 launch
+discrimination, clean genesis topology, activation/schema/hash binding, mechanism admission,
 broker failure recovery, copied July-inclusive snapshot and A6 authority, evaluator/scoring/source
 archive identity, and R1 external behavior. It did not activate the tournament, launch a team,
-run a strategy backtest, or modify any runtime artifact.
+run a strategy backtest, read a score, or modify any runtime artifact.
 
 ## Gate status
 
 **PASSED. Unresolved findings: 0.**
 
-The restart worktree is ready to be committed, rebound by the aggregate adversarial-review record,
-and activated. It contains no accepted trial, result, candidate, feedback, research session, source
-archive, nomination, selection, or release from the private predecessor.
+The successor worktree is ready to be committed, rebound by the aggregate adversarial-review
+record, and activated. It carries over no accepted trial, result, candidate, feedback, research
+session, source archive, nomination, selection, or release from either private stopped attempt.
 
 ## Fresh restart and predecessor separation
 
 - `FRESH-RESTART-AUTHORITY.json` is a regular single-link frozen-scope file with exact SHA-256
-  `bae6aa65e9689c6c19b302bd3284cdda118449187705b05314392ae5853b5431`.
+  `f33d4ac0fdbea88a75b8c8d8cd6f4bbbd799a4095dfbb3e9147c1c1a483d3f0b`.
 - Its predecessor facts were independently matched against the untouched private worktree: branch
   and implementation commit, activation file `b80cd016...`, four-record journal file
   `d79411dc...`, head `ffc9d322...`, two accepted/succeeded request-terminal pairs, summaries
   `c648329a...` and `2d8bf14c...`, and the rejected pre-acceptance outbox, research receipt, and
   source archive. The rejected candidate had no accepted record, evaluation, or feedback.
-- The restart contains no R2 journal or activation before organizer activation, and no candidate,
+- The stopped r3 attempt was independently matched without reading any score: activation file
+  `0082eab1...`, valid canonical record self-hash `ebd5b977...`, branch
+  `quant-portfolio-blind-top40-v4-r1-v2-restart`, implementation commit `79758b44...`, current-v8
+  discovery launch `d3f4da4c...`, byte-empty journal with zero records, eight exact research
+  receipt hashes, and unarchived outbox `fd620a26...`. It has zero accepted/evaluated trials, only
+  `.keep` in feedback, and no result file. The runtime/model artifacts remain exact; tracked history
+  advanced after the stop only to commit the recovery fix.
+- The successor contains no R2 journal or activation before organizer activation, and no candidate,
   feedback, outbox request, research-session file, IS result, result receipt, source archive,
   nomination, selection, certificate, or historical release. Reports contain only the two frozen
   common return/regime files; all 15 lanes have the exact six seed files.
@@ -34,8 +42,29 @@ archive, nomination, selection, or release from the private predecessor.
   team-visible or worker-visible surface.
 - Evaluator/data/runner identity is not inferred from the restart declaration. All copied snapshot
   files and the unchanged data, engine, metrics, protocol, risk-policy, runner, scoring, and source-
-  archive modules matched the predecessor byte-for-byte. No predecessor result artifact is an
-  evaluator input or lifecycle authority in this worktree.
+  archive modules matched the fully verified r3 copy byte-for-byte. No predecessor or stopped-r3
+  result artifact is an evaluator input or lifecycle authority in this worktree.
+
+## Current-v8 and superseded-v7 launch discrimination
+
+- The historical superseded-v7 receipt remains pinned to SHA-256 `726ed7f5...`; that exact hash is
+  rejected before any generic current-launch check. The actual stopped-r3 receipt is distinct at
+  `d3f4da4c...`, byte-equals the current canonical payload, and passes both the stable-file and
+  already-captured-payload validators for launcher v8, Team 01, discovery phase, profile hash,
+  team-kit hash, tournament, schema, and status.
+- Any non-v7 file at the reused pathname is not trusted merely for differing. It must pass that
+  complete current authority validator; arbitrary or malformed residue fails closed. Recording and
+  validation derive one identical, sorted, newline-terminated canonical byte representation.
+  Semantically equivalent noncanonical JSON and duplicate-key JSON reject by exact byte inequality.
+- Activation makes one bounded, no-follow stable capture and passes those same bytes to the payload
+  validator; it does not reopen the lexical path between the v7 comparison and current-v8 check.
+  A substitution after capture cannot change the bytes authorized by that invocation, while every
+  subsequent authority check performs a fresh stable capture. The R2 suite exercises exact-v7
+  rejection, current-v8 delegation, invalid-current rejection, canonicalization, duplicate keys,
+  after-capture substitution, and the no-file pre-launch state.
+- `TOP40_V4_R2_LAYOUT.branch` now binds activation to the actual successor branch
+  `quant-portfolio-blind-top40-v4-r1-v2-restart2`. The stopped activation remains bound to its
+  original r3 branch and is evidence only, never successor activation authority.
 
 ## Genesis scan and activation binding
 
@@ -54,7 +83,7 @@ archive, nomination, selection, or release from the private predecessor.
   `FROZEN_SCOPE`; their committed size and SHA-256 feed the chain, while only the journal is
   synthesized as empty genesis. Activation freezes the authority hash, mode, empty-journal hash,
   lane count, file count, and independently recomputed chained surface head
-  `ad0594a4222679cd4ccf4abc54afb12381f8789aef3ab9b00361ddfd8bdaf9e0`.
+  `fb34ad31d82422ce8680d3dc7285978ff1d51ea2ac00dce8c826c4e459dc2e8f`.
 - The seed head is independently recomputed from the exact activation `scope_entries` before freeze
   publication and again during validation. The wider scope still binds every committed code,
   policy, team-kit, template, review, snapshot-manifest, and common-report byte through its normal
@@ -62,7 +91,7 @@ archive, nomination, selection, or release from the private predecessor.
   commit, config, adversarial-review record, full snapshot manifest, A6 report, and exact successful
   focused-test output; its canonical self-hash covers the complete schema.
 - Activation is one-shot and branch-bound to
-  `quant-portfolio-blind-top40-v4-r1-v2-restart`. Dirty-surface integration rejects before creating
+  `quant-portfolio-blind-top40-v4-r1-v2-restart2`. Dirty-surface integration rejects before creating
   activation tests or a freeze. A failed focused-test attempt creates no freeze, and the next safe
   attempt replaces the test scratch and revalidates the unchanged seed state.
 
@@ -117,7 +146,7 @@ selection are R2-only; the shared evaluator's R1 external behavior is unchanged.
 ## Focused evidence
 
 ```text
-R2 exact-current restart/contract/security suite                     106 passed
+R2 exact-current restart/contract/security suite                     109 passed
 Focused evaluator/risk/past-only set                                  14 passed
 Source-archive boundary suite                                          5 passed
 R1 clean external-contract suite                                      24 passed
@@ -126,8 +155,11 @@ Ruff on changed broker/activation/layout/orchestrator/test modules       passed
 git diff --check                                                         passed
 July rows / rows at or after 2026-08-01                    present / zero
 A6 deterministic report                                      passed / zero violations
-fresh R2 journal / accepted trials                         absent / zero
-fresh R2 candidate/result/research/disclosure artifacts                  none
+successor journal / accepted or evaluated trials            absent / zero
+successor candidate/result/research/disclosure artifacts                 none
+stopped-r3 journal / accepted / evaluated records              0 / 0 / 0
+stopped-r3 current-v8 launch / superseded-v7 hash        valid / distinct
+launch capture / canonical bytes / duplicate keys        one / exact / rejected
 team reads of restart authority and predecessor evidence               denied
 ```
 

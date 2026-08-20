@@ -1084,28 +1084,98 @@ def test_fresh_restart_accepts_only_the_exact_current_discovery_launch(
     destination.write_bytes(source.read_bytes())
     launch = tmp_path / activation_v4._PRETRIAL_OLD_LAUNCH_PATH
     launch.parent.mkdir(parents=True)
-    launch.write_bytes(b"current launch authority fixture\n")
-    calls: list[tuple[Path, str, str]] = []
+    captured = b"current launch authority fixture\n"
+    launch.write_bytes(captured)
+    calls: list[tuple[Path, str, str, bytes]] = []
 
-    def validate_current(root: str | Path, team_id: str, phase: str) -> dict[str, str]:
-        calls.append((Path(root), team_id, phase))
-        return {"path": str(launch), "sha256": hashlib.sha256(launch.read_bytes()).hexdigest()}
+    def validate_current(
+        root: str | Path, team_id: str, phase: str, payload: bytes
+    ) -> dict[str, str]:
+        calls.append((Path(root), team_id, phase, payload))
+        return {"path": str(launch), "sha256": hashlib.sha256(payload).hexdigest()}
 
-    monkeypatch.setattr(research_runtime_v4, "validate_launch_authority", validate_current)
+    monkeypatch.setattr(
+        research_runtime_v4, "validate_launch_authority_payload", validate_current
+    )
     assert activation_v4.pretrial_recovery_pending(tmp_path) is False
     assert activation_v4.require_completed_pretrial_recovery(tmp_path)["results_reused"] is False
     assert calls == [
-        (tmp_path, "team-01", "discovery"),
-        (tmp_path, "team-01", "discovery"),
+        (tmp_path, "team-01", "discovery", captured),
+        (tmp_path, "team-01", "discovery", captured),
     ]
 
-    def reject_current(_root: str | Path, _team_id: str, _phase: str) -> None:
+    def reject_current(
+        _root: str | Path, _team_id: str, _phase: str, _payload: bytes
+    ) -> None:
         raise research_runtime_v4.ResearchRuntimeError("invalid current fixture")
 
-    monkeypatch.setattr(research_runtime_v4, "validate_launch_authority", reject_current)
+    monkeypatch.setattr(
+        research_runtime_v4, "validate_launch_authority_payload", reject_current
+    )
     assert activation_v4.pretrial_recovery_pending(tmp_path) is True
     with pytest.raises(activation_v4.ActivationError, match="launch authority is not current"):
         activation_v4.require_completed_pretrial_recovery(tmp_path)
+
+
+def test_launch_authority_requires_exact_canonical_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(research_runtime_v4, "profile_sha256", lambda _root, _team: "1" * 64)
+    monkeypatch.setattr(research_runtime_v4, "_team_kit_sha256", lambda _root: "2" * 64)
+    recorded = research_runtime_v4._record_launch_authority(
+        tmp_path, "team-01", "discovery"
+    )
+    launch = tmp_path / recorded["path"]
+    canonical = launch.read_bytes()
+    assert research_runtime_v4.validate_launch_authority_payload(
+        tmp_path, "team-01", "discovery", canonical
+    ) == recorded
+
+    semantic = json.loads(canonical)
+    noncanonical = json.dumps(semantic, separators=(",", ":")).encode() + b"\n"
+    duplicate = canonical.replace(
+        b'{\n  "launcher_version"',
+        b'{\n  "schema_version": 1,\n  "launcher_version"',
+        1,
+    )
+    for payload in (noncanonical, duplicate):
+        with pytest.raises(
+            research_runtime_v4.ResearchRuntimeError,
+            match="launch authority differs",
+        ):
+            research_runtime_v4.validate_launch_authority_payload(
+                tmp_path, "team-01", "discovery", payload
+            )
+
+
+def test_fresh_restart_validates_the_same_stable_launch_capture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(research_runtime_v4, "profile_sha256", lambda _root, _team: "1" * 64)
+    monkeypatch.setattr(research_runtime_v4, "_team_kit_sha256", lambda _root: "2" * 64)
+    recorded = research_runtime_v4._record_launch_authority(
+        tmp_path, "team-01", "discovery"
+    )
+    launch = tmp_path / recorded["path"]
+    canonical = launch.read_bytes()
+    validate_payload = research_runtime_v4.validate_launch_authority_payload
+    seen: list[bytes] = []
+
+    def substitute_after_capture(
+        root: str | Path, team_id: str, phase: str, payload: bytes
+    ) -> dict[str, str]:
+        seen.append(payload)
+        launch.write_bytes(b"substituted after stable capture\n")
+        return dict(validate_payload(root, team_id, phase, payload))
+
+    monkeypatch.setattr(
+        research_runtime_v4,
+        "validate_launch_authority_payload",
+        substitute_after_capture,
+    )
+    activation_v4._validate_fresh_restart_launch(tmp_path)
+    assert seen == [canonical]
+    assert launch.read_bytes() != canonical
 
 
 def test_fresh_restart_seed_state_binds_exact_clean_genesis(tmp_path: Path) -> None:

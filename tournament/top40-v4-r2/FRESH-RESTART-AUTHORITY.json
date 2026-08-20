@@ -33,7 +33,7 @@
     "journal_records": 0,
     "outbox_archived": false,
     "outbox_sha256": "fd620a263e3756fce382d86673ac42a114d0f720e4eb714b92ed4bc5e41cb4e4",
-    "preservation": "stopped-worktree-left-byte-for-byte-intact",
+    "preservation": "exact-stopped-runtime-artifacts-preserved;tracked-fix-committed-after-stop",
     "reason": "fresh-restart-validator-confused-the-current-v8-launch-with-the-superseded-v7-launch",
     "research_receipt_sha256": [
       "311a131e5cb5b3d4c71bb5ca755e811780ef18e5248ee6cfc9a3d5a47a1d794d",
