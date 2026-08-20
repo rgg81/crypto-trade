@@ -22,8 +22,35 @@
     "trial_evaluated": false
   },
   "results_reused": false,
+  "restart_attempt": {
+    "activation_file_sha256": "0082eab1741b23cf9497afdf9398078b6c78be614cf85ea7e1041dcdfc871310",
+    "activation_record_sha256": "ebd5b97788258492bfd22612db10316a425a00f854f90f3a95cb01be66768c10",
+    "branch": "quant-portfolio-blind-top40-v4-r1-v2-restart",
+    "discovery_launch_sha256": "d3f4da4cf9ecd1a6f7f0826d218dbedc903569101399e5627f672d80639c3d92",
+    "feedback_disclosed": false,
+    "implementation_commit": "79758b4460435d68d3b3b14cccb89f6d72e48436",
+    "journal_file_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "journal_records": 0,
+    "outbox_archived": false,
+    "outbox_sha256": "fd620a263e3756fce382d86673ac42a114d0f720e4eb714b92ed4bc5e41cb4e4",
+    "preservation": "stopped-worktree-left-byte-for-byte-intact",
+    "reason": "fresh-restart-validator-confused-the-current-v8-launch-with-the-superseded-v7-launch",
+    "research_receipt_sha256": [
+      "311a131e5cb5b3d4c71bb5ca755e811780ef18e5248ee6cfc9a3d5a47a1d794d",
+      "5cabe70f51cd4c1720220941bdb5d224b5d201b20da913a209a578dfc8c8455e",
+      "622a76e6d2c7d0a574d4d90f598488220870c4db57d1a3d95c1861f9f77be64c",
+      "82c92eff83a60ad69d534620646032229bf806b4cba7e2ee208e403b052dc834",
+      "ba28fea5c1ae0f490f8f7f1f1ae37b58b93cf72595bf4a9e22fd940b07131fc7",
+      "e9c490b944c26c8c6f5a08415a5b1e1547c184eced492349413da64efedd6120",
+      "f2ee7c13d16d00fdec7c057857eeba8c625dc0cbf51cffc77d8a607b47a18414",
+      "f6a710ed3e79a812a99ff02ee509bda6428c4074943ed1626b04c267f2169a49"
+    ],
+    "team_id": "team-01",
+    "trials_accepted": 0,
+    "trials_evaluated": 0
+  },
   "schema_version": 1,
-  "status": "fresh-restart-after-private-aborted-contract-incident",
+  "status": "fresh-restart-after-private-aborted-pre-evaluation-incidents",
   "successful_prefix": [
     {
       "candidate_id": "pressure-reversal-f24-r1-baseline",

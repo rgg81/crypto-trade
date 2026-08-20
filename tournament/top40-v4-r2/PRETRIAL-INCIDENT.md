@@ -19,6 +19,17 @@ and chained seed-surface digest in the activation freeze. The seed-only check is
 fact; later commands validate its frozen binding without incorrectly requiring an empty live
 journal after trials begin.
 
+The first clean-restart attempt exposed a second organizer-only admission defect after Team 01's
+discovery model had written its eight-candidate batch but before any candidate was accepted or
+evaluated. The fresh-authority validator treated every file at the historical Team-01 discovery
+receipt pathname as the superseded v7 receipt, including the valid current v8 receipt. The broker
+stopped fail-closed with a byte-empty journal, no result or feedback, and an unarchived outbox. That
+worktree is preserved unchanged. The restart authority binds its activation, current launch,
+outbox, and all eight content-addressed research receipts. No candidate or model output from that
+attempt is reused. The repaired validator rejects the exact superseded v7 hash and arbitrary
+residue, while accepting only a launch receipt that passes the current launcher/profile/team-kit
+identity check. This successor again starts all 15 lanes from the exact seed-only state.
+
 If activation stops after atomically writing `activation-tests.out` but before publishing a freeze,
 that bounded regular single-link file is treated only as non-authoritative scratch. The next
 canonical activation still proves the same competitive seed digest, reruns the full tests, and

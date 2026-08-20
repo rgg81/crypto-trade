@@ -1050,7 +1050,7 @@ def test_pretrial_recovery_archives_old_then_new_authority_and_is_idempotent(
 
 
 def test_fresh_restart_authority_is_an_explicit_alternative_to_incident_recovery(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = ROOT / activation_v4._FRESH_RESTART_AUTHORITY_PATH
     destination = tmp_path / activation_v4._FRESH_RESTART_AUTHORITY_PATH
@@ -1063,9 +1063,48 @@ def test_fresh_restart_authority_is_an_explicit_alternative_to_incident_recovery
 
     old_launch = tmp_path / activation_v4._PRETRIAL_OLD_LAUNCH_PATH
     old_launch.parent.mkdir(parents=True)
-    old_launch.write_text("unexpected legacy launch\n", encoding="utf-8")
+    legacy_payload = b"exact superseded launch fixture\n"
+    old_launch.write_bytes(legacy_payload)
+    monkeypatch.setattr(
+        activation_v4,
+        "_PRETRIAL_OLD_LAUNCH_SHA256",
+        hashlib.sha256(legacy_payload).hexdigest(),
+    )
     assert activation_v4.pretrial_recovery_pending(tmp_path) is True
     with pytest.raises(activation_v4.ActivationError, match="superseded v7 launch"):
+        activation_v4.require_completed_pretrial_recovery(tmp_path)
+
+
+def test_fresh_restart_accepts_only_the_exact_current_discovery_launch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = ROOT / activation_v4._FRESH_RESTART_AUTHORITY_PATH
+    destination = tmp_path / activation_v4._FRESH_RESTART_AUTHORITY_PATH
+    destination.parent.mkdir(parents=True)
+    destination.write_bytes(source.read_bytes())
+    launch = tmp_path / activation_v4._PRETRIAL_OLD_LAUNCH_PATH
+    launch.parent.mkdir(parents=True)
+    launch.write_bytes(b"current launch authority fixture\n")
+    calls: list[tuple[Path, str, str]] = []
+
+    def validate_current(root: str | Path, team_id: str, phase: str) -> dict[str, str]:
+        calls.append((Path(root), team_id, phase))
+        return {"path": str(launch), "sha256": hashlib.sha256(launch.read_bytes()).hexdigest()}
+
+    monkeypatch.setattr(research_runtime_v4, "validate_launch_authority", validate_current)
+    assert activation_v4.pretrial_recovery_pending(tmp_path) is False
+    assert activation_v4.require_completed_pretrial_recovery(tmp_path)["results_reused"] is False
+    assert calls == [
+        (tmp_path, "team-01", "discovery"),
+        (tmp_path, "team-01", "discovery"),
+    ]
+
+    def reject_current(_root: str | Path, _team_id: str, _phase: str) -> None:
+        raise research_runtime_v4.ResearchRuntimeError("invalid current fixture")
+
+    monkeypatch.setattr(research_runtime_v4, "validate_launch_authority", reject_current)
+    assert activation_v4.pretrial_recovery_pending(tmp_path) is True
+    with pytest.raises(activation_v4.ActivationError, match="launch authority is not current"):
         activation_v4.require_completed_pretrial_recovery(tmp_path)
 
 

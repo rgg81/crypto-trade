@@ -45,7 +45,7 @@ _PRETRIAL_SMOKE_RECEIPT_SHA256 = (
 )
 _FRESH_RESTART_AUTHORITY_PATH = "tournament/top40-v4-r2/FRESH-RESTART-AUTHORITY.json"
 _FRESH_RESTART_AUTHORITY_SHA256 = (
-    "bae6aa65e9689c6c19b302bd3284cdda118449187705b05314392ae5853b5431"
+    "8b65462489ecb3d59d5625584cd2f574f849dc073e4253225490427d0b90f871"
 )
 _FRESH_LANE_MARKER_PAYLOAD = b"\n"
 _PRETRIAL_OLD_ACTIVATION_FILE_SHA256 = (
@@ -658,6 +658,26 @@ def _pretrial_incident_manifest(root: Path, path: Path) -> Mapping[str, Any]:
     return manifest
 
 
+def _validate_fresh_restart_launch(root: Path) -> None:
+    """Reject the predecessor receipt while allowing the exact current first launch."""
+
+    launch_path = _pretrial_runtime_path(root, _PRETRIAL_OLD_LAUNCH_PATH)
+    if not os.path.lexists(launch_path):
+        return
+    payload = _pretrial_stable_bytes(launch_path)
+    if _sha256(payload) == _PRETRIAL_OLD_LAUNCH_SHA256:
+        raise ActivationError("fresh restart unexpectedly contains the superseded v7 launch")
+    # This path is intentionally reused by the first current-edition Team-01 discovery
+    # session.  Once research begins, accept only that exact current launch authority;
+    # arbitrary residue must not turn the one-time genesis assertion into a bypass.
+    from crypto_trade.tournament import research_runtime_v4
+
+    try:
+        research_runtime_v4.validate_launch_authority(root, "team-01", "discovery")
+    except research_runtime_v4.ResearchRuntimeError as exc:
+        raise ActivationError("fresh restart launch authority is not current") from exc
+
+
 def pretrial_recovery_pending(root: str | Path) -> bool:
     root_path = Path(root).resolve()
     stage = _pretrial_runtime_path(root_path, _PRETRIAL_INCIDENT_STAGE)
@@ -672,9 +692,10 @@ def pretrial_recovery_pending(root: str | Path) -> bool:
         return False
     try:
         _fresh_restart_authority(root_path)
+        _validate_fresh_restart_launch(root_path)
     except ActivationError:
         return True
-    return os.path.lexists(_pretrial_runtime_path(root_path, _PRETRIAL_OLD_LAUNCH_PATH))
+    return False
 
 
 def _fresh_restart_authority(root: Path) -> Mapping[str, Any]:
@@ -690,6 +711,7 @@ def _fresh_restart_authority(root: Path) -> Mapping[str, Any]:
         "reason",
         "rejected_preacceptance_residue",
         "results_reused",
+        "restart_attempt",
         "schema_version",
         "status",
         "successful_prefix",
@@ -700,13 +722,14 @@ def _fresh_restart_authority(root: Path) -> Mapping[str, Any]:
         or authority.get("schema_version") != 1
         or authority.get("tournament") != TOP40_V4_LAYOUT.name
         or authority.get("status")
-        != "fresh-restart-after-private-aborted-contract-incident"
+        != "fresh-restart-after-private-aborted-pre-evaluation-incidents"
         or authority.get("feedback_disclosed") is not False
         or authority.get("results_reused") is not False
     ):
         raise ActivationError("fresh restart authority identity changed")
     predecessor = authority.get("predecessor")
     rejected = authority.get("rejected_preacceptance_residue")
+    restart = authority.get("restart_attempt")
     prefix = authority.get("successful_prefix")
     if (
         not isinstance(predecessor, Mapping)
@@ -716,6 +739,45 @@ def _fresh_restart_authority(root: Path) -> Mapping[str, Any]:
         or not isinstance(rejected, Mapping)
         or rejected.get("trial_accepted") is not False
         or rejected.get("trial_evaluated") is not False
+        or not isinstance(restart, Mapping)
+        or set(restart)
+        != {
+            "activation_file_sha256",
+            "activation_record_sha256",
+            "branch",
+            "discovery_launch_sha256",
+            "feedback_disclosed",
+            "implementation_commit",
+            "journal_file_sha256",
+            "journal_records",
+            "outbox_archived",
+            "outbox_sha256",
+            "preservation",
+            "reason",
+            "research_receipt_sha256",
+            "team_id",
+            "trials_accepted",
+            "trials_evaluated",
+        }
+        or restart.get("feedback_disclosed") is not False
+        or restart.get("journal_file_sha256") != _sha256(b"")
+        or restart.get("journal_records") != 0
+        or restart.get("outbox_archived") is not False
+        or restart.get("team_id") != "team-01"
+        or restart.get("trials_accepted") != 0
+        or restart.get("trials_evaluated") != 0
+        or not isinstance(restart.get("research_receipt_sha256"), list)
+        or len(restart["research_receipt_sha256"]) != 8
+        or any(
+            not isinstance(value, str) or _SHA256.fullmatch(value) is None
+            for value in (
+                restart.get("activation_file_sha256"),
+                restart.get("activation_record_sha256"),
+                restart.get("discovery_launch_sha256"),
+                restart.get("outbox_sha256"),
+                *restart["research_receipt_sha256"],
+            )
+        )
         or not isinstance(prefix, list)
         or len(prefix) != 2
     ):
@@ -993,8 +1055,7 @@ def require_completed_pretrial_recovery(root: str | Path) -> Mapping[str, Any]:
             "completed pretrial incident authority is missing; "
             "fresh restart authority is unavailable"
         ) from exc
-    if os.path.lexists(_pretrial_runtime_path(root_path, _PRETRIAL_OLD_LAUNCH_PATH)):
-        raise ActivationError("fresh restart unexpectedly contains the superseded v7 launch")
+    _validate_fresh_restart_launch(root_path)
     return authority
 
 
