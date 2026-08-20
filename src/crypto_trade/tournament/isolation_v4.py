@@ -97,7 +97,8 @@ market reasoning already available to you before this session.
 The OS-enforced permission profile makes `ACCESS-POLICY.json` the complete readable and writable
 surface. Every unlisted path and all command networking are unavailable. Do not request access to
 another lane, repository history, legacy research, organizer-private state, sealed rows, or the
-public internet. Do not use remembered post-cutoff prices, results, or precomputed strategies.
+public internet. No host, system, user, plugin, or external skill is available to this session.
+Do not use remembered post-cutoff prices, results, or precomputed strategies.
 
 Before any official run, create a new candidate directory under `candidates/` containing
 `candidate.json`, `strategy.py`, `risk_policy.json`, `README.md`, and

@@ -33,7 +33,10 @@ from crypto_trade.tournament.layout_v4 import TOP40_V4_LAYOUT
 PROFILE_NAME = "top40-v4-r2-offline-team"
 RECEIPT_SCHEMA_VERSION = 1
 SOURCE_REVIEW_SCHEMA_VERSION = 7
-LAUNCHER_VERSION = "top40-v4-r2-research-runtime-v8"
+LAUNCHER_VERSION = "top40-v4-r2-research-runtime-v9"
+MODEL_RUNTIME_SCHEMA_VERSION = 1
+_PRIVATE_MODEL_RUNTIME_RELATIVE = "tournament/top40-v4-r2/private/model-runtime"
+_SYSTEM_SKILL_MARKER = b"1f03dcab110ce82d\n"
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _SAFE_ID = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}")
 _PHASE = re.compile(r"(?:discovery|refinement|decision)")
@@ -77,6 +80,7 @@ _RECEIPT_KEYS = frozenset(
         "codex_version",
         "disabled_capabilities",
         "launcher_version",
+        "model_runtime_sha256",
         "phase",
         "profile_sha256",
         "probes",
@@ -107,6 +111,7 @@ _SOURCE_REVIEW_KEYS = frozenset(
 _LAUNCH_KEYS = frozenset(
     {
         "launcher_version",
+        "model_runtime_sha256",
         "phase",
         "profile_sha256",
         "schema_version",
@@ -316,9 +321,12 @@ _PROBE_KEYS = frozenset(
         "allowed_reads",
         "cross_lane_write_denied",
         "denied_reads",
+        "host_skill_roots_denied",
         "host_process_hidden",
         "network_denied",
         "own_lane_write_allowed",
+        "private_model_auth_denied",
+        "skill_catalog_empty",
     }
 )
 _STATIC_CHECKS = (
@@ -545,6 +553,195 @@ def _codex_install_root(binary: Path) -> Path:
     return binary.parent.parent
 
 
+def _organizer_codex_home() -> Path:
+    configured = os.environ.get("CODEX_HOME")
+    if configured is None:
+        home = os.environ.get("HOME")
+        if home is None:
+            raise ResearchRuntimeError("organizer HOME is required for Codex authentication")
+        configured = str(Path(home) / ".codex")
+    path = Path(configured)
+    if not path.is_absolute():
+        raise ResearchRuntimeError("organizer Codex home must be absolute")
+    return path.resolve()
+
+
+def _private_model_paths(root: Path, team_id: str) -> Mapping[str, Path]:
+    TOP40_V4_LAYOUT.require_team(team_id)
+    model_runtime = root / _PRIVATE_MODEL_RUNTIME_RELATIVE
+    runtime = model_runtime / team_id
+    return {
+        "private": model_runtime.parent,
+        "model_runtime": model_runtime,
+        "runtime": runtime,
+        "home": runtime / "home",
+        "codex_home": runtime / "codex-home",
+        "auth": runtime / "codex-home/auth.json",
+        "skills": runtime / "codex-home/skills",
+        "system_skills": runtime / "codex-home/skills/.system",
+        "skill_marker": runtime / "codex-home/skills/.system/.codex-system-skills.marker",
+        "tmp": runtime / "tmp",
+    }
+
+
+def model_runtime_spec(root: str | Path, team_id: str) -> Mapping[str, object]:
+    """Return the exact skill-free Codex boundary bound into every research authority."""
+
+    root_path = Path(root).resolve()
+    paths = _private_model_paths(root_path, team_id)
+    return {
+        "schema_version": MODEL_RUNTIME_SCHEMA_VERSION,
+        "team_id": team_id,
+        "codex_home": str(paths["codex_home"].relative_to(root_path)),
+        "home": str(paths["home"].relative_to(root_path)),
+        "organizer_codex_home": str(_organizer_codex_home()),
+        "skill_catalog": "empty-system-marker",
+        "system_skill_marker_sha256": hashlib.sha256(_SYSTEM_SKILL_MARKER).hexdigest(),
+    }
+
+
+def model_runtime_sha256(root: str | Path, team_id: str) -> str:
+    return hashlib.sha256(_canonical(model_runtime_spec(root, team_id))).hexdigest()
+
+
+def _ensure_owner_directory(root: Path, path: Path) -> None:
+    try:
+        relative = path.relative_to(root)
+    except ValueError as exc:  # pragma: no cover - construction invariant.
+        raise ResearchRuntimeError("private model directory escaped the tournament root") from exc
+    current = root
+    for part in relative.parts:
+        current /= part
+        try:
+            os.mkdir(current, 0o700)
+        except FileExistsError:
+            pass
+        try:
+            details = current.lstat()
+        except OSError as exc:
+            raise ResearchRuntimeError("private model directory is unavailable") from exc
+        if (
+            not stat.S_ISDIR(details.st_mode)
+            or current.is_symlink()
+            or details.st_uid != os.geteuid()
+        ):
+            raise ResearchRuntimeError("private model directory is unsafe")
+
+
+def _validate_empty_skill_surface(paths: Mapping[str, Path]) -> None:
+    skills = paths["skills"]
+    system = paths["system_skills"]
+    if {entry.name for entry in skills.iterdir()} != {".system"}:
+        raise ResearchRuntimeError("private Codex skill catalog is not empty")
+    if {entry.name for entry in system.iterdir()} != {".codex-system-skills.marker"}:
+        raise ResearchRuntimeError("private Codex system-skill catalog is not empty")
+    marker = paths["skill_marker"]
+    if _stable_bytes(marker, maximum=128) != _SYSTEM_SKILL_MARKER:
+        raise ResearchRuntimeError("private Codex system-skill marker differs")
+
+
+def _validate_private_model_permissions(paths: Mapping[str, Path]) -> None:
+    for name in (
+        "private",
+        "model_runtime",
+        "runtime",
+        "home",
+        "codex_home",
+        "skills",
+        "system_skills",
+        "tmp",
+    ):
+        details = paths[name].lstat()
+        if (
+            not stat.S_ISDIR(details.st_mode)
+            or paths[name].is_symlink()
+            or details.st_uid != os.geteuid()
+            or stat.S_IMODE(details.st_mode) & 0o077
+        ):
+            raise ResearchRuntimeError("private model directory permissions are unsafe")
+    for name in ("auth", "skill_marker"):
+        details = paths[name].lstat()
+        if (
+            not stat.S_ISREG(details.st_mode)
+            or details.st_uid != os.geteuid()
+            or details.st_nlink != 1
+            or stat.S_IMODE(details.st_mode) & 0o077
+        ):
+            raise ResearchRuntimeError("private model file permissions are unsafe")
+
+
+def _private_model_environment(root: Path, team_id: str) -> dict[str, str]:
+    paths = _private_model_paths(root, team_id)
+    environment = {
+        name: os.environ[name]
+        for name in ("LANG", "LC_ALL", "LC_CTYPE", "NO_COLOR", "PATH", "SHELL", "TERM")
+        if name in os.environ
+    }
+    environment["HOME"] = str(paths["home"])
+    environment["CODEX_HOME"] = str(paths["codex_home"])
+    for name in _SINGLE_THREAD_ENVIRONMENT_VARIABLES:
+        environment[name] = "1"
+    return environment
+
+
+def ensure_private_model_runtime(root: str | Path, team_id: str) -> Mapping[str, object]:
+    """Create and verify an organizer-only auth home with no model-visible skills."""
+
+    root_path = Path(root).resolve()
+    paths = _private_model_paths(root_path, team_id)
+    for name in (
+        "private",
+        "model_runtime",
+        "runtime",
+        "home",
+        "codex_home",
+        "skills",
+        "system_skills",
+        "tmp",
+    ):
+        _ensure_owner_directory(root_path, paths[name])
+    if not os.path.lexists(paths["skill_marker"]):
+        _write_immutable(paths["skill_marker"], _SYSTEM_SKILL_MARKER)
+    _validate_empty_skill_surface(paths)
+
+    if not os.path.lexists(paths["auth"]):
+        source = _organizer_codex_home() / "auth.json"
+        _write_immutable(paths["auth"], _stable_bytes(source, maximum=128 * 1024))
+    _stable_bytes(paths["auth"], maximum=128 * 1024)
+    _validate_private_model_permissions(paths)
+
+    binary = _codex_binary()
+    command = [
+        str(binary),
+        *sum((["--disable", feature] for feature in _DISABLED_FEATURES), []),
+        "debug",
+        "prompt-input",
+        "Return the word catalog-probe and do not perform any task.",
+    ]
+    completed = subprocess.run(
+        command,
+        check=False,
+        capture_output=True,
+        cwd=root_path,
+        env=_private_model_environment(root_path, team_id),
+        stdin=subprocess.DEVNULL,
+        timeout=30,
+    )
+    if completed.returncode != 0:
+        raise ResearchRuntimeError("cannot inspect the private Codex prompt catalog")
+    forbidden = (
+        b"<skills_instructions>",
+        b"SKILL.md",
+        str(_organizer_codex_home() / "skills").encode(),
+        str(_organizer_codex_home() / "plugins").encode(),
+    )
+    if any(value in completed.stdout for value in forbidden):
+        raise ResearchRuntimeError("private Codex prompt still exposes installed skills")
+    _validate_private_model_permissions(paths)
+    _validate_empty_skill_surface(paths)
+    return model_runtime_spec(root_path, team_id)
+
+
 def _team_paths(root: Path, team_id: str) -> dict[str, Path]:
     TOP40_V4_LAYOUT.require_team(team_id)
     team = root / TOP40_V4_LAYOUT.team_root(team_id)
@@ -579,6 +776,7 @@ def profile_spec(root: str | Path, team_id: str) -> Mapping[str, object]:
         "approvals": "never",
         "web_search": False,
         "disabled_capabilities": list(_DISABLED_FEATURES),
+        "model_runtime": model_runtime_spec(root_path, team_id),
     }
 
 
@@ -640,6 +838,8 @@ def _probe(
     arguments: Sequence[str],
     cwd: Path,
     command: Sequence[str],
+    *,
+    environment: Mapping[str, str] | None = None,
 ) -> int:
     completed = subprocess.run(
         (
@@ -654,6 +854,7 @@ def _probe(
             *command,
         ),
         check=False,
+        env=environment,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
@@ -666,9 +867,12 @@ def run_profile_probes(root: str | Path, team_id: str) -> Mapping[str, object]:
     """Attack the actual research profile and return a bounded pass/fail receipt projection."""
 
     root_path = Path(root).resolve()
+    ensure_private_model_runtime(root_path, team_id)
     paths = _team_paths(root_path, team_id)
+    private_paths = _private_model_paths(root_path, team_id)
     binary = _codex_binary()
     arguments = codex_profile_arguments(root_path, team_id)
+    environment = _private_model_environment(root_path, team_id)
     team = paths["team"]
     other_team = "team-02" if team_id != "team-02" else "team-01"
     allowed = (
@@ -688,13 +892,48 @@ def run_profile_probes(root: str | Path, team_id: str) -> Mapping[str, object]:
     if any(not path.exists() for path in (*allowed, *denied)):
         raise ResearchRuntimeError("research profile probe fixture is missing")
     allowed_codes = [
-        _probe(binary, arguments, team, ("/usr/bin/test", "-r", str(path)))
+        _probe(
+            binary,
+            arguments,
+            team,
+            ("/usr/bin/test", "-r", str(path)),
+            environment=environment,
+        )
         for path in allowed
     ]
     denied_codes = [
-        _probe(binary, arguments, team, ("/usr/bin/test", "-r", str(path)))
+        _probe(
+            binary,
+            arguments,
+            team,
+            ("/usr/bin/test", "-r", str(path)),
+            environment=environment,
+        )
         for path in denied
     ]
+    host_skill_roots = (
+        _organizer_codex_home() / "skills",
+        _organizer_codex_home() / "plugins",
+    )
+    if any(not path.exists() for path in host_skill_roots):
+        raise ResearchRuntimeError("host skill-root probe fixture is missing")
+    host_skill_codes = [
+        _probe(
+            binary,
+            arguments,
+            team,
+            ("/usr/bin/test", "-r", str(path)),
+            environment=environment,
+        )
+        for path in host_skill_roots
+    ]
+    private_auth_code = _probe(
+        binary,
+        arguments,
+        team,
+        ("/usr/bin/test", "-r", str(private_paths["auth"])),
+        environment=environment,
+    )
     cross_lane_probe = (
         root_path / TOP40_V4_LAYOUT.team_root(other_team) / "work" / ".r2-cross-lane-probe"
     )
@@ -711,6 +950,7 @@ def run_profile_probes(root: str | Path, team_id: str) -> Mapping[str, object]:
             "except OSError: sys.exit(0)\nos.close(fd);sys.exit(9)",
             str(cross_lane_probe),
         ),
+        environment=environment,
     )
     if os.path.lexists(cross_lane_probe):
         cross_lane_probe.unlink()
@@ -728,6 +968,7 @@ def run_profile_probes(root: str | Path, team_id: str) -> Mapping[str, object]:
             "os.write(fd,b'allowed');os.close(fd)",
             str(own_write_probe),
         ),
+        environment=environment,
     )
     try:
         own_lane_write_allowed = (
@@ -749,12 +990,14 @@ def run_profile_probes(root: str | Path, team_id: str) -> Mapping[str, object]:
             "import socket,sys\ntry: socket.create_connection(('1.1.1.1',443),0.25)\n"
             "except OSError: sys.exit(0)\nsys.exit(9)",
         ),
+        environment=environment,
     )
     host_process = _probe(
         binary,
         arguments,
         team,
         ("/usr/bin/test", "!", "-e", f"/proc/{os.getpid()}/cmdline"),
+        environment=environment,
     )
     result = {
         "allowed_reads": all(code == 0 for code in allowed_codes),
@@ -762,7 +1005,10 @@ def run_profile_probes(root: str | Path, team_id: str) -> Mapping[str, object]:
         "cross_lane_write_denied": cross_lane_write == 0,
         "network_denied": network == 0,
         "host_process_hidden": host_process == 0,
+        "host_skill_roots_denied": all(code != 0 for code in host_skill_codes),
         "own_lane_write_allowed": own_lane_write_allowed,
+        "private_model_auth_denied": private_auth_code != 0,
+        "skill_catalog_empty": True,
     }
     if not all(result.values()):
         raise ResearchRuntimeError("research clean-room profile failed its adversarial probes")
@@ -825,6 +1071,7 @@ def _write_immutable(path: Path, payload: bytes) -> None:
 def _launch_authority_payload(root: Path, team_id: str, phase: str) -> bytes:
     launch = {
         "launcher_version": LAUNCHER_VERSION,
+        "model_runtime_sha256": model_runtime_sha256(root, team_id),
         "phase": phase,
         "profile_sha256": profile_sha256(root, team_id),
         "schema_version": 1,
@@ -906,6 +1153,7 @@ def record_candidate_receipts(
             "codex_version": _codex_version(binary),
             "disabled_capabilities": list(_DISABLED_FEATURES),
             "launcher_version": LAUNCHER_VERSION,
+            "model_runtime_sha256": model_runtime_sha256(root_path, team_id),
             "phase": phase,
             "profile_sha256": profile_sha256(root_path, team_id),
             "probes": dict(probes),
@@ -965,6 +1213,7 @@ def validate_candidate_receipt(
         "candidate_root": f"{TOP40_V4_LAYOUT.team_root(team_id)}/candidates/{candidate_id}",
         "disabled_capabilities": list(_DISABLED_FEATURES),
         "launcher_version": LAUNCHER_VERSION,
+        "model_runtime_sha256": model_runtime_sha256(root_path, team_id),
         "profile_sha256": profile_sha256(root_path, team_id),
         "schema_version": RECEIPT_SCHEMA_VERSION,
         "source_bundle_sha256": source_bundle_sha256,
@@ -2082,14 +2331,8 @@ def launch_team_phase(
     probes = run_profile_probes(root_path, team_id)
     launch_authority = _record_launch_authority(root_path, team_id, phase)
     command = _codex_exec_command(root_path, team_id, model=model, prompt=prompt)
-    environment = {
-        name: os.environ[name]
-        for name in ("HOME", "LANG", "LC_ALL", "LC_CTYPE", "NO_COLOR", "PATH", "SHELL", "TERM")
-        if name in os.environ
-    }
-    environment["TMPDIR"] = str(paths["work"])
-    for name in _SINGLE_THREAD_ENVIRONMENT_VARIABLES:
-        environment[name] = "1"
+    environment = _private_model_environment(root_path, team_id)
+    environment["TMPDIR"] = str(_private_model_paths(root_path, team_id)["tmp"])
     completed = subprocess.run(
         command,
         check=False,
@@ -2098,6 +2341,7 @@ def launch_team_phase(
         stdin=subprocess.DEVNULL,
         timeout=7_200,
     )
+    ensure_private_model_runtime(root_path, team_id)
     if completed.returncode != 0:
         raise ResearchRuntimeError("isolated team process did not complete successfully")
     request = json.loads(_stable_bytes(paths["outbox"] / outbox_name))
@@ -2118,6 +2362,7 @@ def launch_team_phase(
         "team_id": team_id,
         "phase": phase,
         "profile_sha256": profile_sha256(root_path, team_id),
+        "model_runtime_sha256": model_runtime_sha256(root_path, team_id),
         "launch_authority": launch_authority,
         "probes": probes,
         "candidate_receipts": list(receipts),
@@ -2132,9 +2377,12 @@ __all__ = [
     "ResearchRuntimeError",
     "broker_lease",
     "codex_profile_arguments",
+    "ensure_private_model_runtime",
     "launch_team_phase",
     "profile_sha256",
     "profile_spec",
+    "model_runtime_sha256",
+    "model_runtime_spec",
     "record_candidate_receipts",
     "recover_candidate_receipts",
     "review_candidate_source",

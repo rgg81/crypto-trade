@@ -989,6 +989,9 @@ def test_research_profile_is_networkless_and_cannot_read_repository_root() -> No
     assert filesystem[str(team / "candidates")] == "write"
     assert filesystem[str(team / "outbox")] == "write"
     assert filesystem[str(team / "work")] == "write"
+    runtime = spec["model_runtime"]
+    assert runtime["skill_catalog"] == "empty-system-marker"
+    assert str(ROOT / runtime["codex_home"]) not in filesystem
 
 
 def test_model_exec_uses_permission_profile_without_legacy_sandbox() -> None:
@@ -1017,6 +1020,94 @@ def test_model_exec_uses_permission_profile_without_legacy_sandbox() -> None:
     )
 
 
+def test_private_model_runtime_is_auth_only_and_skill_empty(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    organizer = tmp_path / "organizer-codex"
+    (organizer / "skills").mkdir(parents=True)
+    (organizer / "plugins").mkdir()
+    (organizer / "auth.json").write_bytes(b'{"auth":"fixture"}\n')
+    root = tmp_path / "root"
+    root.mkdir()
+    monkeypatch.setattr(research_runtime_v4, "_organizer_codex_home", lambda: organizer)
+    monkeypatch.setattr(research_runtime_v4, "_codex_binary", lambda: Path("/usr/bin/true"))
+
+    spec = research_runtime_v4.ensure_private_model_runtime(root, "team-01")
+    private = (
+        root
+        / research_runtime_v4._PRIVATE_MODEL_RUNTIME_RELATIVE
+        / "team-01/codex-home"
+    )
+    assert (private / "auth.json").read_bytes() == b'{"auth":"fixture"}\n'
+    assert sorted(path.relative_to(private).as_posix() for path in private.rglob("*")) == [
+        "auth.json",
+        "skills",
+        "skills/.system",
+        "skills/.system/.codex-system-skills.marker",
+    ]
+    assert spec["skill_catalog"] == "empty-system-marker"
+    assert research_runtime_v4.model_runtime_sha256(root, "team-01") == hashlib.sha256(
+        research_runtime_v4._canonical(spec)
+    ).hexdigest()
+    assert spec["team_id"] == "team-01"
+    assert research_runtime_v4.model_runtime_sha256(
+        root, "team-02"
+    ) != research_runtime_v4.model_runtime_sha256(root, "team-01")
+    for path in (
+        root / research_runtime_v4._PRIVATE_MODEL_RUNTIME_RELATIVE,
+        private,
+        private / "skills",
+        private / "skills/.system",
+    ):
+        assert path.stat().st_mode & 0o077 == 0
+
+
+def test_private_model_runtime_rejects_group_readable_boundary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    organizer = tmp_path / "organizer-codex"
+    organizer.mkdir()
+    (organizer / "auth.json").write_bytes(b'{"auth":"fixture"}\n')
+    root = tmp_path / "root"
+    root.mkdir()
+    monkeypatch.setattr(research_runtime_v4, "_organizer_codex_home", lambda: organizer)
+    monkeypatch.setattr(research_runtime_v4, "_codex_binary", lambda: Path("/usr/bin/true"))
+    research_runtime_v4.ensure_private_model_runtime(root, "team-01")
+    private = root / "tournament/top40-v4-r2/private"
+    private.chmod(0o750)
+    with pytest.raises(
+        research_runtime_v4.ResearchRuntimeError,
+        match="directory permissions are unsafe",
+    ):
+        research_runtime_v4.ensure_private_model_runtime(root, "team-01")
+
+
+def test_private_model_runtime_rejects_model_visible_skill_catalog(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    organizer = tmp_path / "organizer-codex"
+    organizer.mkdir()
+    (organizer / "auth.json").write_bytes(b'{"auth":"fixture"}\n')
+    root = tmp_path / "root"
+    root.mkdir()
+    monkeypatch.setattr(research_runtime_v4, "_organizer_codex_home", lambda: organizer)
+    monkeypatch.setattr(research_runtime_v4, "_codex_binary", lambda: Path("/usr/bin/true"))
+    monkeypatch.setattr(
+        research_runtime_v4.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            returncode=0,
+            stdout=b"<skills_instructions>host skill</skills_instructions>",
+            stderr=b"",
+        ),
+    )
+    with pytest.raises(
+        research_runtime_v4.ResearchRuntimeError,
+        match="prompt still exposes installed skills",
+    ):
+        research_runtime_v4.ensure_private_model_runtime(root, "team-01")
+
+
 def test_pretrial_recovery_archives_old_then_new_authority_and_is_idempotent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1042,7 +1133,7 @@ def test_pretrial_recovery_archives_old_then_new_authority_and_is_idempotent(
         "file_sha256": hashlib.sha256(new_payload).hexdigest(),
         "record_sha256": "2" * 64,
         "implementation_commit": "3" * 40,
-        "launcher_version": "top40-v4-r2-research-runtime-v8",
+        "launcher_version": "top40-v4-r2-research-runtime-v9",
     }
     assert not paths["launch"].exists()
     assert activation_v4.pretrial_recovery_pending(tmp_path) is False

@@ -15,8 +15,9 @@ later controls must parent a candidate in that new family. A no-op or second piv
 Your process runs in an OS-enforced, deny-by-default filesystem profile. Read only this kit, your
 own brief/policy, your own candidates and work notes, and your lane-local feedback. Write only
 inside `candidates/`, `work/`, and `outbox/`. Command networking, web/browser tools, plugins,
-subagents, other lanes, repository history, organizer code/state, raw data, and every earlier
-edition are unavailable. Do not use remembered post-cutoff prices, results, or strategy code.
+skills, subagents, other lanes, repository history, organizer code/state, raw data, and every
+earlier edition are unavailable. The initial context contains no installed skill catalog or host
+skill path. Do not use remembered post-cutoff prices, results, or strategy code.
 
 Create eight preregistered candidates in the first batch and at most four additional candidates
 after lane-local feedback. Cover a transparent baseline, its exact sign inversion, three formation

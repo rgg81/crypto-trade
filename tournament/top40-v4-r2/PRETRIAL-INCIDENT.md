@@ -1,5 +1,41 @@
 # Pretrial executor incident
 
+## Installed-skill boundary incident and third clean restart
+
+The second clean restart completed Team 01 and Team 02's twelve accepted evaluations before an
+organizer observed the fresh Team-02 decision process automatically select and read the host-level
+`cup50-team02-monitor` skill. The decision process was interrupted before it read result content or
+wrote a certificate, decision, nomination, retirement, or archived outbox. Its only durable residue
+is the canonical decision launch authority. Independent replay verified a 49-record journal with
+Team 01's twelve accepted/succeeded trials and retirement followed by Team 02's twelve
+accepted/succeeded trials; the result surfaces are mechanically intact.
+
+The boundary nevertheless violated `ACCESS-POLICY.json`: Codex injected installed-skill metadata
+into the initial context and dynamically granted the selected `SKILL.md` even though ordinary
+sandbox probes denied that pathname. Because every prior ephemeral model phase had the same
+unprobed capability, the edition's research provenance cannot prove non-access. The second restart
+is therefore preserved privately and aborted in full. No candidate, feedback, score, result,
+source archive, receipt, nomination, or decision from it is reused, and all 15 lanes restart from
+trial zero.
+
+`FRESH-RESTART-AUTHORITY.json` schema 2 binds the stopped activation/test/journal/decision-launch
+hashes, the 49-record head, the exposed skill hash, the exact 478-file runtime artifact-surface
+digest, and the no-decision/no-nomination facts. The successor uses a new launcher and branch. Its
+each team's model process receives its own organizer-private skill-empty `HOME`/`CODEX_HOME`;
+launch admission binds
+that runtime identity and rejects any model-visible skill catalog, host skill/plugin readability,
+or private-auth readability. Activation again requires the exact seed-only 15-lane genesis, so no
+stopped artifact can enter the new competition.
+
+The tracked v9 smoke receipt binds the exact private-runtime and permission-profile digests, the
+post-reset model command, Codex 0.148.0 session, rendered empty-catalog probe, denial of both host
+skill roots and the private authentication file, and the exact lane-local sentinel. Its prompt
+deliberately matched the exposed Team-02 skill description; the model reported `smoke-complete`
+without a skill catalog and created only the requested sentinel. The sentinel and the entire
+disposable private runtime were then removed and the exact seed-only surface was revalidated before
+activation. A distinct fresh private runtime is created under the same frozen specification for
+each team's live phases, so client state cannot cross lane boundaries.
+
 ## Clean restart authority
 
 The original worktree later encountered a separate organizer contract defect after two private

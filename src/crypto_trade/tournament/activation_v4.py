@@ -41,11 +41,11 @@ _PRETRIAL_INCIDENT_STAGE = f"{_PRETRIAL_INCIDENT_ROOT}/.{_PRETRIAL_INCIDENT_ID}.
 _PRETRIAL_INCIDENT_FINAL = f"{_PRETRIAL_INCIDENT_ROOT}/{_PRETRIAL_INCIDENT_ID}"
 _PRETRIAL_SMOKE_RECEIPT_PATH = "tournament/top40-v4-r2/PRETRIAL-MODEL-SMOKE.json"
 _PRETRIAL_SMOKE_RECEIPT_SHA256 = (
-    "3d6d524c9420ff2019a2176f74845d3fd13852700d18214bc3d02b15ee863136"
+    "afee4735ea87ac50ebccc62eadae8edd9bb17977b16bbebd885d0047b7c9c5e0"
 )
 _FRESH_RESTART_AUTHORITY_PATH = "tournament/top40-v4-r2/FRESH-RESTART-AUTHORITY.json"
 _FRESH_RESTART_AUTHORITY_SHA256 = (
-    "f33d4ac0fdbea88a75b8c8d8cd6f4bbbd799a4095dfbb3e9147c1c1a483d3f0b"
+    "aac191864a05460fa379e8b628a31e5739ce81141edf31c4a007d9470ccd146c"
 )
 _FRESH_LANE_MARKER_PAYLOAD = b"\n"
 _PRETRIAL_OLD_ACTIVATION_FILE_SHA256 = (
@@ -561,7 +561,7 @@ def _pretrial_incident_manifest(root: Path, path: Path) -> Mapping[str, Any]:
         or not isinstance(new_activation, Mapping)
         or set(new_activation)
         != {"file_sha256", "record_sha256", "implementation_commit", "launcher_version"}
-        or new_activation.get("launcher_version") != "top40-v4-r2-research-runtime-v8"
+        or new_activation.get("launcher_version") != "top40-v4-r2-research-runtime-v9"
         or not isinstance(new_activation.get("file_sha256"), str)
         or _SHA256.fullmatch(str(new_activation.get("file_sha256"))) is None
         or not isinstance(new_activation.get("record_sha256"), str)
@@ -715,16 +715,17 @@ def _fresh_restart_authority(root: Path) -> Mapping[str, Any]:
         "results_reused",
         "restart_attempt",
         "schema_version",
+        "skill_boundary_incident",
         "status",
         "successful_prefix",
         "tournament",
     }
     if (
         set(authority) != expected_keys
-        or authority.get("schema_version") != 1
+        or authority.get("schema_version") != 2
         or authority.get("tournament") != TOP40_V4_LAYOUT.name
         or authority.get("status")
-        != "fresh-restart-after-private-aborted-pre-evaluation-incidents"
+        != "fresh-restart-after-private-aborted-incidents"
         or authority.get("feedback_disclosed") is not False
         or authority.get("results_reused") is not False
     ):
@@ -732,6 +733,7 @@ def _fresh_restart_authority(root: Path) -> Mapping[str, Any]:
     predecessor = authority.get("predecessor")
     rejected = authority.get("rejected_preacceptance_residue")
     restart = authority.get("restart_attempt")
+    skill_incident = authority.get("skill_boundary_incident")
     prefix = authority.get("successful_prefix")
     if (
         not isinstance(predecessor, Mapping)
@@ -784,6 +786,64 @@ def _fresh_restart_authority(root: Path) -> Mapping[str, Any]:
         or len(prefix) != 2
     ):
         raise ActivationError("fresh restart evidence changed")
+    expected_skill_keys = {
+        "activation_file_sha256",
+        "activation_record_sha256",
+        "activation_tests_sha256",
+        "artifact_surface_file_count",
+        "artifact_surface_sha256",
+        "branch",
+        "decision_certificate_created",
+        "decision_launch_sha256",
+        "decision_outbox_created",
+        "exposed_skill_sha256",
+        "feedback_released_to_team_02",
+        "implementation_commit",
+        "journal_file_sha256",
+        "journal_head_sha256",
+        "journal_records",
+        "nomination_created",
+        "preservation",
+        "reason",
+        "research_provenance_valid",
+        "results_reused",
+        "team_01_retired",
+        "team_01_trials_succeeded",
+        "team_02_trials_succeeded",
+    }
+    if (
+        not isinstance(skill_incident, Mapping)
+        or set(skill_incident) != expected_skill_keys
+        or skill_incident.get("branch")
+        != "quant-portfolio-blind-top40-v4-r1-v2-restart2"
+        or skill_incident.get("implementation_commit")
+        != "620c7c873b8f8a2827849386423e7d46dac86c1d"
+        or skill_incident.get("journal_records") != 49
+        or skill_incident.get("artifact_surface_file_count") != 478
+        or skill_incident.get("feedback_released_to_team_02") is not True
+        or skill_incident.get("research_provenance_valid") is not False
+        or skill_incident.get("results_reused") is not False
+        or skill_incident.get("decision_outbox_created") is not False
+        or skill_incident.get("decision_certificate_created") is not False
+        or skill_incident.get("nomination_created") is not False
+        or skill_incident.get("team_01_retired") is not True
+        or skill_incident.get("team_01_trials_succeeded") != 12
+        or skill_incident.get("team_02_trials_succeeded") != 12
+        or any(
+            not isinstance(value, str) or _SHA256.fullmatch(value) is None
+            for value in (
+                skill_incident.get("activation_file_sha256"),
+                skill_incident.get("activation_record_sha256"),
+                skill_incident.get("activation_tests_sha256"),
+                skill_incident.get("artifact_surface_sha256"),
+                skill_incident.get("decision_launch_sha256"),
+                skill_incident.get("exposed_skill_sha256"),
+                skill_incident.get("journal_file_sha256"),
+                skill_incident.get("journal_head_sha256"),
+            )
+        )
+    ):
+        raise ActivationError("fresh restart skill-boundary incident changed")
     return authority
 
 
@@ -1345,7 +1405,7 @@ def complete_pretrial_recovery(root: str | Path) -> Mapping[str, Any]:
             "file_sha256": _sha256(new_activation_payload),
             "record_sha256": new_activation["record_sha256"],
             "implementation_commit": new_activation["implementation_commit"],
-            "launcher_version": "top40-v4-r2-research-runtime-v8",
+            "launcher_version": "top40-v4-r2-research-runtime-v9",
         },
         "model_smoke_receipt": {
             "path": _PRETRIAL_SMOKE_RECEIPT_PATH,

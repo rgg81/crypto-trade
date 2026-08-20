@@ -12,14 +12,26 @@ child grants keep the rest of the lane read-only while making the three declared
 Because Codex `--ignore-user-config` rebuilds the exec-layer configuration, it must precede every
 `-c` security override and every disabled-capability flag in the frozen model command.
 
+Model execution uses a distinct organizer-private `HOME` and `CODEX_HOME` for each team, outside
+every team profile. Each
+home contains authentication plus an exact version marker whose system-skill directory is empty;
+it contains no user, system, plugin, or external skill and no prior session/history. Before every
+model launch, the organizer renders the exact model-visible prompt with the frozen CLI and rejects
+any skill instructions, `SKILL.md` locator, or host skill/plugin root. Physical probes separately
+deny the original host skill/plugin roots and that team's private auth file. The team-specific
+private-runtime identity,
+marker hash, profile, CLI version, and disabled features are bound into launch and candidate
+receipts. A model launch fails closed if the catalog is installed, changed, or nonempty.
+
 The following categories are denied: other team workspaces, earlier tournament artifacts,
 organizer-private or sealed state, repository history, legacy research/reports, command network,
 native web/browser tools, plugins, apps, and subagents. External precomputed signals, fitted
 objects, weights, performance tables, and strategy code are not allowed.
 
 This clean worktree is score-blind with respect to its privately preserved predecessor. The
-frozen `FRESH-RESTART-AUTHORITY.json` records that no feedback was disclosed and no candidate or
-result is reused. It is organizer-only and outside every team profile. A launch requires either
+frozen `FRESH-RESTART-AUTHORITY.json` records the private predecessor incidents and that no
+candidate, feedback, result, or receipt is reused. It is organizer-only and outside every team
+profile. A launch requires either
 the exact completed v7 incident archive or this exact clean-restart authority; a stale v7 launch,
 missing authority, unsafe file, or changed hash fails closed.
 
