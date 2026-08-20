@@ -1,0 +1,61 @@
+{
+  "freeze_phase": "pre-activation-before-feedback",
+  "namespace": "cup50v2",
+  "policy_id": "causal-no-replacement-unavailability-v1",
+  "provenance": "The in-sample restriction of the organizer audit. Windows that begin at or after the in-sample end are sealed-side facts and are censored from this file.",
+  "rule": "At a canonical decision boundary, a weekly member proven non-trading remains in the frozen roster but is not executable and is never replaced. A position held into the first unavailable boundary is force-settled at the preceding verified transaction bar close with the ordinary per-side cost multiplier and no participation cap; the strategy cannot reopen it while unavailable.",
+  "schema_version": 1,
+  "window_end": "2024-02-01T00:00:00Z",
+  "windows": [
+    {
+      "end": "2022-06-13T00:00:00Z",
+      "evidence": {
+        "last_observation_close": 6.44,
+        "last_observation_close_time": "2022-06-10T15:59:59.999Z",
+        "monthly_8h_archive_sha256": "afb5c238fc77a9bff4559f5d3b83ac5416ea7e1f3a8c211fdb395ef863fb28a6",
+        "source": "checksum-verified Binance USD-M monthly transaction archive"
+      },
+      "reason": "Verified midweek cessation of ICPUSDT trading; the next canonical bar is a zero-trade placeholder.",
+      "start": "2022-06-10T16:00:00Z",
+      "symbol": "ICPUSDT"
+    },
+    {
+      "end": "2022-05-16T00:00:00Z",
+      "evidence": {
+        "daily_1h_archive_sha256": "5c08a0829589e414d96fc20086ac0c5fabe1e133cc1a9f7a6f3431efcce341a5",
+        "daily_1m_archive_sha256": "fd3beeefd927ea67d8bb2ab4c54dc6587b42fba286e185de696bd192f4682688",
+        "daily_8h_archive_sha256": "dea67d24aec3913768d8ac2d37141496712150c94f5a2370d6daa9c1421eb581",
+        "last_observation_close": 0.008,
+        "last_observation_close_time": "2022-05-13T06:49:59.999Z",
+        "source": "checksum-verified Binance USD-M daily transaction archives"
+      },
+      "reason": "Verified midweek cessation of LUNAUSDT trading; no 08:00 UTC transaction open exists.",
+      "start": "2022-05-13T08:00:00Z",
+      "symbol": "LUNAUSDT"
+    },
+    {
+      "end": "2022-06-13T00:00:00Z",
+      "evidence": {
+        "last_observation_close": 0.0347,
+        "last_observation_close_time": "2022-06-09T15:59:59.999Z",
+        "monthly_8h_archive_sha256": "4dc02bea9304aeb6b063da1224e7f278b09c6a70c27f884f2ea3d1d3c459236a",
+        "source": "checksum-verified Binance USD-M monthly transaction archive"
+      },
+      "reason": "Verified midweek cessation of TLMUSDT trading; the next canonical bar is a zero-trade placeholder.",
+      "start": "2022-06-09T16:00:00Z",
+      "symbol": "TLMUSDT"
+    },
+    {
+      "end": "2023-11-20T00:00:00Z",
+      "evidence": {
+        "last_observation_close": 1.2792,
+        "last_observation_close_time": "2023-11-14T15:59:59.999Z",
+        "monthly_8h_archive_sha256": "904f616656c4d53f18ffa0cc789a1ab57af379836cf357217ee6b5fc6718e7a5",
+        "source": "checksum-verified Binance USD-M monthly transaction archive"
+      },
+      "reason": "Verified midweek cessation of TOMOUSDT trading; the next canonical bar is a zero-trade placeholder.",
+      "start": "2023-11-14T16:00:00Z",
+      "symbol": "TOMOUSDT"
+    }
+  ]
+}

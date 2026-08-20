@@ -92,6 +92,15 @@ reports-cup50/
 tournament/cup50/private/
 paper-cup50/
 
+# CUP-50 v2 organizer-only and derived surfaces. Same rule as CUP-50: sealed membership,
+# observations, integrity staging, forward caches, reports and the trial ledger never enter a
+# team-visible source checkout.
+reports-cup50v2/
+tournament/cup50v2/private/
+tournament/cup50v2/private-stage/
+tournament/cup50v2/trials.jsonl*
+paper-cup50v2/
+
 # Notebook outputs and checkpoints
 notebooks/output/
 notebooks/.ipynb_checkpoints/

@@ -21,6 +21,7 @@ dependencies = [
 [project.scripts]
 crypto-trade = "crypto_trade.main:main"
 cup50 = "crypto_trade.cup50.cli:main"
+cup50v2 = "crypto_trade.cup50v2.cli:main"
 
 [build-system]
 requires = ["hatchling"]
