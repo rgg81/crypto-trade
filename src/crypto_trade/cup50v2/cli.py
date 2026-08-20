@@ -6,18 +6,26 @@ import argparse
 import dataclasses
 import hashlib
 import json
+import math
 import os
 import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from crypto_trade.cup50v2.acquisition import acquire_execution_gaps, acquire_terminal_gaps
 from crypto_trade.cup50v2.activation import build_activation_record
 from crypto_trade.cup50v2.availability import load_unavailability_audit
-from crypto_trade.cup50v2.config import IS_START, OOS_END, OOS_START, active_policy
+from crypto_trade.cup50v2.config import (
+    IS_START,
+    OOS_END,
+    OOS_START,
+    TEAM_IDS,
+    active_policy,
+)
 from crypto_trade.cup50v2.isolation import (
     export_evaluator_bundle,
     export_protocol_bundle,
@@ -247,6 +255,14 @@ def _acquire_coverage(arguments: argparse.Namespace) -> Mapping[str, object]:
 
 
 def _readiness(arguments: argparse.Namespace) -> Mapping[str, object]:
+    """Prove the windows are executable by running the field that will be scored on them.
+
+    CUP-50 activated on a flat readiness strategy. A flat book never carries a position into a
+    roster exit, never meets the participation ceiling, and never needs a mark after a contract
+    stops trading, so three organizer defects survived into a live field and invalidated all twelve
+    trials twice. Readiness here replays every lane seed over the whole in-sample window at all
+    three cost levels, and requires the field to trade and to be sized by the common unit.
+    """
     research, sealed = load_snapshot(arguments.is_root), load_snapshot(arguments.sealed_root)
     verify_semantic_coverage(research)
     verify_semantic_coverage(sealed)
@@ -254,16 +270,58 @@ def _readiness(arguments: argparse.Namespace) -> Mapping[str, object]:
     boundaries = weekly_reconstitution_times(IS_START, OOS_END, weekday=0)
     require_exact_membership(combined.membership, boundaries)
     decisions = pd.date_range(IS_START, OOS_END, freq="8h", inclusive="left")
-    require_execution_coverage(
-        combined,
-        decisions,
-        unavailability=load_unavailability_audit(arguments.unavailability_audit),
-    )
+    unavailability = load_unavailability_audit(arguments.unavailability_audit)
+    require_execution_coverage(combined, decisions, unavailability=unavailability)
+
+    seed_root = Path(arguments.seed_root)
+    lanes: dict[str, Mapping[str, object]] = {}
+    deployed_lanes = 0
+    for team_id in TEAM_IDS:
+        source = seed_root / team_id / "strategy.py"
+        strategy = strategy_from_module(load_strategy_module(source))
+        replay = run_candidate(
+            strategy,
+            snapshot=research,
+            start=IS_START,
+            end=OOS_START,
+            seed=int(team_id.split("-")[1]),
+            unavailability=unavailability,
+            record_events=False,
+        )
+        summary: dict[str, object] = {}
+        for multiplier, result in replay.costs.items():
+            returns = result.returns
+            gross = returns["gross_return"].to_numpy(dtype=float)
+            realized = float(np.std(gross, ddof=1)) * math.sqrt(365 * 24 / 8)
+            summary[str(multiplier)] = {
+                "turnover": float(returns["turnover"].sum()),
+                "activity": float((returns["gross_exposure"] >= 0.05).mean()),
+                "annualized_volatility": realized,
+                "final_equity": float(returns["equity"].iloc[-1]),
+            }
+            if not np.isfinite(returns["net_return"].to_numpy()).all():
+                raise ValueError(f"{team_id} produced a non-finite return at {multiplier}x")
+            if float(returns["equity"].min()) <= 0.0:
+                raise ValueError(f"{team_id} went insolvent at {multiplier}x")
+        base = summary["1"]
+        if float(base["activity"]) >= 0.05:
+            deployed_lanes += 1
+            if float(base["turnover"]) <= 0.0:
+                raise ValueError(f"{team_id} deployed without ever trading")
+        lanes[team_id] = summary
+
+    if deployed_lanes < 9:
+        raise ValueError(
+            f"only {deployed_lanes} of {len(TEAM_IDS)} lane seeds deployed; readiness has to "
+            "exercise execution, not merely survive it"
+        )
     return {
         "status": "ready",
         "is_manifest_sha256": research.manifest_sha256,
         "sealed_manifest_sha256": sealed.manifest_sha256,
         "decision_boundaries": len(decisions),
+        "deployed_lanes": deployed_lanes,
+        "lanes": lanes,
     }
 
 
@@ -727,6 +785,7 @@ def parser() -> argparse.ArgumentParser:
 
     ready = commands.add_parser("readiness")
     ready.add_argument("--is-root", required=True)
+    ready.add_argument("--seed-root", default="tournament/cup50v2/seeds")
     ready.add_argument("--sealed-root", required=True)
     ready.add_argument("--unavailability-audit", required=True)
     ready.set_defaults(handler=_readiness)
