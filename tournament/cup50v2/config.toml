@@ -68,7 +68,9 @@ team_volatility_targeting = "forbidden"
 [research]
 official_trial_budget = 12
 minimum_official_trials = 0
-maximum_dimensions = 10
+# Five, not ten: the neighbourhood is 1+4k points past one dimension, and every point is an
+# observation the sealed window pays for.
+maximum_dimensions = 5
 # Neighbourhood probe geometry: a multiplicative step for scale parameters, a logit shift for
 # fractions, and a fraction of the declared natural scale for signed parameters.
 neighbourhood_scale_step = 1.25

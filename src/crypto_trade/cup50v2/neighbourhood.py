@@ -109,20 +109,13 @@ def generate_neighbourhood(
         # The point set is j=-3..3, with the centre first so P0 is unambiguous everywhere.
         step_vectors.append({})
         step_vectors.extend({dims[0].name: step} for step in (-3, -2, -1, 1, 2, 3))
-    elif len(dims) == 2:
-        step_vectors.append({})
-        for dimension in dims:
-            step_vectors.extend(({dimension.name: -1}, {dimension.name: 1}))
-        step_vectors.extend(
-            (
-                {dimension.name: -1 for dimension in dims},
-                {dimension.name: 1 for dimension in dims},
-            )
-        )
     else:
+        # Two probes out on each axis, so a multi-dimensional declaration is examined as far from
+        # its centre as a one-dimensional one. CUP-50 probed +/-1 only past two dimensions, which
+        # made a wider declaration the cheaper way to look robust.
         step_vectors.append({})
         for dimension in dims:
-            step_vectors.extend(({dimension.name: -1}, {dimension.name: 1}))
+            step_vectors.extend({dimension.name: step} for step in (-2, -1, 1, 2))
 
     points = tuple(_point(centre, dims, vector, rules) for vector in step_vectors)
     keys = tuple(sorted(str(name) for name in centre))

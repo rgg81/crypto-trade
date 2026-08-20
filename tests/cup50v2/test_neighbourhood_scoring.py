@@ -34,26 +34,55 @@ def _labels() -> dict[str, str]:
 
 
 def test_neighbourhood_cardinality_and_transforms() -> None:
+    """One dimension is probed three steps out; more are probed two steps out on every axis.
+
+    CUP-50 probed +/-1 only past two dimensions, so declaring a wider neighbourhood was the
+    cheapest way to look robust: a three-axis declaration was examined far less thoroughly than a
+    one-axis one.
+    """
     assert len(generate_neighbourhood({"fixed": 2.0}, ()).points) == 1
+
     one = generate_neighbourhood({"lookback": 100.0}, [Dimension("lookback", "integer")])
     assert len(one.points) == 7
     assert one.points[0]["lookback"] == 100
+    assert sorted(point["lookback"] for point in one.points) == [
+        51.0,
+        64.0,
+        80.0,
+        100.0,
+        125.0,
+        157.0,
+        196.0,
+    ]
+
     two = generate_neighbourhood(
         {"decay": 10.0, "fraction": 0.5},
         [Dimension("decay", "positive"), Dimension("fraction", "fraction")],
     )
-    assert len(two.points) == 7
-    three = generate_neighbourhood(
-        {"a": 10.0, "b": 20.0, "c": 0.0},
-        [
-            Dimension("a", "positive"),
-            Dimension("b", "integer"),
-            Dimension("c", "signed", natural_scale=5.0),
-        ],
-    )
-    assert len(three.points) == 7
+    assert len(two.points) == 9
+
+    for count in (3, 4, 5):
+        centre = {chr(ord("a") + index): 10.0 for index in range(count)}
+        dimensions = [Dimension(name, "integer") for name in centre]
+        assert len(generate_neighbourhood(centre, dimensions).points) == 1 + 4 * count
+
+    six = {chr(ord("a") + index): 10.0 for index in range(6)}
+    with pytest.raises(ValueError, match="at most 5 tunable dimensions"):
+        generate_neighbourhood(six, [Dimension(name, "integer") for name in six])
+
     with pytest.raises(ValueError, match="inert"):
         reject_inert_dimensions(one, lambda parameters: "same-target-stream")
+
+
+def test_the_lower_quartile_point_tracks_the_declared_cardinality() -> None:
+    """P_low is the ceil(K/4)-th worst point, so a wider declaration is judged deeper in."""
+    from crypto_trade.cup50v2.scoring import score_neighbourhood
+
+    seven = score_neighbourhood([float(value) for value in range(7)])
+    assert seven.lower_quartile_score == 1.0
+
+    twenty_one = score_neighbourhood([float(value) for value in range(21)])
+    assert twenty_one.lower_quartile_score == 5.0
 
 
 def test_a_book_that_never_deploys_scores_nothing() -> None:
