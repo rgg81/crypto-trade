@@ -1031,6 +1031,11 @@ def test_private_model_runtime_is_auth_only_and_skill_empty(
     root.mkdir()
     monkeypatch.setattr(research_runtime_v4, "_organizer_codex_home", lambda: organizer)
     monkeypatch.setattr(research_runtime_v4, "_codex_binary", lambda: Path("/usr/bin/true"))
+    monkeypatch.setattr(
+        research_runtime_v4,
+        "_codex_version",
+        lambda _binary: research_runtime_v4._EXPECTED_CODEX_VERSION,
+    )
 
     spec = research_runtime_v4.ensure_private_model_runtime(root, "team-01")
     private = (
@@ -1050,6 +1055,7 @@ def test_private_model_runtime_is_auth_only_and_skill_empty(
         research_runtime_v4._canonical(spec)
     ).hexdigest()
     assert spec["team_id"] == "team-01"
+    assert spec["codex_version"] == "codex-cli 0.148.0"
     assert research_runtime_v4.model_runtime_sha256(
         root, "team-02"
     ) != research_runtime_v4.model_runtime_sha256(root, "team-01")
@@ -1072,6 +1078,11 @@ def test_private_model_runtime_rejects_group_readable_boundary(
     root.mkdir()
     monkeypatch.setattr(research_runtime_v4, "_organizer_codex_home", lambda: organizer)
     monkeypatch.setattr(research_runtime_v4, "_codex_binary", lambda: Path("/usr/bin/true"))
+    monkeypatch.setattr(
+        research_runtime_v4,
+        "_codex_version",
+        lambda _binary: research_runtime_v4._EXPECTED_CODEX_VERSION,
+    )
     research_runtime_v4.ensure_private_model_runtime(root, "team-01")
     private = root / "tournament/top40-v4-r2/private"
     private.chmod(0o750)
@@ -1093,6 +1104,11 @@ def test_private_model_runtime_rejects_model_visible_skill_catalog(
     monkeypatch.setattr(research_runtime_v4, "_organizer_codex_home", lambda: organizer)
     monkeypatch.setattr(research_runtime_v4, "_codex_binary", lambda: Path("/usr/bin/true"))
     monkeypatch.setattr(
+        research_runtime_v4,
+        "_codex_version",
+        lambda _binary: research_runtime_v4._EXPECTED_CODEX_VERSION,
+    )
+    monkeypatch.setattr(
         research_runtime_v4.subprocess,
         "run",
         lambda *_args, **_kwargs: SimpleNamespace(
@@ -1104,6 +1120,28 @@ def test_private_model_runtime_rejects_model_visible_skill_catalog(
     with pytest.raises(
         research_runtime_v4.ResearchRuntimeError,
         match="prompt still exposes installed skills",
+    ):
+        research_runtime_v4.ensure_private_model_runtime(root, "team-01")
+
+
+def test_private_model_runtime_rejects_codex_version_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    organizer = tmp_path / "organizer-codex"
+    organizer.mkdir()
+    (organizer / "auth.json").write_bytes(b'{"auth":"fixture"}\n')
+    root = tmp_path / "root"
+    root.mkdir()
+    monkeypatch.setattr(research_runtime_v4, "_organizer_codex_home", lambda: organizer)
+    monkeypatch.setattr(research_runtime_v4, "_codex_binary", lambda: Path("/usr/bin/true"))
+    monkeypatch.setattr(
+        research_runtime_v4,
+        "_codex_version",
+        lambda _binary: "codex-cli 0.149.0",
+    )
+    with pytest.raises(
+        research_runtime_v4.ResearchRuntimeError,
+        match="version differs",
     ):
         research_runtime_v4.ensure_private_model_runtime(root, "team-01")
 

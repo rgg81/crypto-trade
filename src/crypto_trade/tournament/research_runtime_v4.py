@@ -35,6 +35,7 @@ RECEIPT_SCHEMA_VERSION = 1
 SOURCE_REVIEW_SCHEMA_VERSION = 7
 LAUNCHER_VERSION = "top40-v4-r2-research-runtime-v9"
 MODEL_RUNTIME_SCHEMA_VERSION = 1
+_EXPECTED_CODEX_VERSION = "codex-cli 0.148.0"
 _PRIVATE_MODEL_RUNTIME_RELATIVE = "tournament/top40-v4-r2/private/model-runtime"
 _SYSTEM_SKILL_MARKER = b"1f03dcab110ce82d\n"
 _SHA256 = re.compile(r"[0-9a-f]{64}")
@@ -592,6 +593,7 @@ def model_runtime_spec(root: str | Path, team_id: str) -> Mapping[str, object]:
     return {
         "schema_version": MODEL_RUNTIME_SCHEMA_VERSION,
         "team_id": team_id,
+        "codex_version": _EXPECTED_CODEX_VERSION,
         "codex_home": str(paths["codex_home"].relative_to(root_path)),
         "home": str(paths["home"].relative_to(root_path)),
         "organizer_codex_home": str(_organizer_codex_home()),
@@ -711,6 +713,8 @@ def ensure_private_model_runtime(root: str | Path, team_id: str) -> Mapping[str,
     _validate_private_model_permissions(paths)
 
     binary = _codex_binary()
+    if _codex_version(binary) != _EXPECTED_CODEX_VERSION:
+        raise ResearchRuntimeError("Codex CLI version differs from the frozen model runtime")
     command = [
         str(binary),
         *sum((["--disable", feature] for feature in _DISABLED_FEATURES), []),
