@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 import subprocess
 import tempfile
 from collections.abc import Mapping
@@ -14,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from crypto_trade.tournament import (
+    journal_v4,
     pure_crypto_universe_v4_r2,
     pure_crypto_universe_v6,
     snapshot,
@@ -32,6 +34,29 @@ _REVIEW_REPORT_PATHS = (
     "tournament/top40-v4-r2/reviews/leakage-cleanroom.md",
     "tournament/top40-v4-r2/reviews/lifecycle-holdout.md",
     "tournament/top40-v4-r2/reviews/evaluator-compatibility.md",
+)
+_PRETRIAL_INCIDENT_ID = "team-01-discovery-permission-profile-v7"
+_PRETRIAL_INCIDENT_ROOT = "tournament/top40-v4-r2/private/pretrial-incidents"
+_PRETRIAL_INCIDENT_STAGE = f"{_PRETRIAL_INCIDENT_ROOT}/.{_PRETRIAL_INCIDENT_ID}.staging"
+_PRETRIAL_INCIDENT_FINAL = f"{_PRETRIAL_INCIDENT_ROOT}/{_PRETRIAL_INCIDENT_ID}"
+_PRETRIAL_SMOKE_RECEIPT_PATH = "tournament/top40-v4-r2/PRETRIAL-MODEL-SMOKE.json"
+_PRETRIAL_SMOKE_RECEIPT_SHA256 = (
+    "3d6d524c9420ff2019a2176f74845d3fd13852700d18214bc3d02b15ee863136"
+)
+_PRETRIAL_OLD_ACTIVATION_FILE_SHA256 = (
+    "d1b4aa7242b2085e9455ac7628672e7f6bc9826e3e4559f87f8d88a87db53aef"
+)
+_PRETRIAL_OLD_ACTIVATION_RECORD_SHA256 = (
+    "c2777fbe3aa1ea80e86e35f346e771bccf0dfdb892c2c2bb8b3d0aaf3355d654"
+)
+_PRETRIAL_OLD_TEST_OUTPUT_SHA256 = (
+    "66d244083e4c8b9ddf35c9c3c583ad96c58f37bd5073d60b3fed9596dc4843bb"
+)
+_PRETRIAL_OLD_LAUNCH_SHA256 = (
+    "726ed7f538e4c49c5c98a3a35a80f7948631cf47091c99b791202d72dcdf2bc5"
+)
+_PRETRIAL_OLD_LAUNCH_PATH = (
+    "tournament/top40-v4-r2/research-sessions/launches/team-01/discovery.json"
 )
 
 _COMMON_FROZEN_SCOPE = (
@@ -70,6 +95,8 @@ if _IS_R2:
         "src/crypto_trade/tournament/snapshot.py",
         "tests/tournament/test_top40_v4_r2.py",
         "tournament/top40-v4-r2/CLEANROOM-POLICY.md",
+        "tournament/top40-v4-r2/PRETRIAL-INCIDENT.md",
+        _PRETRIAL_SMOKE_RECEIPT_PATH,
         "tournament/top40-v4-r2/README.md",
         "tournament/top40-v4-r2/ROBUSTNESS-POLICY.md",
         "tournament/top40-v4-r2/SNAPSHOT-BUILD.toml",
@@ -210,6 +237,36 @@ def _fsync_directory(path: Path) -> None:
         os.close(descriptor)
 
 
+def _durable_directory(path: Path, *, stop: Path) -> None:
+    missing: list[Path] = []
+    current = path
+    while not os.path.lexists(current):
+        if current == stop or not current.is_relative_to(stop):
+            raise ActivationError("durable directory escaped the tournament root")
+        missing.append(current)
+        current = current.parent
+    if not current.is_dir() or current.is_symlink():
+        raise ActivationError("durable directory ancestor is unsafe")
+    for directory in reversed(missing):
+        os.mkdir(directory, mode=0o700)
+        _fsync_directory(directory)
+        _fsync_directory(directory.parent)
+    if not path.is_dir() or path.is_symlink():
+        raise ActivationError("durable directory is unsafe")
+
+
+def _fsync_regular_file(path: Path) -> None:
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(path, flags)
+    try:
+        details = os.fstat(descriptor)
+        if not stat.S_ISREG(details.st_mode) or details.st_nlink != 1:
+            raise ActivationError("durable incident evidence is not a single regular file")
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
 def _write_atomic(path: Path, payload: bytes, *, exclusive: bool) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(
@@ -234,6 +291,681 @@ def _write_atomic(path: Path, payload: bytes, *, exclusive: bool) -> None:
         if os.path.lexists(temporary):
             temporary.unlink()
             _fsync_directory(path.parent)
+
+
+def _pretrial_runtime_path(root: Path, relative: str) -> Path:
+    path = root
+    for part in Path(relative).parts:
+        path = path / part
+        if os.path.lexists(path) and path.is_symlink():
+            raise ActivationError(f"pretrial recovery path is a symlink: {relative}")
+    resolved = path.resolve()
+    if not resolved.is_relative_to(root):
+        raise ActivationError(f"pretrial recovery path escapes the root: {relative}")
+    return path
+
+
+def _pretrial_stable_evidence(
+    path: Path,
+    *,
+    allowed_links: frozenset[int] = frozenset({1}),
+    maximum: int = 2 * 1024 * 1024,
+) -> tuple[bytes, os.stat_result]:
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
+    try:
+        descriptor = os.open(path, flags)
+        with os.fdopen(descriptor, "rb") as handle:
+            before = os.fstat(handle.fileno())
+            if (
+                not stat.S_ISREG(before.st_mode)
+                or before.st_nlink not in allowed_links
+                or before.st_size > maximum
+            ):
+                raise ActivationError("pretrial evidence is not a bounded regular file")
+            payload = handle.read(maximum + 1)
+            after = os.fstat(handle.fileno())
+        current = path.lstat()
+    except ActivationError:
+        raise
+    except OSError as exc:
+        raise ActivationError("cannot read pretrial evidence safely") from exc
+    identities = {
+        (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_nlink),
+        (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_nlink),
+        (
+            current.st_dev,
+            current.st_ino,
+            current.st_size,
+            current.st_mtime_ns,
+            current.st_nlink,
+        ),
+    }
+    if (
+        len(identities) != 1
+        or not stat.S_ISREG(current.st_mode)
+        or len(payload) > maximum
+    ):
+        raise ActivationError("pretrial evidence changed while being read")
+    return payload, current
+
+
+def _pretrial_stable_bytes(
+    path: Path,
+    *,
+    allowed_links: frozenset[int] = frozenset({1}),
+    maximum: int = 2 * 1024 * 1024,
+) -> bytes:
+    return _pretrial_stable_evidence(
+        path, allowed_links=allowed_links, maximum=maximum
+    )[0]
+
+
+def _pretrial_file_bytes(root: Path, relative: str) -> bytes:
+    path = _pretrial_runtime_path(root, relative)
+    try:
+        return _pretrial_stable_bytes(path)
+    except ActivationError as exc:
+        raise ActivationError(
+            f"pretrial recovery file is missing or unsafe: {relative}"
+        ) from exc
+
+
+def _pretrial_object_bytes(payload: bytes, label: str) -> Mapping[str, Any]:
+    def unique(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, item in pairs:
+            if key in result:
+                raise ActivationError(f"duplicate JSON key in {label}")
+            result[key] = item
+        return result
+
+    def reject(value: str) -> None:
+        raise ActivationError(f"nonfinite JSON value in {label}: {value}")
+
+    try:
+        value = json.loads(
+            payload.decode("utf-8"),
+            object_pairs_hook=unique,
+            parse_constant=reject,
+        )
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise ActivationError(f"{label} is invalid JSON") from exc
+    if not isinstance(value, Mapping):
+        raise ActivationError(f"{label} must be a JSON object")
+    return value
+
+
+def _pretrial_object(
+    path: Path,
+    label: str,
+    *,
+    allowed_links: frozenset[int] = frozenset({1}),
+) -> Mapping[str, Any]:
+    return _pretrial_object_bytes(
+        _pretrial_stable_bytes(path, allowed_links=allowed_links), label
+    )
+
+
+def _pretrial_exact_directory(root: Path, relative: str, expected: set[str]) -> None:
+    path = _pretrial_runtime_path(root, relative)
+    if not path.is_dir() or path.is_symlink():
+        raise ActivationError(f"pretrial recovery directory is missing or unsafe: {relative}")
+    entries = list(path.iterdir())
+    if {entry.name for entry in entries} != expected or any(
+        not stat.S_ISREG(entry.lstat().st_mode) or entry.lstat().st_nlink != 1
+        for entry in entries
+    ):
+        raise ActivationError(f"pretrial recovery directory is not seed-only: {relative}")
+
+
+def _validate_pretrial_empty_state(root: Path) -> None:
+    journal = _pretrial_file_bytes(root, TOP40_V4_LAYOUT.journal_path)
+    if journal != b"" or journal_v4.replay_bytes(journal).record_count != 0:
+        raise ActivationError("pretrial recovery requires an exactly empty research journal")
+    for team_id in TOP40_V4_LAYOUT.team_ids:
+        team = TOP40_V4_LAYOUT.team_root(team_id)
+        _pretrial_exact_directory(root, f"{team}/candidates", {"README.md"})
+        for directory in ("feedback", "outbox", "work"):
+            _pretrial_exact_directory(root, f"{team}/{directory}", {".keep"})
+    forbidden = (
+        TOP40_V4_LAYOUT.nomination_registry_path,
+        TOP40_V4_LAYOUT.selection_freeze_path,
+        f"{TOP40_V4_LAYOUT.tournament_root}/nominations",
+        f"{TOP40_V4_LAYOUT.tournament_root}/certificates",
+        f"{TOP40_V4_LAYOUT.tournament_root}/lifecycle.jsonl",
+        f"{TOP40_V4_LAYOUT.tournament_root}/private/historical-oos",
+        f"{TOP40_V4_LAYOUT.reports_root}/is",
+        f"{TOP40_V4_LAYOUT.reports_root}/source-archives",
+        f"{TOP40_V4_LAYOUT.reports_root}/historical-oos",
+    )
+    if any(os.path.lexists(_pretrial_runtime_path(root, relative)) for relative in forbidden):
+        raise ActivationError("pretrial recovery found result, selection, or release artifacts")
+    sessions_relative = f"{TOP40_V4_LAYOUT.tournament_root}/research-sessions"
+    sessions = _pretrial_runtime_path(root, sessions_relative)
+    if os.path.lexists(sessions):
+        if not sessions.is_dir() or sessions.is_symlink():
+            raise ActivationError("pretrial research-session root is unsafe")
+        allowed_files = {"launches/team-01/discovery.json"}
+        allowed_directories = {"launches", "launches/team-01"}
+        files: set[str] = set()
+        directories: set[str] = set()
+        for entry in sessions.rglob("*"):
+            if entry.is_symlink():
+                raise ActivationError("pretrial research-session tree contains a symlink")
+            relative = entry.relative_to(sessions).as_posix()
+            if entry.is_dir():
+                directories.add(relative)
+            elif entry.is_file():
+                files.add(relative)
+            else:
+                raise ActivationError("pretrial research-session tree is not regular")
+        if not files.issubset(allowed_files) or not directories.issubset(allowed_directories):
+            raise ActivationError("pretrial research-session tree contains result evidence")
+        launch = sessions / "launches/team-01/discovery.json"
+        if os.path.lexists(launch):
+            launch_payload, launch_details = _pretrial_stable_evidence(
+                launch, allowed_links=frozenset({1, 2})
+            )
+            if _sha256(launch_payload) != _PRETRIAL_OLD_LAUNCH_SHA256:
+                raise ActivationError("pretrial launch authority hash differs")
+            if launch_details.st_nlink == 2:
+                staged_launch = (
+                    _pretrial_runtime_path(root, _PRETRIAL_INCIDENT_STAGE)
+                    / "superseded-team-01-discovery-v7.json"
+                )
+                if not os.path.lexists(staged_launch):
+                    raise ActivationError("pretrial launch hardlink has no staged counterpart")
+                staged_payload, staged_details = _pretrial_stable_evidence(
+                    staged_launch, allowed_links=frozenset({2})
+                )
+                if (
+                    _sha256(staged_payload) != _PRETRIAL_OLD_LAUNCH_SHA256
+                    or (launch_details.st_dev, launch_details.st_ino)
+                    != (staged_details.st_dev, staged_details.st_ino)
+                ):
+                    raise ActivationError("pretrial launch hardlink topology is unsafe")
+
+
+def _pretrial_incident_manifest(root: Path, path: Path) -> Mapping[str, Any]:
+    if not path.is_file() or path.is_symlink():
+        raise ActivationError("pretrial incident manifest is missing or unsafe")
+    manifest = _pretrial_object(path, "pretrial incident manifest")
+    expected = {
+        "schema_version",
+        "tournament",
+        "incident_id",
+        "status",
+        "reason",
+        "verified_empty_journal_sha256",
+        "old_activation",
+        "old_test_output",
+        "old_launch_authority",
+        "new_activation",
+        "model_smoke_receipt",
+        "record_sha256",
+    }
+    if set(manifest) != expected:
+        raise ActivationError("pretrial incident manifest schema changed")
+    unsigned = dict(manifest)
+    claimed = unsigned.pop("record_sha256")
+    if not isinstance(claimed, str) or claimed != _sha256(_canonical(unsigned)):
+        raise ActivationError("pretrial incident manifest hash is invalid")
+    if (
+        manifest["schema_version"] != 1
+        or manifest["tournament"] != TOP40_V4_LAYOUT.name
+        or manifest["incident_id"] != _PRETRIAL_INCIDENT_ID
+        or manifest["status"] != "completed-before-first-trial"
+        or manifest["reason"]
+        != "codex-0.148-exec-security-overrides-preceded-ignore-user-config"
+        or manifest["verified_empty_journal_sha256"] != _sha256(b"")
+    ):
+        raise ActivationError("pretrial incident manifest identity changed")
+    old_activation = manifest["old_activation"]
+    old_tests = manifest["old_test_output"]
+    old_launch = manifest["old_launch_authority"]
+    new_activation = manifest["new_activation"]
+    smoke = manifest["model_smoke_receipt"]
+    if (
+        not isinstance(old_activation, Mapping)
+        or dict(old_activation)
+        != {
+            "file_sha256": _PRETRIAL_OLD_ACTIVATION_FILE_SHA256,
+            "record_sha256": _PRETRIAL_OLD_ACTIVATION_RECORD_SHA256,
+        }
+        or not isinstance(old_tests, Mapping)
+        or dict(old_tests) != {"sha256": _PRETRIAL_OLD_TEST_OUTPUT_SHA256}
+        or not isinstance(old_launch, Mapping)
+        or dict(old_launch)
+        != {
+            "launcher_version": "top40-v4-r2-research-runtime-v7",
+            "sha256": _PRETRIAL_OLD_LAUNCH_SHA256,
+            "team_id": "team-01",
+            "phase": "discovery",
+        }
+        or not isinstance(new_activation, Mapping)
+        or set(new_activation)
+        != {"file_sha256", "record_sha256", "implementation_commit", "launcher_version"}
+        or new_activation.get("launcher_version") != "top40-v4-r2-research-runtime-v8"
+        or not isinstance(new_activation.get("file_sha256"), str)
+        or _SHA256.fullmatch(str(new_activation.get("file_sha256"))) is None
+        or not isinstance(new_activation.get("record_sha256"), str)
+        or _SHA256.fullmatch(str(new_activation.get("record_sha256"))) is None
+        or not isinstance(new_activation.get("implementation_commit"), str)
+        or _GIT_OBJECT_ID.fullmatch(str(new_activation.get("implementation_commit"))) is None
+        or not isinstance(smoke, Mapping)
+        or dict(smoke)
+        != {
+            "path": _PRETRIAL_SMOKE_RECEIPT_PATH,
+            "sha256": _PRETRIAL_SMOKE_RECEIPT_SHA256,
+            "record_sha256": "ebbd03151348350767feac7acb9eebb0e57f15659353ea43cc51738292e87565",
+        }
+    ):
+        raise ActivationError("pretrial incident authority binding changed")
+    archived = {
+        "superseded-activation-freeze.json": _PRETRIAL_OLD_ACTIVATION_FILE_SHA256,
+        "superseded-activation-tests.out": _PRETRIAL_OLD_TEST_OUTPUT_SHA256,
+        "superseded-team-01-discovery-v7.json": _PRETRIAL_OLD_LAUNCH_SHA256,
+    }
+    if any(
+        not (candidate := path.parent / name).is_file()
+        or candidate.is_symlink()
+        or _sha256(_pretrial_stable_bytes(candidate)) != digest
+        for name, digest in archived.items()
+    ):
+        raise ActivationError("pretrial incident archived evidence changed")
+    prepared_path = path.parent / "prepared.json"
+    if not prepared_path.is_file() or prepared_path.is_symlink():
+        raise ActivationError("pretrial incident prepared receipt is missing or unsafe")
+    prepared = _pretrial_object(prepared_path, "pretrial prepared receipt")
+    if set(prepared) != {
+        "schema_version",
+        "tournament",
+        "incident_id",
+        "status",
+        "old_activation_file_sha256",
+        "old_activation_record_sha256",
+        "old_test_output_sha256",
+        "old_launch_authority_sha256",
+        "verified_empty_journal_sha256",
+        "record_sha256",
+    }:
+        raise ActivationError("pretrial incident prepared receipt schema changed")
+    prepared_unsigned = dict(prepared)
+    prepared_claimed = prepared_unsigned.pop("record_sha256")
+    if (
+        prepared_claimed != _sha256(_canonical(prepared_unsigned))
+        or prepared_unsigned
+        != {
+            "schema_version": 1,
+            "tournament": TOP40_V4_LAYOUT.name,
+            "incident_id": _PRETRIAL_INCIDENT_ID,
+            "status": "prepared-awaiting-v8-activation",
+            "old_activation_file_sha256": _PRETRIAL_OLD_ACTIVATION_FILE_SHA256,
+            "old_activation_record_sha256": _PRETRIAL_OLD_ACTIVATION_RECORD_SHA256,
+            "old_test_output_sha256": _PRETRIAL_OLD_TEST_OUTPUT_SHA256,
+            "old_launch_authority_sha256": _PRETRIAL_OLD_LAUNCH_SHA256,
+            "verified_empty_journal_sha256": _sha256(b""),
+        }
+    ):
+        raise ActivationError("pretrial incident prepared receipt binding changed")
+    current_activation = _pretrial_file_bytes(root, TOP40_V4_LAYOUT.activation_freeze_path)
+    if _sha256(current_activation) != new_activation["file_sha256"]:
+        raise ActivationError("pretrial incident new activation binding changed")
+    current_activation_object = _pretrial_object_bytes(
+        current_activation, "current activation"
+    )
+    if (
+        current_activation_object.get("record_sha256") != new_activation["record_sha256"]
+        or current_activation_object.get("implementation_commit")
+        != new_activation["implementation_commit"]
+    ):
+        raise ActivationError("pretrial incident stable activation identity changed")
+    validated_activation = validate(root, verify_universe_snapshot=False)
+    if (
+        validated_activation.get("record_sha256") != new_activation["record_sha256"]
+        or validated_activation.get("implementation_commit")
+        != new_activation["implementation_commit"]
+    ):
+        raise ActivationError("pretrial incident current activation identity changed")
+    smoke_receipt = _pretrial_file_bytes(root, _PRETRIAL_SMOKE_RECEIPT_PATH)
+    if _sha256(smoke_receipt) != _PRETRIAL_SMOKE_RECEIPT_SHA256:
+        raise ActivationError("pretrial model-smoke receipt changed")
+    final_entries = {entry.name for entry in path.parent.iterdir()}
+    if final_entries != {
+        "incident.json",
+        "prepared.json",
+        "superseded-activation-freeze.json",
+        "superseded-activation-tests.out",
+        "superseded-team-01-discovery-v7.json",
+    }:
+        raise ActivationError("pretrial incident archive surface changed")
+    return manifest
+
+
+def pretrial_recovery_pending(root: str | Path) -> bool:
+    root_path = Path(root).resolve()
+    stage = _pretrial_runtime_path(root_path, _PRETRIAL_INCIDENT_STAGE)
+    final = _pretrial_runtime_path(root_path, _PRETRIAL_INCIDENT_FINAL)
+    return os.path.lexists(stage) or not os.path.lexists(final)
+
+
+def require_completed_pretrial_recovery(root: str | Path) -> Mapping[str, Any]:
+    """Fail closed until the known incident archive and its new activation binding are valid."""
+
+    root_path = Path(root).resolve()
+    stage = _pretrial_runtime_path(root_path, _PRETRIAL_INCIDENT_STAGE)
+    if os.path.lexists(stage):
+        raise ActivationError("pretrial activation recovery is not complete")
+    final = _pretrial_runtime_path(root_path, _PRETRIAL_INCIDENT_FINAL)
+    if not final.is_dir() or final.is_symlink():
+        raise ActivationError("completed pretrial incident authority is missing or unsafe")
+    return _pretrial_incident_manifest(root_path, final / "incident.json")
+
+
+def _move_pretrial_file(
+    root: Path,
+    source_relative: str,
+    destination: Path,
+    expected_sha256: str,
+) -> None:
+    source = _pretrial_runtime_path(root, source_relative)
+    source_exists = os.path.lexists(source)
+    destination_exists = os.path.lexists(destination)
+    if source_exists and destination_exists:
+        source_payload, source_details = _pretrial_stable_evidence(
+            source, allowed_links=frozenset({1, 2})
+        )
+        destination_payload, destination_details = _pretrial_stable_evidence(
+            destination, allowed_links=frozenset({1, 2})
+        )
+        same_inode = (source_details.st_dev, source_details.st_ino) == (
+            destination_details.st_dev,
+            destination_details.st_ino,
+        )
+        valid_topology = (
+            source_details.st_nlink == destination_details.st_nlink == 1
+        ) or (
+            source_details.st_nlink == destination_details.st_nlink == 2 and same_inode
+        )
+        if (
+            not valid_topology
+            or _sha256(source_payload) != expected_sha256
+            or _sha256(destination_payload) != expected_sha256
+        ):
+            raise ActivationError("pretrial recovery found unsafe duplicate authority")
+        # Destination-first fsync can recover with both names after a crash. Preserve the verified
+        # archive, release only the redundant source name, then persist that cleanup.
+        source.unlink()
+        _fsync_directory(source.parent)
+        source_exists = False
+    if source_exists:
+        payload = _pretrial_file_bytes(root, source_relative)
+        if _sha256(payload) != expected_sha256:
+            raise ActivationError("pretrial recovery old authority hash differs")
+        _durable_directory(destination.parent, stop=root)
+        os.replace(source, destination)
+        _fsync_regular_file(destination)
+        # Persist the new name before persisting removal of the only old name. A crash may leave
+        # both names durable, but must never durably lose the archived authority from both sides.
+        _fsync_directory(destination.parent)
+        _fsync_directory(source.parent)
+    elif not destination_exists:
+        raise ActivationError("pretrial recovery old authority is missing")
+    if (
+        not destination.is_file()
+        or destination.is_symlink()
+        or _sha256(_pretrial_stable_bytes(destination)) != expected_sha256
+    ):
+        raise ActivationError("archived pretrial authority differs from its expected hash")
+    _fsync_regular_file(destination)
+
+
+def _preflight_pretrial_file(
+    root: Path,
+    source_relative: str,
+    staged: Path,
+    expected_sha256: str,
+) -> Path:
+    source = _pretrial_runtime_path(root, source_relative)
+    candidates = [path for path in (source, staged) if os.path.lexists(path)]
+    if not candidates:
+        raise ActivationError("pretrial recovery old authority is missing")
+    evidence = [
+        (
+            candidate,
+            *_pretrial_stable_evidence(
+                candidate, allowed_links=frozenset({1, 2})
+            ),
+        )
+        for candidate in candidates
+    ]
+    for _candidate, payload, _details in evidence:
+        if _sha256(payload) != expected_sha256:
+            raise ActivationError("pretrial recovery old authority hash differs")
+    if len(evidence) == 1 and evidence[0][2].st_nlink != 1:
+        raise ActivationError("pretrial recovery found unsafe duplicate authority")
+    if len(evidence) == 2:
+        source_details = evidence[0][2]
+        staged_details = evidence[1][2]
+        same_inode = (source_details.st_dev, source_details.st_ino) == (
+            staged_details.st_dev,
+            staged_details.st_ino,
+        )
+        valid_topology = (
+            source_details.st_nlink == staged_details.st_nlink == 1
+        ) or (
+            source_details.st_nlink == staged_details.st_nlink == 2 and same_inode
+        )
+        if not valid_topology:
+            raise ActivationError("pretrial recovery found unsafe duplicate authority")
+    return staged if os.path.lexists(staged) else source
+
+
+def _expected_pretrial_prepared() -> dict[str, Any]:
+    prepared: dict[str, Any] = {
+        "schema_version": 1,
+        "tournament": TOP40_V4_LAYOUT.name,
+        "incident_id": _PRETRIAL_INCIDENT_ID,
+        "status": "prepared-awaiting-v8-activation",
+        "old_activation_file_sha256": _PRETRIAL_OLD_ACTIVATION_FILE_SHA256,
+        "old_activation_record_sha256": _PRETRIAL_OLD_ACTIVATION_RECORD_SHA256,
+        "old_test_output_sha256": _PRETRIAL_OLD_TEST_OUTPUT_SHA256,
+        "old_launch_authority_sha256": _PRETRIAL_OLD_LAUNCH_SHA256,
+        "verified_empty_journal_sha256": _sha256(b""),
+    }
+    prepared["record_sha256"] = _sha256(_canonical(prepared))
+    return prepared
+
+
+def _validate_pretrial_prepared(root: Path, stage: Path) -> Mapping[str, Any]:
+    """Validate a durable prepared stage without treating a new freeze as old authority."""
+
+    prepared_path = stage / "prepared.json"
+    prepared = _pretrial_object(prepared_path, "pretrial prepared receipt")
+    if dict(prepared) != _expected_pretrial_prepared():
+        raise ActivationError("pretrial incident prepared receipt binding changed")
+    expected_entries = {
+        "prepared.json",
+        "superseded-activation-freeze.json",
+        "superseded-activation-tests.out",
+    }
+    optional_entries = {
+        "incident.json",
+        "superseded-team-01-discovery-v7.json",
+    }
+    entries = {entry.name for entry in stage.iterdir()}
+    if not expected_entries.issubset(entries) or not entries.issubset(
+        expected_entries | optional_entries
+    ):
+        raise ActivationError("pretrial incident staging surface changed")
+    for name, digest in (
+        ("superseded-activation-freeze.json", _PRETRIAL_OLD_ACTIVATION_FILE_SHA256),
+        ("superseded-activation-tests.out", _PRETRIAL_OLD_TEST_OUTPUT_SHA256),
+    ):
+        if _sha256(_pretrial_stable_bytes(stage / name)) != digest:
+            raise ActivationError("pretrial incident prepared authority changed")
+    active_tests = _pretrial_runtime_path(root, TEST_OUTPUT_PATH)
+    active_activation = _pretrial_runtime_path(
+        root, TOP40_V4_LAYOUT.activation_freeze_path
+    )
+    if os.path.lexists(active_activation):
+        active_payload = _pretrial_stable_bytes(active_activation)
+        if _sha256(active_payload) == _PRETRIAL_OLD_ACTIVATION_FILE_SHA256:
+            raise ActivationError("superseded activation reappeared after preparation")
+        validated = validate(root, verify_universe_snapshot=False)
+        tests = validated.get("tests")
+        test_payload = _pretrial_stable_bytes(active_tests)
+        if (
+            not isinstance(tests, Mapping)
+            or tests.get("output_path") != TEST_OUTPUT_PATH
+            or tests.get("exit_code") != 0
+            or tests.get("output_size") != len(test_payload)
+            or tests.get("output_sha256") != _sha256(test_payload)
+        ):
+            raise ActivationError("prepared successor activation tests are not bound")
+    elif os.path.lexists(active_tests):
+        # Activation publishes its bounded test output before the exclusive freeze. A crash in
+        # that window leaves disposable successor scratch evidence, which the next activation
+        # rerun atomically replaces. It is not authority until a freeze binds its exact bytes.
+        scratch = _pretrial_stable_bytes(active_tests)
+        if _sha256(scratch) == _PRETRIAL_OLD_TEST_OUTPUT_SHA256:
+            raise ActivationError("superseded activation tests reappeared after preparation")
+    _preflight_pretrial_file(
+        root,
+        _PRETRIAL_OLD_LAUNCH_PATH,
+        stage / "superseded-team-01-discovery-v7.json",
+        _PRETRIAL_OLD_LAUNCH_SHA256,
+    )
+    if "incident.json" in entries:
+        _pretrial_incident_manifest(root, stage / "incident.json")
+    return prepared
+
+
+def prepare_pretrial_recovery(root: str | Path) -> Mapping[str, Any]:
+    """Archive the exact old activation while leaving the stale launch fail-closed."""
+
+    if not _IS_R2:
+        raise ActivationError("pretrial recovery exists only for Top-40 V4 R2")
+    root_path = Path(root).resolve()
+    _validate_pretrial_empty_state(root_path)
+    final = _pretrial_runtime_path(root_path, _PRETRIAL_INCIDENT_FINAL)
+    if os.path.lexists(final):
+        return _pretrial_incident_manifest(root_path, final / "incident.json")
+    stage = _pretrial_runtime_path(root_path, _PRETRIAL_INCIDENT_STAGE)
+    if os.path.lexists(stage) and (not stage.is_dir() or stage.is_symlink()):
+        raise ActivationError("pretrial incident staging path is unsafe")
+    if os.path.lexists(stage / "prepared.json"):
+        return _validate_pretrial_prepared(root_path, stage)
+    old_activation_path = _preflight_pretrial_file(
+        root_path,
+        TOP40_V4_LAYOUT.activation_freeze_path,
+        stage / "superseded-activation-freeze.json",
+        _PRETRIAL_OLD_ACTIVATION_FILE_SHA256,
+    )
+    _preflight_pretrial_file(
+        root_path,
+        TEST_OUTPUT_PATH,
+        stage / "superseded-activation-tests.out",
+        _PRETRIAL_OLD_TEST_OUTPUT_SHA256,
+    )
+    _preflight_pretrial_file(
+        root_path,
+        _PRETRIAL_OLD_LAUNCH_PATH,
+        stage / "superseded-team-01-discovery-v7.json",
+        _PRETRIAL_OLD_LAUNCH_SHA256,
+    )
+    old_activation = _pretrial_object(
+        old_activation_path,
+        "superseded activation",
+        allowed_links=frozenset({1, 2}),
+    )
+    if old_activation.get("record_sha256") != _PRETRIAL_OLD_ACTIVATION_RECORD_SHA256:
+        raise ActivationError("superseded activation record identity differs")
+    _durable_directory(stage, stop=root_path)
+    _move_pretrial_file(
+        root_path,
+        TOP40_V4_LAYOUT.activation_freeze_path,
+        stage / "superseded-activation-freeze.json",
+        _PRETRIAL_OLD_ACTIVATION_FILE_SHA256,
+    )
+    _move_pretrial_file(
+        root_path,
+        TEST_OUTPUT_PATH,
+        stage / "superseded-activation-tests.out",
+        _PRETRIAL_OLD_TEST_OUTPUT_SHA256,
+    )
+    prepared = _expected_pretrial_prepared()
+    _write_atomic(stage / "prepared.json", _pretty(prepared), exclusive=False)
+    return prepared
+
+
+def complete_pretrial_recovery(root: str | Path) -> Mapping[str, Any]:
+    """Bind the valid new activation, then archive the stale v7 launch authority."""
+
+    if not _IS_R2:
+        raise ActivationError("pretrial recovery exists only for Top-40 V4 R2")
+    root_path = Path(root).resolve()
+    _validate_pretrial_empty_state(root_path)
+    final = _pretrial_runtime_path(root_path, _PRETRIAL_INCIDENT_FINAL)
+    if os.path.lexists(final):
+        return _pretrial_incident_manifest(root_path, final / "incident.json")
+    stage = _pretrial_runtime_path(root_path, _PRETRIAL_INCIDENT_STAGE)
+    if not stage.is_dir() or stage.is_symlink():
+        raise ActivationError("pretrial recovery was not prepared")
+    new_activation = validate(root_path)
+    new_activation_payload = _pretrial_file_bytes(
+        root_path, TOP40_V4_LAYOUT.activation_freeze_path
+    )
+    if new_activation.get("record_sha256") == _PRETRIAL_OLD_ACTIVATION_RECORD_SHA256:
+        raise ActivationError("pretrial recovery requires a distinct new activation")
+    _move_pretrial_file(
+        root_path,
+        _PRETRIAL_OLD_LAUNCH_PATH,
+        stage / "superseded-team-01-discovery-v7.json",
+        _PRETRIAL_OLD_LAUNCH_SHA256,
+    )
+    manifest: dict[str, Any] = {
+        "schema_version": 1,
+        "tournament": TOP40_V4_LAYOUT.name,
+        "incident_id": _PRETRIAL_INCIDENT_ID,
+        "status": "completed-before-first-trial",
+        "reason": "codex-0.148-exec-security-overrides-preceded-ignore-user-config",
+        "verified_empty_journal_sha256": _sha256(b""),
+        "old_activation": {
+            "file_sha256": _PRETRIAL_OLD_ACTIVATION_FILE_SHA256,
+            "record_sha256": _PRETRIAL_OLD_ACTIVATION_RECORD_SHA256,
+        },
+        "old_test_output": {"sha256": _PRETRIAL_OLD_TEST_OUTPUT_SHA256},
+        "old_launch_authority": {
+            "launcher_version": "top40-v4-r2-research-runtime-v7",
+            "sha256": _PRETRIAL_OLD_LAUNCH_SHA256,
+            "team_id": "team-01",
+            "phase": "discovery",
+        },
+        "new_activation": {
+            "file_sha256": _sha256(new_activation_payload),
+            "record_sha256": new_activation["record_sha256"],
+            "implementation_commit": new_activation["implementation_commit"],
+            "launcher_version": "top40-v4-r2-research-runtime-v8",
+        },
+        "model_smoke_receipt": {
+            "path": _PRETRIAL_SMOKE_RECEIPT_PATH,
+            "sha256": _PRETRIAL_SMOKE_RECEIPT_SHA256,
+            "record_sha256": "ebbd03151348350767feac7acb9eebb0e57f15659353ea43cc51738292e87565",
+        },
+    }
+    manifest["record_sha256"] = _sha256(_canonical(manifest))
+    _write_atomic(stage / "incident.json", _pretty(manifest), exclusive=False)
+    destination = _pretrial_runtime_path(root_path, _PRETRIAL_INCIDENT_FINAL)
+    _durable_directory(destination.parent, stop=root_path)
+    os.replace(stage, destination)
+    _fsync_directory(destination.parent)
+    return _pretrial_incident_manifest(root_path, destination / "incident.json")
 
 
 def _test_command() -> tuple[str, ...]:
@@ -600,5 +1332,9 @@ __all__ = [
     "TARGETED_TESTS",
     "TEST_OUTPUT_PATH",
     "activate",
+    "complete_pretrial_recovery",
+    "prepare_pretrial_recovery",
+    "pretrial_recovery_pending",
+    "require_completed_pretrial_recovery",
     "validate",
 ]

@@ -4,6 +4,14 @@ Each team's `ACCESS-POLICY.json` is the complete authority enforced by a dedicat
 profile: unlisted paths are unavailable. Teams may read the sanitized common kit and their own
 lane. They may write only `candidates/`, `work/`, and `outbox/` in that lane.
 
+The effective phase probe must create, verify, and remove a file inside the lane's `work/` root
+while still denying a write to every peer lane. Model execution selects the named permission
+profile as its sole filesystem authority. It must not pass a legacy `--sandbox` setting, because
+that setting supersedes rather than composes with permission profiles. The profile's more-specific
+child grants keep the rest of the lane read-only while making the three declared write roots usable.
+Because Codex `--ignore-user-config` rebuilds the exec-layer configuration, it must precede every
+`-c` security override and every disabled-capability flag in the frozen model command.
+
 The following categories are denied: other team workspaces, earlier tournament artifacts,
 organizer-private or sealed state, repository history, legacy research/reports, command network,
 native web/browser tools, plugins, apps, and subagents. External precomputed signals, fitted

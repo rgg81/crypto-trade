@@ -1,120 +1,140 @@
-# Adversarial evaluator, data, and compatibility re-review
+# Adversarial evaluator, data, activation, and compatibility re-review
 
-Review scope: exact-current-byte Top-40 V4-R2 pre-activation implementation inspected on
-2026-08-20 after source-boundary, research-runtime, lifecycle/status, broker, and activation-lock
-remediation. The implementation was not modified by this review. No broad snapshot replay or
-full-window strategy run was performed.
+Review date: 2026-08-20
+Scope: exact current Top-40 V4-R2 bytes and pretrial runtime state after launcher-v8 and incident-
+recovery remediation. This independent review inspected activation supersession, crash durability,
+model/result admission, frozen-scope binding, July-inclusive data, A6, evaluator/scoring/source
+boundaries, and R1 external behavior. It did not modify implementation/runtime artifacts and did
+not perform a broad snapshot replay or strategy backtest.
 
 ## Gate status
 
-**PASSED.** Unresolved findings: **0**. The activation, data, candidate-source, evaluator, scoring,
-release, and R1-compatibility gates reviewed here are closed for tournament activation.
+**PASSED. Unresolved findings: 0.**
 
-## Activation deadlock remediation verification
+The implementation is ready for the controlled pretrial recovery, fresh committed v8 activation,
+and one Team-01 discovery retry. The old activation remains intentionally invalid until that
+procedure is executed; no model or evaluator can run under it. No team trial has been accepted.
 
-The one-time activation bootstrap and post-activation command serialization now have a consistent,
-fail-closed boundary:
+## Pretrial activation recovery
 
-- Activation is the sole bootstrap exception to the broker lease. It remains inside the organizer
-  result lock while checking committed scope, running the exact R2 tests, and exclusively publishing
-  the freeze; its pytest child can therefore acquire the broker lease without waiting on its parent.
-- `serialized_activated_r2_command` performs a no-snapshot activation validation before broker
-  acquisition for direct `run_is`, `nominate`, `retire`, `close_is`, and `historical_release`
-  calls. Each function repeats validation after broker and result-lock acquisition, so the precheck
-  prevents deadlock without becoming the final authorization decision.
-- The canonical organizer CLI no longer wraps those internally serialized entrypoints in an outer
-  broker lease. Read-only isolation audit retains its appropriate outer lease; activation remains
-  outside it.
-- The cross-process regression holds the activation result lock and checks both a direct `run_is`
-  child and the canonical CLI `is-run` child. Both reject the missing freeze within five seconds,
-  without waiting for the result lock or retaining the broker lease. Idle bootstrap and
-  post-activation global broker serialization regressions also pass.
+The previously blocking v7 authority state now has a narrow, evidence-preserving transition:
 
-## Remediation verification
+- Recovery requires the exact superseded activation file
+  `d1b4aa7242b2085e9455ac7628672e7f6bc9826e3e4559f87f8d88a87db53aef`, activation record
+  `c2777fbe3aa1ea80e86e35f346e771bccf0dfdb892c2c2bb8b3d0aaf3355d654`, activation-test output
+  `66d244083e4c8b9ddf35c9c3c583ad96c58f37bd5073d60b3fed9596dc4843bb`, and Team-01 v7 launch
+  authority `726ed7f538e4c49c5c98a3a35a80f7948631cf47091c99b791202d72dcdf2bc5`.
+- Before the first mutation, it preflights all four old authorities, including the embedded old
+  activation record identity. Evidence reads are bounded, non-following descriptor reads with
+  regular-file, link-count, repeated-`fstat`, and final lexical-identity checks. JSON identities
+  are parsed from those exact captured bytes with duplicate-key and nonfinite-value rejection. A
+  lone active or staged candidate must have exactly one link; an nlink-2 candidate is accepted only
+  when both names exist, both have two links, and their device/inode identities match. Regressions
+  cover unrelated duplicates for each authority and a staged-only external alias, and require
+  rejection before any earlier authority moves.
+- It also requires a byte-empty valid journal; all 15 lanes in their exact seed-only state; no
+  nomination, selection, certificate, IS report, source archive, historical output, candidate,
+  outbox, or feedback; and a research-session tree containing only the known v7 launch path and
+  its empty parent directories. Unexpected or mismatched evidence fails before an authority moves.
+- Stage one durably creates each missing incident directory and parent, archives and verifies the
+  old activation/test bytes, and publishes a self-hashed prepared receipt. The stale immutable v7
+  launch remains active and incompatible with launcher v8, so it continues to fail closed.
+- Canonical restart recognizes the exact prepared receipt before interpreting a fresh activation
+  as superseded evidence. A committed successor must validate and bind its exact successful test
+  output; an output-only activation crash is treated as non-authoritative scratch and is safely
+  replaced by the activation rerun. Restart is covered with both one-name and same-inode two-name
+  stale-launch states.
+- A fresh activation may then be published only from clean committed v8 frozen scope, three passed
+  exact-byte review reports, the aggregate review record, focused tests, A6, and the full July-
+  inclusive snapshot. Completion validates that new activation before moving the stale launch.
+- Authority moves persist the exact regular destination file, then its directory, before the
+  source directory removal. If a crash exposes both names, identical expected bytes resume by
+  retaining the verified archive and durably removing only the redundant source. An nlink-2
+  duplicate is accepted only when both names resolve to the same device/inode; unrelated hard-link
+  topology, differing bytes, and unsafe nodes reject before source mutation. Full prepare and
+  completion regressions exercise activation and launch same-inode crash recovery.
+- The final atomic directory rename publishes an exact five-file archive surface: the three
+  superseded authorities, prepared receipt, and completed incident manifest. Admission rechecks
+  the archived hashes, both self-hashes, exact tracked model-smoke receipt, expected v7/v8 identity,
+  the exact incident reason, and the current validated activation file/record/implementation-commit
+  binding from the same stable activation payload. Missing, extra, symlinked, hard-linked,
+  corrupted, self-consistently rewritten, or mismatched evidence fails closed.
+- Every R2 model launch and every result-bearing entrypoint requires the completed incident
+  authority. Result commands check it before broker acquisition and repeat it under broker/result
+  locks, alongside activation validation. Therefore recovery cannot race an accepted trial and
+  deletion/corruption of incident evidence later blocks both model and evaluator progress.
 
-The previously open candidate-directory substitution defect is closed in the final bytes:
+The current incident boundary matches those predicates: the journal is zero bytes; no candidate,
+outbox, feedback, receipt, archive, score, nomination, selection, or release exists. The recorded
+model smoke is a tracked frozen-scope receipt with SHA-256
+`3d6d524c9420ff2019a2176f74845d3fd13852700d18214bc3d02b15ee863136`; its canonical record hash
+is valid and binds Codex 0.148, launcher v8, the exact permission profile, approval `never`, denied
+network, successful lane-local sentinel creation, and zero durable lane delta after cleanup.
 
-- `_PinnedDirectory` opens every absolute component from the filesystem anchor through the
-  selected candidate root with `O_DIRECTORY | O_NOFOLLOW`, retains all descriptors during the
-  traversal, records `(device, inode)` identities, and reopens the complete lexical chain before
-  acceptance to prove that no component was replaced.
-- `_team_tree_files()` enumerates pinned directory descriptors, inspects entries with
-  `stat(..., dir_fd=..., follow_symlinks=False)`, and opens subdirectories relative to their pinned
-  parents. It verifies each subdirectory before and after recursion.
-- `_stable_file_bytes()` opens files relative to pinned parent descriptors with
-  `O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK`; it requires a regular, singly linked,
-  at-most-2-MiB descriptor, repeats `fstat()`, and compares it with a no-follow `dir_fd` stat.
-  Final symlinks, FIFOs, hard links, non-regular files, oversize files, and identity changes fail
-  closed.
-- Captured bytes are retained in the pinned tree records and become the content-addressed source
-  archive. Worker materialization uses those archive bytes, verifies every staged hash, and mounts
-  only Python source in R2; notes, JSON, attestations, and certificates remain evidence but are not
-  executable inputs.
-- The full `capture_source_bundle()` parent-directory replacement regression now proves that
-  replacement after entrypoint resolution is rejected. The final-file symlink/FIFO/hard-link and
-  lexical substitution regressions also pass.
+## Launcher, activation, and source authority
 
-## Evaluator and data gates
+- Launcher v8 constructs `codex exec --strict-config --ignore-user-config` before every `-c`
+  security override and disabled-capability flag. It supplies no legacy `--sandbox`, explicitly
+  sets approval policy `never`, and retains specific candidate/outbox/work write grants beneath a
+  read-only lane. Codex 0.148 reports these as valid `exec` options; the exact prefix/ordering
+  regression passes.
+- The effective profile probe now requires a successful create/verify/remove operation inside the
+  team's work root in addition to allowed sanitized reads, denied organizer/peer reads, denied
+  cross-lane writes, denied network, and hidden host processes. Probe failure precedes launch-
+  authority creation.
+- Activation still binds a clean committed explicit scope, branch, current review-scope head,
+  exact report hashes, focused test output, config, A6 report, full snapshot manifest, and
+  implementation commit. The old activation correctly rejects the new frozen scope with
+  `adversarial review does not bind the activation implementation`.
+- Candidate capture remains descriptor-relative through every candidate-directory component and
+  rejects symlink, FIFO, hard-link, non-regular, oversize, lexical-substitution, and parent-
+  directory-substitution inputs. Pinned captured bytes become the content-addressed source archive;
+  official worker staging re-verifies those archive bytes and mounts Python source only.
 
-- **July-2026 snapshot boundary:** config and manifest bind
-  `2026-08-01T00:00:00Z` as the exclusive end. The manifest SHA-256 is
-  `c21fdcefc39961cd4408277e6cbb4833c31178cf86fa5d166499a3df6a8e7af7`; the final transaction bar
-  is `2026-07-31T16:00:00Z`, July funding is present, and focused checks find no August bar or
-  funding timestamp. Activation requires the identical July-inclusive authority and performs the
-  full canonical manifest verification once.
-- **A6 pure-native-crypto authority:** module, dependency, membership, manifest, deterministic
-  report, metadata, exchange-info, and count authorities match config. The audit report SHA-256 is
-  `a1f9175b7728efde33d9d421b08c6cbcfe904783ba0f856b52504a28a453776e`, with status `passed`, zero
+## July 2026, A6, and evaluator semantics
+
+- Config, holdout, and manifest end exclusively at `2026-08-01T00:00:00Z`. The manifest SHA-256
+  remains `c21fdcefc39961cd4408277e6cbb4833c31178cf86fa5d166499a3df6a8e7af7`.
+- Direct column scans found 59,605 July transaction-bar rows, 42,138 July funding rows, 28,494 July
+  mark rows, and 160 July membership rows, with zero rows at or after August 1. Maximum timestamps
+  are July 31 16:00 for transaction bars/marks, July 31 23:00 for funding, and July 27 for weekly
+  membership.
+- A6 module, dependency, manifest, and membership hashes match config. Deterministic report
+  regeneration remains
+  `a1f9175b7728efde33d9d421b08c6cbcfe904783ba0f856b52504a28a453776e`, status `passed`, zero
   violations, 670 metadata symbols, 328 membership symbols, and 13,026 membership rows.
-- **Past-only strategy context:** bars enter a decision only after their complete 8-hour interval;
-  funding is strictly earlier than the decision; out-of-universe rows remain hidden. The strategy
-  worker receives only append-only canonical prefixes, while the organizer retains the raw
-  snapshot and evaluator.
-- **Execution semantics:** targets fill at the next executable transaction open, using boundary
-  marks for target sizing. Funding on the boundary applies to the carried position before
-  rebalance; interior funding applies once. Base, 2x-cost, and 3x-cost scenarios share the canonical
-  grid and charge normal fees, slippage, participation limits, policy actions, risk reductions,
-  membership exits, and forced exits.
-- **Immutable authorities:** config, manifest, dependency lock, evaluator, A6 report, source
-  archive, strategy, risk policy, target artifacts, and result artifacts are hashed and rechecked
-  across evaluation and publication. Official execution stages the verified source archive rather
-  than the live lane tree.
+- Past-only context exposes only completed bars, strictly earlier funding, and current-universe
+  rows. Next-executable-open fills, boundary funding on carried positions, interior funding,
+  mark-based sizing, transaction-open execution, participation limits, membership/forced exits,
+  policy actions, and 2x/3x cost reruns retain their tested semantics.
+- Exact sign inversion remains bound to a cited baseline, matching metadata/policy/grid, and exact
+  numerical target negation. Accepted failures consume multiplicity; team Bonferroni and field-
+  wide adjustment remain recomputed over accepted trials before the frozen floor and deterministic
+  ranking. July 2024 through July 2026 continues to supply nine calendar quarters and the frozen
+  five-positive-quarter winner gate.
 
-## Selection, release, and compatibility gates
+## R1 compatibility
 
-- **Exact sign inversion:** nomination verifies a cited baseline, matching mechanism/horizon/
-  control metadata and risk-policy digest, identical timestamp/column/rebalance grids, and exact
-  numerical negation of all target weights. A mislabeled positive copy is rejected.
-- **Scoring and multiplicity:** accepted failures consume trials. Team qualification recomputes
-  Bonferroni confidence at the final lane trial count; IS close applies the field-wide adjustment
-  over every accepted field trial and the frozen 0.90 floor before deterministic ranking. At most
-  six candidates advance, with no floor lowering or backfill.
-- **Historical release:** July 2024 through July 2026 touches nine calendar quarters, so the frozen
-  five-positive-quarter winner gate is computed over the correct interval. Historical observations
-  remain serial, one-shot, non-replaceable, and atomically disclosed. DNF constituent weight is
-  reported and carried to effective cash without redistribution.
-- **Activation/review binding:** activation requires a clean committed explicit scope, the exact
-  branch, current A6 authority, the July-inclusive canonical snapshot, three passed report hashes
-  with zero unresolved findings, and the review-scope head. The activation record then binds the
-  scope, review, tests, manifest, config, commit, and report hashes; later validation recomputes
-  them. R2 result, status, validation, close, release, and broker transitions now share the frozen
-  serialized command boundary; the expanded lifecycle tests confirm this does not change evaluator
-  authorities or disclose per-team or per-finalist progress.
-- **R1 external behavior:** a clean default-edition process remains 12 teams, five finalists, and
-  the original R1 layout and schema strings. R1 keeps its worker-visible bundle semantics while the
-  descriptor-pinned read is a transparent hardening. Shared implementation hashes necessarily
-  differ, but the reviewed R1 external contracts and focused behavior remain compatible.
+The clean default-edition external-contract suite passes 24/24. R1 remains 12 teams, advances five,
+uses its original paths/schema identities, and preserves its worker-visible bundle behavior. The
+new in-lock incident check is explicitly R2-conditional; R1 decorated orchestrator operations no
+longer inherit an R2 incident prerequisite. Launcher-v8 and pretrial recovery files are R2-specific
+and do not change the shared evaluator's external behavior.
 
 ## Focused evidence
 
-- R2 focused suite on the exact reviewed bytes: **55 passed**.
-- R1 focused contract suite in a clean default-edition process: **24 passed**.
-- Focused next-open, funding, cost, participation, forced-exit, risk, and past-only evaluator set:
-  **12 passed**.
-- Source-archive boundary suite: **5 passed**.
-- Ruff on the changed evaluator/authority modules and R2 tests: passed.
-- `git diff --check`: passed at review time.
-- Direct current-authority hashing matched the config's manifest, A6 module/dependency, and
-  membership identities; deterministic A6 report regeneration matched its frozen report hash.
+```text
+R2 exact-current contract/security/recovery suite                     85 passed
+Focused evaluator/risk/past-only set                                  14 passed
+Source-archive boundary suite                                          5 passed
+R1 clean external-contract suite                                      24 passed
+Ruff on changed CLI/runtime/orchestrator/activation/test modules         passed
+git diff --check                                                         passed
+July rows / rows at or after 2026-08-01                    present / zero
+A6 deterministic report                                      passed / zero violations
+old activation under current v8 frozen scope                         rejected
+R2 journal bytes / accepted trials                                      0 / 0
+R2 candidate/result/disclosure artifacts                                  none
+```
 
 **Final result: PASSED, zero unresolved findings.**

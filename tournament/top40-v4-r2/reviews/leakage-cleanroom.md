@@ -8,33 +8,47 @@ Unresolved findings: **0**
 ## Scope and executed evidence
 
 This final-byte re-review inspected the sanitized team kit, all 15 physical lane roots, Codex
-permission profile, offline broker, strategy-worker namespace, source capture/archive path,
-nomination review, organizer command serialization, phase lifecycle, and disclosure-safe status
-projections. It rechecked every previously reported LC-01 through LC-06 attack class.
+0.148 permission profile and exact model argv, offline broker, strategy-worker namespace, source
+capture/archive path, nomination review, organizer command serialization, phase lifecycle,
+pretrial incident recovery, and disclosure-safe status projections. It rechecked every previously
+reported LC-01 through LC-06 attack class.
 
 Executed evidence on the final implementation:
 
-- R2 contract/security suite: **55 passed**.
+- R2 contract/security suite: **85 passed**.
 - R1 compatibility suite: **24 passed**.
 - Ruff on the R2 clean-room, runner, orchestrator, broker, CLI, and tests: **passed**.
 - `git diff --check`: **passed**.
 - Organizer isolation audit: **passed**, exactly 15 lanes.
 - Physical filesystem inspection found no symlink, FIFO, socket/device, or multiply-linked regular
-  file under `tournament/top40-v4-r2`.
+  file under `tournament/top40-v4-r2`; all 15 lanes remained seed-only after probe cleanup.
 - The documented Team-01 probe was run outside the enclosing workspace sandbox against the final
-  bytes. All five effective controls were true: allowed lane reads, denied organizer/prior/
-  cross-lane reads, denied cross-lane writes, denied network, and hidden host processes.
+  bytes. All six effective controls were true: allowed lane reads, allowed own-lane work writes,
+  denied organizer/prior/holdout/cross-lane reads, denied cross-lane writes, denied network, and
+  hidden host processes.
+- The frozen organizer-observed Codex 0.148 model-smoke receipt has exact file SHA-256
+  `3d6d524c9420ff2019a2176f74845d3fd13852700d18214bc3d02b15ee863136` and a valid canonical
+  record SHA-256 `ebbd03151348350767feac7acb9eebb0e57f15659353ea43cc51738292e87565`.
+  It records launcher v8, `sandbox: custom permissions`, approval `never`, network disabled, return
+  code zero, writes confined to Team-01 `work/`, the requested sentinel's exact hash, and no durable
+  lane delta after verified cleanup. This organizer observation is distinct from the independent
+  six-control OS probe above.
 
 ## Finding closure
 
 ### LC-01 and LC-02 — local, cross-lane, prior-edition, process, and web access: closed
 
 The effective Codex profile is deny-by-default and approval-free. It exposes only the sanitized
-kit, the selected lane, and the minimal Codex runtime; disables web search, apps, plugins, and
-subagents; and denies command networking. The real profile probe verifies the effective boundary,
-not merely its configuration. Teams cannot read the repository, snapshot, organizer state, prior
-editions, another lane, host process command lines, or public web data, and cannot write outside
-their own candidate/work/outbox roots.
+kit, the selected lane, and the minimal Codex runtime; disables web search, browser/computer tools,
+apps, plugins, and subagents; and denies command networking. Model execution uses exactly
+`exec --strict-config --ignore-user-config` before every `-c` permission/approval override and
+every disabled-capability flag. It carries no `-s` or legacy `--sandbox` argument that could
+supersede the custom profile. The regression binds the entire security prefix and the clean-room
+policy explicitly freezes that ordering.
+
+The real profile probe verifies the effective boundary, not merely its configuration. Teams can
+write only their own candidate/work/outbox children and cannot read the repository, snapshot,
+organizer state, prior editions, another lane, host process command lines, or public web data.
 
 ### LC-03 and LC-06 — hidden, encoded, or ordinal executable payloads: closed
 
@@ -85,13 +99,37 @@ the immutable archive, validate every staged byte and manifest entry, and mount 
 file. Existing regressions cover symlink, FIFO, hard-link, open-time substitution, and
 intermediate-directory substitution.
 
+The known failed v7 model start is preserved as a strictly pretrial incident rather than erased.
+Recovery requires a byte-empty, zero-record journal, all 15 seed-only lanes, no result/source/
+nomination/selection/release artifacts, and the exact old activation, activation-test output,
+Team-01 discovery authority, and frozen model-smoke receipt hashes. It preflights every required
+authority hash and duplicate-link topology before moving the first one. Stable no-follow, bounded,
+single-file reads feed strict duplicate-key/nonfinite-rejecting JSON parsing directly, and the
+archive transition fsyncs the new file and directory identity before removing an old name.
+Identical same-inode, two-name crash residue is normalized to one archived link during both prepare
+and complete; a lone source or staged name with link count two is rejected as unrelated authority.
+Differing duplicates, unrelated hard-link corruption, substitution, and corruption fail closed
+without moving an earlier authority.
+
+The fresh v8 activation must validate before the stale v7 launch is archived. The completed
+hash-bound incident manifest binds the old bytes, prepared receipt, smoke receipt, new
+activation file/record/commit identity, and exact archive surface. Missing, altered, or extra final
+evidence blocks both direct model launch and every result-bearing command before and again after
+lease acquisition. Canonical recovery re-entry validates the durable prepared receipt and staged
+old authorities while distinguishing the valid new active v8 freeze. If the freeze exists, its
+successful activation-test output path, size, and SHA-256 must match the stable bounded output
+bytes; bounded pre-freeze successor test scratch is non-authoritative and is safely replaced by the
+activation rerun. A restart after activation or during the two-name launch move therefore completes
+idempotently without manual state edits.
+
 ### LC-05 — progress oracles, overlap, and lifecycle races: closed
 
 Pre-selection `validate` and `status` both project the constant genesis journal head and disclose
 no record count, team dispositions, peer errors, ordering, or timing. During sealed historical
 evaluation they expose only the fixed selection boundary until the atomic release. Lane audits
 inspect only the requested lane, team feedback is lane-local, and result-lock contention queues
-without a distinct busy outcome.
+without a distinct busy outcome. Pretrial recovery and its hash-bound evidence are organizer-only,
+outside every lane, and do not alter the constant pre-selection public projection.
 
 After the one-time activation bootstrap, one blocking, re-entrant kernel lease encloses the broker
 CLI, every non-activation tournament CLI command, every broker/model session, and every direct R2
@@ -114,12 +152,13 @@ test process.
 
 Every result-bearing orchestrator entrypoint performs a fail-fast activation validation before it
 can acquire the broker lease, then repeats validation after acquiring its ordinary broker/result
-locks. The canonical organizer CLI supplies no outer lease for these commands and delegates to the
-same decorated entrypoints, preserving that order. Consequently a pre-activation direct or CLI
-result call cannot hold broker while waiting for activation's result lock, and a scope change
-between the precheck and lock acquisition still fails the authoritative in-lock validation. The
-cross-process regression exercises both paths while activation's result lock is held; both return
-without waiting on broker or running an evaluator.
+locks. The completed pretrial incident authority is checked at both points as part of the same
+gate. The canonical organizer CLI supplies no outer lease for these commands and delegates to the
+same decorated entrypoints, preserving that order. Consequently a pre-activation or incomplete-
+recovery direct/CLI result call cannot hold broker while waiting for activation's result lock, and
+a scope or incident-authority change between the precheck and lock acquisition still fails the
+authoritative in-lock validation. The cross-process regression exercises both paths while
+activation's result lock is held; both return without waiting on broker or running an evaluator.
 
 The exported low-level launcher now validates the frozen activation itself, while holding the
 same lease, before any model process or candidate receipt can be created. Refinement and decision
@@ -132,7 +171,8 @@ observation.
 
 ## Gate decision
 
-**PASSED — zero unresolved leakage or clean-room findings.** The OS boundary, network denial,
-single-lane filesystem authority, exact-byte capture/archive/replay chain, stateless causal source
-subset, three-scenario future invariance, receipt binding, global serial lease, phase lifecycle,
-and disclosure-safe projections are ready for activation.
+**PASSED — zero unresolved leakage or clean-room findings.** The corrected Codex 0.148 launcher,
+OS boundary, network denial, single-lane filesystem authority, exact-byte capture/archive/replay
+chain, stateless causal source subset, three-scenario future invariance, pretrial incident and
+receipt binding, global serial lease, phase lifecycle, and disclosure-safe projections are ready
+for recovery activation and the one authorized Team-01 discovery retry.

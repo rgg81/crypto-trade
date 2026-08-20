@@ -28,6 +28,10 @@ def _parser() -> argparse.ArgumentParser:
     validate.add_argument("--pre-activation", action="store_true")
     commands.add_parser("audit-isolation", help="verify all 15 clean-room surfaces")
     commands.add_parser("activate", help="test and freeze the edition-2 authority")
+    commands.add_parser(
+        "recover-pretrial",
+        help="archive the exact pretrial incident, reactivate, and unblock its one retry",
+    )
     commands.add_parser("status", help="show the disclosure-safe lifecycle projection")
 
     run_is = commands.add_parser("is-run", help="accept and evaluate one structured IS trial")
@@ -73,6 +77,8 @@ def main(argv: list[str] | None = None) -> int:
                 result = isolation_v4.audit_surface(root)
             elif arguments.command == "activate":
                 result = orchestrator_v4.activate(root)
+            elif arguments.command == "recover-pretrial":
+                result = orchestrator_v4.recover_pretrial(root)
             elif arguments.command == "status":
                 result = orchestrator_v4.status(root)
             elif arguments.command == "is-run":

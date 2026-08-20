@@ -548,6 +548,33 @@ def activate(root: str | Path) -> Mapping[str, Any]:
         return activation_v4.activate(root_path)
 
 
+def recover_pretrial(root: str | Path) -> Mapping[str, Any]:
+    """Resume the one known pretrial incident through a fresh activation and sealed archive."""
+
+    root_path = _safe_root(root)
+    with research_runtime_v4.broker_lease(root_path):
+        with _result_lock(root_path):
+            prepared = activation_v4.prepare_pretrial_recovery(root_path)
+    try:
+        fresh_activation = activation_v4.validate(root_path)
+    except activation_v4.ActivationError:
+        try:
+            fresh_activation = activate(root_path)
+        except activation_v4.ActivationError:
+            # A concurrent recovery may have completed activation after our validation attempt.
+            fresh_activation = activation_v4.validate(root_path)
+    with research_runtime_v4.broker_lease(root_path):
+        with _result_lock(root_path):
+            incident = activation_v4.complete_pretrial_recovery(root_path)
+    return {
+        "ok": True,
+        "recovery": "completed-before-first-trial",
+        "prepared": prepared,
+        "activation": fresh_activation,
+        "incident": incident,
+    }
+
+
 @research_runtime_v4.serialized_r2_command
 def validate(root: str | Path, *, require_activation: bool = True) -> Mapping[str, Any]:
     root_path = _safe_root(root)

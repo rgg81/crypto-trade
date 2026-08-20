@@ -62,6 +62,64 @@ def _tournament_cli_module():
     return module
 
 
+def _pretrial_recovery_fixture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> dict[str, Path]:
+    tournament = tmp_path / TOP40_V4_R2_LAYOUT.tournament_root
+    for team_id in TOP40_V4_R2_LAYOUT.team_ids:
+        team = tmp_path / TOP40_V4_R2_LAYOUT.team_root(team_id)
+        for directory, filename, payload in (
+            ("candidates", "README.md", b"seed\n"),
+            ("feedback", ".keep", b""),
+            ("outbox", ".keep", b""),
+            ("work", ".keep", b""),
+        ):
+            path = team / directory
+            path.mkdir(parents=True, exist_ok=True)
+            (path / filename).write_bytes(payload)
+    journal = tmp_path / TOP40_V4_R2_LAYOUT.journal_path
+    journal.parent.mkdir(parents=True, exist_ok=True)
+    journal.write_bytes(b"")
+    old_record = "1" * 64
+    old_activation = json.dumps({"record_sha256": old_record}, sort_keys=True).encode()
+    old_tests = b"old activation tests passed\n"
+    old_launch = b'{"launcher_version":"top40-v4-r2-research-runtime-v7"}\n'
+    activation = tmp_path / TOP40_V4_R2_LAYOUT.activation_freeze_path
+    activation.write_bytes(old_activation)
+    tests = tournament / "activation-tests.out"
+    tests.write_bytes(old_tests)
+    launch = tmp_path / activation_v4._PRETRIAL_OLD_LAUNCH_PATH
+    launch.parent.mkdir(parents=True, exist_ok=True)
+    launch.write_bytes(old_launch)
+    smoke = tmp_path / activation_v4._PRETRIAL_SMOKE_RECEIPT_PATH
+    smoke.parent.mkdir(parents=True, exist_ok=True)
+    smoke.write_bytes((ROOT / activation_v4._PRETRIAL_SMOKE_RECEIPT_PATH).read_bytes())
+    monkeypatch.setattr(
+        activation_v4,
+        "_PRETRIAL_OLD_ACTIVATION_FILE_SHA256",
+        hashlib.sha256(old_activation).hexdigest(),
+    )
+    monkeypatch.setattr(
+        activation_v4, "_PRETRIAL_OLD_ACTIVATION_RECORD_SHA256", old_record
+    )
+    monkeypatch.setattr(
+        activation_v4,
+        "_PRETRIAL_OLD_TEST_OUTPUT_SHA256",
+        hashlib.sha256(old_tests).hexdigest(),
+    )
+    monkeypatch.setattr(
+        activation_v4,
+        "_PRETRIAL_OLD_LAUNCH_SHA256",
+        hashlib.sha256(old_launch).hexdigest(),
+    )
+    return {
+        "activation": activation,
+        "tests": tests,
+        "launch": launch,
+        "journal": journal,
+    }
+
+
 def test_r2_layout_has_fifteen_fresh_lanes_and_six_finalists() -> None:
     assert TOP40_V4_R2_LAYOUT.team_ids == tuple(
         f"team-{number:02d}" for number in range(1, 16)
@@ -190,6 +248,32 @@ else:
         (sys.executable, "-c", script),
         cwd=ROOT,
         env=_r2_environment(),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_activated_r2_decorator_remains_a_noop_for_default_r1_edition(
+    tmp_path: Path,
+) -> None:
+    script = """
+from pathlib import Path
+import sys
+from crypto_trade.tournament import research_runtime_v4
+@research_runtime_v4.serialized_activated_r2_command
+def sample(root):
+    return Path(root).name
+assert sample(sys.argv[1]) == Path(sys.argv[1]).name
+"""
+    environment = dict(os.environ)
+    environment.pop("CRYPTO_TRADE_TOP40_V4_EDITION", None)
+    environment["PYTHONPATH"] = "src"
+    completed = subprocess.run(
+        (sys.executable, "-c", script, str(tmp_path)),
+        cwd=ROOT,
+        env=environment,
         check=False,
         capture_output=True,
         text=True,
@@ -776,6 +860,462 @@ def test_research_profile_is_networkless_and_cannot_read_repository_root() -> No
     assert filesystem[":minimal"] == "read"
     assert filesystem[str(ROOT / "tournament/top40-v4-r2/team-kit")] == "read"
     assert filesystem[str(ROOT / TOP40_V4_R2_LAYOUT.team_root("team-01"))] == "read"
+    team = ROOT / TOP40_V4_R2_LAYOUT.team_root("team-01")
+    assert filesystem[str(team / "candidates")] == "write"
+    assert filesystem[str(team / "outbox")] == "write"
+    assert filesystem[str(team / "work")] == "write"
+
+
+def test_model_exec_uses_permission_profile_without_legacy_sandbox() -> None:
+    profile_arguments = research_runtime_v4.codex_profile_arguments(ROOT, "team-01")
+    disabled_arguments = sum(
+        (["--disable", feature] for feature in research_runtime_v4._DISABLED_FEATURES), []
+    )
+    command = research_runtime_v4._codex_exec_command(
+        ROOT, "team-01", model="test-model", prompt="test prompt"
+    )
+    expected_prefix = [
+        command[0],
+        "exec",
+        "--strict-config",
+        "--ignore-user-config",
+        *profile_arguments,
+        *disabled_arguments,
+    ]
+    assert command[: len(expected_prefix)] == expected_prefix
+    assert "-s" not in command
+    assert "--sandbox" not in command
+    ignored = command.index("--ignore-user-config")
+    assert all(index > ignored for index, argument in enumerate(command) if argument == "-c")
+    assert all(
+        index > ignored for index, argument in enumerate(command) if argument == "--disable"
+    )
+
+
+def test_pretrial_recovery_archives_old_then_new_authority_and_is_idempotent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths = _pretrial_recovery_fixture(tmp_path, monkeypatch)
+    prepared = activation_v4.prepare_pretrial_recovery(tmp_path)
+    assert prepared["status"] == "prepared-awaiting-v8-activation"
+    assert not paths["activation"].exists()
+    assert not paths["tests"].exists()
+    assert paths["launch"].is_file()
+    assert activation_v4.pretrial_recovery_pending(tmp_path) is True
+
+    fresh = {
+        "record_sha256": "2" * 64,
+        "implementation_commit": "3" * 40,
+    }
+    new_payload = (json.dumps(fresh, sort_keys=True) + "\n").encode()
+    paths["activation"].write_bytes(new_payload)
+    monkeypatch.setattr(activation_v4, "validate", lambda _root, **_kwargs: fresh)
+    completed = activation_v4.complete_pretrial_recovery(tmp_path)
+    assert completed["status"] == "completed-before-first-trial"
+    assert completed["old_activation"]["record_sha256"] == "1" * 64
+    assert completed["new_activation"] == {
+        "file_sha256": hashlib.sha256(new_payload).hexdigest(),
+        "record_sha256": "2" * 64,
+        "implementation_commit": "3" * 40,
+        "launcher_version": "top40-v4-r2-research-runtime-v8",
+    }
+    assert not paths["launch"].exists()
+    assert activation_v4.pretrial_recovery_pending(tmp_path) is False
+    assert activation_v4.complete_pretrial_recovery(tmp_path) == completed
+
+
+def test_pretrial_recovery_resumes_after_each_authority_move(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths = _pretrial_recovery_fixture(tmp_path, monkeypatch)
+    stage = tmp_path / activation_v4._PRETRIAL_INCIDENT_STAGE
+    stage.mkdir(parents=True)
+    os.replace(paths["activation"], stage / "superseded-activation-freeze.json")
+    activation_v4.prepare_pretrial_recovery(tmp_path)
+    assert not paths["tests"].exists()
+
+    fresh = {
+        "record_sha256": "2" * 64,
+        "implementation_commit": "3" * 40,
+    }
+    new_payload = (json.dumps(fresh, sort_keys=True) + "\n").encode()
+    paths["activation"].write_bytes(new_payload)
+    monkeypatch.setattr(activation_v4, "validate", lambda _root, **_kwargs: fresh)
+    archived_launch = stage / "superseded-team-01-discovery-v7.json"
+    os.replace(paths["launch"], archived_launch)
+    archived_launch_sha256 = hashlib.sha256(archived_launch.read_bytes()).hexdigest()
+    completed = activation_v4.complete_pretrial_recovery(tmp_path)
+    assert completed["old_launch_authority"]["sha256"] == archived_launch_sha256
+
+
+def test_pretrial_prepare_resumes_same_inode_activation_duplicate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths = _pretrial_recovery_fixture(tmp_path, monkeypatch)
+    stage = tmp_path / activation_v4._PRETRIAL_INCIDENT_STAGE
+    stage.mkdir(parents=True)
+    archived = stage / "superseded-activation-freeze.json"
+    os.link(paths["activation"], archived)
+    assert archived.stat().st_nlink == 2
+    activation_v4.prepare_pretrial_recovery(tmp_path)
+    assert not paths["activation"].exists()
+    assert archived.stat().st_nlink == 1
+
+
+def test_pretrial_complete_resumes_same_inode_launch_duplicate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths = _pretrial_recovery_fixture(tmp_path, monkeypatch)
+    activation_v4.prepare_pretrial_recovery(tmp_path)
+    fresh = {
+        "record_sha256": "2" * 64,
+        "implementation_commit": "3" * 40,
+    }
+    paths["activation"].write_text(json.dumps(fresh, sort_keys=True) + "\n")
+    monkeypatch.setattr(activation_v4, "validate", lambda _root, **_kwargs: fresh)
+    stage = tmp_path / activation_v4._PRETRIAL_INCIDENT_STAGE
+    archived = stage / "superseded-team-01-discovery-v7.json"
+    os.link(paths["launch"], archived)
+    assert paths["launch"].stat().st_nlink == archived.stat().st_nlink == 2
+    completed = activation_v4.complete_pretrial_recovery(tmp_path)
+    assert completed["status"] == "completed-before-first-trial"
+    final_launch = (
+        tmp_path
+        / activation_v4._PRETRIAL_INCIDENT_FINAL
+        / "superseded-team-01-discovery-v7.json"
+    )
+    assert not paths["launch"].exists()
+    assert final_launch.stat().st_nlink == 1
+
+
+@pytest.mark.parametrize("authority", ["activation", "tests", "launch"])
+def test_pretrial_prepare_rejects_unrelated_staged_hardlink_before_any_move(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, authority: str
+) -> None:
+    paths = _pretrial_recovery_fixture(tmp_path, monkeypatch)
+    stage = tmp_path / activation_v4._PRETRIAL_INCIDENT_STAGE
+    stage.mkdir(parents=True)
+    names = {
+        "activation": "superseded-activation-freeze.json",
+        "tests": "superseded-activation-tests.out",
+        "launch": "superseded-team-01-discovery-v7.json",
+    }
+    unrelated = tmp_path / f"unrelated-{authority}"
+    unrelated.write_bytes(paths[authority].read_bytes())
+    os.link(unrelated, stage / names[authority])
+    before = {name: path.read_bytes() for name, path in paths.items() if name != "journal"}
+
+    with pytest.raises(activation_v4.ActivationError, match="unsafe duplicate"):
+        activation_v4.prepare_pretrial_recovery(tmp_path)
+
+    assert all(paths[name].read_bytes() == payload for name, payload in before.items())
+
+
+@pytest.mark.parametrize("duplicate_launch", [False, True])
+def test_canonical_pretrial_recovery_resumes_after_fresh_activation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    duplicate_launch: bool,
+) -> None:
+    paths = _pretrial_recovery_fixture(tmp_path, monkeypatch)
+    activation_v4.prepare_pretrial_recovery(tmp_path)
+    fresh = {
+        "record_sha256": "2" * 64,
+        "implementation_commit": "3" * 40,
+    }
+    new_tests = b"new activation tests passed\n"
+    paths["tests"].write_bytes(new_tests)
+    fresh["tests"] = {
+        "output_path": activation_v4.TEST_OUTPUT_PATH,
+        "exit_code": 0,
+        "output_size": len(new_tests),
+        "output_sha256": hashlib.sha256(new_tests).hexdigest(),
+    }
+    paths["activation"].write_text(json.dumps(fresh, sort_keys=True) + "\n")
+    monkeypatch.setattr(activation_v4, "validate", lambda _root, **_kwargs: fresh)
+    monkeypatch.setattr(
+        orchestrator_v4,
+        "activate",
+        lambda _root: pytest.fail("valid fresh activation was replaced"),
+    )
+    if duplicate_launch:
+        stage = tmp_path / activation_v4._PRETRIAL_INCIDENT_STAGE
+        os.link(
+            paths["launch"], stage / "superseded-team-01-discovery-v7.json"
+        )
+
+    result = orchestrator_v4.recover_pretrial(tmp_path)
+
+    assert result["ok"] is True
+    assert result["incident"]["status"] == "completed-before-first-trial"
+    assert not paths["launch"].exists()
+
+
+def test_canonical_pretrial_recovery_reruns_after_successor_test_output_crash(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths = _pretrial_recovery_fixture(tmp_path, monkeypatch)
+    activation_v4.prepare_pretrial_recovery(tmp_path)
+    paths["tests"].write_bytes(b"interrupted successor activation tests\n")
+    successful_tests = b"rerun successor activation tests passed\n"
+    fresh = {
+        "record_sha256": "2" * 64,
+        "implementation_commit": "3" * 40,
+        "tests": {
+            "output_path": activation_v4.TEST_OUTPUT_PATH,
+            "exit_code": 0,
+            "output_size": len(successful_tests),
+            "output_sha256": hashlib.sha256(successful_tests).hexdigest(),
+        },
+    }
+
+    def validate(root: Path, **_kwargs: object) -> dict[str, object]:
+        activation = root / TOP40_V4_R2_LAYOUT.activation_freeze_path
+        if not activation.exists():
+            raise activation_v4.ActivationError("V4 is not activated")
+        return fresh
+
+    def activate(root: Path) -> dict[str, object]:
+        paths["tests"].write_bytes(successful_tests)
+        paths["activation"].write_text(json.dumps(fresh, sort_keys=True) + "\n")
+        return fresh
+
+    monkeypatch.setattr(activation_v4, "validate", validate)
+    monkeypatch.setattr(orchestrator_v4, "activate", activate)
+
+    result = orchestrator_v4.recover_pretrial(tmp_path)
+
+    assert result["ok"] is True
+    assert paths["tests"].read_bytes() == successful_tests
+    assert result["incident"]["status"] == "completed-before-first-trial"
+
+
+def test_pretrial_prepare_rejects_single_staged_external_hardlink_before_move(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths = _pretrial_recovery_fixture(tmp_path, monkeypatch)
+    stage = tmp_path / activation_v4._PRETRIAL_INCIDENT_STAGE
+    stage.mkdir(parents=True)
+    staged_tests = stage / "superseded-activation-tests.out"
+    external = tmp_path / "external-tests-alias"
+    external.write_bytes(paths["tests"].read_bytes())
+    os.link(external, staged_tests)
+    paths["tests"].unlink()
+    old_activation = paths["activation"].read_bytes()
+
+    with pytest.raises(activation_v4.ActivationError, match="unsafe duplicate"):
+        activation_v4.prepare_pretrial_recovery(tmp_path)
+
+    assert paths["activation"].read_bytes() == old_activation
+    assert staged_tests.stat().st_ino == external.stat().st_ino
+
+
+def test_pretrial_authority_move_resumes_identical_duplicate_and_rejects_difference(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "active/authority.json"
+    destination = tmp_path / "archive/authority.json"
+    source.parent.mkdir(parents=True)
+    destination.parent.mkdir(parents=True)
+    payload = b"exact authority\n"
+    expected = hashlib.sha256(payload).hexdigest()
+    source.write_bytes(payload)
+    destination.write_bytes(payload)
+    activation_v4._move_pretrial_file(
+        tmp_path, "active/authority.json", destination, expected
+    )
+    assert not source.exists()
+    assert destination.read_bytes() == payload
+
+    destination.unlink()
+    source.write_bytes(payload)
+    os.link(source, destination)
+    assert source.stat().st_ino == destination.stat().st_ino
+    assert source.stat().st_nlink == 2
+    activation_v4._move_pretrial_file(
+        tmp_path, "active/authority.json", destination, expected
+    )
+    assert not source.exists()
+    assert destination.stat().st_nlink == 1
+
+    source.write_bytes(payload)
+    destination.write_bytes(b"different authority\n")
+    with pytest.raises(activation_v4.ActivationError, match="unsafe duplicate"):
+        activation_v4._move_pretrial_file(
+            tmp_path, "active/authority.json", destination, expected
+        )
+    assert source.read_bytes() == payload
+
+
+def test_pretrial_authority_move_rejects_unrelated_hardlink_before_source_mutation(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "active/authority.json"
+    destination = tmp_path / "archive/authority.json"
+    unrelated = tmp_path / "third/authority.json"
+    for parent in (source.parent, destination.parent, unrelated.parent):
+        parent.mkdir(parents=True)
+    payload = b"exact authority\n"
+    source.write_bytes(payload)
+    unrelated.write_bytes(payload)
+    os.link(unrelated, destination)
+    assert source.stat().st_nlink == 1
+    assert destination.stat().st_nlink == 2
+    with pytest.raises(activation_v4.ActivationError, match="unsafe duplicate"):
+        activation_v4._move_pretrial_file(
+            tmp_path,
+            "active/authority.json",
+            destination,
+            hashlib.sha256(payload).hexdigest(),
+        )
+    assert source.read_bytes() == payload
+    assert destination.stat().st_ino == unrelated.stat().st_ino
+
+
+def test_pretrial_authority_move_persists_destination_before_source_removal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "active/authority.json"
+    destination = tmp_path / "archive/authority.json"
+    source.parent.mkdir(parents=True)
+    destination.parent.mkdir(parents=True)
+    payload = b"exact authority\n"
+    source.write_bytes(payload)
+    events: list[tuple[str, Path]] = []
+    original_file = activation_v4._fsync_regular_file
+    original_directory = activation_v4._fsync_directory
+
+    def fsync_file(path: Path) -> None:
+        events.append(("file", path))
+        original_file(path)
+
+    def fsync_directory(path: Path) -> None:
+        events.append(("directory", path))
+        original_directory(path)
+
+    monkeypatch.setattr(activation_v4, "_fsync_regular_file", fsync_file)
+    monkeypatch.setattr(activation_v4, "_fsync_directory", fsync_directory)
+    activation_v4._move_pretrial_file(
+        tmp_path,
+        "active/authority.json",
+        destination,
+        hashlib.sha256(payload).hexdigest(),
+    )
+    first_file = events.index(("file", destination))
+    destination_directory = events.index(("directory", destination.parent))
+    source_directory = events.index(("directory", source.parent))
+    assert first_file < destination_directory < source_directory
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "journal",
+        "candidate",
+        "research-receipt",
+        "missing-launch",
+        "old-tests",
+        "old-activation",
+    ],
+)
+def test_pretrial_recovery_rejects_nonempty_or_mismatched_state_without_moving_authority(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mutation: str
+) -> None:
+    paths = _pretrial_recovery_fixture(tmp_path, monkeypatch)
+    if mutation == "journal":
+        paths["journal"].write_bytes(b"not empty\n")
+    elif mutation == "candidate":
+        candidate = (
+            tmp_path
+            / TOP40_V4_R2_LAYOUT.team_root("team-01")
+            / "candidates/created.py"
+        )
+        candidate.write_text("created = True\n")
+    elif mutation == "research-receipt":
+        receipt = (
+            tmp_path
+            / TOP40_V4_R2_LAYOUT.tournament_root
+            / "research-sessions/receipts/team-01/unexpected.json"
+        )
+        receipt.parent.mkdir(parents=True)
+        receipt.write_text("{}\n")
+    elif mutation == "missing-launch":
+        paths["launch"].unlink()
+    elif mutation == "old-tests":
+        paths["tests"].write_bytes(b"different activation tests\n")
+    else:
+        paths["activation"].write_bytes(b"different old activation\n")
+    with pytest.raises(activation_v4.ActivationError):
+        activation_v4.prepare_pretrial_recovery(tmp_path)
+    assert paths["activation"].exists()
+    assert paths["tests"].exists()
+    assert paths["launch"].exists() is (mutation != "missing-launch")
+
+
+def test_pretrial_recovery_validates_new_activation_before_moving_stale_launch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths = _pretrial_recovery_fixture(tmp_path, monkeypatch)
+    activation_v4.prepare_pretrial_recovery(tmp_path)
+    paths["activation"].write_bytes(b"invalid new activation\n")
+
+    def reject(_root: Path) -> None:
+        raise activation_v4.ActivationError("new activation is invalid")
+
+    monkeypatch.setattr(activation_v4, "validate", reject)
+    with pytest.raises(activation_v4.ActivationError, match="new activation is invalid"):
+        activation_v4.complete_pretrial_recovery(tmp_path)
+    assert paths["launch"].is_file()
+    assert activation_v4.pretrial_recovery_pending(tmp_path) is True
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "manifest",
+        "self-consistent-manifest",
+        "manifest-hardlink",
+        "prepared-hardlink",
+        "archive",
+        "current-activation",
+    ],
+)
+def test_completed_pretrial_authority_is_required_and_detects_corruption(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mutation: str
+) -> None:
+    paths = _pretrial_recovery_fixture(tmp_path, monkeypatch)
+    activation_v4.prepare_pretrial_recovery(tmp_path)
+    fresh = {
+        "record_sha256": "2" * 64,
+        "implementation_commit": "3" * 40,
+    }
+    paths["activation"].write_text(json.dumps(fresh, sort_keys=True) + "\n")
+    monkeypatch.setattr(activation_v4, "validate", lambda _root, **_kwargs: fresh)
+    activation_v4.complete_pretrial_recovery(tmp_path)
+    final = tmp_path / activation_v4._PRETRIAL_INCIDENT_FINAL
+    if mutation == "manifest":
+        (final / "incident.json").write_text("{}\n")
+    elif mutation == "self-consistent-manifest":
+        incident_path = final / "incident.json"
+        incident = json.loads(incident_path.read_text())
+        incident["reason"] = "tampered but self-consistent"
+        incident["new_activation"]["record_sha256"] = "4" * 64
+        incident["new_activation"]["implementation_commit"] = "5" * 40
+        incident.pop("record_sha256")
+        incident["record_sha256"] = hashlib.sha256(
+            activation_v4._canonical(incident)
+        ).hexdigest()
+        incident_path.write_text(json.dumps(incident, indent=2, sort_keys=True) + "\n")
+    elif mutation == "manifest-hardlink":
+        os.link(final / "incident.json", tmp_path / "incident-alias.json")
+    elif mutation == "prepared-hardlink":
+        os.link(final / "prepared.json", tmp_path / "prepared-alias.json")
+    elif mutation == "archive":
+        (final / "superseded-team-01-discovery-v7.json").write_text("changed\n")
+    else:
+        paths["activation"].write_text("changed new activation\n")
+    with pytest.raises(activation_v4.ActivationError):
+        activation_v4.require_completed_pretrial_recovery(tmp_path)
 
 
 def test_journal_binds_research_session_to_exact_source_authority() -> None:
@@ -1050,6 +1590,22 @@ def test_direct_launcher_requires_activation_before_any_team_process(
 
     monkeypatch.setattr(activation_v4, "validate", refuse_activation)
     with pytest.raises(activation_v4.ActivationError, match="not activated"):
+        research_runtime_v4.launch_team_phase.__wrapped__(
+            tmp_path,
+            "team-01",
+            "discovery",
+            "authorized prompt",
+        )
+
+
+def test_direct_launcher_requires_completed_pretrial_incident_authority(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(activation_v4, "validate", lambda _root: {"activated": True})
+    with pytest.raises(
+        activation_v4.ActivationError,
+        match="completed pretrial incident authority is missing",
+    ):
         research_runtime_v4.launch_team_phase.__wrapped__(
             tmp_path,
             "team-01",

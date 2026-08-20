@@ -33,7 +33,7 @@ from crypto_trade.tournament.layout_v4 import TOP40_V4_LAYOUT
 PROFILE_NAME = "top40-v4-r2-offline-team"
 RECEIPT_SCHEMA_VERSION = 1
 SOURCE_REVIEW_SCHEMA_VERSION = 7
-LAUNCHER_VERSION = "top40-v4-r2-research-runtime-v7"
+LAUNCHER_VERSION = "top40-v4-r2-research-runtime-v8"
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _SAFE_ID = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}")
 _PHASE = re.compile(r"(?:discovery|refinement|decision)")
@@ -318,6 +318,7 @@ _PROBE_KEYS = frozenset(
         "denied_reads",
         "host_process_hidden",
         "network_denied",
+        "own_lane_write_allowed",
     }
 )
 _STATIC_CHECKS = (
@@ -450,7 +451,16 @@ def serialized_activated_r2_command[ReturnT](
 ) -> Callable[..., ReturnT]:
     """Fail pre-activation result calls before they can contend with activation's test child."""
 
-    leased = serialized_r2_command(function)
+    @functools.wraps(function)
+    def authorized(root: str | Path, *args: object, **kwargs: object) -> ReturnT:
+        if TOP40_V4_LAYOUT.name.endswith("-r2"):
+            from crypto_trade.tournament import activation_v4
+
+            activation_v4.validate(root, verify_universe_snapshot=False)
+            activation_v4.require_completed_pretrial_recovery(root)
+        return function(root, *args, **kwargs)
+
+    leased = serialized_r2_command(authorized)
 
     @functools.wraps(function)
     def wrapped(root: str | Path, *args: object, **kwargs: object) -> ReturnT:
@@ -461,6 +471,7 @@ def serialized_activated_r2_command[ReturnT](
             from crypto_trade.tournament import activation_v4
 
             activation_v4.validate(root, verify_universe_snapshot=False)
+            activation_v4.require_completed_pretrial_recovery(root)
         return leased(root, *args, **kwargs)
 
     return wrapped
@@ -598,6 +609,8 @@ def codex_profile_arguments(root: str | Path, team_id: str) -> list[str]:
         "-c",
         f"permissions.{PROFILE_NAME}.network.enabled=false",
         "-c",
+        "approval_policy=\"never\"",
+        "-c",
         "allow_login_shell=false",
         "-c",
         "project_doc_max_bytes=0",
@@ -701,6 +714,31 @@ def run_profile_probes(root: str | Path, team_id: str) -> Mapping[str, object]:
     )
     if os.path.lexists(cross_lane_probe):
         cross_lane_probe.unlink()
+    own_write_probe = paths["work"] / ".r2-own-write-probe"
+    if os.path.lexists(own_write_probe):
+        raise ResearchRuntimeError("own-lane write probe target already exists")
+    own_lane_write = _probe(
+        binary,
+        arguments,
+        team,
+        (
+            "/usr/bin/python3",
+            "-c",
+            "import os,sys\nfd=os.open(sys.argv[1],os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)\n"
+            "os.write(fd,b'allowed');os.close(fd)",
+            str(own_write_probe),
+        ),
+    )
+    try:
+        own_lane_write_allowed = (
+            own_lane_write == 0
+            and own_write_probe.is_file()
+            and not own_write_probe.is_symlink()
+            and _stable_bytes(own_write_probe) == b"allowed"
+        )
+    finally:
+        if os.path.lexists(own_write_probe):
+            own_write_probe.unlink()
     network = _probe(
         binary,
         arguments,
@@ -724,6 +762,7 @@ def run_profile_probes(root: str | Path, team_id: str) -> Mapping[str, object]:
         "cross_lane_write_denied": cross_lane_write == 0,
         "network_denied": network == 0,
         "host_process_hidden": host_process == 0,
+        "own_lane_write_allowed": own_lane_write_allowed,
     }
     if not all(result.values()):
         raise ResearchRuntimeError("research clean-room profile failed its adversarial probes")
@@ -1974,6 +2013,35 @@ def recover_candidate_receipts(
     return record_candidate_receipts(root_path, team_id, phase, candidate_ids, probes=probes)
 
 
+def _codex_exec_command(
+    root: Path,
+    team_id: str,
+    *,
+    model: str,
+    prompt: str,
+) -> list[str]:
+    paths = _team_paths(root, team_id)
+    return [
+        str(_codex_binary()),
+        "exec",
+        "--strict-config",
+        "--ignore-user-config",
+        # `--ignore-user-config` rebuilds the exec-layer configuration. Keep every security
+        # override after it; pre-subcommand overrides are silently lost by Codex CLI 0.148.
+        *codex_profile_arguments(root, team_id),
+        *sum((["--disable", feature] for feature in _DISABLED_FEATURES), []),
+        "--ephemeral",
+        "--skip-git-repo-check",
+        "--cd",
+        str(paths["team"]),
+        "--model",
+        model,
+        "--config",
+        'model_reasoning_effort="high"',
+        prompt,
+    ]
+
+
 @serialized_r2_command
 def launch_team_phase(
     root: str | Path,
@@ -1993,6 +2061,7 @@ def launch_team_phase(
     from crypto_trade.tournament import activation_v4
 
     activation_v4.validate(root_path)
+    activation_v4.require_completed_pretrial_recovery(root_path)
     _validate_runtime_launch_lifecycle(root_path, team_id, phase)
     isolation_v4.audit_team_surface(root_path, team_id)
     paths = _team_paths(root_path, team_id)
@@ -2005,26 +2074,7 @@ def launch_team_phase(
         raise ResearchRuntimeError("team phase outbox already exists")
     probes = run_profile_probes(root_path, team_id)
     launch_authority = _record_launch_authority(root_path, team_id, phase)
-    binary = _codex_binary()
-    command = [
-        str(binary),
-        *codex_profile_arguments(root_path, team_id),
-        *sum((["--disable", feature] for feature in _DISABLED_FEATURES), []),
-        "-a",
-        "never",
-        "exec",
-        "--strict-config",
-        "--ignore-user-config",
-        "--ephemeral",
-        "--skip-git-repo-check",
-        "--cd",
-        str(paths["team"]),
-        "--model",
-        model,
-        "--config",
-        'model_reasoning_effort="high"',
-        prompt,
-    ]
+    command = _codex_exec_command(root_path, team_id, model=model, prompt=prompt)
     environment = {
         name: os.environ[name]
         for name in ("HOME", "LANG", "LC_ALL", "LC_CTYPE", "NO_COLOR", "PATH", "SHELL", "TERM")

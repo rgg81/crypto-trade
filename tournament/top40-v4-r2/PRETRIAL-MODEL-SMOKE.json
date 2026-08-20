@@ -1,0 +1,25 @@
+{
+  "approval": "never",
+  "codex_session_id": "01a01dc1-1f4f-7073-a2e8-b4957d65b99d",
+  "codex_version": "codex-cli 0.148.0",
+  "durable_lane_delta_after_verified_cleanup": [],
+  "launcher_version": "top40-v4-r2-research-runtime-v8",
+  "network_enabled": false,
+  "observed_added_paths": [
+    "work/.r2-model-write-smoke",
+    "work/.r2-smoke-tmp/codex-bwrap-synthetic-mount-targets-1000",
+    "work/.r2-smoke-tmp/codex-bwrap-synthetic-mount-targets-1000/lock"
+  ],
+  "observed_on_date": "2026-08-20",
+  "organizer_observed": true,
+  "process_returncode": 0,
+  "profile_sha256": "264decca1d61c510818b6891f1dc2d6b02cf9f18f4d5490158da2c851af0fb0a",
+  "purpose": "pretrial-executor-write-smoke",
+  "record_sha256": "ebbd03151348350767feac7acb9eebb0e57f15659353ea43cc51738292e87565",
+  "requested_sentinel": "work/.r2-model-write-smoke",
+  "sandbox": "custom permissions",
+  "schema_version": 1,
+  "sentinel_sha256": "241878ca89bfe5369894e806db82d279b1d1b4e255507a62a5cb931e2d869d6e",
+  "team_id": "team-01",
+  "tournament": "quant-portfolio-blind-top40-v4-r2"
+}
