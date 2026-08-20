@@ -1841,6 +1841,94 @@ def test_canonical_activation_never_repairs_a_preactivation_journal(
     assert not (root / activation_v4.TEST_OUTPUT_PATH).exists()
 
 
+def test_run_team_preactivation_never_recovers_the_journal(
+    tmp_path: Path,
+) -> None:
+    root = _fresh_restart_fixture(tmp_path)
+    journal = root / TOP40_V4_R2_LAYOUT.journal_path
+    fragment = b'{"preactivation":"fragment remains immutable"}'
+    journal.write_bytes(fragment)
+    journal.chmod(0o600)
+    broker = _broker_module()
+    with pytest.raises(activation_v4.ActivationError):
+        broker.run_team(root, "team-01")
+    assert journal.read_bytes() == fragment
+
+    completed = subprocess.run(
+        (
+            sys.executable,
+            "scripts/top40_v4_r2_team_broker.py",
+            "--root",
+            str(root),
+            "run-team",
+            "team-01",
+        ),
+        cwd=ROOT,
+        env=_r2_environment(),
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert completed.returncode != 0
+    assert completed.stderr
+    assert journal.read_bytes() == fragment
+
+
+def test_run_team_activation_gate_precedes_the_terminal_journal_branch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _fresh_restart_fixture(tmp_path)
+    broker = _broker_module()
+    reads: list[Path] = []
+
+    def refuse(_root: Path) -> None:
+        raise activation_v4.ActivationError("synthetic activation refusal")
+
+    monkeypatch.setattr(broker.activation_v4, "validate", refuse)
+    monkeypatch.setattr(broker.journal_v4, "read", lambda path: reads.append(Path(path)))
+    with pytest.raises(activation_v4.ActivationError, match="synthetic activation refusal"):
+        broker.run_team.__wrapped__(root, "team-01")
+    assert reads == []
+
+
+def test_preactivation_status_and_validate_never_recover_the_journal(
+    tmp_path: Path,
+) -> None:
+    root = _fresh_restart_fixture(tmp_path)
+    journal = root / TOP40_V4_R2_LAYOUT.journal_path
+    fragment = b'{"read-only":"commands preserve this fragment"}'
+    journal.write_bytes(fragment)
+    journal.chmod(0o600)
+
+    with pytest.raises(journal_v4.JournalError, match="byte-empty"):
+        orchestrator_v4.status(root)
+    assert journal.read_bytes() == fragment
+    with pytest.raises(journal_v4.JournalError, match="byte-empty"):
+        orchestrator_v4.validate(root, require_activation=False)
+    assert journal.read_bytes() == fragment
+
+    for command in (("status",), ("validate", "--pre-activation")):
+        completed = subprocess.run(
+            (
+                sys.executable,
+                "scripts/top40_v4_r2_tournament.py",
+                "--root",
+                str(root),
+                *command,
+            ),
+            cwd=ROOT,
+            env=_r2_environment(),
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert completed.returncode != 0
+        assert "byte-empty" in completed.stderr
+        assert journal.read_bytes() == fragment
+
+
 def test_fresh_restart_activation_rejects_dirty_root_before_freeze(
     tmp_path: Path,
 ) -> None:

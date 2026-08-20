@@ -522,6 +522,7 @@ def launch_phase(root: Path, team_id: str, phase: str) -> Mapping[str, Any]:
 @research_runtime_v4.serialized_r2_command
 def run_team(root: Path, team_id: str) -> Mapping[str, Any]:
     _restore_lane_markers_before_authority(root, team_id)
+    activation_v4.validate(root)
     results: list[Mapping[str, Any]] = []
     state = journal_v4.read(root / TOP40_V4_LAYOUT.journal_path)
     if team_id in state.nominations or team_id in state.retired:

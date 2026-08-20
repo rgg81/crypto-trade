@@ -612,14 +612,26 @@ def recover_pretrial(root: str | Path) -> Mapping[str, Any]:
     }
 
 
+def _preactivation_journal_state(path: Path) -> journal_v4.JournalState:
+    """Inspect only an exact empty bootstrap journal; never invoke runtime tail recovery."""
+
+    if not os.path.lexists(path):
+        return journal_v4.replay_bytes(b"")
+    return journal_v4.initialize(path)
+
+
 @research_runtime_v4.serialized_r2_command
 def validate(root: str | Path, *, require_activation: bool = True) -> Mapping[str, Any]:
     root_path = _safe_root(root)
     isolation = isolation_v4.audit_surface(root_path)
     loaded = top40_v4.load_config(root=root_path)
-    activation = activation_v4.validate(root_path) if require_activation else None
     journal_path = _journal_path(root_path)
-    state = journal_v4.read(journal_path) if journal_path.exists() else journal_v4.replay_bytes(b"")
+    if require_activation:
+        activation = activation_v4.validate(root_path)
+        state = journal_v4.read(journal_path)
+    else:
+        activation = None
+        state = _preactivation_journal_state(journal_path)
     visible_head = state.head_sha256
     visible_records = state.record_count
     if TOP40_V4_LAYOUT.name.endswith("-r2") and state.selection is None:
@@ -653,9 +665,15 @@ def status(root: str | Path) -> Mapping[str, Any]:
     root_path = _safe_root(root)
     isolation_v4.audit_surface(root_path)
     loaded = top40_v4.load_config(root=root_path)
-    activated = _path(root_path, TOP40_V4_LAYOUT.activation_freeze_path).exists()
+    freeze_path = _path(root_path, TOP40_V4_LAYOUT.activation_freeze_path)
     journal_path = _journal_path(root_path)
-    state = journal_v4.read(journal_path) if journal_path.exists() else journal_v4.replay_bytes(b"")
+    if os.path.lexists(freeze_path):
+        activation_v4.validate(root_path, verify_universe_snapshot=False)
+        activated = True
+        state = journal_v4.read(journal_path)
+    else:
+        activated = False
+        state = _preactivation_journal_state(journal_path)
     visible_head = state.head_sha256
     if TOP40_V4_LAYOUT.name.endswith("-r2") and state.selection is None:
         # Match validate(): pre-selection callers get no field-wide progress oracle.
