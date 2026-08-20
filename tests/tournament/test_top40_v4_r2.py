@@ -1073,6 +1073,84 @@ def test_private_model_runtime_is_auth_only_and_skill_empty(
         assert path.stat().st_mode & 0o077 == 0
 
 
+def test_private_model_runtime_clears_bounded_client_state_between_phases(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    organizer = tmp_path / "organizer-codex"
+    organizer.mkdir()
+    (organizer / "auth.json").write_bytes(b'{"auth":"fixture"}\n')
+    root = tmp_path / "root"
+    root.mkdir()
+    codex_home = (
+        root
+        / research_runtime_v4._PRIVATE_MODEL_RUNTIME_RELATIVE
+        / "team-01/codex-home"
+    )
+
+    def prompt_probe(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        (codex_home / "memories_1.sqlite").write_bytes(b"phase-local-state")
+        (codex_home / "shell_snapshots").mkdir()
+        (codex_home / "memories_1.sqlite").chmod(0o600)
+        (codex_home / "shell_snapshots").chmod(0o700)
+        return SimpleNamespace(returncode=0, stdout=b"catalog-probe", stderr=b"")
+
+    monkeypatch.setattr(research_runtime_v4, "_organizer_codex_home", lambda: organizer)
+    monkeypatch.setattr(research_runtime_v4, "_codex_binary", lambda: Path("/usr/bin/true"))
+    monkeypatch.setattr(
+        research_runtime_v4,
+        "_codex_version",
+        lambda _binary: research_runtime_v4._EXPECTED_CODEX_VERSION,
+    )
+    monkeypatch.setattr(research_runtime_v4.subprocess, "run", prompt_probe)
+
+    research_runtime_v4.ensure_private_model_runtime(root, "team-01")
+    assert sorted(path.relative_to(codex_home).as_posix() for path in codex_home.rglob("*")) == [
+        "auth.json",
+        "skills",
+        "skills/.system",
+        "skills/.system/.codex-system-skills.marker",
+    ]
+
+    # A safely bounded artifact left by an interrupted prior subprocess is removed before the
+    # next prompt inspection as well as after it.
+    (codex_home / "state_5.sqlite").write_bytes(b"interrupted-state")
+    (codex_home / "state_5.sqlite").chmod(0o600)
+    research_runtime_v4.ensure_private_model_runtime(root, "team-01")
+    assert not (codex_home / "state_5.sqlite").exists()
+    assert not (codex_home / "memories_1.sqlite").exists()
+
+
+def test_private_model_runtime_rejects_group_readable_client_state_before_cleanup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    organizer = tmp_path / "organizer-codex"
+    organizer.mkdir()
+    (organizer / "auth.json").write_bytes(b'{"auth":"fixture"}\n')
+    root = tmp_path / "root"
+    root.mkdir()
+    monkeypatch.setattr(research_runtime_v4, "_organizer_codex_home", lambda: organizer)
+    monkeypatch.setattr(research_runtime_v4, "_codex_binary", lambda: Path("/usr/bin/true"))
+    monkeypatch.setattr(
+        research_runtime_v4,
+        "_codex_version",
+        lambda _binary: research_runtime_v4._EXPECTED_CODEX_VERSION,
+    )
+    research_runtime_v4.ensure_private_model_runtime(root, "team-01")
+    state = (
+        root
+        / research_runtime_v4._PRIVATE_MODEL_RUNTIME_RELATIVE
+        / "team-01/codex-home/state_5.sqlite"
+    )
+    state.write_bytes(b"unsafe-state")
+    state.chmod(0o640)
+    with pytest.raises(
+        research_runtime_v4.ResearchRuntimeError,
+        match="volatile file is unsafe",
+    ):
+        research_runtime_v4.ensure_private_model_runtime(root, "team-01")
+    assert state.read_bytes() == b"unsafe-state"
+
+
 def test_private_model_runtime_rejects_group_readable_boundary(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

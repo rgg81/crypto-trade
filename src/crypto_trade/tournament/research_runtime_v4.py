@@ -720,6 +720,7 @@ def _private_regular_file(path: Path, *, maximum: int = 64 * 1024 * 1024) -> int
         or path.is_symlink()
         or details.st_uid != os.geteuid()
         or details.st_nlink != 1
+        or stat.S_IMODE(details.st_mode) & 0o077
         or details.st_size > maximum
     ):
         raise ResearchRuntimeError("private Codex volatile file is unsafe")
@@ -732,6 +733,7 @@ def _private_empty_directory(path: Path) -> None:
         not stat.S_ISDIR(details.st_mode)
         or path.is_symlink()
         or details.st_uid != os.geteuid()
+        or stat.S_IMODE(details.st_mode) & 0o077
         or any(path.iterdir())
     ):
         raise ResearchRuntimeError("private Codex volatile directory is unsafe")
@@ -765,6 +767,7 @@ def _validate_private_model_surface(paths: Mapping[str, Path]) -> None:
             not stat.S_ISDIR(details.st_mode)
             or codex_tmp.is_symlink()
             or details.st_uid != os.geteuid()
+            or stat.S_IMODE(details.st_mode) & 0o077
             or {entry.name for entry in codex_tmp.iterdir()} - {"arg0"}
         ):
             raise ResearchRuntimeError("private CODEX_HOME tmp surface is unsafe")
@@ -776,6 +779,7 @@ def _validate_private_model_surface(paths: Mapping[str, Path]) -> None:
                 not stat.S_ISDIR(arg0_details.st_mode)
                 or arg0.is_symlink()
                 or arg0_details.st_uid != os.geteuid()
+                or stat.S_IMODE(arg0_details.st_mode) & 0o077
                 or len(arg0_entries) > 1
             ):
                 raise ResearchRuntimeError("private Codex arg0 surface is unsafe")
@@ -794,6 +798,7 @@ def _validate_private_model_surface(paths: Mapping[str, Path]) -> None:
                     or not stat.S_ISDIR(wrapper_details.st_mode)
                     or wrapper_root.is_symlink()
                     or wrapper_details.st_uid != os.geteuid()
+                    or stat.S_IMODE(wrapper_details.st_mode) & 0o077
                     or {entry.name for entry in wrapper_root.iterdir()} != expected_wrappers
                 ):
                     raise ResearchRuntimeError("private Codex arg0 wrapper surface is unsafe")
@@ -814,10 +819,71 @@ def _validate_private_model_surface(paths: Mapping[str, Path]) -> None:
             not stat.S_ISDIR(details.st_mode)
             or entry.is_symlink()
             or details.st_uid != os.geteuid()
+            or stat.S_IMODE(details.st_mode) & 0o077
             or {child.name for child in entry.iterdir()} != {"lock"}
         ):
             raise ResearchRuntimeError("private TMPDIR sandbox surface is unsafe")
         _private_regular_file(entry / "lock", maximum=1024)
+
+
+def _fsync_private_directory(path: Path) -> None:
+    descriptor = os.open(
+        path,
+        os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_DIRECTORY", 0),
+    )
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _reset_private_model_session_state(paths: Mapping[str, Path]) -> None:
+    """Remove every bounded Codex client artifact before it can reach another phase."""
+
+    # Validate the complete tree before mutation. The cleanup below names every admitted child
+    # explicitly and never recursively follows a link, so corrupt or unexpected residue fails
+    # closed instead of being traversed or silently erased.
+    _validate_private_model_permissions(paths)
+    _validate_empty_skill_surface(paths)
+    _validate_private_model_surface(paths)
+
+    codex_home = paths["codex_home"]
+    for name in sorted(_CODEX_HOME_VOLATILE_FILES):
+        path = codex_home / name
+        if os.path.lexists(path):
+            path.unlink()
+
+    shell_snapshots = codex_home / "shell_snapshots"
+    if os.path.lexists(shell_snapshots):
+        shell_snapshots.rmdir()
+
+    codex_tmp = codex_home / "tmp"
+    if os.path.lexists(codex_tmp):
+        arg0 = codex_tmp / "arg0"
+        if os.path.lexists(arg0):
+            for wrapper_root in list(arg0.iterdir()):
+                for name in (
+                    ".lock",
+                    "apply_patch",
+                    "applypatch",
+                    "codex-execve-wrapper",
+                    "codex-linux-sandbox",
+                ):
+                    (wrapper_root / name).unlink()
+                wrapper_root.rmdir()
+            arg0.rmdir()
+        codex_tmp.rmdir()
+
+    private_tmp = paths["tmp"]
+    for entry in list(private_tmp.iterdir()):
+        (entry / "lock").unlink()
+        entry.rmdir()
+
+    _fsync_private_directory(codex_home)
+    _fsync_private_directory(private_tmp)
+    _validate_private_model_permissions(paths)
+    _validate_empty_skill_surface(paths)
+    _validate_private_model_surface(paths)
 
 
 def _private_model_environment(root: Path, team_id: str) -> dict[str, str]:
@@ -836,6 +902,12 @@ def _private_model_environment(root: Path, team_id: str) -> dict[str, str]:
     for name in _SINGLE_THREAD_ENVIRONMENT_VARIABLES:
         environment[name] = "1"
     return environment
+
+
+def _private_child_setup() -> None:
+    """Force owner-only creation modes in the isolated child before exec."""
+
+    os.umask(0o077)
 
 
 def model_environment_spec(root: str | Path, team_id: str) -> Mapping[str, str]:
@@ -876,7 +948,7 @@ def ensure_private_model_runtime(root: str | Path, team_id: str) -> Mapping[str,
         _write_immutable(paths["auth"], _stable_bytes(source, maximum=128 * 1024))
     _stable_bytes(paths["auth"], maximum=128 * 1024)
     _validate_private_model_permissions(paths)
-    _validate_private_model_surface(paths)
+    _reset_private_model_session_state(paths)
 
     binary = _codex_binary()
     if _codex_version(binary) != _EXPECTED_CODEX_VERSION:
@@ -888,15 +960,19 @@ def ensure_private_model_runtime(root: str | Path, team_id: str) -> Mapping[str,
         "prompt-input",
         "Return the word catalog-probe and do not perform any task.",
     ]
-    completed = subprocess.run(
-        command,
-        check=False,
-        capture_output=True,
-        cwd=root_path,
-        env=_private_model_environment(root_path, team_id),
-        stdin=subprocess.DEVNULL,
-        timeout=30,
-    )
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            cwd=root_path,
+            env=_private_model_environment(root_path, team_id),
+            stdin=subprocess.DEVNULL,
+            preexec_fn=_private_child_setup,
+            timeout=30,
+        )
+    finally:
+        _reset_private_model_session_state(paths)
     if completed.returncode != 0:
         raise ResearchRuntimeError("cannot inspect the private Codex prompt catalog")
     forbidden = (
@@ -907,9 +983,6 @@ def ensure_private_model_runtime(root: str | Path, team_id: str) -> Mapping[str,
     )
     if any(value in completed.stdout for value in forbidden):
         raise ResearchRuntimeError("private Codex prompt still exposes installed skills")
-    _validate_private_model_permissions(paths)
-    _validate_empty_skill_surface(paths)
-    _validate_private_model_surface(paths)
     return model_runtime_spec(root_path, team_id)
 
 
@@ -1073,6 +1146,7 @@ def _probe(
         check=False,
         env=environment,
         stdin=subprocess.DEVNULL,
+        preexec_fn=_private_child_setup,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         timeout=30,
@@ -1258,8 +1332,8 @@ def run_profile_probes(root: str | Path, team_id: str) -> Mapping[str, object]:
     }
     if not all(result.values()):
         raise ResearchRuntimeError("research clean-room profile failed its adversarial probes")
-    _validate_private_model_surface(private_paths)
-    _validate_private_model_surface(peer_private_paths)
+    _reset_private_model_session_state(private_paths)
+    _reset_private_model_session_state(peer_private_paths)
     return result
 
 
@@ -2719,15 +2793,20 @@ def launch_team_phase(
     prompt = team_phase_prompt(team_id, phase)
     command = _codex_exec_command(root_path, team_id, model=_MODEL_NAME, prompt=prompt)
     environment = _private_model_environment(root_path, team_id)
-    completed = subprocess.run(
-        command,
-        check=False,
-        cwd=paths["team"],
-        env=environment,
-        stdin=subprocess.DEVNULL,
-        timeout=7_200,
-    )
-    ensure_private_model_runtime(root_path, team_id)
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            cwd=paths["team"],
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            preexec_fn=_private_child_setup,
+            timeout=7_200,
+        )
+    finally:
+        # A completed, failed, or interrupted phase never supplies hidden client state to the
+        # next phase. Authentication and the empty skill marker are the only durable client bytes.
+        ensure_private_model_runtime(root_path, team_id)
     if completed.returncode != 0:
         raise ResearchRuntimeError("isolated team process did not complete successfully")
     request = json.loads(_stable_bytes(paths["outbox"] / outbox_name))

@@ -13,10 +13,12 @@ Because Codex `--ignore-user-config` rebuilds the exec-layer configuration, it m
 `-c` security override and every disabled-capability flag in the frozen model command.
 
 Model execution uses a distinct organizer-private `HOME`, `CODEX_HOME`, and `TMPDIR` for each team,
-outside every team profile. Each home contains only the exact bounded Codex client surface:
-authentication, an empty system-skill marker, and explicitly allowlisted volatile client files;
-unknown configuration, history, memory, plugin, skill, `.agents`, or scratch residue is rejected
-before and after every Codex subprocess. Before every model launch, the organizer renders the exact
+outside every team profile. Each home is phase-fresh and retains only authentication plus the empty
+system-skill marker. Bounded client databases, logs, queues, shell snapshots, wrappers, and sandbox
+scratch are accepted only long enough to validate and remove them after each Codex subprocess;
+none can reach a later phase. Unknown configuration, history, memory, plugin, skill, `.agents`, or
+scratch residue is rejected before any removal, and every admitted node is owner-only. Before every
+model launch, the organizer renders the exact
 model-visible prompt with the pinned CLI and rejects any skill instructions, `SKILL.md` locator, or
 host skill/plugin root. Physical probes separately deny the original host roots, the team's private
 auth file, and both reading and writing a peer team's private runtime. The frozen model, prompt,
