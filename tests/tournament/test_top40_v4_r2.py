@@ -212,6 +212,7 @@ def test_r2_layout_has_fifteen_fresh_lanes_and_six_finalists() -> None:
         f"team-{number:02d}" for number in range(1, 16)
     )
     assert TOP40_V4_R2_LAYOUT.advance_count == 6
+    assert TOP40_V4_R2_LAYOUT.branch == "quant-portfolio-blind-top40-v4-r1-v2-restart4"
     assert TOP40_V4_R2_LAYOUT.tournament_root == "tournament/top40-v4-r2"
     assert TOP40_V4_R2_LAYOUT.reports_root == "reports-top40-v4-r2"
 
