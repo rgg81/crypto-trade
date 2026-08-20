@@ -65,17 +65,39 @@ team_volatility_targeting = "forbidden"
 official_trial_budget = 12
 minimum_official_trials = 0
 maximum_dimensions = 10
+# Neighbourhood probe geometry: a multiplicative step for scale parameters, a logit shift for
+# fractions, and a fraction of the declared natural scale for signed parameters.
+neighbourhood_scale_step = 1.25
+neighbourhood_logit_step = 1.5
+neighbourhood_signed_step = 0.20
 controls = "preregistered-permanently-non-promoteable"
 strategy_history_days = 180
 
 [scoring]
+# Every number the scorer uses lives here and nowhere else. The activation record binds these
+# bytes, and each trial re-checks the digest, so the config is the contract the field is scored
+# under rather than a description of one.
 return_weight = 1.0
 drawdown_penalty = 0.50
 underdeployment_penalty = 0.10
 concentration_penalty = 0.05
+volatility_reference = 0.10
+activity_reference = 0.50
+activity_exposure_floor = 0.05
+concentration_threshold = 0.25
+concentration_top_days = 5
+squash_scale = 0.10
+# Aligned with execution.cost_multipliers.
+cost_weights = [0.20, 0.30, 0.50]
+# Applied to fold cost scores sorted ascending, so the weakest fold carries the most weight.
+fold_weights = [0.40, 0.25, 0.20, 0.10, 0.05]
 generalization_weight = 0.85
 all_window_weight = 0.15
+# Neighbourhood aggregate: median, lower-quartile point, declared centre.
+neighbourhood_weights = [0.50, 0.25, 0.25]
+lower_quartile_fraction = 4
 rounding = "decimal-half-even-1e-6"
+rounding_places = 6
 qualification_gates = "none"
 
 [paper]

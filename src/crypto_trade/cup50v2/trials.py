@@ -9,9 +9,9 @@ import math
 from collections.abc import Mapping
 from pathlib import Path
 
+from crypto_trade.cup50v2.config import ResearchPolicy, active_policy
 from crypto_trade.cup50v2.journal import append_record, read_records
 
-OFFICIAL_BUDGET = 12
 CONTROL_KINDS = frozenset({"ablation", "falsifier"})
 
 
@@ -116,16 +116,20 @@ def resolve_trial_binding(
     return matches[0]
 
 
-def register_trial(path: str | Path, binding: TrialBinding) -> Mapping[str, object]:
+def register_trial(
+    path: str | Path, binding: TrialBinding, *, policy: ResearchPolicy | None = None
+) -> Mapping[str, object]:
+    rules = policy if policy is not None else active_policy().research
+    budget = rules.official_trial_budget
     binding.validate()
     existing = _trial_payloads(path, binding.team_id)
     if any(payload.get("trial_id") == binding.trial_id for payload in existing):
         raise ValueError(f"trial_id already exists for {binding.team_id}: {binding.trial_id}")
     if (
         binding.promoteable
-        and sum(bool(payload.get("promoteable")) for payload in existing) >= OFFICIAL_BUDGET
+        and sum(bool(payload.get("promoteable")) for payload in existing) >= budget
     ):
-        raise ValueError(f"{binding.team_id} exhausted its {OFFICIAL_BUDGET} official trials")
+        raise ValueError(f"{binding.team_id} exhausted its {budget} official trials")
     payload = {**dataclasses.asdict(binding), "binding_sha256": binding.binding_sha256}
     return append_record(path, "trial-registered", payload)
 

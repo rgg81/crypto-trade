@@ -11,6 +11,8 @@ import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
+from crypto_trade.cup50v2.config import ResearchPolicy, active_policy
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Dimension:
@@ -48,42 +50,49 @@ class Neighbourhood:
     centre_index: int
 
 
-def _value(dimension: Dimension, centre: float, step: int) -> float:
+def _value(dimension: Dimension, centre: float, step: int, rules: ResearchPolicy) -> float:
     if step == 0:
         return centre
     if dimension.kind == "positive":
-        return centre * (1.25**step)
+        return centre * (rules.neighbourhood_scale_step**step)
     if dimension.kind == "integer":
-        raw = centre * (1.25**step)
+        raw = centre * (rules.neighbourhood_scale_step**step)
         # Round away from the centre, not toward it; every declared point is a real perturbation.
         return float(math.ceil(raw) if step > 0 else math.floor(raw))
     if dimension.kind == "fraction":
-        logit = math.log(centre / (1.0 - centre)) + step * math.log(1.5)
+        logit = math.log(centre / (1.0 - centre)) + step * math.log(rules.neighbourhood_logit_step)
         return 1.0 / (1.0 + math.exp(-logit))
     if dimension.kind == "signed":
         assert dimension.natural_scale is not None
-        return centre + step * 0.20 * dimension.natural_scale
+        return centre + step * rules.neighbourhood_signed_step * dimension.natural_scale
     raise AssertionError("validated dimension kind became unreachable")
 
 
 def _point(
-    centre: Mapping[str, float], dimensions: Sequence[Dimension], steps: Mapping[str, int]
+    centre: Mapping[str, float],
+    dimensions: Sequence[Dimension],
+    steps: Mapping[str, int],
+    rules: ResearchPolicy,
 ) -> dict[str, float]:
     result = {str(name): float(value) for name, value in centre.items()}
     for dimension in dimensions:
         result[dimension.name] = _value(
-            dimension, float(centre[dimension.name]), int(steps.get(dimension.name, 0))
+            dimension, float(centre[dimension.name]), int(steps.get(dimension.name, 0)), rules
         )
     return result
 
 
 def generate_neighbourhood(
-    centre: Mapping[str, float], dimensions: Sequence[Dimension]
+    centre: Mapping[str, float],
+    dimensions: Sequence[Dimension],
+    *,
+    policy: ResearchPolicy | None = None,
 ) -> Neighbourhood:
     """Generate the one charter-permitted local design for ``k`` tunable dimensions."""
+    rules = policy if policy is not None else active_policy().research
     dims = tuple(dimensions)
-    if len(dims) > 10:
-        raise ValueError("CUP-50 v2 allows at most ten tunable dimensions")
+    if len(dims) > rules.maximum_dimensions:
+        raise ValueError(f"CUP-50 v2 allows at most {rules.maximum_dimensions} tunable dimensions")
     names = [dimension.name for dimension in dims]
     if len(names) != len(set(names)):
         raise ValueError("duplicate tunable dimensions")
@@ -115,7 +124,7 @@ def generate_neighbourhood(
         for dimension in dims:
             step_vectors.extend(({dimension.name: -1}, {dimension.name: 1}))
 
-    points = tuple(_point(centre, dims, vector) for vector in step_vectors)
+    points = tuple(_point(centre, dims, vector, rules) for vector in step_vectors)
     keys = tuple(sorted(str(name) for name in centre))
     vectors = [tuple(point[name] for name in keys) for point in points]
     if len(vectors) != len(set(vectors)):
@@ -131,12 +140,15 @@ def generate_neighbourhood(
 def reject_inert_dimensions(
     neighbourhood: Neighbourhood,
     target_stream_digest: Callable[[Mapping[str, float]], str],
+    *,
+    policy: ResearchPolicy | None = None,
 ) -> None:
     """Reject a declared dimension whose low and high probes cannot change the target stream."""
+    rules = policy if policy is not None else active_policy().research
     centre_digest = target_stream_digest(neighbourhood.centre)
     for dimension in neighbourhood.dimensions:
-        low = _point(neighbourhood.centre, neighbourhood.dimensions, {dimension.name: -1})
-        high = _point(neighbourhood.centre, neighbourhood.dimensions, {dimension.name: 1})
+        low = _point(neighbourhood.centre, neighbourhood.dimensions, {dimension.name: -1}, rules)
+        high = _point(neighbourhood.centre, neighbourhood.dimensions, {dimension.name: 1}, rules)
         if (
             target_stream_digest(low) == centre_digest
             and target_stream_digest(high) == centre_digest

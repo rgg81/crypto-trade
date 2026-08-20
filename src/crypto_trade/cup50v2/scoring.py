@@ -10,20 +10,19 @@ from collections.abc import Mapping, Sequence
 import numpy as np
 import pandas as pd
 
-from crypto_trade.cup50v2.config import FOLDS, OOS_END, OOS_START
+from crypto_trade.cup50v2.config import FOLDS, OOS_END, OOS_START, ScoringPolicy, active_policy
 from crypto_trade.cup50v2.replay import EvaluationResultV2
 
-_SIX_PLACES = decimal.Decimal("0.000001")
-_COST_WEIGHTS = {1: 0.20, 2: 0.30, 3: 0.50}
-_WEAKEST_FOLD_WEIGHTS = (0.40, 0.25, 0.20, 0.10, 0.05)
+
+def _scoring(policy: ScoringPolicy | None) -> ScoringPolicy:
+    return policy if policy is not None else active_policy().scoring
 
 
-def round_half_even(value: float) -> float:
+def round_half_even(value: float, *, policy: ScoringPolicy | None = None) -> float:
     if not math.isfinite(value):
         raise ValueError("score fields must be finite before rounding")
-    return float(
-        decimal.Decimal(str(value)).quantize(_SIX_PLACES, rounding=decimal.ROUND_HALF_EVEN)
-    )
+    quantum = decimal.Decimal(1).scaleb(-_scoring(policy).rounding_places)
+    return float(decimal.Decimal(str(value)).quantize(quantum, rounding=decimal.ROUND_HALF_EVEN))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -122,8 +121,10 @@ def score_cell(
     end: pd.Timestamp,
     *,
     failed: bool = False,
+    policy: ScoringPolicy | None = None,
 ) -> CellScore:
     """Score one coherent candidate/window/cost cell exactly once."""
+    rules = _scoring(policy)
     if failed:
         return CellScore(0.0, -1_000_000_000.0, 1.0, 0.0, 0.0, 0.0, 1.0, -1_000_000_000.0, True)
     daily = _daily_frame(returns, start, end)
@@ -139,41 +140,52 @@ def score_cell(
     volatility = (
         float(np.std(gross.to_numpy(dtype=float), ddof=1)) * math.sqrt(365.0) if n > 1 else 0.0
     )
-    activity = float((daily["gross_exposure"] >= 0.05).mean())
-    utilization = min(1.0, volatility / 0.10, activity / 0.50)
+    activity = float((daily["gross_exposure"] >= rules.activity_exposure_floor).mean())
+    utilization = min(
+        1.0,
+        volatility / rules.volatility_reference,
+        activity / rules.activity_reference,
+    )
     absolute = gross.abs()
     total_absolute = float(absolute.sum())
     concentration = (
-        float(absolute.nlargest(5).sum() / total_absolute) if total_absolute > 0 else 1.0
+        float(absolute.nlargest(rules.concentration_top_days).sum() / total_absolute)
+        if total_absolute > 0
+        else 1.0
     )
+    headroom = 1.0 - rules.concentration_threshold
     x = (
         growth
-        - 0.50 * drawdown
-        - 0.10 * (1.0 - utilization)
-        - 0.05 * max(0.0, (concentration - 0.25) / 0.75)
+        - rules.drawdown_penalty * drawdown
+        - rules.underdeployment_penalty * (1.0 - utilization)
+        - rules.concentration_penalty
+        * max(0.0, (concentration - rules.concentration_threshold) / headroom)
     )
     if not all(
         math.isfinite(value)
         for value in (growth, drawdown, volatility, activity, utilization, concentration, x)
     ):
         return CellScore(0.0, -1_000_000_000.0, 1.0, 0.0, 0.0, 0.0, 1.0, -1_000_000_000.0, True)
-    q = 50.0 * (1.0 + math.tanh(x / 0.10))
+    q = 50.0 * (1.0 + math.tanh(x / rules.squash_scale))
     q = min(100.0, max(0.0, q))
     return CellScore(q, growth, drawdown, volatility, activity, utilization, concentration, x)
 
 
-def combine_costs(cells: Mapping[int, CellScore]) -> float:
-    if set(cells) != set(_COST_WEIGHTS):
+def combine_costs(cells: Mapping[int, CellScore], *, policy: ScoringPolicy | None = None) -> float:
+    weights = _scoring(policy).cost_weights
+    if set(cells) != set(weights):
         raise ValueError("a CUP-50 v2 cost aggregate requires exactly 1x, 2x, and 3x cells")
-    return sum(_COST_WEIGHTS[cost] * cells[cost].q for cost in (1, 2, 3))
+    return sum(weights[cost] * cells[cost].q for cost in sorted(weights))
 
 
 def score_point(
     results: Mapping[int, EvaluationResultV2 | pd.DataFrame | None],
     *,
     failed_cells: Sequence[tuple[str, int]] = (),
+    policy: ScoringPolicy | None = None,
 ) -> PointScore:
     """Five chronological folds, weakest-first aggregation, then the full 30-month path."""
+    rules = _scoring(policy)
     if set(results) != {1, 2, 3}:
         raise ValueError("point scoring requires independent 1x, 2x, and 3x results")
     failure_set = set(failed_cells)
@@ -190,12 +202,13 @@ def score_point(
                 start,
                 end,
                 failed=is_failed,
+                policy=rules,
             )
         fold_cells[name] = cells
-        fold_scores[name] = combine_costs(cells)
+        fold_scores[name] = combine_costs(cells, policy=rules)
     weakest = sorted(fold_scores.values())
     generalization = sum(
-        weight * value for weight, value in zip(_WEAKEST_FOLD_WEIGHTS, weakest, strict=True)
+        weight * value for weight, value in zip(rules.fold_weights, weakest, strict=True)
     )
 
     all_cells: dict[int, CellScore] = {}
@@ -207,15 +220,20 @@ def score_point(
             OOS_START,
             OOS_END,
             failed=value is None or ("ALL", cost) in failure_set,
+            policy=rules,
         )
-    all_window = combine_costs(all_cells)
-    point = 0.85 * generalization + 0.15 * all_window
+    all_window = combine_costs(all_cells, policy=rules)
+    point = rules.generalization_weight * generalization + rules.all_window_weight * all_window
     return PointScore(point, generalization, all_window, fold_scores, fold_cells, all_cells)
 
 
 def score_neighbourhood(
-    points: Sequence[PointScore | float], *, centre_index: int = 0
+    points: Sequence[PointScore | float],
+    *,
+    centre_index: int = 0,
+    policy: ScoringPolicy | None = None,
 ) -> NeighbourhoodScore:
+    rules = _scoring(policy)
     if not points:
         raise ValueError("neighbourhood has no observed points")
     if not 0 <= centre_index < len(points):
@@ -226,27 +244,34 @@ def score_neighbourhood(
     if not all(math.isfinite(value) and 0.0 <= value <= 100.0 for value in values):
         raise ValueError("neighbourhood scores must be finite and within [0, 100]")
     ordered = sorted(values)
-    lower_position = math.ceil(len(values) / 4) - 1
+    lower_position = math.ceil(len(values) / rules.lower_quartile_fraction) - 1
     lower = ordered[lower_position]
     median = float(np.median(values))
     centre = values[centre_index]
-    official = 0.50 * median + 0.25 * lower + 0.25 * centre
+    median_weight, lower_weight, centre_weight = rules.neighbourhood_weights
+    official = median_weight * median + lower_weight * lower + centre_weight * centre
     return NeighbourhoodScore(official, centre, median, lower, min(values), values)
 
 
-def rounded_neighbourhood(score: NeighbourhoodScore) -> NeighbourhoodScore:
+def rounded_neighbourhood(
+    score: NeighbourhoodScore, *, policy: ScoringPolicy | None = None
+) -> NeighbourhoodScore:
+    rules = _scoring(policy)
     return NeighbourhoodScore(
-        official_score=round_half_even(score.official_score),
-        centre_score=round_half_even(score.centre_score),
-        median_score=round_half_even(score.median_score),
-        lower_quartile_score=round_half_even(score.lower_quartile_score),
-        minimum_score=round_half_even(score.minimum_score),
-        point_scores=tuple(round_half_even(value) for value in score.point_scores),
+        official_score=round_half_even(score.official_score, policy=rules),
+        centre_score=round_half_even(score.centre_score, policy=rules),
+        median_score=round_half_even(score.median_score, policy=rules),
+        lower_quartile_score=round_half_even(score.lower_quartile_score, policy=rules),
+        minimum_score=round_half_even(score.minimum_score, policy=rules),
+        point_scores=tuple(round_half_even(value, policy=rules) for value in score.point_scores),
     )
 
 
-def rank_entries(entries: Sequence[RankedEntry]) -> tuple[RankedEntry, ...]:
+def rank_entries(
+    entries: Sequence[RankedEntry], *, policy: ScoringPolicy | None = None
+) -> tuple[RankedEntry, ...]:
     """Deterministic total order with every valid submission ahead of every DNF."""
+    rules = _scoring(policy)
     for entry in entries:
         fields = (
             entry.official_score,
@@ -264,13 +289,13 @@ def rank_entries(entries: Sequence[RankedEntry]) -> tuple[RankedEntry, ...]:
             entries,
             key=lambda entry: (
                 not entry.valid,
-                -round_half_even(entry.official_score),
-                -round_half_even(entry.lower_quartile_score),
-                -round_half_even(entry.minimum_point_score),
-                -round_half_even(entry.centre_score),
-                -round_half_even(entry.centre_worst_fold_3x_score),
-                round_half_even(entry.centre_3x_drawdown),
-                round_half_even(entry.centre_turnover),
+                -round_half_even(entry.official_score, policy=rules),
+                -round_half_even(entry.lower_quartile_score, policy=rules),
+                -round_half_even(entry.minimum_point_score, policy=rules),
+                -round_half_even(entry.centre_score, policy=rules),
+                -round_half_even(entry.centre_worst_fold_3x_score, policy=rules),
+                round_half_even(entry.centre_3x_drawdown, policy=rules),
+                round_half_even(entry.centre_turnover, policy=rules),
                 entry.bundle_sha256,
                 entry.team_id,
             ),

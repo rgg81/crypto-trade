@@ -15,6 +15,7 @@ import pandas as pd
 
 from crypto_trade.cup50v2.availability import UnavailabilityWindow, unavailable_symbols
 from crypto_trade.cup50v2.common_risk import common_risk_scalars
+from crypto_trade.cup50v2.config import active_policy
 from crypto_trade.cup50v2.protocol import DecisionContextV2, TargetStrategyV2
 from crypto_trade.cup50v2.snapshot import Snapshot
 from crypto_trade.cup50v2.universe import members_at
@@ -46,21 +47,47 @@ class StrategyFailureError(RuntimeError):
     """A source, target, or parameter failure attributable to the candidate bundle."""
 
 
+def _policy_default(section: str, name: str) -> Any:
+    """A dataclass default that resolves against the active config when an instance is built."""
+    return dataclasses.field(
+        default_factory=lambda: getattr(getattr(active_policy(), section), name)
+    )
+
+
+def _execution_default(name: str) -> Any:
+    return _policy_default("execution", name)
+
+
+def _risk_default(name: str) -> Any:
+    return _policy_default("risk_unit", name)
+
+
+def _research_default(name: str) -> Any:
+    return _policy_default("research", name)
+
+
 @dataclasses.dataclass(frozen=True, slots=True)
 class ExecutionConfig:
-    interval_hours: int = 8
-    initial_equity: float = 100_000.0
-    taker_fee_bps_per_side: float = 5.0
-    slippage_bps_per_side: float = 2.5
-    max_gross_exposure: float = 1.0
-    max_abs_net_exposure: float = 1.0
-    max_symbol_exposure: float = 0.20
-    max_bar_participation: float = 0.001
-    risk_target: float = 0.10
-    risk_lookback_days: int = 90
-    risk_minimum_scale: float = 0.20
-    risk_maximum_scale: float = 3.0
-    strategy_history_days: int = 180
+    """Execution limits, costs and risk-unit bounds, read from the hash-bound config.
+
+    Nothing here carries a literal default.  A caller that wants a different cap edits the config
+    the activation record binds, or passes the field explicitly in a test; there is no third place
+    where a number could disagree with what the field is scored under.
+    """
+
+    interval_hours: int = _execution_default("interval_hours")
+    initial_equity: float = _execution_default("initial_equity")
+    taker_fee_bps_per_side: float = _execution_default("taker_fee_bps_per_side")
+    slippage_bps_per_side: float = _execution_default("slippage_bps_per_side")
+    max_gross_exposure: float = _execution_default("max_gross_exposure")
+    max_abs_net_exposure: float = _execution_default("max_abs_net_exposure")
+    max_symbol_exposure: float = _execution_default("max_symbol_exposure")
+    max_bar_participation: float = _execution_default("max_bar_participation")
+    risk_target: float = _risk_default("target_annualized_volatility")
+    risk_lookback_days: int = _risk_default("lookback_days")
+    risk_minimum_scale: float = _risk_default("minimum_scale")
+    risk_maximum_scale: float = _risk_default("maximum_scale")
+    strategy_history_days: int = _research_default("strategy_history_days")
 
     def validate(self) -> None:
         positive = (

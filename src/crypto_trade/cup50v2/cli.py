@@ -17,7 +17,7 @@ import pandas as pd
 from crypto_trade.cup50v2.acquisition import acquire_execution_gaps, acquire_terminal_gaps
 from crypto_trade.cup50v2.activation import build_activation_record
 from crypto_trade.cup50v2.availability import load_unavailability_audit
-from crypto_trade.cup50v2.config import IS_START, OOS_END, OOS_START
+from crypto_trade.cup50v2.config import IS_START, OOS_END, OOS_START, active_policy
 from crypto_trade.cup50v2.isolation import (
     export_evaluator_bundle,
     export_protocol_bundle,
@@ -142,31 +142,31 @@ def _build(arguments: argparse.Namespace) -> Mapping[str, object]:
     )
     allowed = pure_crypto_symbols(metadata)
     volume = canonical_daily_quote_volume(bars, end=OOS_END)
+    universe_policy = active_policy().universe
     boundaries = weekly_reconstitution_times(
-        volume.index.min() + pd.Timedelta(days=180), OOS_END, weekday=0
+        volume.index.min() + pd.Timedelta(days=universe_policy.lookback_days), OOS_END
     )
     eligible = episode_eligibility(
         derive_listing_episodes(bars),
         boundaries,
-        lookback_days=180,
-        interval_hours=8,
     ).reindex(index=pd.DatetimeIndex(boundaries), columns=volume.columns, fill_value=False)
     eligible.loc[:, [column for column in volume.columns if str(column) not in allowed]] = False
     membership = build_membership(
         volume,
         eligible=eligible,
         reconstitution_times=boundaries,
-        lookback_days=180,
-        target_size=50,
     )
-    measured = first_full_boundary(membership, target_size=50)
+    measured = first_full_boundary(membership)
     if measured != IS_START:
-        raise ValueError(f"first full Top-50 boundary drifted: {measured} != {IS_START}")
+        raise ValueError(
+            f"first full Top-{universe_policy.target_size} boundary drifted: "
+            f"{measured} != {IS_START}"
+        )
     membership = membership.loc[
         pd.to_datetime(membership["reconstitution_time"], utc=True) >= IS_START
     ].reset_index(drop=True)
-    exact_boundaries = weekly_reconstitution_times(IS_START, OOS_END, weekday=0)
-    require_exact_membership(membership, exact_boundaries, target_size=50)
+    exact_boundaries = weekly_reconstitution_times(IS_START, OOS_END)
+    require_exact_membership(membership, exact_boundaries)
     members = set(membership["symbol"].astype(str))
     audit = {
         "schema_version": 1,
@@ -241,7 +241,7 @@ def _readiness(arguments: argparse.Namespace) -> Mapping[str, object]:
     verify_semantic_coverage(sealed)
     combined = stitch_snapshots(research, sealed)
     boundaries = weekly_reconstitution_times(IS_START, OOS_END, weekday=0)
-    require_exact_membership(combined.membership, boundaries, target_size=50)
+    require_exact_membership(combined.membership, boundaries)
     decisions = pd.date_range(IS_START, OOS_END, freq="8h", inclusive="left")
     require_execution_coverage(
         combined,

@@ -8,6 +8,8 @@ from collections.abc import Sequence
 import numpy as np
 import pandas as pd
 
+from crypto_trade.cup50v2.config import active_policy
+
 MEMBERSHIP_COLUMNS = (
     "reconstitution_time",
     "symbol",
@@ -81,10 +83,11 @@ def _utc(value: object, label: str) -> pd.Timestamp:
 
 
 def weekly_reconstitution_times(
-    start: pd.Timestamp, end: pd.Timestamp, *, weekday: int = 0
+    start: pd.Timestamp, end: pd.Timestamp, *, weekday: int | None = None
 ) -> tuple[pd.Timestamp, ...]:
     """Monday 00:00 UTC boundaries in the half-open interval ``[start, end)``."""
     start_utc, end_utc = _utc(start, "start"), _utc(end, "end")
+    weekday = weekday if weekday is not None else active_policy().universe.reconstitution_weekday
     if not 0 <= weekday <= 6:
         raise ValueError("weekday must be in 0..6")
     if start_utc >= end_utc:
@@ -282,10 +285,13 @@ def episode_eligibility(
     episodes: Sequence[ListingEpisode],
     boundaries: Sequence[pd.Timestamp],
     *,
-    lookback_days: int = 180,
+    lookback_days: int | None = None,
     interval_hours: int = 8,
 ) -> pd.DataFrame:
     """Past-only eligibility requiring one continuous complete lookback episode."""
+    lookback_days = (
+        lookback_days if lookback_days is not None else active_policy().universe.lookback_days
+    )
     if lookback_days < 1 or interval_hours <= 0:
         raise ValueError("lookback_days and interval_hours must be positive")
     ordered = tuple(_utc(boundary, "boundary") for boundary in boundaries)
@@ -322,10 +328,13 @@ def build_membership(
     *,
     eligible: pd.DataFrame,
     reconstitution_times: Sequence[pd.Timestamp],
-    lookback_days: int = 180,
-    target_size: int = 50,
+    lookback_days: int | None = None,
+    target_size: int | None = None,
 ) -> pd.DataFrame:
     """Rank each Monday independently; no hysteresis and no future execution availability."""
+    universe = active_policy().universe
+    lookback_days = lookback_days if lookback_days is not None else universe.lookback_days
+    target_size = target_size if target_size is not None else universe.target_size
     if lookback_days < 1 or target_size < 1:
         raise ValueError("lookback_days and target_size must be positive")
     volume = daily_quote_volume.copy()
@@ -371,7 +380,10 @@ def build_membership(
     )
 
 
-def first_full_boundary(membership: pd.DataFrame, *, target_size: int = 50) -> pd.Timestamp:
+def first_full_boundary(
+    membership: pd.DataFrame, *, target_size: int | None = None
+) -> pd.Timestamp:
+    target_size = target_size if target_size is not None else active_policy().universe.target_size
     counts = membership.groupby("reconstitution_time", sort=True).size()
     exact = counts[counts.eq(target_size)]
     if exact.empty:
@@ -383,8 +395,9 @@ def require_exact_membership(
     membership: pd.DataFrame,
     boundaries: Sequence[pd.Timestamp],
     *,
-    target_size: int = 50,
+    target_size: int | None = None,
 ) -> None:
+    target_size = target_size if target_size is not None else active_policy().universe.target_size
     counts = membership.groupby("reconstitution_time").size()
     failures = {
         boundary.isoformat(): int(counts.get(boundary, 0))
