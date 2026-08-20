@@ -7,9 +7,19 @@ from types import SimpleNamespace
 import pandas as pd
 import pytest
 
+from crypto_trade.cup20_desk.live_data import (
+    AppendInvarianceError,
+    append_frame,
+    conform_frame,
+)
 from crypto_trade.cup50.config import OOS_END
 from crypto_trade.cup50_desk.authority import WINNER_TEAM_ID, verify_lineage
-from crypto_trade.cup50_desk.live_data import CacheGenerationError, current_generation
+from crypto_trade.cup50_desk.live_data import (
+    PERPETUAL_DELIVERY_SENTINEL,
+    CacheGenerationError,
+    _defer_announced_delivery_dates,
+    current_generation,
+)
 from crypto_trade.cup50_desk.schedule import ready_boundary
 from crypto_trade.cup50_desk.tick import (
     _event_rows,
@@ -40,6 +50,89 @@ def test_unsafe_cache_pointer_fails_closed(tmp_path: Path) -> None:
     (tmp_path / "CURRENT").write_text("../../elsewhere\n")
     with pytest.raises(CacheGenerationError, match="unsafe"):
         current_generation(tmp_path)
+
+
+def _current_contract(delivery_date: pd.Timestamp = PERPETUAL_DELIVERY_SENTINEL) -> pd.DataFrame:
+    return conform_frame(
+        "contract_metadata",
+        pd.DataFrame(
+            [
+                {
+                    "symbol": "ICXUSDT",
+                    "contract_type": "PERPETUAL",
+                    "quote_asset": "USDT",
+                    "margin_asset": "USDT",
+                    "is_crypto": True,
+                    "onboard_date": pd.Timestamp("2020-01-01T00:00:00Z"),
+                    "delivery_date": delivery_date,
+                    "underlying_type": "COIN",
+                    "metadata_source": "current_exchangeInfo",
+                }
+            ]
+        ),
+    )
+
+
+def test_future_delivery_announcement_is_deferred_and_audited(tmp_path: Path) -> None:
+    path = tmp_path / "contract_metadata.parquet"
+    recorded = _current_contract()
+    append_frame(path, recorded, name="contract_metadata")
+    before = path.read_bytes()
+    announced = pd.Timestamp("2026-08-26T09:00:00Z")
+
+    normalized, observations = _defer_announced_delivery_dates(
+        tmp_path,
+        _current_contract(announced),
+        observed_at=pd.Timestamp("2026-08-20T08:00:00Z"),
+    )
+    result = append_frame(path, normalized, name="contract_metadata")
+
+    assert (result.appended, result.unchanged, result.transitioned) == (0, 1, 0)
+    assert path.read_bytes() == before
+    assert normalized.iloc[0]["delivery_date"] == PERPETUAL_DELIVERY_SENTINEL
+    assert observations == (
+        {
+            "symbol": "ICXUSDT",
+            "field": "delivery_date",
+            "recorded_value": PERPETUAL_DELIVERY_SENTINEL.isoformat(),
+            "observed_value": announced.isoformat(),
+            "observed_at": "2026-08-20T08:00:00+00:00",
+            "disposition": "deferred_until_delisting_transition",
+        },
+    )
+
+
+def test_past_delivery_revision_still_aborts(tmp_path: Path) -> None:
+    path = tmp_path / "contract_metadata.parquet"
+    append_frame(path, _current_contract(), name="contract_metadata")
+    revised = _current_contract(pd.Timestamp("2026-08-19T09:00:00Z"))
+
+    normalized, observations = _defer_announced_delivery_dates(
+        tmp_path,
+        revised,
+        observed_at=pd.Timestamp("2026-08-20T08:00:00Z"),
+    )
+
+    assert observations == ()
+    with pytest.raises(AppendInvarianceError, match="delivery_date"):
+        append_frame(path, normalized, name="contract_metadata")
+
+
+def test_delivery_deferral_does_not_hide_identity_change(tmp_path: Path) -> None:
+    path = tmp_path / "contract_metadata.parquet"
+    append_frame(path, _current_contract(), name="contract_metadata")
+    announced = _current_contract(pd.Timestamp("2026-08-26T09:00:00Z"))
+    announced.loc[0, "quote_asset"] = "USDC"
+
+    normalized, observations = _defer_announced_delivery_dates(
+        tmp_path,
+        announced,
+        observed_at=pd.Timestamp("2026-08-20T08:00:00Z"),
+    )
+
+    assert len(observations) == 1
+    with pytest.raises(AppendInvarianceError, match="quote_asset"):
+        append_frame(path, normalized, name="contract_metadata")
 
 
 def test_funding_at_seam_is_historical_and_right_edge_belongs_to_interval() -> None:

@@ -46,6 +46,7 @@ CURRENT_FILENAME = "CURRENT"
 GENERATIONS_DIRNAME = "generations"
 DIAGNOSTICS_FILENAME = "diagnostics.json"
 MANIFEST_FILENAME = "cache-manifest.json"
+PERPETUAL_DELIVERY_SENTINEL = pd.Timestamp(4_133_404_800_000, unit="ms", tz="UTC")
 
 MembershipResolver = Callable[
     [Path, pd.Timestamp], tuple[pd.DataFrame, tuple[str, ...], tuple[str, ...]]
@@ -165,6 +166,69 @@ def _append(staging: Path, name: str, frame: pd.DataFrame) -> None:
     append_frame(staging / f"{name}.parquet", frame, name=name)
 
 
+def _defer_announced_delivery_dates(
+    staging: Path, incoming: pd.DataFrame, *, observed_at: object
+) -> tuple[pd.DataFrame, tuple[dict[str, str], ...]]:
+    """Keep a live perpetual's recorded sentinel while auditing a scheduled delivery.
+
+    Binance can announce a future delivery while a USD-M perpetual is still ``TRADING`` and
+    remains in ``exchangeInfo``.  That changes ``deliveryDate`` from Binance's perpetual sentinel
+    to the announced timestamp without firing the existing ``current_exchangeInfo`` ->
+    ``archive_inference`` delisting transition.  Rewriting the symbol-keyed metadata row would
+    retroactively inject the announcement into every earlier replay.
+
+    Defer only the exact causal case: both observations are still current-exchange records, the
+    recorded value is Binance's exact perpetual sentinel, and the newly observed delivery is
+    strictly after this generation's public-data cutoff but before the sentinel.  The recorded row
+    remains byte-stable; the new observation is hash-bound in generation diagnostics.  Once the
+    contract actually leaves exchangeInfo, CUP-20's existing delisting transition adopts the real
+    delivery date.  Every other metadata difference still reaches ``append_frame`` and aborts.
+    """
+    path = staging / f"{CONTRACT_METADATA}.parquet"
+    if not path.is_file() or incoming.empty:
+        return incoming, ()
+    cutoff = _utc(observed_at)
+    recorded = pd.read_parquet(path)
+    overlap = recorded.merge(
+        incoming,
+        on="symbol",
+        how="inner",
+        suffixes=("__recorded", "__fetched"),
+        validate="one_to_one",
+    )
+    normalized = incoming.copy()
+    observations: list[dict[str, str]] = []
+    for row in overlap.itertuples(index=False):
+        recorded_source = str(getattr(row, "metadata_source__recorded"))
+        fetched_source = str(getattr(row, "metadata_source__fetched"))
+        recorded_delivery = pd.Timestamp(getattr(row, "delivery_date__recorded"))
+        fetched_delivery = pd.Timestamp(getattr(row, "delivery_date__fetched"))
+        if (
+            recorded_source != "current_exchangeInfo"
+            or fetched_source != "current_exchangeInfo"
+            or pd.isna(recorded_delivery)
+            or pd.isna(fetched_delivery)
+            or recorded_delivery != PERPETUAL_DELIVERY_SENTINEL
+            or not cutoff < fetched_delivery < recorded_delivery
+        ):
+            continue
+        symbol = str(row.symbol)
+        normalized.loc[normalized["symbol"].astype(str).eq(symbol), "delivery_date"] = (
+            recorded_delivery
+        )
+        observations.append(
+            {
+                "symbol": symbol,
+                "field": "delivery_date",
+                "recorded_value": recorded_delivery.isoformat(),
+                "observed_value": fetched_delivery.isoformat(),
+                "observed_at": cutoff.isoformat(),
+                "disposition": "deferred_until_delisting_transition",
+            }
+        )
+    return normalized, tuple(sorted(observations, key=lambda item: item["symbol"]))
+
+
 def refresh_generation(
     cache_root: str | Path,
     *,
@@ -219,7 +283,12 @@ def refresh_generation(
             else empty_frame(BARS)
         )
         _append(staging, BARS, bars)
-        _append(staging, CONTRACT_METADATA, _fetch_contract_metadata(reader, bars, right))
+        metadata, deferred_metadata = _defer_announced_delivery_dates(
+            staging,
+            _fetch_contract_metadata(reader, bars, right),
+            observed_at=right,
+        )
+        _append(staging, CONTRACT_METADATA, metadata)
 
         membership, current_members, execution_symbols = resolve_membership(staging, decision)
         if len(current_members) != 50:
@@ -285,6 +354,8 @@ def refresh_generation(
             "public_endpoints_only": True,
             "funding_right_boundary_inclusive": True,
             "transaction_bars_end_exclusive": True,
+            "deferred_contract_metadata_observation_count": len(deferred_metadata),
+            "deferred_contract_metadata_observations": list(deferred_metadata),
         }
         # The generation name binds the cumulative parquet bytes. The final cache manifest then
         # binds this diagnostics record too, avoiding an impossible self-hash cycle.
