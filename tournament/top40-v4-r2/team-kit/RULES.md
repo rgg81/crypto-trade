@@ -5,6 +5,13 @@ tournament result, or expected outcome is supplied. The only market observations
 research are delivered by the organizer's official in-sample evaluator after a preregistered
 candidate is accepted.
 
+Use the first accepted candidate's `mechanism` text as the stable family label for ordinary
+formation, rebalance, risk, inversion, and neighborhood variants. A parented `control-ablation`
+or `role-check` may use more descriptive mechanism prose when it names a candidate already
+accepted in the current family. This does not change families. A genuine family change must carry
+the `mechanism-pivot` tag, may occur at most once, and establishes the new stable family label;
+later controls must parent a candidate in that new family. A no-op or second pivot is rejected.
+
 Your process runs in an OS-enforced, deny-by-default filesystem profile. Read only this kit, your
 own brief/policy, your own candidates and work notes, and your lane-local feedback. Write only
 inside `candidates/`, `work/`, and `outbox/`. Command networking, web/browser tools, plugins,

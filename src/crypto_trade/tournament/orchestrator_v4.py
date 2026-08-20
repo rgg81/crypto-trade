@@ -326,19 +326,56 @@ def _strict_object(root: Path, relative: str) -> Mapping[str, Any]:
 def _result_lock(root: Path) -> Iterator[None]:
     path = _path(root, TOP40_V4_LAYOUT.result_lock_path)
     _ensure_directory(root, path.parent)
-    descriptor = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
+    directory_flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+    )
+    file_flags = (
+        os.O_RDWR
+        | os.O_CREAT
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
     try:
+        parent_fd = os.open(path.parent, directory_flags)
+        descriptor = os.open(path.name, file_flags, 0o600, dir_fd=parent_fd)
+    except OSError as exc:
+        with contextlib.suppress(UnboundLocalError, OSError):
+            os.close(parent_fd)
+        raise OrchestratorError("cannot open the protected result-command lock") from exc
+    try:
+        opened = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+            or opened.st_uid != os.geteuid()
+        ):
+            raise OrchestratorError("result-command lock is not a private regular file")
         # Organizer commands queue silently.  Team processes are never alive while the broker
         # owns this lock, so a distinct busy error cannot become a cross-lane progress oracle.
         fcntl.flock(descriptor, fcntl.LOCK_EX)
+        locked = os.fstat(descriptor)
+        lexical = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+        if (
+            not stat.S_ISREG(lexical.st_mode)
+            or lexical.st_nlink != 1
+            or lexical.st_uid != os.geteuid()
+            or (locked.st_dev, locked.st_ino) != (lexical.st_dev, lexical.st_ino)
+        ):
+            raise OrchestratorError("result-command lock changed while acquiring it")
         os.ftruncate(descriptor, 0)
-        os.write(descriptor, f"pid={os.getpid()}\n".encode("ascii"))
+        marker = f"pid={os.getpid()}\n".encode("ascii")
+        if os.write(descriptor, marker) != len(marker):
+            raise OrchestratorError("result-command lock marker write was incomplete")
         os.fsync(descriptor)
         yield
     finally:
         with contextlib.suppress(OSError):
             fcntl.flock(descriptor, fcntl.LOCK_UN)
         os.close(descriptor)
+        os.close(parent_fd)
 
 
 def _journal_path(root: Path) -> Path:
@@ -774,30 +811,52 @@ def _validate_open_lane_mechanism(
 
     if not TOP40_V4_LAYOUT.name.endswith("-r2"):
         return
-    history = [
-        request["payload"]["metadata"]
-        for request in state.is_requests.values()
-        if request["payload"]["team_id"] == team_id
-    ]
+    requests = sorted(
+        (
+            request["payload"]
+            for request in state.is_requests.values()
+            if request["payload"]["team_id"] == team_id
+        ),
+        key=lambda payload: payload["trial_number"],
+    )
+    history = [request["metadata"] for request in requests]
     mechanism = str(metadata["mechanism"])
     pivot_tagged = "mechanism-pivot" in metadata["tags"]
     if not history:
         if pivot_tagged:
             raise OrchestratorError("a lane cannot pivot before its first accepted mechanism")
         return
-    transitions = sum(
-        str(previous["mechanism"]) != str(current["mechanism"])
-        for previous, current in zip(history, history[1:], strict=False)
-    )
-    current_mechanism = str(history[-1]["mechanism"])
+    pivot_indexes = [
+        index for index, row in enumerate(history) if "mechanism-pivot" in row["tags"]
+    ]
+    epoch_start = pivot_indexes[-1] if pivot_indexes else 0
+    current_mechanism = str(history[epoch_start]["mechanism"])
     if mechanism == current_mechanism:
-        if pivot_tagged and transitions == 0:
+        if pivot_tagged:
             raise OrchestratorError("mechanism-pivot tag requires an actual mechanism change")
         return
-    if not pivot_tagged:
-        raise OrchestratorError("an open lane mechanism change requires mechanism-pivot")
-    if transitions >= 1:
-        raise OrchestratorError("team already consumed its one mechanism pivot")
+    if pivot_tagged:
+        if pivot_indexes:
+            raise OrchestratorError("team already consumed its one mechanism pivot")
+        return
+
+    # ``mechanism`` is disclosed as human-readable causal prose, not as a machine epoch ID.
+    # A derived control may therefore describe the isolated role/ablation more precisely while
+    # remaining in its accepted parent's current epoch.  Genuine family changes still require
+    # the explicit, one-shot mechanism-pivot tag.
+    variant_tags = {"control-ablation", "role-check"}
+    parent_id = metadata.get("parent_candidate_id")
+    current_epoch_ids = {
+        str(request["candidate_id"]) for request in requests[epoch_start:]
+    }
+    if (
+        not isinstance(parent_id, str)
+        or parent_id not in current_epoch_ids
+        or variant_tags.isdisjoint(metadata["tags"])
+    ):
+        raise OrchestratorError(
+            "descriptive mechanism variants require a current-epoch parent and control tag"
+        )
 
 
 @research_runtime_v4.serialized_activated_r2_command

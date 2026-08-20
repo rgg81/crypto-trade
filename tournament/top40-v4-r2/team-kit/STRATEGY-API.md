@@ -96,3 +96,9 @@ accepted trial. An exact sign inversion names the baseline as `parent_candidate_
 mechanism/horizon/control/risk metadata, and returns the negative of every baseline target while
 preserving explicit-rebalance versus hold decisions. The organizer verifies the archived target
 artifacts, not the tag.
+
+`mechanism` is normally the stable family label established by the first accepted candidate.
+Parented `control-ablation` and `role-check` candidates may describe the isolated control more
+specifically without changing families. Any genuine family change requires `mechanism-pivot`, is
+limited to one accepted pivot, and starts a new parent epoch. The pivot tag is invalid when the
+family label did not change.

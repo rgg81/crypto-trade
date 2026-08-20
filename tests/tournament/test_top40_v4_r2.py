@@ -120,6 +120,93 @@ def _pretrial_recovery_fixture(
     }
 
 
+def _fresh_restart_fixture(tmp_path: Path) -> Path:
+    tournament_prefix = f"{TOP40_V4_R2_LAYOUT.tournament_root}/"
+    reports_prefix = f"{TOP40_V4_R2_LAYOUT.reports_root}/"
+    for relative in activation_v4.FROZEN_SCOPE:
+        if not relative.startswith((tournament_prefix, reports_prefix)):
+            continue
+        source = ROOT / relative
+        destination = tmp_path / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(source.read_bytes())
+    for team_id in TOP40_V4_R2_LAYOUT.team_ids:
+        for directory in ("feedback", "outbox", "work"):
+            marker = (
+                tmp_path
+                / TOP40_V4_R2_LAYOUT.team_root(team_id)
+                / directory
+                / ".keep"
+            )
+            marker.parent.mkdir(parents=True, exist_ok=True)
+            marker.write_bytes(b"")
+    journal = tmp_path / TOP40_V4_R2_LAYOUT.journal_path
+    journal.parent.mkdir(parents=True, exist_ok=True)
+    journal.write_bytes(b"")
+    return tmp_path
+
+
+def _fresh_restart_scope_entries(root: Path) -> list[dict[str, object]]:
+    relevant = {
+        activation_v4._FRESH_RESTART_AUTHORITY_PATH,
+        *(
+            f"{TOP40_V4_R2_LAYOUT.team_root(team_id)}/{relative}"
+            for team_id in TOP40_V4_R2_LAYOUT.team_ids
+            for relative in (
+                "ACCESS-POLICY.json",
+                "TEAM-BRIEF.md",
+                "candidates/README.md",
+            )
+        ),
+        *(
+            relative
+            for relative in activation_v4.FROZEN_SCOPE
+            if relative.startswith(f"{TOP40_V4_R2_LAYOUT.reports_root}/")
+        ),
+    }
+    return [
+        {
+            "path": relative,
+            "size": (root / relative).stat().st_size,
+            "sha256": hashlib.sha256((root / relative).read_bytes()).hexdigest(),
+        }
+        for relative in sorted(relevant)
+    ]
+
+
+def _patch_fresh_activation(
+    root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    test_results: list[tuple[bytes, int]],
+) -> None:
+    results = iter(test_results)
+    scope_entries = _fresh_restart_scope_entries(root)
+    monkeypatch.setattr(activation_v4, "_implementation_commit", lambda _root: "1" * 40)
+    monkeypatch.setattr(
+        activation_v4,
+        "_validate_snapshot_window",
+        lambda _root, _config: None,
+    )
+    monkeypatch.setattr(
+        activation_v4,
+        "_verify_full_snapshot_once",
+        lambda _root, _config: "2" * 64,
+    )
+    monkeypatch.setattr(activation_v4, "_validate_adversarial_review", lambda _root: None)
+    monkeypatch.setattr(
+        activation_v4,
+        "_scope",
+        lambda _root, **_kwargs: (scope_entries, "3" * 64),
+    )
+    monkeypatch.setattr(activation_v4, "_audit_sha256", lambda _root, _config: "4" * 64)
+    monkeypatch.setattr(activation_v4, "_run_tests", lambda _root: next(results))
+    monkeypatch.setattr(
+        activation_v4.top40_v4,
+        "load_config",
+        lambda **_kwargs: SimpleNamespace(raw={}, sha256="5" * 64),
+    )
+
+
 def test_r2_layout_has_fifteen_fresh_lanes_and_six_finalists() -> None:
     assert TOP40_V4_R2_LAYOUT.team_ids == tuple(
         f"team-{number:02d}" for number in range(1, 16)
@@ -286,19 +373,25 @@ def test_open_lane_allows_exactly_one_explicit_mechanism_pivot() -> None:
 from types import SimpleNamespace
 from crypto_trade.tournament import orchestrator_v4
 
-def record(mechanism, tags):
+def record(number, candidate_id, mechanism, tags, parent=None):
     return {'payload': {'team_id': 'team-01', 'metadata': {
-        'mechanism': mechanism, 'tags': tags,
-    }}}
+        'mechanism': mechanism, 'tags': tags, 'parent_candidate_id': parent,
+    }, 'trial_number': number, 'candidate_id': candidate_id}}
 
 first = SimpleNamespace(is_requests={})
 orchestrator_v4._validate_open_lane_mechanism(
-    first, team_id='team-01', metadata={'mechanism': 'alpha', 'tags': ['baseline']}
+    first, team_id='team-01', metadata={
+        'mechanism': 'alpha', 'tags': ['baseline'], 'parent_candidate_id': None,
+    }
 )
-history = SimpleNamespace(is_requests={'a': record('alpha', ['baseline'])})
+history = SimpleNamespace(is_requests={
+    'a': record(1, 'baseline', 'alpha', ['baseline']),
+})
 try:
     orchestrator_v4._validate_open_lane_mechanism(
-        history, team_id='team-01', metadata={'mechanism': 'beta', 'tags': ['baseline']}
+        history, team_id='team-01', metadata={
+            'mechanism': 'beta', 'tags': ['baseline'], 'parent_candidate_id': None,
+        }
     )
 except orchestrator_v4.OrchestratorError:
     pass
@@ -307,17 +400,56 @@ else:
 orchestrator_v4._validate_open_lane_mechanism(
     history,
     team_id='team-01',
-    metadata={'mechanism': 'beta', 'tags': ['mechanism-pivot']},
+    metadata={
+        'mechanism': 'price-only control of alpha',
+        'tags': ['control-ablation'],
+        'parent_candidate_id': 'baseline',
+    },
+)
+try:
+    orchestrator_v4._validate_open_lane_mechanism(
+        history,
+        team_id='team-01',
+        metadata={
+            'mechanism': 'unparented control of alpha',
+            'tags': ['control-ablation'],
+            'parent_candidate_id': None,
+        },
+    )
+except orchestrator_v4.OrchestratorError:
+    pass
+else:
+    raise AssertionError('unparented descriptive variant was accepted')
+orchestrator_v4._validate_open_lane_mechanism(
+    history,
+    team_id='team-01',
+    metadata={
+        'mechanism': 'beta', 'tags': ['mechanism-pivot'], 'parent_candidate_id': None,
+    },
 )
 used = SimpleNamespace(is_requests={
-    'a': record('alpha', ['baseline']),
-    'b': record('beta', ['mechanism-pivot']),
+    'a': record(1, 'baseline', 'alpha', ['baseline']),
+    'b': record(2, 'pivot', 'beta', ['mechanism-pivot']),
 })
 try:
     orchestrator_v4._validate_open_lane_mechanism(
         used,
         team_id='team-01',
-        metadata={'mechanism': 'gamma', 'tags': ['mechanism-pivot']},
+        metadata={
+            'mechanism': 'beta', 'tags': ['mechanism-pivot'], 'parent_candidate_id': 'pivot',
+        },
+    )
+except orchestrator_v4.OrchestratorError:
+    pass
+else:
+    raise AssertionError('no-op repeated pivot tag was accepted')
+try:
+    orchestrator_v4._validate_open_lane_mechanism(
+        used,
+        team_id='team-01',
+        metadata={
+            'mechanism': 'gamma', 'tags': ['mechanism-pivot'], 'parent_candidate_id': 'pivot',
+        },
     )
 except orchestrator_v4.OrchestratorError:
     pass
@@ -922,6 +1054,191 @@ def test_pretrial_recovery_archives_old_then_new_authority_and_is_idempotent(
     assert not paths["launch"].exists()
     assert activation_v4.pretrial_recovery_pending(tmp_path) is False
     assert activation_v4.complete_pretrial_recovery(tmp_path) == completed
+
+
+def test_fresh_restart_authority_is_an_explicit_alternative_to_incident_recovery(
+    tmp_path: Path,
+) -> None:
+    source = ROOT / activation_v4._FRESH_RESTART_AUTHORITY_PATH
+    destination = tmp_path / activation_v4._FRESH_RESTART_AUTHORITY_PATH
+    destination.parent.mkdir(parents=True)
+    destination.write_bytes(source.read_bytes())
+    assert activation_v4.pretrial_recovery_pending(tmp_path) is False
+    authority = activation_v4.require_completed_pretrial_recovery(tmp_path)
+    assert authority["feedback_disclosed"] is False
+    assert authority["results_reused"] is False
+
+    old_launch = tmp_path / activation_v4._PRETRIAL_OLD_LAUNCH_PATH
+    old_launch.parent.mkdir(parents=True)
+    old_launch.write_text("unexpected legacy launch\n", encoding="utf-8")
+    assert activation_v4.pretrial_recovery_pending(tmp_path) is True
+    with pytest.raises(activation_v4.ActivationError, match="superseded v7 launch"):
+        activation_v4.require_completed_pretrial_recovery(tmp_path)
+
+
+def test_fresh_restart_seed_state_binds_exact_clean_genesis(tmp_path: Path) -> None:
+    root = _fresh_restart_fixture(tmp_path)
+    state = activation_v4._fresh_restart_seed_state(
+        root, activation_tests_present=False
+    )
+    assert state == {
+        "mode": "score-blind-fresh-restart",
+        "authority_sha256": activation_v4._FRESH_RESTART_AUTHORITY_SHA256,
+        "journal_sha256": hashlib.sha256(b"").hexdigest(),
+        "lane_count": 15,
+        "surface_file_count": 94,
+        "surface_head_sha256": state["surface_head_sha256"],
+    }
+    scope_entries = _fresh_restart_scope_entries(root)
+    activation_v4._validate_fresh_restart_binding(root, state, scope_entries)
+    changed = dict(state)
+    changed["lane_count"] = 14
+    with pytest.raises(activation_v4.ActivationError, match="binding changed"):
+        activation_v4._validate_fresh_restart_binding(root, changed, scope_entries)
+    changed = dict(state)
+    changed["surface_head_sha256"] = "0" * 64
+    with pytest.raises(activation_v4.ActivationError, match="binding changed"):
+        activation_v4._validate_fresh_restart_binding(root, changed, scope_entries)
+
+
+@pytest.mark.parametrize(
+    "relative",
+    (
+        "tournament/top40-v4-r2/teams/team-01/candidates/residue.py",
+        "tournament/top40-v4-r2/teams/team-01/outbox/batch-1.json",
+        "tournament/top40-v4-r2/teams/team-01/feedback/batch-1.json",
+        "tournament/top40-v4-r2/teams/team-01/work/scratch.txt",
+        "tournament/top40-v4-r2/research-sessions/launches/team-02/discovery.json",
+        "tournament/top40-v4-r2/nomination-registry.json",
+        "tournament/top40-v4-r2/selection-freeze.json",
+        "tournament/top40-v4-r2/private/historical-oos/release.json",
+        "reports-top40-v4-r2/is/team-01/summary.json",
+        "reports-top40-v4-r2/source-archives/team-01/archive.json",
+    ),
+)
+def test_fresh_restart_seed_state_rejects_runtime_residue(
+    tmp_path: Path, relative: str
+) -> None:
+    root = _fresh_restart_fixture(tmp_path)
+    residue = root / relative
+    residue.parent.mkdir(parents=True, exist_ok=True)
+    residue.write_bytes(b"residue\n")
+    with pytest.raises(activation_v4.ActivationError):
+        activation_v4._fresh_restart_seed_state(
+            root, activation_tests_present=False
+        )
+
+
+def test_fresh_restart_seed_state_rejects_nonempty_journal_and_linked_seed(
+    tmp_path: Path,
+) -> None:
+    root = _fresh_restart_fixture(tmp_path)
+    journal = root / TOP40_V4_R2_LAYOUT.journal_path
+    journal.write_bytes(b"historical record\n")
+    with pytest.raises(activation_v4.ActivationError, match="byte-empty"):
+        activation_v4._fresh_restart_seed_state(
+            root, activation_tests_present=False
+        )
+
+    root = _fresh_restart_fixture(tmp_path / "linked")
+    marker = (
+        root / TOP40_V4_R2_LAYOUT.team_root("team-01") / "feedback" / ".keep"
+    )
+    external = root / "external-alias"
+    os.link(marker, external)
+    with pytest.raises(activation_v4.ActivationError, match="unsafe"):
+        activation_v4._fresh_restart_seed_state(
+            root, activation_tests_present=False
+        )
+
+
+def test_fresh_restart_seed_state_binds_activation_test_transition(
+    tmp_path: Path,
+) -> None:
+    root = _fresh_restart_fixture(tmp_path)
+    initial = activation_v4._fresh_restart_seed_state(
+        root, activation_tests_present=False
+    )
+    tests = root / activation_v4.TEST_OUTPUT_PATH
+    tests.write_bytes(b"focused tests passed\n")
+    assert (
+        activation_v4._fresh_restart_seed_state(
+            root, activation_tests_present=True
+        )
+        == initial
+    )
+    with pytest.raises(activation_v4.ActivationError):
+        activation_v4._fresh_restart_seed_state(
+            root, activation_tests_present=False
+        )
+
+
+def test_fresh_restart_activation_freezes_seed_binding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _fresh_restart_fixture(tmp_path)
+    _patch_fresh_activation(root, monkeypatch, [(b"passed\n", 0)])
+    monkeypatch.setattr(isolation_v4, "audit_surface", lambda _root: {})
+    record = orchestrator_v4.activate(root)
+    assert record["fresh_restart"]["mode"] == "score-blind-fresh-restart"
+    assert record["fresh_restart"]["surface_file_count"] == 94
+    assert (root / TOP40_V4_R2_LAYOUT.activation_freeze_path).is_file()
+    assert (
+        root / TOP40_V4_R2_LAYOUT.result_lock_path
+    ).read_bytes() == f"pid={os.getpid()}\n".encode()
+
+
+def test_fresh_restart_activation_rejects_dirty_root_before_freeze(
+    tmp_path: Path,
+) -> None:
+    root = _fresh_restart_fixture(tmp_path)
+    residue = root / TOP40_V4_R2_LAYOUT.team_root("team-04") / "outbox" / "batch.json"
+    residue.write_bytes(b"residue\n")
+    with pytest.raises(activation_v4.ActivationError):
+        activation_v4.activate(root)
+    assert not (root / TOP40_V4_R2_LAYOUT.activation_freeze_path).exists()
+    assert not (root / activation_v4.TEST_OUTPUT_PATH).exists()
+
+
+def test_fresh_restart_activation_reruns_after_test_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _fresh_restart_fixture(tmp_path)
+    _patch_fresh_activation(
+        root,
+        monkeypatch,
+        [(b"first run failed\n", 1), (b"second run passed\n", 0)],
+    )
+    with pytest.raises(activation_v4.ActivationError, match="focused activation tests failed"):
+        activation_v4.activate(root)
+    assert not (root / TOP40_V4_R2_LAYOUT.activation_freeze_path).exists()
+    assert (root / activation_v4.TEST_OUTPUT_PATH).read_bytes() == b"first run failed\n"
+
+    record = activation_v4.activate(root)
+    assert record["tests"]["output_sha256"] == hashlib.sha256(
+        b"second run passed\n"
+    ).hexdigest()
+    assert (root / activation_v4.TEST_OUTPUT_PATH).read_bytes() == b"second run passed\n"
+    assert (root / TOP40_V4_R2_LAYOUT.activation_freeze_path).is_file()
+
+
+def test_result_lock_rejects_links_before_mutating_their_target(tmp_path: Path) -> None:
+    lock = tmp_path / TOP40_V4_R2_LAYOUT.result_lock_path
+    lock.parent.mkdir(parents=True)
+    target = tmp_path / "outside-authority"
+    target.write_bytes(b"must remain unchanged\n")
+    os.link(target, lock)
+    with pytest.raises(orchestrator_v4.OrchestratorError, match="private regular file"):
+        with orchestrator_v4._result_lock(tmp_path):
+            pytest.fail("unsafe hard-linked lock was acquired")
+    assert target.read_bytes() == b"must remain unchanged\n"
+
+    lock.unlink()
+    lock.symlink_to(target)
+    with pytest.raises(orchestrator_v4.OrchestratorError):
+        with orchestrator_v4._result_lock(tmp_path):
+            pytest.fail("unsafe symlinked lock was acquired")
+    assert target.read_bytes() == b"must remain unchanged\n"
 
 
 def test_pretrial_recovery_resumes_after_each_authority_move(
@@ -1939,6 +2256,126 @@ def test_consume_transition_rejects_out_of_phase_batch_before_evaluation(
     with pytest.raises(broker.BrokerError, match="out of phase|journal prefix"):
         broker.consume_batch(tmp_path, "team-01", "discovery")
     assert evaluations == []
+
+
+def test_consume_batch_preserves_preacceptance_admission_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    broker = _broker_module()
+    requests = [
+        {
+            "candidate_id": "candidate-1",
+            "entrypoint": "candidates/candidate-1/strategy.py",
+            "purpose": "trial 1",
+        }
+    ]
+    monkeypatch.setattr(broker.activation_v4, "validate", lambda _root: {})
+    monkeypatch.setattr(
+        broker,
+        "_validate_batch",
+        lambda *_: (requests, tmp_path / "batch-1.json", b"{}"),
+    )
+    monkeypatch.setattr(broker, "_validate_consume_transition", lambda *_: None)
+    monkeypatch.setattr(
+        broker.research_runtime_v4, "recover_candidate_receipts", lambda *_: None
+    )
+    monkeypatch.setattr(broker, "_maybe_accepted_record", lambda *_: None)
+
+    def rejected(*_args: object, **_kwargs: object) -> None:
+        raise broker.orchestrator_v4.OrchestratorError("original admission detail")
+
+    monkeypatch.setattr(broker.orchestrator_v4, "run_is", rejected)
+    with pytest.raises(
+        broker.orchestrator_v4.OrchestratorError, match="original admission detail"
+    ):
+        broker.consume_batch(tmp_path, "team-01", "discovery")
+
+
+def test_consume_batch_swallows_only_a_durable_terminal_runtime_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    broker = _broker_module()
+    request = {
+        "candidate_id": "candidate-1",
+        "entrypoint": "candidates/candidate-1/strategy.py",
+        "purpose": "trial 1",
+    }
+    monkeypatch.setattr(broker.activation_v4, "validate", lambda _root: {})
+    monkeypatch.setattr(
+        broker,
+        "_validate_batch",
+        lambda *_: ([request], tmp_path / "batch-1.json", b"{}"),
+    )
+    monkeypatch.setattr(broker, "_validate_consume_transition", lambda *_: None)
+    monkeypatch.setattr(
+        broker.research_runtime_v4, "recover_candidate_receipts", lambda *_: None
+    )
+    calls = 0
+
+    def accepted(*_args: object) -> object:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return None
+        return (
+            "a" * 64,
+            {"payload": {"trial_number": 1}},
+            {"event_type": "is_failed", "payload": {"failure": "runtime"}},
+        )
+
+    monkeypatch.setattr(broker, "_maybe_accepted_record", accepted)
+
+    def failed(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("candidate runtime failure")
+
+    monkeypatch.setattr(broker.orchestrator_v4, "run_is", failed)
+    monkeypatch.setattr(
+        broker,
+        "_feedback_row",
+        lambda *_: {"candidate_id": "candidate-1", "trial_number": 1},
+    )
+    monkeypatch.setattr(broker, "_write_exclusive", lambda *_: None)
+    monkeypatch.setattr(broker, "_archive_outbox", lambda *_: "archive.json")
+    result = broker.consume_batch(tmp_path, "team-01", "discovery")
+    assert result["trials"] == 1
+
+
+def test_consume_batch_reraises_when_accepted_request_has_no_terminal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    broker = _broker_module()
+    request = {
+        "candidate_id": "candidate-1",
+        "entrypoint": "candidates/candidate-1/strategy.py",
+        "purpose": "trial 1",
+    }
+    monkeypatch.setattr(broker.activation_v4, "validate", lambda _root: {})
+    monkeypatch.setattr(
+        broker,
+        "_validate_batch",
+        lambda *_: ([request], tmp_path / "batch-1.json", b"{}"),
+    )
+    monkeypatch.setattr(broker, "_validate_consume_transition", lambda *_: None)
+    monkeypatch.setattr(
+        broker.research_runtime_v4, "recover_candidate_receipts", lambda *_: None
+    )
+    calls = 0
+
+    def accepted(*_args: object) -> object:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return None
+        return "a" * 64, {"payload": {"trial_number": 1}}, None
+
+    monkeypatch.setattr(broker, "_maybe_accepted_record", accepted)
+
+    def interrupted(*_args: object, **_kwargs: object) -> None:
+        raise OSError("interrupted infrastructure")
+
+    monkeypatch.setattr(broker.orchestrator_v4, "run_is", interrupted)
+    with pytest.raises(OSError, match="interrupted infrastructure"):
+        broker.consume_batch(tmp_path, "team-01", "discovery")
 
 
 def test_runtime_decision_schema_and_terminal_launch_fail_closed(

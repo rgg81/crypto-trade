@@ -1,5 +1,33 @@
 # Pretrial executor incident
 
+## Clean restart authority
+
+The original worktree later encountered a separate organizer contract defect after two private
+Team-01 trials: free-form control prose in `mechanism` was treated as an undocumented exact epoch
+identifier. That edition is preserved privately and is not continued. No feedback was disclosed,
+and none of its candidates or results are reused. `FRESH-RESTART-AUTHORITY.json` binds the exact
+predecessor journal, accepted prefix, summaries, rejected pre-acceptance residue, and no-disclosure
+decision. This clean worktree starts all 15 seed-only lanes from trial zero under the clarified
+uniform contract. It has no v7 launch incident to recover; the frozen restart authority is the
+explicit alternative launch prerequisite. Before running activation tests, activation requires an
+exact byte-empty journal and exact regular, single-link seed surfaces: all 15 lane roots, the two
+frozen common reports, no research session, and no candidate, feedback, outbox, work, nomination,
+selection, result, source archive, private release, activation freeze, or competitive residue. It
+repeats this check
+after the tests and records the authority hash, mode, lane count, empty-journal hash, file count,
+and chained seed-surface digest in the activation freeze. The seed-only check is an activation-time
+fact; later commands validate its frozen binding without incorrectly requiring an empty live
+journal after trials begin.
+
+If activation stops after atomically writing `activation-tests.out` but before publishing a freeze,
+that bounded regular single-link file is treated only as non-authoritative scratch. The next
+canonical activation still proves the same competitive seed digest, reruns the full tests, and
+atomically replaces the scratch; it never accepts the prior output as test authority. The active
+result-command lock is likewise excluded from the digest, but must be an owner-controlled regular
+single-link file containing the current process marker.
+
+## Superseded v7 executor incident
+
 The first Team-01 discovery process on 2026-08-20 stopped before creating a candidate or outbox.
 Codex CLI 0.148.0 applied `--ignore-user-config` after security overrides supplied at the global
 layer, rebuilt its configuration, and entered `read-only` instead of the named permission profile.

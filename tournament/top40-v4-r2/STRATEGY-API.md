@@ -62,6 +62,12 @@ listings and missing non-executable intervals.
 strictly earlier than the decision. `context.auxiliary` is empty. A strategy must not mutate any
 context frame.
 
+The first accepted candidate establishes the stable mechanism-family label. Parented
+`control-ablation` and `role-check` candidates may use more specific descriptive mechanism prose;
+all other within-family variants normally repeat the family label. A genuine family change uses
+`mechanism-pivot`, is allowed once, and starts a new parent epoch. No-op and second pivots fail
+before acceptance.
+
 ## Accepted trials and certificates
 
 The organizer accepts a trial into the append-only journal before market access; a runtime failure

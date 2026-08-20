@@ -372,8 +372,12 @@ def consume_batch(root: Path, team_id: str, phase: str) -> Mapping[str, Any]:
                 )
             except Exception:
                 # Runtime failures are already terminal and consume a trial. Admission failures
-                # have no accepted authority and stop rather than fabricate trial evidence.
-                _accepted_record(root, team_id, request["candidate_id"])
+                # have no accepted authority and must preserve the original actionable error.
+                # Never fabricate trial evidence, and never mask an interrupted infrastructure
+                # failure whose accepted request still lacks a durable terminal record.
+                admitted = _maybe_accepted_record(root, team_id, request["candidate_id"])
+                if admitted is None or admitted[2] is None:
+                    raise
         rows.append(_feedback_row(root, team_id, request["candidate_id"]))
     feedback = {
         "schema_version": 1,
@@ -504,6 +508,9 @@ Choose one original causal crypto mechanism independently. Create exactly eight 
 candidates and outbox/batch-1.json. Allocate the eight trials efficiently across a transparent
 baseline, its exact sign inversion, formation/rebalance variants, controls and roles, and the
 start of a five-point numeric local neighborhood. Every candidate needs all five required files.
+Keep the first accepted candidate's mechanism text as the family label. A parented
+control-ablation or role-check may use more specific descriptive mechanism prose. Only a genuine
+family change uses mechanism-pivot, and at most one such pivot is allowed.
 Use only ordinary Python with numpy/pandas/math; no file loading, dynamic
 imports, encoded payloads, explicit calendar-date lookup, or opaque state. Use a unique declarative
 risk policy per intended control. Every strategy must use the compact stateless causal subset in

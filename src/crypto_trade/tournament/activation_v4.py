@@ -43,6 +43,10 @@ _PRETRIAL_SMOKE_RECEIPT_PATH = "tournament/top40-v4-r2/PRETRIAL-MODEL-SMOKE.json
 _PRETRIAL_SMOKE_RECEIPT_SHA256 = (
     "3d6d524c9420ff2019a2176f74845d3fd13852700d18214bc3d02b15ee863136"
 )
+_FRESH_RESTART_AUTHORITY_PATH = "tournament/top40-v4-r2/FRESH-RESTART-AUTHORITY.json"
+_FRESH_RESTART_AUTHORITY_SHA256 = (
+    "bae6aa65e9689c6c19b302bd3284cdda118449187705b05314392ae5853b5431"
+)
 _PRETRIAL_OLD_ACTIVATION_FILE_SHA256 = (
     "d1b4aa7242b2085e9455ac7628672e7f6bc9826e3e4559f87f8d88a87db53aef"
 )
@@ -95,6 +99,7 @@ if _IS_R2:
         "src/crypto_trade/tournament/snapshot.py",
         "tests/tournament/test_top40_v4_r2.py",
         "tournament/top40-v4-r2/CLEANROOM-POLICY.md",
+        _FRESH_RESTART_AUTHORITY_PATH,
         "tournament/top40-v4-r2/PRETRIAL-INCIDENT.md",
         _PRETRIAL_SMOKE_RECEIPT_PATH,
         "tournament/top40-v4-r2/README.md",
@@ -651,20 +656,345 @@ def pretrial_recovery_pending(root: str | Path) -> bool:
     root_path = Path(root).resolve()
     stage = _pretrial_runtime_path(root_path, _PRETRIAL_INCIDENT_STAGE)
     final = _pretrial_runtime_path(root_path, _PRETRIAL_INCIDENT_FINAL)
-    return os.path.lexists(stage) or not os.path.lexists(final)
+    if os.path.lexists(stage):
+        return True
+    if os.path.lexists(final):
+        try:
+            _pretrial_incident_manifest(root_path, final / "incident.json")
+        except ActivationError:
+            return True
+        return False
+    try:
+        _fresh_restart_authority(root_path)
+    except ActivationError:
+        return True
+    return os.path.lexists(_pretrial_runtime_path(root_path, _PRETRIAL_OLD_LAUNCH_PATH))
+
+
+def _fresh_restart_authority(root: Path) -> Mapping[str, Any]:
+    """Validate the frozen score-blind authority for a genuinely clean restart worktree."""
+
+    payload = _pretrial_file_bytes(root, _FRESH_RESTART_AUTHORITY_PATH)
+    if _sha256(payload) != _FRESH_RESTART_AUTHORITY_SHA256:
+        raise ActivationError("fresh restart authority changed")
+    authority = _pretrial_object_bytes(payload, "fresh restart authority")
+    expected_keys = {
+        "feedback_disclosed",
+        "predecessor",
+        "reason",
+        "rejected_preacceptance_residue",
+        "results_reused",
+        "schema_version",
+        "status",
+        "successful_prefix",
+        "tournament",
+    }
+    if (
+        set(authority) != expected_keys
+        or authority.get("schema_version") != 1
+        or authority.get("tournament") != TOP40_V4_LAYOUT.name
+        or authority.get("status")
+        != "fresh-restart-after-private-aborted-contract-incident"
+        or authority.get("feedback_disclosed") is not False
+        or authority.get("results_reused") is not False
+    ):
+        raise ActivationError("fresh restart authority identity changed")
+    predecessor = authority.get("predecessor")
+    rejected = authority.get("rejected_preacceptance_residue")
+    prefix = authority.get("successful_prefix")
+    if (
+        not isinstance(predecessor, Mapping)
+        or predecessor.get("journal_records") != 4
+        or predecessor.get("trials_accepted") != 2
+        or predecessor.get("trials_succeeded") != 2
+        or not isinstance(rejected, Mapping)
+        or rejected.get("trial_accepted") is not False
+        or rejected.get("trial_evaluated") is not False
+        or not isinstance(prefix, list)
+        or len(prefix) != 2
+    ):
+        raise ActivationError("fresh restart evidence changed")
+    return authority
+
+
+def _fresh_surface_payloads(
+    root: Path,
+    base_relative: str,
+    expected_files: set[str],
+) -> dict[str, bytes]:
+    """Read an exact regular-file surface without admitting unlisted residue."""
+
+    base = _pretrial_runtime_path(root, base_relative)
+    if not base.is_dir() or base.is_symlink():
+        raise ActivationError(f"fresh restart surface is missing or unsafe: {base_relative}")
+    expected_directories = {""}
+    for relative in expected_files:
+        parent = Path(relative).parent
+        while parent != Path("."):
+            expected_directories.add(parent.as_posix())
+            parent = parent.parent
+    for relative in sorted(expected_directories, key=lambda value: (value.count("/"), value)):
+        directory = base if not relative else base / relative
+        if not directory.is_dir() or directory.is_symlink():
+            raise ActivationError("fresh restart directory surface changed")
+        expected_names = {
+            Path(candidate).relative_to(relative).parts[0]
+            if relative
+            else Path(candidate).parts[0]
+            for candidate in expected_files | (expected_directories - {""})
+            if candidate != relative
+            and (
+                (not relative and Path(candidate).parts)
+                or (relative and Path(candidate).is_relative_to(relative))
+            )
+        }
+        entries = list(directory.iterdir())
+        if {entry.name for entry in entries} != expected_names:
+            raise ActivationError("fresh restart surface contains missing or unexpected entries")
+        child_directories = {
+            Path(candidate).relative_to(relative).parts[0]
+            if relative
+            else Path(candidate).parts[0]
+            for candidate in expected_directories - {"", relative}
+            if (not relative or Path(candidate).is_relative_to(relative))
+        }
+        for entry in entries:
+            details = entry.lstat()
+            if entry.name in child_directories:
+                if not stat.S_ISDIR(details.st_mode) or entry.is_symlink():
+                    raise ActivationError("fresh restart directory surface is unsafe")
+            elif (
+                not stat.S_ISREG(details.st_mode)
+                or details.st_nlink != 1
+                or details.st_uid != os.geteuid()
+            ):
+                raise ActivationError("fresh restart file surface is unsafe")
+    payloads: dict[str, bytes] = {}
+    for relative in sorted(expected_files):
+        payloads[relative] = _pretrial_stable_bytes(base / relative)
+    return payloads
+
+
+def _fresh_restart_seed_state(
+    root: Path,
+    *,
+    activation_tests_present: bool,
+) -> Mapping[str, Any]:
+    """Prove the score-blind restart is still the exact 15-lane genesis state."""
+
+    _fresh_restart_authority(root)
+    tournament_prefix = f"{TOP40_V4_LAYOUT.tournament_root}/"
+    reports_prefix = f"{TOP40_V4_LAYOUT.reports_root}/"
+    tournament_files = {
+        relative.removeprefix(tournament_prefix)
+        for relative in FROZEN_SCOPE
+        if relative.startswith(tournament_prefix)
+    }
+    report_files = {
+        relative.removeprefix(reports_prefix)
+        for relative in FROZEN_SCOPE
+        if relative.startswith(reports_prefix)
+    }
+    tournament_files.add(Path(TOP40_V4_LAYOUT.journal_path).name)
+    for team_id in TOP40_V4_LAYOUT.team_ids:
+        for directory in ("feedback", "outbox", "work"):
+            tournament_files.add(f"teams/{team_id}/{directory}/.keep")
+    optional_locks = {"broker.lock", Path(TOP40_V4_LAYOUT.result_lock_path).name}
+    tournament_root = _pretrial_runtime_path(root, TOP40_V4_LAYOUT.tournament_root)
+    for relative in optional_locks:
+        if os.path.lexists(tournament_root / relative):
+            tournament_files.add(relative)
+    tests_relative = Path(TEST_OUTPUT_PATH).name
+    if activation_tests_present:
+        tournament_files.add(tests_relative)
+    tournament_payloads = _fresh_surface_payloads(
+        root, TOP40_V4_LAYOUT.tournament_root, tournament_files
+    )
+    report_payloads = _fresh_surface_payloads(
+        root, TOP40_V4_LAYOUT.reports_root, report_files
+    )
+    if tournament_payloads[Path(TOP40_V4_LAYOUT.journal_path).name] != b"":
+        raise ActivationError("fresh restart requires a byte-empty research journal")
+    if "broker.lock" in tournament_files and tournament_payloads["broker.lock"] != b"":
+        raise ActivationError("fresh restart broker lock is not empty")
+    result_lock = Path(TOP40_V4_LAYOUT.result_lock_path).name
+    if result_lock in tournament_files and tournament_payloads[result_lock] != (
+        f"pid={os.getpid()}\n".encode("ascii")
+    ):
+        raise ActivationError("fresh restart result lock has no current owner marker")
+    for team_id in TOP40_V4_LAYOUT.team_ids:
+        for directory in ("feedback", "outbox", "work"):
+            if tournament_payloads[f"teams/{team_id}/{directory}/.keep"] != b"":
+                raise ActivationError("fresh restart lane marker changed")
+
+    digest_paths = {
+        _FRESH_RESTART_AUTHORITY_PATH.removeprefix(tournament_prefix),
+        Path(TOP40_V4_LAYOUT.journal_path).name,
+        *(
+            f"teams/{team_id}/{relative}"
+            for team_id in TOP40_V4_LAYOUT.team_ids
+            for relative in (
+                "ACCESS-POLICY.json",
+                "TEAM-BRIEF.md",
+                "candidates/README.md",
+                "feedback/.keep",
+                "outbox/.keep",
+                "work/.keep",
+            )
+        ),
+    }
+    seed_rows: list[dict[str, Any]] = []
+    previous = "0" * 64
+    for sequence, relative in enumerate(sorted(digest_paths), start=1):
+        payload = tournament_payloads[relative]
+        row: dict[str, Any] = {
+            "sequence": sequence,
+            "path": f"{TOP40_V4_LAYOUT.tournament_root}/{relative}",
+            "size": len(payload),
+            "sha256": _sha256(payload),
+            "previous_sha256": previous,
+        }
+        row["entry_sha256"] = _sha256(_canonical(row))
+        previous = row["entry_sha256"]
+        seed_rows.append(row)
+    for relative in sorted(report_payloads):
+        payload = report_payloads[relative]
+        row = {
+            "sequence": len(seed_rows) + 1,
+            "path": f"{TOP40_V4_LAYOUT.reports_root}/{relative}",
+            "size": len(payload),
+            "sha256": _sha256(payload),
+            "previous_sha256": previous,
+        }
+        row["entry_sha256"] = _sha256(_canonical(row))
+        previous = row["entry_sha256"]
+        seed_rows.append(row)
+    return {
+        "mode": "score-blind-fresh-restart",
+        "authority_sha256": _FRESH_RESTART_AUTHORITY_SHA256,
+        "journal_sha256": _sha256(b""),
+        "lane_count": len(TOP40_V4_LAYOUT.team_ids),
+        "surface_file_count": len(seed_rows),
+        "surface_head_sha256": previous,
+    }
+
+
+def _fresh_restart_scope_binding(scope_entries: object) -> tuple[int, str]:
+    if not isinstance(scope_entries, list) or any(
+        not isinstance(entry, Mapping) for entry in scope_entries
+    ):
+        raise ActivationError("fresh restart activation scope is malformed")
+    indexed = {entry.get("path"): entry for entry in scope_entries}
+    if len(indexed) != len(scope_entries):
+        raise ActivationError("fresh restart activation scope contains duplicate paths")
+    tournament_paths = {
+        _FRESH_RESTART_AUTHORITY_PATH,
+        TOP40_V4_LAYOUT.journal_path,
+        *(
+            f"{TOP40_V4_LAYOUT.team_root(team_id)}/{relative}"
+            for team_id in TOP40_V4_LAYOUT.team_ids
+            for relative in (
+                "ACCESS-POLICY.json",
+                "TEAM-BRIEF.md",
+                "candidates/README.md",
+                "feedback/.keep",
+                "outbox/.keep",
+                "work/.keep",
+            )
+        ),
+    }
+    report_paths = sorted(
+        relative
+        for relative in FROZEN_SCOPE
+        if relative.startswith(f"{TOP40_V4_LAYOUT.reports_root}/")
+    )
+    ordered_paths = [*sorted(tournament_paths), *report_paths]
+    empty_runtime_paths = {
+        TOP40_V4_LAYOUT.journal_path,
+        *(
+            f"{TOP40_V4_LAYOUT.team_root(team_id)}/{directory}/.keep"
+            for team_id in TOP40_V4_LAYOUT.team_ids
+            for directory in ("feedback", "outbox", "work")
+        ),
+    }
+    previous = "0" * 64
+    for sequence, relative in enumerate(ordered_paths, start=1):
+        if relative in empty_runtime_paths:
+            size = 0
+            digest = _sha256(b"")
+        else:
+            scope_entry = indexed.get(relative)
+            if (
+                not isinstance(scope_entry, Mapping)
+                or type(scope_entry.get("size")) is not int
+                or not isinstance(scope_entry.get("sha256"), str)
+                or _SHA256.fullmatch(str(scope_entry.get("sha256"))) is None
+            ):
+                raise ActivationError("fresh restart seed file is absent from activation scope")
+            size = scope_entry["size"]
+            digest = scope_entry["sha256"]
+        row = {
+            "sequence": sequence,
+            "path": relative,
+            "size": size,
+            "sha256": digest,
+            "previous_sha256": previous,
+        }
+        row["entry_sha256"] = _sha256(_canonical(row))
+        previous = row["entry_sha256"]
+    return len(ordered_paths), previous
+
+
+def _validate_fresh_restart_binding(
+    root: Path,
+    value: object,
+    scope_entries: object,
+) -> None:
+    _fresh_restart_authority(root)
+    expected_keys = {
+        "mode",
+        "authority_sha256",
+        "journal_sha256",
+        "lane_count",
+        "surface_file_count",
+        "surface_head_sha256",
+    }
+    expected_file_count, expected_head = _fresh_restart_scope_binding(scope_entries)
+    if (
+        not isinstance(value, Mapping)
+        or set(value) != expected_keys
+        or value.get("mode") != "score-blind-fresh-restart"
+        or value.get("authority_sha256") != _FRESH_RESTART_AUTHORITY_SHA256
+        or value.get("journal_sha256") != _sha256(b"")
+        or value.get("lane_count") != len(TOP40_V4_LAYOUT.team_ids)
+        or value.get("surface_file_count") != expected_file_count
+        or value.get("surface_head_sha256") != expected_head
+    ):
+        raise ActivationError("fresh restart activation binding changed")
 
 
 def require_completed_pretrial_recovery(root: str | Path) -> Mapping[str, Any]:
-    """Fail closed until the known incident archive and its new activation binding are valid."""
+    """Require either the exact recovered incident or the exact clean-restart authority."""
 
     root_path = Path(root).resolve()
     stage = _pretrial_runtime_path(root_path, _PRETRIAL_INCIDENT_STAGE)
     if os.path.lexists(stage):
         raise ActivationError("pretrial activation recovery is not complete")
     final = _pretrial_runtime_path(root_path, _PRETRIAL_INCIDENT_FINAL)
-    if not final.is_dir() or final.is_symlink():
-        raise ActivationError("completed pretrial incident authority is missing or unsafe")
-    return _pretrial_incident_manifest(root_path, final / "incident.json")
+    if os.path.lexists(final):
+        if not final.is_dir() or final.is_symlink():
+            raise ActivationError("completed pretrial incident authority is missing or unsafe")
+        return _pretrial_incident_manifest(root_path, final / "incident.json")
+    try:
+        authority = _fresh_restart_authority(root_path)
+    except ActivationError as exc:
+        raise ActivationError(
+            "completed pretrial incident authority is missing; "
+            "fresh restart authority is unavailable"
+        ) from exc
+    if os.path.lexists(_pretrial_runtime_path(root_path, _PRETRIAL_OLD_LAUNCH_PATH)):
+        raise ActivationError("fresh restart unexpectedly contains the superseded v7 launch")
+    return authority
 
 
 def _move_pretrial_file(
@@ -1172,17 +1502,41 @@ def activate(root: str | Path) -> Mapping[str, Any]:
     freeze_path = root_path / TOP40_V4_LAYOUT.activation_freeze_path
     if freeze_path.exists():
         raise ActivationError("V4 activation is one-time and already exists")
+    fresh_restart: Mapping[str, Any] | None = None
+    if _IS_R2:
+        stage = _pretrial_runtime_path(root_path, _PRETRIAL_INCIDENT_STAGE)
+        final = _pretrial_runtime_path(root_path, _PRETRIAL_INCIDENT_FINAL)
+        if not os.path.lexists(stage) and not os.path.lexists(final):
+            require_completed_pretrial_recovery(root_path)
+            tests_path = _pretrial_runtime_path(root_path, TEST_OUTPUT_PATH)
+            fresh_restart = _fresh_restart_seed_state(
+                root_path,
+                activation_tests_present=os.path.lexists(tests_path),
+            )
     implementation_commit = _implementation_commit(root_path)
     loaded = top40_v4.load_config(root=root_path)
     _validate_snapshot_window(root_path, loaded.raw)
     full_snapshot_sha256 = _verify_full_snapshot_once(root_path, loaded.raw)
     review = _validate_adversarial_review(root_path)
     entries, head = _scope(root_path, implementation_commit=implementation_commit)
+    if fresh_restart is not None:
+        expected_count, expected_head = _fresh_restart_scope_binding(entries)
+        if (
+            fresh_restart.get("surface_file_count") != expected_count
+            or fresh_restart.get("surface_head_sha256") != expected_head
+        ):
+            raise ActivationError("fresh restart seed digest differs from activation scope")
     audit_sha256 = _audit_sha256(root_path, loaded.raw)
     output, exit_code = _run_tests(root_path)
     _write_atomic(root_path / TEST_OUTPUT_PATH, output, exclusive=False)
     if exit_code != 0:
         raise ActivationError(f"V4 focused activation tests failed; inspect {TEST_OUTPUT_PATH}")
+    if fresh_restart is not None:
+        verified_fresh_restart = _fresh_restart_seed_state(
+            root_path, activation_tests_present=True
+        )
+        if verified_fresh_restart != fresh_restart:
+            raise ActivationError("fresh restart seed state changed during activation")
     if _implementation_commit(root_path) != implementation_commit:
         raise ActivationError("implementation commit changed during activation")
     verified_entries, verified_head = _scope(root_path, implementation_commit=implementation_commit)
@@ -1214,6 +1568,8 @@ def activate(root: str | Path) -> Mapping[str, Any]:
         )
     if full_snapshot_sha256 is not None:
         unsigned["full_snapshot_manifest_sha256"] = full_snapshot_sha256
+    if fresh_restart is not None:
+        unsigned["fresh_restart"] = dict(fresh_restart)
     unsigned["record_sha256"] = _sha256(_canonical(unsigned))
     _write_atomic(freeze_path, _pretty(unsigned), exclusive=True)
     return unsigned
@@ -1270,6 +1626,9 @@ def validate(root: str | Path, *, verify_universe_snapshot: bool = True) -> Mapp
         expected_keys.add("adversarial_review_sha256")
     if _IS_R2:
         expected_keys.add("full_snapshot_manifest_sha256")
+        final = _pretrial_runtime_path(root_path, _PRETRIAL_INCIDENT_FINAL)
+        if not os.path.lexists(final):
+            expected_keys.add("fresh_restart")
     if set(record) != expected_keys:
         raise ActivationError("V4 activation freeze schema changed")
     unsigned = dict(record)
@@ -1286,6 +1645,12 @@ def validate(root: str | Path, *, verify_universe_snapshot: bool = True) -> Mapp
         "manifest_sha256"
     ]:
         raise ActivationError("V4 full-snapshot activation binding changed")
+    if _IS_R2 and "fresh_restart" in expected_keys:
+        _validate_fresh_restart_binding(
+            root_path,
+            record["fresh_restart"],
+            record["scope_entries"],
+        )
     if (
         record["schema_version"] != SCHEMA_VERSION
         or record["tournament_id"] != TOP40_V4_LAYOUT.name

@@ -17,6 +17,22 @@ organizer-private or sealed state, repository history, legacy research/reports, 
 native web/browser tools, plugins, apps, and subagents. External precomputed signals, fitted
 objects, weights, performance tables, and strategy code are not allowed.
 
+This clean worktree is score-blind with respect to its privately preserved predecessor. The
+frozen `FRESH-RESTART-AUTHORITY.json` records that no feedback was disclosed and no candidate or
+result is reused. It is organizer-only and outside every team profile. A launch requires either
+the exact completed v7 incident archive or this exact clean-restart authority; a stale v7 launch,
+missing authority, unsafe file, or changed hash fails closed.
+
+For the clean-restart alternative, activation also proves the physical genesis state rather than
+trusting the authority's assertion alone. It requires a byte-empty journal, exact 15-lane seed
+trees, exact frozen common reports, no research sessions or result/selection/release residue, and
+only regular single-link files. The same score-blind seed digest must survive the activation tests
+and is then frozen into the activation record. This is a one-time bootstrap invariant; runtime
+validation binds the receipt but does not expose or require post-start journal state.
+An interrupted pre-freeze test output is bounded non-authoritative scratch and is always replaced
+by a complete test rerun. Volatile result/broker lock files are excluded from the digest and are
+accepted only with their exact safe owner/topology and current canonical lock marker.
+
 Every candidate carries `cleanroom-attestation.json` with exactly these affirmative facts:
 
 - the lane access policy was followed;

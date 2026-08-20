@@ -1,0 +1,42 @@
+{
+  "feedback_disclosed": false,
+  "predecessor": {
+    "activation_file_sha256": "b80cd016b9572fe75c63abd485990b345901bfe671937f3e1e0b60044e792f17",
+    "branch": "quant-portfolio-blind-top40-v4-r1-v2",
+    "implementation_commit": "cc653f84870b3c368090aaa9349f0a0463706785",
+    "journal_file_sha256": "d79411dc7acf556a1793ec6a7c73b106d58ddbed3946376be77fd9f4f2af9db4",
+    "journal_head_sha256": "ffc9d322a1133267ef63efe2fcb96a179f73cf2e5df811a30d414f7437599631",
+    "journal_records": 4,
+    "private_preservation": "original-worktree-left-byte-for-byte-intact",
+    "team_id": "team-01",
+    "trials_accepted": 2,
+    "trials_succeeded": 2
+  },
+  "reason": "undocumented-free-form-mechanism-prose-was-treated-as-an-exact-epoch-id",
+  "rejected_preacceptance_residue": {
+    "candidate_id": "pressure-reversal-f24-no-volume",
+    "outbox_sha256": "68dc67844bb671cc1053b21e6d6e675abe187d3beb5307605ade507a33603735",
+    "research_receipt_sha256": "0087d41cc394d501e32a1ab26e0134de538fcc376e79f957d510b325928e2322",
+    "source_archive_sha256": "aa185560e79f4099c4679537b34f529844a3800b7ef9e52323300ae6a6135c31",
+    "trial_accepted": false,
+    "trial_evaluated": false
+  },
+  "results_reused": false,
+  "schema_version": 1,
+  "status": "fresh-restart-after-private-aborted-contract-incident",
+  "successful_prefix": [
+    {
+      "candidate_id": "pressure-reversal-f24-r1-baseline",
+      "request_record_sha256": "1ade065d060ece0ab1110fb21185d64d581e91704023d0de76159800623b0a73",
+      "summary_sha256": "c648329a77d9a18fcc90325433371aa3fdccc8875537448fe511204b824d08b7",
+      "terminal_record_sha256": "4e5d78ce16adf3d53e2b2a686b6c85aa8aff2533037bf62f7112c2ccd2e9d785"
+    },
+    {
+      "candidate_id": "pressure-reversal-f24-r1-inverse",
+      "request_record_sha256": "63ad8eb9bcba63e2f70a85971a6ee1558dfd76fb17f2902a13f701db0181cab4",
+      "summary_sha256": "2d8bf14c2ff60a9d197934c53b271d60917f014024da23e219cdb3fbd2fb67d1",
+      "terminal_record_sha256": "ffc9d322a1133267ef63efe2fcb96a179f73cf2e5df811a30d414f7437599631"
+    }
+  ],
+  "tournament": "quant-portfolio-blind-top40-v4-r2"
+}

@@ -38,6 +38,13 @@ Activation performs the expensive full raw-source replay once. Each later result
 the bound pure-crypto classification audit and canonical-file hashes before and after execution,
 without re-reading tens of thousands of immutable source archives.
 
+This worktree is a clean restart after a private predecessor contract incident. The predecessor
+is not continued, no feedback or result is reused, and all 15 lanes begin at trial zero. The exact
+score-blind decision and predecessor hashes are frozen in `FRESH-RESTART-AUTHORITY.json`; teams
+cannot read that organizer authority or any predecessor artifact. Activation independently proves
+the physical restart is an exact seed-only genesis, repeats that proof across its test run, and
+binds the resulting chained surface digest into the activation freeze before any team can launch.
+
 The isolated rebuild authority is `SNAPSHOT-BUILD.toml`; it publishes to `snapshot-v2` and an
 edition-local manifest, leaving every existing snapshot unchanged.
 

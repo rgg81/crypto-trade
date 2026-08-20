@@ -7,7 +7,7 @@
   "material_parameters": {
     "example_numeric_coordinate": 1.0
   },
-  "mechanism": "replace-with-independently-chosen-mechanism",
+  "mechanism": "replace-with-stable-family-label-or-documented-parented-control-description",
   "neighborhood_coordinates": {
     "example_numeric_coordinate": 1.0
   },
