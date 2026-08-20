@@ -130,7 +130,9 @@ class ExecutionPolicy:
 @dataclasses.dataclass(frozen=True, slots=True)
 class RiskUnitPolicy:
     target_annualized_volatility: float
-    lookback_days: int
+    covariance_halflife_bars: int
+    covariance_window_bars: int
+    minimum_symbol_bars: int
     minimum_scale: float
     maximum_scale: float
 
@@ -283,8 +285,28 @@ def build_policy(raw: Mapping[str, Any]) -> Policy:
         target_annualized_volatility=_number(
             raw, ("risk_unit", "target_annualized_volatility"), minimum=1e-6, maximum=10.0
         ),
-        lookback_days=int(
-            _number(raw, ("risk_unit", "lookback_days"), minimum=1, maximum=3_650, integral=True)
+        covariance_halflife_bars=int(
+            _number(
+                raw,
+                ("risk_unit", "covariance_halflife_bars"),
+                minimum=1,
+                maximum=10_000,
+                integral=True,
+            )
+        ),
+        covariance_window_bars=int(
+            _number(
+                raw,
+                ("risk_unit", "covariance_window_bars"),
+                minimum=2,
+                maximum=10_000,
+                integral=True,
+            )
+        ),
+        minimum_symbol_bars=int(
+            _number(
+                raw, ("risk_unit", "minimum_symbol_bars"), minimum=2, maximum=10_000, integral=True
+            )
         ),
         minimum_scale=_number(raw, ("risk_unit", "minimum_scale"), minimum=1e-6, maximum=100.0),
         maximum_scale=_number(raw, ("risk_unit", "maximum_scale"), minimum=1e-6, maximum=100.0),

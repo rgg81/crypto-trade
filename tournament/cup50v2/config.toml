@@ -55,9 +55,13 @@ max_bar_participation = 0.001
 unavailability_policy = "causal-no-replacement-last-close-v1"
 
 [risk_unit]
+# Ex-ante: the scalar prices the book the strategy is about to hold, from an exponentially
+# weighted covariance of the names in it, not the realised path of a book it no longer holds.
 target_annualized_volatility = 0.10
-lookback_days = 90
-minimum_scale = 0.20
+covariance_halflife_bars = 90
+covariance_window_bars = 270
+minimum_symbol_bars = 30
+minimum_scale = 0.10
 maximum_scale = 3.0
 team_volatility_targeting = "forbidden"
 

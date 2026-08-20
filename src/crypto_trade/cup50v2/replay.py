@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 
 from crypto_trade.cup50v2.availability import UnavailabilityWindow, unavailable_symbols
-from crypto_trade.cup50v2.common_risk import common_risk_scalars
+from crypto_trade.cup50v2.common_risk import exante_risk_scalars
 from crypto_trade.cup50v2.config import active_policy
 from crypto_trade.cup50v2.protocol import DecisionContextV2, TargetStrategyV2
 from crypto_trade.cup50v2.snapshot import Snapshot
@@ -84,7 +84,9 @@ class ExecutionConfig:
     max_symbol_exposure: float = _execution_default("max_symbol_exposure")
     max_bar_participation: float = _execution_default("max_bar_participation")
     risk_target: float = _risk_default("target_annualized_volatility")
-    risk_lookback_days: int = _risk_default("lookback_days")
+    risk_halflife_bars: int = _risk_default("covariance_halflife_bars")
+    risk_window_bars: int = _risk_default("covariance_window_bars")
+    risk_minimum_symbol_bars: int = _risk_default("minimum_symbol_bars")
     risk_minimum_scale: float = _risk_default("minimum_scale")
     risk_maximum_scale: float = _risk_default("maximum_scale")
     strategy_history_days: int = _research_default("strategy_history_days")
@@ -98,7 +100,9 @@ class ExecutionConfig:
             self.max_symbol_exposure,
             self.max_bar_participation,
             self.risk_target,
-            self.risk_lookback_days,
+            self.risk_halflife_bars,
+            self.risk_window_bars,
+            self.risk_minimum_symbol_bars,
             self.risk_minimum_scale,
             self.risk_maximum_scale,
             self.strategy_history_days,
@@ -129,7 +133,6 @@ class EvaluationResultV2:
 class CandidateReplay:
     raw_targets: pd.DataFrame
     risk_scalars: pd.Series
-    calibration: EvaluationResultV2
     costs: Mapping[int, EvaluationResultV2]
 
 
@@ -1419,7 +1422,7 @@ def run_candidate(
     unavailability: Sequence[UnavailabilityWindow] = (),
     record_events: bool = True,
 ) -> CandidateReplay:
-    """One target stream, one causal calibration pass, and independent 1x/2x/3x cost runs."""
+    """One target stream, one ex-ante risk scale, and independent 1x/2x/3x cost runs."""
     decisions = decision_grid(start, end, interval_hours=config.interval_hours)
     raw = generate_targets(
         strategy,
@@ -1438,26 +1441,9 @@ def run_candidate(
         if nonflat
         else None
     )
-    calibration = evaluate_targets(
-        raw,
-        snapshot=snapshot,
-        config=config,
-        cost_multiplier=0.0,
-        terminal=False,
-        unavailability=unavailability,
-        record_events=False,
-        _prepared=prepared,
-    )
-    gross = calibration.returns["gross_return"]
-    scalars = common_risk_scalars(
-        gross,
-        decisions,
-        target_annualized_volatility=config.risk_target,
-        lookback_days=config.risk_lookback_days,
-        interval_hours=config.interval_hours,
-        minimum_scale=config.risk_minimum_scale,
-        maximum_scale=config.risk_maximum_scale,
-    )
+    # No calibration pass: the scalar prices the intended book from bars that closed before the
+    # decision, so it needs the targets and the panel, not a replay of the book's own past.
+    scalars = exante_risk_scalars(raw, bars=snapshot.bars, config=config)
     scaled = scale_targets(raw, scalars)
     results = {
         multiplier: evaluate_targets(
@@ -1472,7 +1458,7 @@ def run_candidate(
         )
         for multiplier in (1, 2, 3)
     }
-    return CandidateReplay(raw, scalars, calibration, results)
+    return CandidateReplay(raw, scalars, results)
 
 
 def scored_returns(
