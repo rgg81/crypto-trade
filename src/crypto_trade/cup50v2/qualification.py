@@ -15,6 +15,7 @@ able to win on one sealed draw. Every nominated lane is observed either way.
 from __future__ import annotations
 
 import dataclasses
+import re
 from collections.abc import Mapping
 
 from crypto_trade.cup50v2.config import QualificationPolicy, active_policy
@@ -127,12 +128,17 @@ def verify_certificate(path) -> None:
             raise ValueError(
                 f"research certificate still contains its template scaffolding: {marker!r}"
             )
+    headings = {}
     for section in CERTIFICATE_SECTIONS:
-        start = lowered.index(section.lower())
+        # Locate the heading, not the first time the word appears. One required section is called
+        # "Cost", an ordinary English word that shows up in prose long before its own heading, so
+        # a first-substring search measured the wrong span entirely.
+        match = re.search(rf"^#+\s*\d*\.?\s*{re.escape(section)}", text, re.MULTILINE | re.I)
+        headings[section] = match.start() if match else lowered.index(section.lower())
+    for section in CERTIFICATE_SECTIONS:
+        start = headings[section]
         following = [
-            lowered.index(other.lower())
-            for other in CERTIFICATE_SECTIONS
-            if lowered.index(other.lower()) > start
+            headings[other] for other in CERTIFICATE_SECTIONS if headings[other] > start
         ]
         end = min(following) if following else len(text)
         body = text[start + len(section) : end].strip().strip("#").strip()

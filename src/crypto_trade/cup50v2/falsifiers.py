@@ -80,12 +80,26 @@ def corruption_cut_points(
     return tuple(usable[index] for index in picks)
 
 
+# Everything a strategy can read from a bar. Corrupting only `close` leaves a lane that trades
+# volume share, taker flow or funding free to reach forward through a column the test never touches.
+CORRUPTIBLE_COLUMNS = (
+    "close",
+    "high",
+    "low",
+    "volume",
+    "quote_volume",
+    "trade_count",
+    "taker_buy_volume",
+    "taker_buy_quote_volume",
+)
+
+
 def future_corruption(
     generate: Callable[[pd.DataFrame], pd.DataFrame],
     bars: pd.DataFrame,
     *,
     cut_points: Sequence[pd.Timestamp],
-    corrupt_column: str = "close",
+    corrupt_columns: Sequence[str] = CORRUPTIBLE_COLUMNS,
 ) -> FalsifierOutcome:
     """Corrupt everything after a cut point; the decisions up to it must not move.
 
@@ -94,39 +108,74 @@ def future_corruption(
     clustering can reach forward through its own memory in a way the interface cannot prevent.
     """
     reference = generate(bars)
+    columns = [column for column in corrupt_columns if column in bars.columns]
+    responded = 0
     for cut in cut_points:
         corrupted = bars.copy()
         closes = pd.DatetimeIndex(pd.to_datetime(corrupted["close_time"], utc=True))
         future = closes >= pd.Timestamp(cut)
-        corrupted.loc[future, corrupt_column] = corrupted.loc[future, corrupt_column] * 7.5 + 1.0
+        for column in columns:
+            # Widen first: an integer column such as trade_count cannot take a float multiplier in
+            # place, and a corruption that raises is a corruption that never happened.
+            corrupted[column] = corrupted[column].astype(float)
+            corrupted.loc[future, column] = corrupted.loc[future, column] * 7.5 + 1.0
         observed = generate(corrupted)
-        before = pd.DatetimeIndex(observed.index) < pd.Timestamp(cut)
-        expected_prefix = reference.loc[before]
-        observed_prefix = observed.loc[before]
-        if target_stream_digest(expected_prefix) != target_stream_digest(observed_prefix):
+        index = pd.DatetimeIndex(observed.index)
+        before, after = index < pd.Timestamp(cut), index >= pd.Timestamp(cut)
+        expected = target_stream_digest(reference.loc[before])
+        if expected != target_stream_digest(observed.loc[before]):
             return FalsifierOutcome(
                 name="future-corruption",
                 passed=False,
                 detail=f"decisions before {pd.Timestamp(cut).isoformat()} changed when the "
                 "future was corrupted",
-                evidence={"cut_point": pd.Timestamp(cut).isoformat()},
+                evidence={"cut_point": pd.Timestamp(cut).isoformat(), "columns": columns},
             )
+        # Positive control: the suffix must move. A constant book, or one that ignores every
+        # corrupted column, passes the prefix test trivially and the evidence cannot tell the
+        # difference between a causal candidate and an inert one.
+        if target_stream_digest(reference.loc[after]) != target_stream_digest(observed.loc[after]):
+            responded += 1
     return FalsifierOutcome(
         name="future-corruption",
         passed=True,
-        detail=f"{len(cut_points)} cut points left every earlier decision unchanged",
-        evidence={"cut_points": [pd.Timestamp(cut).isoformat() for cut in cut_points]},
+        detail=(
+            f"{len(cut_points)} cut points left every earlier decision unchanged; "
+            f"{responded} of them changed the decisions after the cut"
+        ),
+        evidence={
+            "cut_points": [pd.Timestamp(cut).isoformat() for cut in cut_points],
+            "corrupted_columns": columns,
+            "cut_points_with_a_responsive_suffix": responded,
+            "positive_control": "passed" if responded else "VACUOUS: no suffix responded",
+        },
     )
 
 
-def determinism(first: pd.DataFrame, second: pd.DataFrame) -> FalsifierOutcome:
-    """Two clean runs of the same source and seed must agree bit for bit."""
-    left, right = target_stream_digest(first), target_stream_digest(second)
+def determinism(
+    *streams: pd.DataFrame, hash_seeds: Sequence[int] | None = None
+) -> FalsifierOutcome:
+    """Independent runs of the same source and seed must agree bit for bit.
+
+    Two runs inside one process share a hash seed, so the defect this exists to catch -- a float sum
+    accumulated over set iteration, whose order depends on PYTHONHASHSEED -- survives it untouched.
+    A lane found exactly that bug in an organizer seed. Pass streams generated under different hash
+    seeds and name them.
+    """
+    digests = [target_stream_digest(stream) for stream in streams]
+    agree = len(set(digests)) == 1
     return FalsifierOutcome(
         name="determinism",
-        passed=left == right,
-        detail="two independent runs agree" if left == right else "independent runs diverged",
-        evidence={"first": left, "second": second is not None and right},
+        passed=agree and len(digests) >= 2,
+        detail=(
+            f"{len(digests)} independent runs agree"
+            if agree
+            else f"independent runs diverged across {len(set(digests))} distinct streams"
+        ),
+        evidence={
+            "digests": digests,
+            "hash_seeds": list(hash_seeds) if hash_seeds else "not varied",
+        },
     )
 
 

@@ -1,0 +1,23 @@
+{
+  "also_rejected": "Treating team-10's ten scan findings as disqualifying. The scan never ran as a gate on anybody, the findings are in that lane's private analysis tooling rather than its nominated bundle, and its bundle scans clean. Applying a gate retrospectively to one lane after it failed to run on the field is the move that cost the previous edition its credibility.",
+  "amendment": "A4",
+  "amendment_sha256": "790ea3e1c8160aa168d5d16e63e186ce4628c99f3ac78782b64881f6416b2ec7",
+  "date": "2026-08-21",
+  "defect": "The charter, the README and the team brief all state that evaluation runs in network-disabled, read-only containers and that a lane's workspace is scanned before every evaluation. Neither happened. evaluator_container_command and observer_container_command are referenced nowhere outside the test suite, and scan_research_root gates nothing: it is called only inside those unused builders and inside critic-pack, which runs after the fact. The CLI's only isolation enforcement is a check that an environment variable is set to a string -- a variable the organizer sets by hand.",
+  "forward_fix": "The sealed observation has not run. It is the one stage that touches sealed data, and it will run through the container path for real. The research and nomination phases cannot be un-run and are disclosed as having been in-process.",
+  "found_by": "the independent critic, reviewing all twelve nominations",
+  "namespace": "cup50v2",
+  "phase": "pre-sealed-read",
+  "rejected": "Re-running the research and nomination phases inside containers. It would cost roughly twelve hours, would not change any candidate's bytes, and would not recover the property that matters -- prevention at the time. Claiming it had been fixed retroactively would be worse than recording that it was not.",
+  "schema_version": 1,
+  "so_what_actually_ran": "Every research evaluation, every charged trial and every nomination ran in-process on the host, asserting an isolation it did not have.",
+  "status": "disclosed-and-repaired-forward",
+  "trials_affected": 0,
+  "trials_recharged": 0,
+  "what_did_protect_the_field": [
+    "The team-visible snapshot genuinely omits the transaction open and every mark price. That is a property of the bytes, not of a container, and it held.",
+    "The transcript audit read every lane's own session and found no access to another lane's workspace, an earlier edition, the sealed window or any organizer-private surface. That is evidence rather than assumption, and the critic re-derived it independently.",
+    "The clean-room scan, run after the fact by the critic against all twelve research roots, returns zero violations for eleven lanes and ten forbidden-call/import entries in one lane's private research tooling -- none in any nominated bundle."
+  ],
+  "what_was_genuinely_weaker": "Mechanical enforcement. A lane that had chosen to read a prohibited path would have been caught after the fact by the transcript audit rather than prevented at the boundary. The isolation claim in the charter was stronger than the isolation in the code."
+}

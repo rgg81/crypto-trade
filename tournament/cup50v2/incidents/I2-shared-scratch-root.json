@@ -1,10 +1,10 @@
 {
   "cause": "Organizer setup, wholly. The workspaces were isolated and the scratch root was not, and the agents were told to use it. Neither the clean-room scan nor the transcript audit governs a directory outside every research root.",
   "date": "2026-08-21",
-  "disclosed_by": "team-01, unprompted, in its own final report",
+  "disclosed_by": "team-01 first, unprompted; team-03 and team-08 independently reported the same collision in their own certificates",
   "fix": "Each lane gets its own scratch root under its results directory, and the shared scratchpad is not offered to a team agent again. A future edition should run lanes in the sandbox container, which has neither a shared scratch root nor a shared process table.",
   "incident": "I2",
-  "incident_sha256": "bc511269e309087681e61bf8b3d8ff17acf8594abe8f1fe2d3e7c8b6bf631f5f",
+  "incident_sha256": "7d47497d2e543771a0397a11c99b79d64fe42a7c7487c61e8278103f4a9b4efb",
   "namespace": "cup50v2",
   "phase": "pre-sealed-read",
   "related": [
@@ -19,6 +19,7 @@
     "research_ledgers": "unaffected -- one hash-chained journal per lane; all twelve verified after the incident, 325 records total, no broken chain",
     "sealed_data": "never reachable from a team session at any point"
   },
+  "scope_correction": "The first version of this record named one affected lane. Three reported it. team-03's first-sitting parameter files were overwritten in the shared root and it reconstructed from its hash-chained journal; team-08's wildcard copy out of the root picked up fifteen files belonging to other lanes, which it deleted unread and then re-ran both its centres to confirm they reproduced bit-for-bit. The exposure surface was wider than recorded. The ruling does not change: all three disclosed unprompted, no nominated bundle or ledger was affected, and every ledger verifies. Found by the independent critic.",
   "title": "All twelve lanes were given the same scratch directory",
   "what_happened": "Every team agent inherits one session scratchpad path. Twelve lanes wrote there at once under generic names -- an1.py, batchC.txt, close.parquet, df.pkl -- and 837 files accumulated. A filename collision silently replaced team-01's sweep.py with another lane's file, and team-01 saw five lines of another lane's run log (score summaries, no source, no team identifier) before recognising the collision. It deleted the imported files unread, rewrote its tooling, and moved its work under its own results directory."
 }
