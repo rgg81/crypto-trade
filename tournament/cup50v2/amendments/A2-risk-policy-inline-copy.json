@@ -1,0 +1,19 @@
+{
+  "amendment": "A2",
+  "amendment_sha256": "643099c15b88e6c681e703abe87ec4d9a946989e5a439046b12a81632b74e72a",
+  "class": "organizer gate defect. The risk unit's behaviour is unchanged and has been in force since before activation, including throughout the readiness field; only the check that validates its declaration was wrong.",
+  "date": "2026-08-21",
+  "defect": "The evaluator validated a team's risk policy against an inline dictionary in cli.py naming policy id cup50v2-common-risk-unit-v1. The shipped policy is cup50v2-common-risk-unit-exante-v1, written when the realised-volatility risk unit was replaced by the ex-ante one. The two drifted at that moment and no charged trial could ever pass; the charged path was unreachable for the whole research phase.",
+  "evidence": "team-12 official-seed-001 registered and evaluated successfully after the fix; ledger hash chain verifies; eight result artifacts written across three cost levels.",
+  "fix": "The policy id moves into config.toml, where every other tunable already lives, and the evaluator checks the shipped policy against the config rather than against a copy of it. A test asserts the id is not inlined again. This is the same defect the config refactor exists to prevent -- a policy restated in a second place, and the second place going stale.",
+  "found_by": "the organizer, on the first charged trial run for real",
+  "namespace": "cup50v2",
+  "phase": "pre-sealed-read",
+  "schema_version": 1,
+  "status": "fixed-and-reactivated",
+  "superseded_activation_sha256": "4acc2f788d08b4d3f81abc56c938f93afcbcfccf36dff487e5694d378f76842c",
+  "superseded_git_commit": "11ef014b48f0916e5316881bfe80d273942edd76",
+  "trials_affected": 0,
+  "trials_recharged": 0,
+  "why_the_tests_missed_it": "Every test either supplied the CLI's own expectation or bypassed _evaluate. The check was self-consistent and wrong, which no amount of internal consistency can detect. It surfaced on the first execution of the real path against the real artifact."
+}

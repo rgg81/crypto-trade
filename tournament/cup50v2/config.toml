@@ -64,6 +64,9 @@ minimum_symbol_bars = 30
 minimum_scale = 0.10
 maximum_scale = 3.0
 team_volatility_targeting = "forbidden"
+# Named here so the evaluator checks the shipped policy against the config, never against a
+# copy of it living in code.
+policy_id = "cup50v2-common-risk-unit-exante-v1"
 
 [research]
 # Twelve charged trials -- official centres and neighbourhood probes both count -- and at least

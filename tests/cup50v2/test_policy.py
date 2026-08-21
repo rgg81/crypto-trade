@@ -333,3 +333,23 @@ def test_the_first_charged_trial_must_be_the_unmodified_seed(tmp_path: Path) -> 
     register_trial(journal, binding("official-seed-001", 189.0), seed_binding=seed)
     # Once the seed is spent, the team is free.
     register_trial(journal, binding("t2", 250.0), seed_binding=seed)
+
+
+def test_the_risk_policy_is_checked_against_the_config_not_a_copy_in_code() -> None:
+    """The evaluator compared the shipped policy against an inline dict naming a superseded id.
+
+    No charged trial could pass it, and the failure surfaced only when the first one was run for
+    real. This is the exact defect the config refactor exists to prevent: a policy restated in code
+    is a second place for it to live, and the second place is the one that goes stale.
+    """
+    source = Path("src/crypto_trade/cup50v2/cli.py").read_text()
+    start = source.index("policy = _json(arguments.risk_policy)")
+    block = source[start : start + 900]
+    assert "cup50v2-common-risk-unit" not in block, "the policy id is inlined again"
+    assert 'raw["risk_unit"]["policy_id"]' in block
+
+    shipped = json.loads(Path("tournament/cup50v2/risk-policy.json").read_text())
+    declared = load_config(DEFAULT_CONFIG_PATH).raw["risk_unit"]["policy_id"]
+    assert shipped["policy_id"] == declared
+    assert shipped["team_specific_controls"] is False
+    assert shipped["team_specific_volatility_targeting"] is False

@@ -106,6 +106,7 @@ _FROZEN: dict[tuple[str, ...], object] = {
     ("universe", "classification_policy"): "pure-crypto-fail-closed-v1",
     ("execution", "unavailability_policy"): "causal-no-replacement-last-close-v1",
     ("risk_unit", "team_volatility_targeting"): "forbidden",
+    ("risk_unit", "policy_id"): "cup50v2-common-risk-unit-exante-v1",
     ("research", "controls"): "preregistered-permanently-non-promoteable",
     ("scoring", "rounding"): "decimal-half-even-1e-6",
     ("scoring", "qualification_gates"): "in-sample-bar-v1",

@@ -25,6 +25,7 @@ from crypto_trade.cup50v2.config import (
     OOS_START,
     TEAM_IDS,
     active_policy,
+    load_config,
 )
 from crypto_trade.cup50v2.falsifiers import (
     corruption_cut_points,
@@ -489,14 +490,17 @@ def _evaluate(arguments: argparse.Namespace) -> Mapping[str, object]:
         != binding["risk_policy_sha256"]
     ):
         raise ValueError("evaluation risk policy differs from its preregistered policy")
+    # Check the shipped policy against the config, never against a copy of it living here. An
+    # inline dict is a second place for a policy to live, and the second place is the one that goes
+    # stale: this check named a superseded policy id and no charged trial could pass it.
     policy = _json(arguments.risk_policy)
-    expected_policy = {
-        "schema_version": 1,
-        "policy_id": "cup50v2-common-risk-unit-v1",
-        "team_specific_controls": False,
-        "team_specific_volatility_targeting": False,
-    }
-    if policy != expected_policy:
+    expected_id = str(load_config(arguments.config).raw["risk_unit"]["policy_id"])
+    if (
+        int(policy.get("schema_version", 0)) != 1
+        or str(policy.get("policy_id")) != expected_id
+        or bool(policy.get("team_specific_controls"))
+        or bool(policy.get("team_specific_volatility_targeting"))
+    ):
         raise ValueError("CUP-50 v2 permits only the frozen common risk-unit policy")
     scorer = Path(__file__).with_name("scoring.py")
     if hashlib.sha256(scorer.read_bytes()).hexdigest() != binding["scorer_sha256"]:
