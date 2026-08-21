@@ -3536,7 +3536,7 @@ def test_canonical_broker_consume_frame_is_the_only_batch_authority(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     broker = _broker_module()
-    observed: list[int] = []
+    observed: list[object] = []
 
     class AdmissionObservedError(RuntimeError):
         pass
@@ -3584,7 +3584,6 @@ def test_preflight_classifies_malformed_and_unsafe_candidate_batches_score_blind
     monkeypatch.setattr(
         orchestrator_v4.research_runtime_v4, "validate_launch_authority", lambda *_: {}
     )
-
     outbox.write_text('{"wrong":"schema"}\n', encoding="utf-8")
     with pytest.raises(orchestrator_v4.CandidateBatchRejectedError) as malformed:
         orchestrator_v4.preflight_is_batch.__wrapped__(
@@ -3754,6 +3753,8 @@ def test_preflight_receipt_failure_is_resumable_then_durably_authorizes_batch(
     [
         (b"not-json\n", "invalid JSON"),
         (b"{}\n", "schema differs"),
+        (b'{"phase":"discovery","phase":"discovery"}\n', "duplicate key"),
+        (b'{"phase":NaN}\n', "nonfinite value"),
         (
             json.dumps(
                 dict.fromkeys(research_runtime_v4._RECEIPT_KEYS)  # noqa: SLF001
@@ -3782,6 +3783,7 @@ def test_candidate_receipt_semantic_corruption_is_explicitly_deterministic(
     path = tmp_path / relative
     path.parent.mkdir(parents=True)
     path.write_bytes(payload)
+    path.chmod(0o600)
     with pytest.raises(
         research_runtime_v4.CandidateReceiptRejectedError, match=expected
     ):
@@ -3833,6 +3835,7 @@ def test_candidate_receipt_hash_mismatch_and_immutable_conflict_are_deterministi
     path = tmp_path / relative
     path.parent.mkdir(parents=True)
     path.write_text(json.dumps(receipt), encoding="utf-8")
+    path.chmod(0o600)
     monkeypatch.setattr(
         research_runtime_v4, "_model_command_authority", lambda *_args: command_authority
     )
@@ -3861,6 +3864,86 @@ def test_candidate_receipt_hash_mismatch_and_immutable_conflict_are_deterministi
             source_sha256,
             expected_phase="discovery",
         )
+
+    receipt.update(
+        {
+            "codex_version": "frozen-codex",
+            "probes": {
+                key: True for key in research_runtime_v4._PROBE_KEYS  # noqa: SLF001
+            },
+            "recorded_at_utc": "2026-08-21T12:00:00Z",
+            "source_bundle_sha256": source_sha256,
+        }
+    )
+    monkeypatch.setattr(
+        research_runtime_v4, "_codex_binary", lambda: Path("/frozen/codex")
+    )
+    monkeypatch.setattr(
+        research_runtime_v4, "_codex_version", lambda _binary: "frozen-codex"
+    )
+    canonical = json.dumps(
+        receipt,
+        allow_nan=False,
+        ensure_ascii=True,
+        indent=2,
+        sort_keys=True,
+    ).encode("ascii") + b"\n"
+    path.write_bytes(canonical)
+    assert research_runtime_v4.validate_candidate_receipt(
+        tmp_path,
+        "team-01",
+        "candidate-1",
+        source_sha256,
+        expected_phase="discovery",
+    )["sha256"] == hashlib.sha256(canonical).hexdigest()
+
+    noncanonical_payloads = (
+        json.dumps(
+            dict(reversed(tuple(receipt.items()))),
+            allow_nan=False,
+            ensure_ascii=True,
+            indent=2,
+        ).encode("ascii")
+        + b"\n",
+        json.dumps(
+            receipt,
+            allow_nan=False,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("ascii")
+        + b"\n",
+        canonical[:-1],
+    )
+    for noncanonical in noncanonical_payloads:
+        path.write_bytes(noncanonical)
+        with pytest.raises(
+            research_runtime_v4.CandidateReceiptRejectedError,
+            match="not canonical",
+        ):
+            research_runtime_v4.validate_candidate_receipt(
+                tmp_path,
+                "team-01",
+                "candidate-1",
+                source_sha256,
+                expected_phase="discovery",
+            )
+
+    path.write_bytes(canonical)
+    path.chmod(0o644)
+    with pytest.raises(
+        research_runtime_v4.ResearchRuntimeError, match="private regular"
+    ):
+        research_runtime_v4.validate_candidate_receipt(
+            tmp_path,
+            "team-01",
+            "candidate-1",
+            source_sha256,
+            expected_phase="discovery",
+        )
+    assert path.read_bytes() == canonical
+    assert stat.S_IMODE(path.stat().st_mode) == 0o644
+    path.chmod(0o600)
 
     immutable = tmp_path / "immutable-receipt.json"
     research_runtime_v4._write_immutable(immutable, b"first\n")  # noqa: SLF001
@@ -3971,6 +4054,11 @@ def test_refinement_preflight_rejects_candidate_reuse_from_discovery(
         orchestrator_v4.research_runtime_v4, "validate_launch_authority", lambda *_: {}
     )
     monkeypatch.setattr(
+        orchestrator_v4.research_runtime_v4,
+        "_validate_prior_phase_evidence",
+        lambda *_args: None,
+    )
+    monkeypatch.setattr(
         orchestrator_v4.runner_v4,
         "capture_source_bundle",
         lambda *_: SimpleNamespace(files=(), sha256="d" * 64),
@@ -3999,6 +4087,84 @@ def test_refinement_preflight_rejects_candidate_reuse_from_discovery(
         )
     assert journal.read_bytes() == before
     assert ("team-01", "refinement") not in journal_v4.read(journal).batch_preflights
+
+
+@pytest.mark.parametrize(
+    "prior_error",
+    ["prior research outbox archive is missing", "prior research feedback differs"],
+)
+def test_refinement_rejection_revalidates_prior_phase_before_any_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    prior_error: str,
+) -> None:
+    journal = tmp_path / orchestrator_v4.TOP40_V4_LAYOUT.journal_path
+    journal.parent.mkdir(parents=True)
+    journal_v4.initialize(journal)
+    malformed = b'{"wrong":"refinement"}\n'
+    outbox = (
+        tmp_path
+        / orchestrator_v4.TOP40_V4_LAYOUT.team_root("team-01")
+        / "outbox/batch-2.json"
+    )
+    outbox.parent.mkdir(parents=True)
+    outbox.write_bytes(malformed)
+    state = SimpleNamespace(
+        selection=None,
+        nominations={},
+        retired={},
+        trials_by_team={"team-01": 8},
+        is_requests={},
+        is_terminals={},
+        batch_preflights={},
+        head_sha256=journal_v4.GENESIS_SHA256,
+    )
+    monkeypatch.setattr(orchestrator_v4, "_batch_broker_frame", lambda *_: 123)
+    monkeypatch.setattr(
+        orchestrator_v4, "_close_interrupted_is_requests", lambda *_: state
+    )
+    monkeypatch.setattr(orchestrator_v4.journal_v4, "read", lambda *_: state)
+    monkeypatch.setattr(orchestrator_v4.activation_v4, "validate", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        orchestrator_v4.isolation_v4, "audit_team_surface", lambda *_args: {}
+    )
+    monkeypatch.setattr(
+        orchestrator_v4.top40_v4,
+        "load_config",
+        lambda **_kwargs: SimpleNamespace(raw={}),
+    )
+    monkeypatch.setattr(
+        orchestrator_v4.research_runtime_v4,
+        "_validate_prior_phase_evidence",
+        lambda *_args: (_ for _ in ()).throw(
+            research_runtime_v4.ResearchRuntimeError(prior_error)
+        ),
+    )
+    before = journal.read_bytes()
+    with pytest.raises(research_runtime_v4.ResearchRuntimeError, match=prior_error):
+        orchestrator_v4.preflight_is_batch.__wrapped__(
+            tmp_path, "team-01", "refinement", require_receipts=False
+        )
+    assert journal.read_bytes() == before
+
+    capability = orchestrator_v4._BatchRejectionCapability(
+        seal=orchestrator_v4._BATCH_CAPABILITY_SEAL,
+        root=str(tmp_path.resolve()),
+        team_id="team-01",
+        phase="refinement",
+        outbox_sha256=hashlib.sha256(malformed).hexdigest(),
+        candidate_ids=(),
+        journal_head_sha256=journal_v4.GENESIS_SHA256,
+        broker_frame=123,  # type: ignore[arg-type]
+    )
+    rejection = orchestrator_v4.CandidateBatchRejectedError(
+        "malformed refinement batch", capability=capability
+    )
+    with pytest.raises(research_runtime_v4.ResearchRuntimeError, match=prior_error):
+        orchestrator_v4.reject_batch_before_evaluation.__wrapped__(
+            tmp_path, rejection
+        )
+    assert journal.read_bytes() == before
 
 
 def test_preflighted_batch_rejects_changed_accepted_prefix_purpose_without_mutation(
@@ -4135,7 +4301,7 @@ def test_orchestrator_rejects_discovery_batch_at_trial_zero(
         outbox_sha256=hashlib.sha256(payload).hexdigest(),
         candidate_ids=(),
         journal_head_sha256=journal_v4.GENESIS_SHA256,
-        broker_frame_id=123,
+        broker_frame=123,  # type: ignore[arg-type]
     )
     error = orchestrator_v4.CandidateBatchRejectedError(
         "deterministic score-blind admission failure", capability=capability

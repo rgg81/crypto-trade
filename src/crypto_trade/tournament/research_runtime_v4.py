@@ -547,7 +547,12 @@ def _canonical(value: object) -> bytes:
     ).encode("ascii")
 
 
-def _stable_bytes(path: Path, *, maximum: int = 2 * 1024 * 1024) -> bytes:
+def _stable_bytes(
+    path: Path,
+    *,
+    maximum: int = 2 * 1024 * 1024,
+    require_private: bool = False,
+) -> bytes:
     flags = (
         os.O_RDONLY
         | getattr(os, "O_CLOEXEC", 0)
@@ -562,8 +567,18 @@ def _stable_bytes(path: Path, *, maximum: int = 2 * 1024 * 1024) -> bytes:
                 not stat.S_ISREG(before.st_mode)
                 or before.st_nlink != 1
                 or before.st_size > maximum
+                or (
+                    require_private
+                    and (
+                        before.st_uid != os.geteuid()
+                        or stat.S_IMODE(before.st_mode) != 0o600
+                    )
+                )
             ):
-                raise ResearchRuntimeError("research authority is not a bounded regular file")
+                qualifier = " private" if require_private else ""
+                raise ResearchRuntimeError(
+                    f"research authority is not a bounded{qualifier} regular file"
+                )
             payload = handle.read(maximum + 1)
             after = os.fstat(handle.fileno())
         current = path.lstat()
@@ -572,17 +587,46 @@ def _stable_bytes(path: Path, *, maximum: int = 2 * 1024 * 1024) -> bytes:
     except OSError as exc:
         raise ResearchRuntimeError("cannot read research authority safely") from exc
     identities = {
-        (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_nlink),
-        (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_nlink),
+        (
+            before.st_dev,
+            before.st_ino,
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_nlink,
+            before.st_uid,
+            before.st_mode,
+        ),
+        (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_nlink,
+            after.st_uid,
+            after.st_mode,
+        ),
         (
             current.st_dev,
             current.st_ino,
             current.st_size,
             current.st_mtime_ns,
             current.st_nlink,
+            current.st_uid,
+            current.st_mode,
         ),
     }
-    if len(identities) != 1 or not stat.S_ISREG(current.st_mode) or len(payload) > maximum:
+    if (
+        len(identities) != 1
+        or not stat.S_ISREG(current.st_mode)
+        or len(payload) > maximum
+        or (
+            require_private
+            and (
+                current.st_uid != os.geteuid()
+                or stat.S_IMODE(current.st_mode) != 0o600
+            )
+        )
+    ):
         raise ResearchRuntimeError("research authority changed while being read")
     return payload
 
@@ -1760,9 +1804,31 @@ def validate_candidate_receipt(
         return {}
     root_path = Path(root).resolve()
     relative = _receipt_relative(team_id, source_bundle_sha256)
-    payload = _stable_bytes(root_path / relative)
+    payload = _stable_bytes(root_path / relative, require_private=True)
+
+    def unique(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        value: dict[str, object] = {}
+        for key, item in pairs:
+            if key in value:
+                raise CandidateReceiptRejectedError(
+                    f"research session receipt contains duplicate key {key}"
+                )
+            value[key] = item
+        return value
+
+    def reject_nonfinite(value: str) -> None:
+        raise CandidateReceiptRejectedError(
+            f"research session receipt contains nonfinite value {value}"
+        )
+
     try:
-        receipt = json.loads(payload)
+        receipt = json.loads(
+            payload.decode("utf-8"),
+            object_pairs_hook=unique,
+            parse_constant=reject_nonfinite,
+        )
+    except CandidateReceiptRejectedError:
+        raise
     except (UnicodeError, json.JSONDecodeError) as exc:
         raise CandidateReceiptRejectedError(
             "research session receipt is invalid JSON"
@@ -1816,6 +1882,17 @@ def validate_candidate_receipt(
     ):
         raise CandidateReceiptRejectedError(
             "research session receipt probes did not pass"
+        )
+    canonical = json.dumps(
+        receipt,
+        allow_nan=False,
+        ensure_ascii=True,
+        indent=2,
+        sort_keys=True,
+    ).encode("ascii") + b"\n"
+    if payload != canonical:
+        raise CandidateReceiptRejectedError(
+            "research session receipt bytes are not canonical"
         )
     return {
         "path": relative,

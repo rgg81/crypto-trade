@@ -17,6 +17,7 @@ import stat
 import tempfile
 from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path, PurePosixPath
+from types import FrameType
 from typing import Any
 
 import numpy as np
@@ -116,7 +117,7 @@ class _BatchCapability:
     outbox_sha256: str
     candidates: tuple[_BatchCandidate, ...]
     preflight_record_sha256: str
-    broker_frame_id: int
+    broker_frame: FrameType
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -128,10 +129,10 @@ class _BatchRejectionCapability:
     outbox_sha256: str
     candidate_ids: tuple[str, ...]
     journal_head_sha256: str
-    broker_frame_id: int
+    broker_frame: FrameType
 
 
-def _batch_broker_frame(root: Path, team_id: str, phase: str) -> int:
+def _batch_broker_frame(root: Path, team_id: str, phase: str) -> FrameType:
     """Bind admission authority to the live canonical broker consume frame."""
 
     expected = (root / "scripts/top40_v4_r2_team_broker.py").resolve()
@@ -151,7 +152,7 @@ def _batch_broker_frame(root: Path, team_id: str, phase: str) -> int:
                 and frame.f_locals.get("team_id") == team_id
                 and frame.f_locals.get("phase") == phase
             ):
-                return id(frame)
+                return frame
             frame = frame.f_back
     finally:
         del frame
@@ -985,7 +986,7 @@ def preflight_is_batch(
     """Validate and durably authorize a whole batch before its first evaluation."""
 
     root_path = _safe_root(root)
-    broker_frame_id = _batch_broker_frame(root_path, team_id, phase)
+    broker_frame = _batch_broker_frame(root_path, team_id, phase)
     with _result_lock(root_path):
         isolation_v4.audit_team_surface(root_path, team_id)
         activation_v4.validate(root_path, verify_universe_snapshot=False)
@@ -1010,6 +1011,13 @@ def preflight_is_batch(
             )
         ):
             raise OrchestratorError("batch preflight journal range is out of phase")
+        if phase == "refinement":
+            # A launch proved the discovery archive/feedback before the model ran, but a crash or
+            # organizer-side substitution can occur before consume resumes.  A malformed new
+            # batch must never turn missing prior-phase authority into a terminal lane outcome.
+            research_runtime_v4._validate_prior_phase_evidence(  # noqa: SLF001
+                root_path, team_id, "discovery"
+            )
         research_runtime_v4.validate_launch_authority(root_path, team_id, phase)
         outbox_name = "batch-1.json" if phase == "discovery" else "batch-2.json"
         outbox_relative = f"{TOP40_V4_LAYOUT.team_root(team_id)}/outbox/{outbox_name}"
@@ -1026,7 +1034,7 @@ def preflight_is_batch(
                 outbox_sha256=outbox_sha256,
                 candidate_ids=tuple(candidate_ids),
                 journal_head_sha256=state.head_sha256,
-                broker_frame_id=broker_frame_id,
+                broker_frame=broker_frame,
             )
 
         try:
@@ -1209,7 +1217,7 @@ def preflight_is_batch(
             outbox_sha256=outbox_sha256,
             candidates=tuple(candidates),
             preflight_record_sha256=str(record["record_sha256"]),
-            broker_frame_id=broker_frame_id,
+            broker_frame=broker_frame,
         )
 
 
@@ -1231,7 +1239,7 @@ def reject_batch_before_evaluation(
         raise OrchestratorError("batch rejection lacks a sealed failed-preflight authority")
     team_id = capability.team_id
     phase = capability.phase
-    if _batch_broker_frame(root_path, team_id, phase) != capability.broker_frame_id:
+    if _batch_broker_frame(root_path, team_id, phase) is not capability.broker_frame:
         raise OrchestratorError("batch rejection broker authority changed")
     with _result_lock(root_path):
         isolation_v4.audit_team_surface(root_path, team_id)
@@ -1240,6 +1248,10 @@ def reject_batch_before_evaluation(
         TOP40_V4_LAYOUT.require_team(team_id)
         if phase not in {"discovery", "refinement"}:
             raise OrchestratorError("batch rejection phase is invalid")
+        if phase == "refinement":
+            research_runtime_v4._validate_prior_phase_evidence(  # noqa: SLF001
+                root_path, team_id, "discovery"
+            )
         expected_trials = 0 if phase == "discovery" else 8
         expected_candidates = 8 if phase == "discovery" else 4
         normalized_ids = [
@@ -1269,7 +1281,10 @@ def reject_batch_before_evaluation(
             )
         ):
             raise OrchestratorError("batch cannot be rejected in its current lifecycle state")
-        reason = _validate_text(str(rejection), "reason")
+        # Candidate-derived diagnostics can contain arbitrary length or control characters.  The
+        # sealed capability—not that text—is the terminal authority, so persist one bounded
+        # score-blind disposition independently of the diagnostic text.
+        reason = "batch failed frozen deterministic score-blind admission"
         record = journal_v4.append(
             _journal_path(root_path),
             "batch_rejected",
@@ -1308,7 +1323,7 @@ def _validated_batch_capability(
         or capability.root != str(root)
         or capability.team_id != team_id
         or _batch_broker_frame(root, team_id, capability.phase)
-        != capability.broker_frame_id
+        is not capability.broker_frame
     ):
         raise OrchestratorError("R2 IS evaluation requires a sealed whole-batch capability")
     phase_start = 0 if capability.phase == "discovery" else 8
@@ -1393,7 +1408,7 @@ def run_is(
         raise OrchestratorError("R2 IS evaluation is available only through the batch broker")
     if TOP40_V4_LAYOUT.name.endswith("-r2") and _batch_broker_frame(
         root_path, team_id, _batch_capability.phase
-    ) != _batch_capability.broker_frame_id:
+    ) is not _batch_capability.broker_frame:
         raise OrchestratorError("R2 IS evaluation broker authority changed")
     with _result_lock(root_path):
         isolation_v4.audit_team_surface(root_path, team_id)
