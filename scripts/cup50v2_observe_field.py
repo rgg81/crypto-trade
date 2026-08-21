@@ -20,9 +20,13 @@ import json
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+
+# job, seconds elapsed, the completed subprocess
+Observed = tuple[dict[str, object], float, "subprocess.CompletedProcess[str]"]
 
 
 def completed_points(journal: Path) -> set[str]:
@@ -53,6 +57,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--job-dir", default=None, help="where per-point job files are written")
     parser.add_argument("--dry-run", action="store_true", help="build every job, observe nothing")
+    parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=6,
+        help=(
+            "points observed at once WITHIN a lane. Lanes are still read strictly in the frozen "
+            "order: the pool drains completely before the next lane starts, so the order rule in "
+            "observe_point sees exactly the sequence the field froze. Safe because append_record "
+            "serialises the hash chain under an flock, each point is an independent replay in its "
+            "own process, and determinism across processes is what the falsifier battery checks."
+        ),
+    )
     arguments = parser.parse_args(argv)
 
     field = json.loads(Path(arguments.field).read_text())
@@ -96,7 +112,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     started = time.monotonic()
-    for position, job in enumerate(remaining, start=1):
+    done_count = len(already)
+    failures: list[tuple[str, subprocess.CompletedProcess]] = []
+
+    def observe(job: dict[str, object]) -> Observed:
         job_path = jobs_root / f"{job['point_id']}.json"
         job_path.write_text(json.dumps(job, indent=2))
         began = time.monotonic()
@@ -113,23 +132,38 @@ def main(argv: list[str] | None = None) -> int:
             capture_output=True,
             text=True,
         )
-        elapsed = time.monotonic() - began
-        if result.returncode != 0:
-            # Do not swallow this. A candidate failure has already been journalled as a terminal
-            # zero by observe_point; anything else is an organizer fault and the run must stop so
-            # it can be diagnosed rather than silently zeroing the rest of the field.
-            print(f"\nSTOPPED at {job['point_id']} after {position - 1} points", flush=True)
+        return job, time.monotonic() - began, result
+
+    by_lane: dict[str, list[dict[str, object]]] = {}
+    for job in remaining:
+        by_lane.setdefault(str(job["team_id"]), []).append(job)
+
+    for team_id in field["observation_order"]:          # the barrier that keeps lane order exact
+        lane = by_lane.get(team_id)
+        if not lane:
+            continue
+        with ThreadPoolExecutor(max_workers=max(1, arguments.concurrency)) as pool:
+            for job, elapsed, result in pool.map(observe, lane):
+                if result.returncode != 0:
+                    failures.append((str(job["point_id"]), result))
+                    continue
+                done_count += 1
+                rate = (time.monotonic() - started) / max(1, done_count - len(already))
+                left = (len(planned) - done_count) * rate / 60.0
+                print(
+                    f"[{done_count:3d}/{len(planned)}] {team_id} {job['point_id']} "
+                    f"{elapsed:6.1f}s  eta {left:6.1f}m",
+                    flush=True,
+                )
+        if failures:
+            # An organizer fault, not a candidate failure -- observe_point journals those itself and
+            # exits zero. Stop at the lane boundary rather than zeroing the rest of the field.
+            point_id, result = failures[0]
+            print(f"\nSTOPPED in {team_id} at {point_id}; {done_count} points terminal", flush=True)
             print(result.stdout[-2000:], flush=True)
             print(result.stderr[-4000:], file=sys.stderr, flush=True)
             return 1
-        done = position + len(already)
-        rate = (time.monotonic() - started) / position
-        left = (len(remaining) - position) * rate / 60.0
-        print(
-            f"[{done:3d}/{len(planned)}] {job['team_id']} {job['point_id']} "
-            f"{elapsed:5.1f}s  eta {left:5.1f}m",
-            flush=True,
-        )
+
     print("observation complete", flush=True)
     return 0
 
