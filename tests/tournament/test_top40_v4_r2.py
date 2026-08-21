@@ -3026,6 +3026,30 @@ def test_close_is_revalidates_abandoned_batch_evidence_before_registry_write(
         orchestrator_v4.close_is.__wrapped__(tmp_path)
 
 
+def test_historical_release_revalidates_terminal_batch_evidence_before_selection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    state = SimpleNamespace(retired={})
+    monkeypatch.setattr(orchestrator_v4.isolation_v4, "audit_surface", lambda *_args: {})
+    monkeypatch.setattr(orchestrator_v4.activation_v4, "validate", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(orchestrator_v4.top40_v4, "load_config", lambda **_kwargs: {})
+    monkeypatch.setattr(orchestrator_v4.journal_v4, "read", lambda *_args: state)
+    monkeypatch.setattr(
+        orchestrator_v4,
+        "_validate_retired_research_authorities",
+        lambda *_args: (_ for _ in ()).throw(
+            orchestrator_v4.OrchestratorError("terminal evidence is missing")
+        ),
+    )
+    monkeypatch.setattr(
+        orchestrator_v4,
+        "_selection_freeze",
+        lambda *_args: pytest.fail("historical selection opened before terminal validation"),
+    )
+    with pytest.raises(orchestrator_v4.OrchestratorError, match="evidence is missing"):
+        orchestrator_v4.historical_release.__wrapped__(tmp_path)
+
+
 def test_missing_batch_exhaustion_terminally_resolves_without_fabricated_outbox(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

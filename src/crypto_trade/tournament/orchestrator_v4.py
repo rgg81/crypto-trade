@@ -2812,6 +2812,9 @@ def historical_release(root: str | Path) -> Mapping[str, Any]:
         activation_v4.validate(root_path, verify_universe_snapshot=False)
         loaded = top40_v4.load_config(root=root_path)
         state = journal_v4.read(_journal_path(root_path))
+        # Terminal batch evidence can be damaged after IS selection. Recheck it before accepting
+        # any historical identity, reading the sealed snapshot, or recovering a release bundle.
+        _validate_retired_research_authorities(root_path, state)
         selection = _selection_freeze(root_path, state)
         if state.release is not None:
             result = _recover_authorized_release(root_path, selection, state, loaded.raw)
