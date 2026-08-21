@@ -59,6 +59,14 @@ addopts = "-m 'not parity'"
 [tool.ruff]
 src = ["src"]
 line-length = 100
+extend-exclude = [
+    # Frozen tournament nominations. Every file here is bound by a SHA-256 recorded in its
+    # nomination before the sealed window opened; reformatting one would change its digest and
+    # silently break the binding the paper desk verifies at launch. Style findings in a team's
+    # own source are the team's, and are not the organizer's to correct after the freeze.
+    "tournament/cup50v2/teams",
+    "tournament/cup50v2/seeds",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
