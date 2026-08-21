@@ -1,0 +1,16 @@
+{
+  "centre": {
+    "momentum_days": 90,
+    "carry_settlements": 42,
+    "sigma_days": 30,
+    "state_band": 0.05,
+    "state_trend_days": 60,
+    "sleeve_breadth": 10
+  },
+  "dimensions": [
+    {"name": "momentum_days", "kind": "integer"},
+    {"name": "carry_settlements", "kind": "integer"},
+    {"name": "sigma_days", "kind": "integer"},
+    {"name": "state_band", "kind": "positive"}
+  ]
+}

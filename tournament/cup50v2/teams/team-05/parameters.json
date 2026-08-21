@@ -1,0 +1,33 @@
+{
+  "centre": {
+    "settlements": 21,
+    "trim": 3,
+    "decay": 0.02,
+    "band": 0.1,
+    "z_guard": 2.5,
+    "state_window": 3,
+    "reference_window": 21,
+    "term_structure": 1.0,
+    "price_drop": 0.45,
+    "price_bars": 90,
+    "minimum_side": 4
+  },
+  "dimensions": [
+    {
+      "name": "settlements",
+      "kind": "integer"
+    },
+    {
+      "name": "trim",
+      "kind": "integer"
+    },
+    {
+      "name": "decay",
+      "kind": "fraction"
+    },
+    {
+      "name": "band",
+      "kind": "fraction"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "centre": {
+    "ridge_lambda": 3.0,
+    "horizon_days": 7,
+    "breadth": 8,
+    "state_bandwidth": 0.64,
+    "refit_days": 14
+  },
+  "dimensions": [
+    {
+      "name": "ridge_lambda",
+      "kind": "positive"
+    },
+    {
+      "name": "horizon_days",
+      "kind": "integer"
+    },
+    {
+      "name": "breadth",
+      "kind": "integer"
+    },
+    {
+      "name": "state_bandwidth",
+      "kind": "positive"
+    },
+    {
+      "name": "refit_days",
+      "kind": "integer"
+    }
+  ]
+}

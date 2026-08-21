@@ -1,0 +1,22 @@
+{
+  "centre": {
+    "rev_days": 10,
+    "z_enter": 0.52,
+    "vol_confirm": 2.0,
+    "blend": 0.65
+  },
+  "dimensions": [
+    {
+      "name": "z_enter",
+      "kind": "positive"
+    },
+    {
+      "name": "vol_confirm",
+      "kind": "positive"
+    },
+    {
+      "name": "blend",
+      "kind": "fraction"
+    }
+  ]
+}

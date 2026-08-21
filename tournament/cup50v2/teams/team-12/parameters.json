@@ -1,0 +1,22 @@
+{
+  "centre": {
+    "horizon": 32,
+    "band": 0.22,
+    "sigma_days": 30,
+    "decay": 0.15
+  },
+  "dimensions": [
+    {
+      "name": "horizon",
+      "kind": "integer"
+    },
+    {
+      "name": "band",
+      "kind": "fraction"
+    },
+    {
+      "name": "sigma_days",
+      "kind": "integer"
+    }
+  ]
+}

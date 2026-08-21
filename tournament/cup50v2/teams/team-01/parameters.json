@@ -1,0 +1,20 @@
+{
+  "centre": {
+    "h_centre_days": 21.0,
+    "h_spread": 3.0,
+    "n_rungs": 5,
+    "clip_limit": 2.0,
+    "sigma_bars": 90,
+    "net_scale": 0.18,
+    "symbol_cap": 0.15,
+    "smooth_decay": 0.25,
+    "smooth_band": 0.05
+  },
+  "dimensions": [
+    {"name": "h_centre_days", "kind": "positive"},
+    {"name": "h_spread", "kind": "positive"},
+    {"name": "net_scale", "kind": "positive"},
+    {"name": "clip_limit", "kind": "positive"},
+    {"name": "sigma_bars", "kind": "integer"}
+  ]
+}

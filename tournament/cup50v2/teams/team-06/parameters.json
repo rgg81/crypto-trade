@@ -1,0 +1,16 @@
+{
+  "centre": {
+    "window_days": 48,
+    "persistence_weight": 0.5,
+    "crash_days": 20,
+    "crash_drop": 0.35,
+    "band": 0.08
+  },
+  "dimensions": [
+    {"name": "window_days", "kind": "integer"},
+    {"name": "persistence_weight", "kind": "fraction"},
+    {"name": "crash_days", "kind": "integer"},
+    {"name": "crash_drop", "kind": "positive"},
+    {"name": "band", "kind": "fraction"}
+  ]
+}

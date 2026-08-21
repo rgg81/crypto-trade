@@ -1,0 +1,17 @@
+{
+  "centre": {
+    "k_sigma": 2.0,
+    "vol_mult": 3.5,
+    "hold_bars": 75,
+    "stop_sigma": 1.5,
+    "trend_bars": 60,
+    "trend_min": 0.25,
+    "cooldown_bars": 30,
+    "max_open": 15
+  },
+  "dimensions": [
+    {"name": "k_sigma", "kind": "positive"},
+    {"name": "stop_sigma", "kind": "positive"},
+    {"name": "hold_bars", "kind": "integer"}
+  ]
+}

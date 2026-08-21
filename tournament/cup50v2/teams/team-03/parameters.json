@@ -1,0 +1,31 @@
+{
+  "centre": {
+    "form_days": 90,
+    "form_blend": 5,
+    "form_spread": 1.6,
+    "skip_days": 14,
+    "skip_blend": 3,
+    "skip_spread": 1.6,
+    "beta_days": 90,
+    "vol_days": 30,
+    "liq_days": 30,
+    "min_form_days": 45,
+    "distress": 0.5,
+    "distress_rel": 0.4,
+    "distress_days": 14,
+    "top_k": 10,
+    "hold_k": 16,
+    "symbol_cap": 0.15,
+    "side_tilt_cap": 0.15,
+    "smooth_decay": 0.2,
+    "smooth_band": 0.06,
+    "guard_drawdown": 0.3,
+    "guard_lookback_days": 120,
+    "guard_rebound_days": 10
+  },
+  "dimensions": [
+    {"name": "skip_days", "kind": "integer"},
+    {"name": "distress_rel", "kind": "positive"},
+    {"name": "smooth_decay", "kind": "fraction"}
+  ]
+}

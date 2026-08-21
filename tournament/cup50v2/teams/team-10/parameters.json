@@ -1,0 +1,16 @@
+{
+  "centre": {
+    "fast_days": 7,
+    "slow_days": 20,
+    "trend_days": 18,
+    "top_k": 10,
+    "guard_days": 60
+  },
+  "dimensions": [
+    {"name": "fast_days", "kind": "integer"},
+    {"name": "slow_days", "kind": "integer"},
+    {"name": "trend_days", "kind": "integer"},
+    {"name": "top_k", "kind": "integer"},
+    {"name": "guard_days", "kind": "integer"}
+  ]
+}

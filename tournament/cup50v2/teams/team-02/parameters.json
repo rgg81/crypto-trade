@@ -1,0 +1,14 @@
+{
+  "centre": {
+    "channel_days": 105,
+    "confirm_days": 18,
+    "confirm_floor": 0.10,
+    "quintile": 0.143
+  },
+  "dimensions": [
+    {"name": "channel_days", "kind": "integer"},
+    {"name": "confirm_days", "kind": "integer"},
+    {"name": "confirm_floor", "kind": "fraction"},
+    {"name": "quintile", "kind": "fraction"}
+  ]
+}

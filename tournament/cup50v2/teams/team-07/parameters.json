@@ -1,0 +1,16 @@
+{
+  "centre": {
+    "fast_days": 13,
+    "slow_days": 40,
+    "adv_days": 24,
+    "blend_decay": 0.09,
+    "trade_band": 0.12
+  },
+  "dimensions": [
+    {"name": "fast_days", "kind": "integer"},
+    {"name": "slow_days", "kind": "integer"},
+    {"name": "adv_days", "kind": "integer"},
+    {"name": "blend_decay", "kind": "fraction"},
+    {"name": "trade_band", "kind": "fraction"}
+  ]
+}
