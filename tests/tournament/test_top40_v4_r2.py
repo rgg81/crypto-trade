@@ -2808,6 +2808,8 @@ def test_direct_launcher_rejects_journal_contradictory_prior_feedback(
     )
     archive.parent.mkdir(parents=True)
     archive.write_bytes(payload)
+    archive.parent.chmod(0o700)
+    archive.chmod(0o600)
     feedback = tmp_path / TOP40_V4_R2_LAYOUT.team_root("team-01") / "feedback/discovery.json"
     feedback.parent.mkdir(parents=True)
     feedback.write_text(
@@ -2861,7 +2863,12 @@ def test_retirement_reason_control_characters_fail_at_launch_and_consume(
         research_runtime_v4._validate_phase_request(request, "decision")
 
     broker = _broker_module()
-    monkeypatch.setattr(broker.activation_v4, "validate", lambda _root: {})
+    monkeypatch.setattr(broker.activation_v4, "validate", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        broker.orchestrator_v4,
+        "preflight_is_batch",
+        lambda *_args, **_kwargs: None,
+    )
     monkeypatch.setattr(broker, "_validate_decision_transition", lambda *_: None)
     monkeypatch.setattr(
         broker,
@@ -3032,6 +3039,8 @@ def test_completed_feedback_is_bound_to_journal_and_archived_outbox(
     )
     archive.parent.mkdir(parents=True)
     archive.write_bytes(payload)
+    archive.parent.chmod(0o700)
+    archive.chmod(0o600)
     feedback = team / "feedback/discovery.json"
     feedback.parent.mkdir()
     feedback.write_text('{"contradictory":true}\n', encoding="utf-8")
@@ -3091,7 +3100,12 @@ def test_consume_transition_rejects_out_of_phase_batch_before_evaluation(
         trials_by_team={"team-01": 8},
         is_requests=accepted,
     )
-    monkeypatch.setattr(broker.activation_v4, "validate", lambda _root: {})
+    monkeypatch.setattr(broker.activation_v4, "validate", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        broker.orchestrator_v4,
+        "preflight_is_batch",
+        lambda *_args, **_kwargs: None,
+    )
     monkeypatch.setattr(
         broker,
         "_validate_batch",
@@ -3135,8 +3149,13 @@ def test_consume_batch_preserves_preacceptance_admission_error(
     monkeypatch.setattr(
         broker.research_runtime_v4, "recover_candidate_receipts", lambda *_: None
     )
+    capability = object()
     monkeypatch.setattr(
-        broker.orchestrator_v4, "preflight_is_batch", lambda *_: {"ok": True}
+        broker.orchestrator_v4,
+        "preflight_is_batch",
+        lambda *_args, **kwargs: None
+        if kwargs.get("require_receipts") is False
+        else capability,
     )
     monkeypatch.setattr(broker, "_maybe_accepted_record", lambda *_: None)
 
@@ -3169,8 +3188,13 @@ def test_consume_batch_swallows_only_a_durable_terminal_runtime_failure(
     monkeypatch.setattr(
         broker.research_runtime_v4, "recover_candidate_receipts", lambda *_: None
     )
+    capability = object()
     monkeypatch.setattr(
-        broker.orchestrator_v4, "preflight_is_batch", lambda *_: {"ok": True}
+        broker.orchestrator_v4,
+        "preflight_is_batch",
+        lambda *_args, **kwargs: None
+        if kwargs.get("require_receipts") is False
+        else capability,
     )
     calls = 0
 
@@ -3221,8 +3245,13 @@ def test_consume_batch_reraises_when_accepted_request_has_no_terminal(
     monkeypatch.setattr(
         broker.research_runtime_v4, "recover_candidate_receipts", lambda *_: None
     )
+    capability = object()
     monkeypatch.setattr(
-        broker.orchestrator_v4, "preflight_is_batch", lambda *_: {"ok": True}
+        broker.orchestrator_v4,
+        "preflight_is_batch",
+        lambda *_args, **kwargs: None
+        if kwargs.get("require_receipts") is False
+        else capability,
     )
     calls = 0
 
@@ -3265,7 +3294,7 @@ def test_consume_batch_preflight_rejection_retires_before_any_trial(
         broker.research_runtime_v4, "recover_candidate_receipts", lambda *_: None
     )
 
-    def reject_preflight(*_args: object) -> None:
+    def reject_preflight(*_args: object, **_kwargs: object) -> None:
         raise broker.orchestrator_v4.CandidateBatchRejectedError(
             "candidate-7: neighborhood coordinate mismatch"
         )
@@ -3279,14 +3308,9 @@ def test_consume_batch_preflight_rejection_retires_before_any_trial(
         _root: Path,
         _team_id: str,
         _phase: str,
-        *,
-        reason: str,
-        outbox_sha256: str,
-        candidate_ids: list[str],
+        error: orchestrator_v4.CandidateBatchRejectedError,
     ) -> dict[str, object]:
-        retired.append(reason)
-        assert len(outbox_sha256) == 64
-        assert candidate_ids == [request["candidate_id"] for request in requests]
+        retired.append(str(error))
         return {
             "ok": True,
             "team_id": "team-01",
@@ -3295,15 +3319,7 @@ def test_consume_batch_preflight_rejection_retires_before_any_trial(
             "score_data_opened": False,
         }
 
-    monkeypatch.setattr(
-        broker.orchestrator_v4, "reject_batch_before_evaluation", retire
-    )
-    monkeypatch.setattr(
-        broker,
-        "_archive_outbox",
-        lambda *_: "tournament/top40-v4-r2/research-sessions/outboxes/"
-        "team-01/discovery-placeholder.json",
-    )
+    monkeypatch.setattr(broker, "_reject_failed_preflight", retire)
     evaluations: list[str] = []
     monkeypatch.setattr(
         broker.orchestrator_v4,
@@ -3350,24 +3366,783 @@ def test_journal_records_preacceptance_batch_rejection_without_weakening_retirem
     assert journal_v4.read(second).record_count == 0
 
 
+def test_r2_journal_requires_durable_whole_batch_authority_before_acceptance(
+    tmp_path: Path,
+) -> None:
+    journal = tmp_path / "research-journal.jsonl"
+    journal_v4.initialize(journal)
+    source_sha256 = "3" * 64
+    accepted = {
+        "team_id": "team-01",
+        "run_id": "team01-is-01-authority",
+        "trial_number": 1,
+        "candidate_id": "candidate-1",
+        "purpose": "trial 1",
+        "metadata": {},
+        "authority": {
+            "entrypoint": (
+                "tournament/top40-v4-r2/teams/team-01/"
+                "candidates/candidate-1/strategy.py"
+            ),
+            "source_bundle_sha256": source_sha256,
+        },
+        "research_session": {
+            "path": (
+                "tournament/top40-v4-r2/research-sessions/team-01/"
+                f"{source_sha256}.json"
+            ),
+            "sha256": "4" * 64,
+            "source_bundle_sha256": source_sha256,
+        },
+        "output_path": "reports-top40-v4-r2/is/team-01/trial-1",
+    }
+    with pytest.raises(journal_v4.JournalError, match="whole-batch preflight"):
+        journal_v4.append(journal, "is_accepted", accepted)
+    assert journal_v4.read(journal).record_count == 0
+
+    journal_v4.append(
+        journal,
+        "batch_preflighted",
+        {
+            "team_id": "team-01",
+            "phase": "discovery",
+            "outbox_sha256": "5" * 64,
+            "candidate_ids": [f"candidate-{number}" for number in range(1, 9)],
+            "source_bundle_sha256s": [source_sha256, *["6" * 64] * 7],
+        },
+    )
+    journal_v4.append(journal, "is_accepted", accepted)
+    assert journal_v4.read(journal).trials_by_team["team-01"] == 1
+
+
+def test_unauthorized_direct_and_cli_is_run_leave_pending_journal_byte_exact(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    journal = tmp_path / orchestrator_v4.TOP40_V4_LAYOUT.journal_path
+    journal.parent.mkdir(parents=True)
+    journal_v4.initialize(journal)
+    source_sha256 = "7" * 64
+    journal_v4.append(
+        journal,
+        "batch_preflighted",
+        {
+            "team_id": "team-01",
+            "phase": "discovery",
+            "outbox_sha256": "8" * 64,
+            "candidate_ids": [f"candidate-{number}" for number in range(1, 9)],
+            "source_bundle_sha256s": [source_sha256, *["9" * 64] * 7],
+        },
+    )
+    journal_v4.append(
+        journal,
+        "is_accepted",
+        {
+            "team_id": "team-01",
+            "run_id": "team01-is-01-pending",
+            "trial_number": 1,
+            "candidate_id": "candidate-1",
+            "purpose": "trial 1",
+            "metadata": {},
+            "authority": {
+                "entrypoint": (
+                    "tournament/top40-v4-r2/teams/team-01/"
+                    "candidates/candidate-1/strategy.py"
+                ),
+                "source_bundle_sha256": source_sha256,
+            },
+            "research_session": {
+                "path": (
+                    "tournament/top40-v4-r2/research-sessions/team-01/"
+                    f"{source_sha256}.json"
+                ),
+                "sha256": "a" * 64,
+                "source_bundle_sha256": source_sha256,
+            },
+            "output_path": "reports-top40-v4-r2/is/team-01/pending",
+        },
+    )
+    before = journal.read_bytes()
+    with pytest.raises(orchestrator_v4.OrchestratorError, match="batch broker"):
+        orchestrator_v4.run_is.__wrapped__(
+            tmp_path,
+            "team-01",
+            (
+                "tournament/top40-v4-r2/teams/team-01/"
+                "candidates/candidate-2/strategy.py"
+            ),
+            purpose="trial 2",
+        )
+    assert journal.read_bytes() == before
+
+    cli = _tournament_cli_module()
+    monkeypatch.setattr(
+        cli.orchestrator_v4,
+        "run_is",
+        lambda *_args, **_kwargs: pytest.fail("disabled CLI reached run_is"),
+    )
+    exit_code = cli.main(
+        [
+            "--root",
+            str(tmp_path),
+            "is-run",
+            "team-01",
+            "tournament/top40-v4-r2/teams/team-01/candidates/candidate-2/strategy.py",
+            "--purpose",
+            "trial 2",
+        ]
+    )
+    assert exit_code == 2
+    assert "batch broker" in capsys.readouterr().err
+    assert journal.read_bytes() == before
+
+
+def test_direct_batch_rejection_without_failed_preflight_capability_is_forbidden(
+    tmp_path: Path,
+) -> None:
+    journal = tmp_path / orchestrator_v4.TOP40_V4_LAYOUT.journal_path
+    journal.parent.mkdir(parents=True)
+    journal_v4.initialize(journal)
+    before = journal.read_bytes()
+    error = orchestrator_v4.CandidateBatchRejectedError("caller-supplied rejection")
+    with pytest.raises(orchestrator_v4.OrchestratorError, match="sealed failed-preflight"):
+        orchestrator_v4.reject_batch_before_evaluation.__wrapped__(tmp_path, error)
+    assert journal.read_bytes() == before
+
+
+def test_direct_batch_preflight_cannot_issue_or_reject_authority(
+    tmp_path: Path,
+) -> None:
+    journal = tmp_path / orchestrator_v4.TOP40_V4_LAYOUT.journal_path
+    journal.parent.mkdir(parents=True)
+    journal_v4.initialize(journal)
+    outbox = (
+        tmp_path
+        / orchestrator_v4.TOP40_V4_LAYOUT.team_root("team-01")
+        / "outbox/batch-1.json"
+    )
+    outbox.parent.mkdir(parents=True)
+    outbox.write_text('{"wrong":"schema"}\n', encoding="utf-8")
+    before_journal = journal.read_bytes()
+    before_outbox = outbox.read_bytes()
+    with pytest.raises(orchestrator_v4.OrchestratorError, match="canonical broker"):
+        orchestrator_v4.preflight_is_batch.__wrapped__(
+            tmp_path, "team-01", "discovery", require_receipts=False
+        )
+    assert journal.read_bytes() == before_journal
+    assert outbox.read_bytes() == before_outbox
+
+
+def test_canonical_broker_consume_frame_is_the_only_batch_authority(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    broker = _broker_module()
+    observed: list[int] = []
+
+    class AdmissionObservedError(RuntimeError):
+        pass
+
+    def inspect_authority(
+        root: Path,
+        team_id: str,
+        phase: str,
+        **_kwargs: object,
+    ) -> None:
+        observed.append(orchestrator_v4._batch_broker_frame(root, team_id, phase))
+        raise AdmissionObservedError
+
+    monkeypatch.setattr(
+        broker, "_restore_lane_markers_before_authority", lambda *_args: ()
+    )
+    monkeypatch.setattr(broker.activation_v4, "validate", lambda *_args: {})
+    monkeypatch.setattr(
+        broker.orchestrator_v4, "preflight_is_batch", inspect_authority
+    )
+    with pytest.raises(AdmissionObservedError):
+        broker.consume_batch.__wrapped__(ROOT, "team-01", "discovery")
+    assert len(observed) == 1
+
+
+def test_preflight_classifies_malformed_and_unsafe_candidate_batches_score_blind(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    journal = tmp_path / orchestrator_v4.TOP40_V4_LAYOUT.journal_path
+    journal.parent.mkdir(parents=True)
+    journal_v4.initialize(journal)
+    monkeypatch.setattr(orchestrator_v4, "_batch_broker_frame", lambda *_: 123)
+    team = tmp_path / orchestrator_v4.TOP40_V4_LAYOUT.team_root("team-01")
+    outbox = team / "outbox/batch-1.json"
+    outbox.parent.mkdir(parents=True)
+    monkeypatch.setattr(orchestrator_v4.activation_v4, "validate", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        orchestrator_v4.isolation_v4, "audit_team_surface", lambda *_: {}
+    )
+    monkeypatch.setattr(
+        orchestrator_v4.top40_v4,
+        "load_config",
+        lambda **_kwargs: SimpleNamespace(raw={}),
+    )
+    monkeypatch.setattr(
+        orchestrator_v4.research_runtime_v4, "validate_launch_authority", lambda *_: {}
+    )
+
+    outbox.write_text('{"wrong":"schema"}\n', encoding="utf-8")
+    with pytest.raises(orchestrator_v4.CandidateBatchRejectedError) as malformed:
+        orchestrator_v4.preflight_is_batch.__wrapped__(
+            tmp_path, "team-01", "discovery", require_receipts=False
+        )
+    assert isinstance(
+        malformed.value._capability, orchestrator_v4._BatchRejectionCapability
+    )
+    assert journal_v4.read(journal).record_count == 0
+
+    requests = [
+        {
+            "candidate_id": f"candidate-{number}",
+            "entrypoint": f"candidates/candidate-{number}/strategy.py",
+            "purpose": f"trial {number}",
+        }
+        for number in range(1, 9)
+    ]
+    outbox.write_text(
+        json.dumps({"schema_version": 1, "operation": "is-batch", "requests": requests}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        orchestrator_v4.runner_v4,
+        "capture_source_bundle",
+        lambda *_: (_ for _ in ()).throw(
+            runner_v4.StrategySandboxError("unsafe candidate tree")
+        ),
+    )
+    with pytest.raises(orchestrator_v4.CandidateBatchRejectedError, match="unsafe candidate"):
+        orchestrator_v4.preflight_is_batch.__wrapped__(
+            tmp_path, "team-01", "discovery", require_receipts=False
+        )
+    assert journal_v4.read(journal).record_count == 0
+
+
+def test_preflight_receipt_failure_is_resumable_then_durably_authorizes_batch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    journal = tmp_path / orchestrator_v4.TOP40_V4_LAYOUT.journal_path
+    journal.parent.mkdir(parents=True)
+    journal_v4.initialize(journal)
+    monkeypatch.setattr(orchestrator_v4, "_batch_broker_frame", lambda *_: 123)
+    team = tmp_path / orchestrator_v4.TOP40_V4_LAYOUT.team_root("team-01")
+    outbox = team / "outbox/batch-1.json"
+    outbox.parent.mkdir(parents=True)
+    rows = [
+        {
+            "candidate_id": f"candidate-{number}",
+            "entrypoint": f"candidates/candidate-{number}/strategy.py",
+            "purpose": f"trial {number}",
+        }
+        for number in range(1, 9)
+    ]
+    outbox.write_text(
+        json.dumps({"schema_version": 1, "operation": "is-batch", "requests": rows}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(orchestrator_v4.activation_v4, "validate", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        orchestrator_v4.isolation_v4, "audit_team_surface", lambda *_: {}
+    )
+    monkeypatch.setattr(
+        orchestrator_v4.top40_v4,
+        "load_config",
+        lambda **_kwargs: SimpleNamespace(raw={}),
+    )
+    monkeypatch.setattr(
+        orchestrator_v4.research_runtime_v4, "validate_launch_authority", lambda *_: {}
+    )
+
+    def capture(_root: Path, _team_id: str, entrypoint: str) -> SimpleNamespace:
+        number = int(entrypoint.split("candidate-", 1)[1].split("/", 1)[0])
+        return SimpleNamespace(files=(), sha256=f"{number:064x}")
+
+    def metadata(
+        _root: Path,
+        _config: object,
+        _team_id: str,
+        entrypoint: str,
+        *,
+        capture: object,
+    ) -> tuple[dict[str, object], str]:
+        del capture
+        candidate_id = entrypoint.split("/candidates/", 1)[1].split("/", 1)[0]
+        return {
+            "candidate_id": candidate_id,
+            "mechanism": "one causal mechanism",
+            "tags": ["baseline"],
+        }, "candidate.json"
+
+    monkeypatch.setattr(orchestrator_v4.runner_v4, "capture_source_bundle", capture)
+    monkeypatch.setattr(orchestrator_v4, "_candidate_metadata", metadata)
+    monkeypatch.setattr(
+        orchestrator_v4.research_runtime_v4,
+        "_static_source_findings",
+        lambda _files: (["strategy.py"], []),
+    )
+    monkeypatch.setattr(
+        orchestrator_v4.research_runtime_v4,
+        "recover_candidate_receipts",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            research_runtime_v4.CandidateReceiptRejectedError(
+                "existing immutable receipt differs"
+            )
+        ),
+    )
+    with pytest.raises(
+        orchestrator_v4.CandidateBatchRejectedError,
+        match="existing immutable receipt differs",
+    ):
+        orchestrator_v4.preflight_is_batch.__wrapped__(
+            tmp_path, "team-01", "discovery"
+        )
+    assert journal_v4.read(journal).record_count == 0
+
+    def transient_receipt_failure(*_args: object, **_kwargs: object) -> None:
+        try:
+            raise OSError("temporary receipt read failure")
+        except OSError as exc:
+            raise research_runtime_v4.ResearchRuntimeError(
+                "receipt authority is unavailable"
+            ) from exc
+
+    monkeypatch.setattr(
+        orchestrator_v4.research_runtime_v4,
+        "recover_candidate_receipts",
+        transient_receipt_failure,
+    )
+    with pytest.raises(
+        research_runtime_v4.ResearchRuntimeError, match="receipt authority"
+    ):
+        orchestrator_v4.preflight_is_batch.__wrapped__(
+            tmp_path, "team-01", "discovery"
+        )
+    assert journal_v4.read(journal).record_count == 0
+
+    monkeypatch.setattr(
+        orchestrator_v4.research_runtime_v4,
+        "recover_candidate_receipts",
+        lambda *_args, **_kwargs: (),
+    )
+    monkeypatch.setattr(
+        orchestrator_v4.research_runtime_v4,
+        "validate_candidate_receipt",
+        lambda *_args, **_kwargs: {},
+    )
+    capability = orchestrator_v4.preflight_is_batch.__wrapped__(
+        tmp_path, "team-01", "discovery"
+    )
+    assert isinstance(capability, orchestrator_v4._BatchCapability)
+    state = journal_v4.read(journal)
+    assert state.record_count == 1
+    assert state.batch_preflights[("team-01", "discovery")]["record_sha256"] == (
+        capability.preflight_record_sha256
+    )
+    repeated = orchestrator_v4.preflight_is_batch.__wrapped__(
+        tmp_path, "team-01", "discovery"
+    )
+    assert isinstance(repeated, orchestrator_v4._BatchCapability)
+    assert repeated.preflight_record_sha256 == capability.preflight_record_sha256
+    assert journal_v4.read(journal).record_count == 1
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    [
+        (b"not-json\n", "invalid JSON"),
+        (b"{}\n", "schema differs"),
+        (
+            json.dumps(
+                dict.fromkeys(research_runtime_v4._RECEIPT_KEYS)  # noqa: SLF001
+                | {"phase": "unknown"}
+            ).encode(),
+            "phase is invalid",
+        ),
+        (
+            json.dumps(
+                dict.fromkeys(research_runtime_v4._RECEIPT_KEYS)  # noqa: SLF001
+                | {"phase": "refinement"}
+            ).encode(),
+            "another phase",
+        ),
+    ],
+)
+def test_candidate_receipt_semantic_corruption_is_explicitly_deterministic(
+    tmp_path: Path,
+    payload: bytes,
+    expected: str,
+) -> None:
+    source_sha256 = "a" * 64
+    relative = research_runtime_v4._receipt_relative(  # noqa: SLF001
+        "team-01", source_sha256
+    )
+    path = tmp_path / relative
+    path.parent.mkdir(parents=True)
+    path.write_bytes(payload)
+    with pytest.raises(
+        research_runtime_v4.CandidateReceiptRejectedError, match=expected
+    ):
+        research_runtime_v4.validate_candidate_receipt(
+            tmp_path,
+            "team-01",
+            "candidate-1",
+            source_sha256,
+            expected_phase="discovery",
+        )
+
+
+def test_candidate_receipt_hash_mismatch_and_immutable_conflict_are_deterministic(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source_sha256 = "b" * 64
+    command_authority = {
+        "command_sha256": "1" * 64,
+        "environment_sha256": "2" * 64,
+        "model": "frozen-model",
+        "prompt_sha256": "3" * 64,
+    }
+    receipt = dict.fromkeys(research_runtime_v4._RECEIPT_KEYS)  # noqa: SLF001
+    receipt.update(
+        {
+            **command_authority,
+            "candidate_root": (
+                "tournament/top40-v4-r2/teams/team-01/candidates/candidate-1"
+            ),
+            "disabled_capabilities": list(
+                research_runtime_v4._DISABLED_FEATURES  # noqa: SLF001
+            ),
+            "launcher_version": research_runtime_v4.LAUNCHER_VERSION,
+            "launch_authority_sha256": "4" * 64,
+            "model_runtime_sha256": "5" * 64,
+            "phase": "discovery",
+            "profile_sha256": "6" * 64,
+            "schema_version": research_runtime_v4.RECEIPT_SCHEMA_VERSION,
+            "source_bundle_sha256": "c" * 64,
+            "status": "passed",
+            "team_id": "team-01",
+            "team_kit_sha256": "7" * 64,
+            "tournament": orchestrator_v4.TOP40_V4_LAYOUT.name,
+        }
+    )
+    relative = research_runtime_v4._receipt_relative(  # noqa: SLF001
+        "team-01", source_sha256
+    )
+    path = tmp_path / relative
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps(receipt), encoding="utf-8")
+    monkeypatch.setattr(
+        research_runtime_v4, "_model_command_authority", lambda *_args: command_authority
+    )
+    monkeypatch.setattr(
+        research_runtime_v4,
+        "validate_launch_authority",
+        lambda *_args: {"sha256": "4" * 64},
+    )
+    monkeypatch.setattr(
+        research_runtime_v4, "model_runtime_sha256", lambda *_args: "5" * 64
+    )
+    monkeypatch.setattr(
+        research_runtime_v4, "profile_sha256", lambda *_args: "6" * 64
+    )
+    monkeypatch.setattr(
+        research_runtime_v4, "_team_kit_sha256", lambda *_args: "7" * 64
+    )
+    with pytest.raises(
+        research_runtime_v4.CandidateReceiptRejectedError,
+        match="source_bundle_sha256",
+    ):
+        research_runtime_v4.validate_candidate_receipt(
+            tmp_path,
+            "team-01",
+            "candidate-1",
+            source_sha256,
+            expected_phase="discovery",
+        )
+
+    immutable = tmp_path / "immutable-receipt.json"
+    research_runtime_v4._write_immutable(immutable, b"first\n")  # noqa: SLF001
+    with pytest.raises(
+        research_runtime_v4.CandidateReceiptRejectedError,
+        match="already differs",
+    ):
+        research_runtime_v4._write_immutable(  # noqa: SLF001
+            immutable,
+            b"second\n",
+            conflict_error=research_runtime_v4.CandidateReceiptRejectedError,
+        )
+
+
+def test_refinement_preflight_rejects_candidate_reuse_from_discovery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    journal = tmp_path / orchestrator_v4.TOP40_V4_LAYOUT.journal_path
+    journal.parent.mkdir(parents=True)
+    journal_v4.initialize(journal)
+    monkeypatch.setattr(orchestrator_v4, "_batch_broker_frame", lambda *_: 123)
+    discovery_ids = [f"candidate-{number}" for number in range(1, 9)]
+    discovery_hashes = [f"{number:064x}" for number in range(1, 9)]
+    journal_v4.append(
+        journal,
+        "batch_preflighted",
+        {
+            "team_id": "team-01",
+            "phase": "discovery",
+            "outbox_sha256": "b" * 64,
+            "candidate_ids": discovery_ids,
+            "source_bundle_sha256s": discovery_hashes,
+        },
+    )
+    for number, (candidate_id, source_sha256) in enumerate(
+        zip(discovery_ids, discovery_hashes, strict=True), start=1
+    ):
+        accepted = journal_v4.append(
+            journal,
+            "is_accepted",
+            {
+                "team_id": "team-01",
+                "run_id": f"team01-is-{number:02d}-prefix",
+                "trial_number": number,
+                "candidate_id": candidate_id,
+                "purpose": f"trial {number}",
+                "metadata": {
+                    "candidate_id": candidate_id,
+                    "mechanism": "one causal mechanism",
+                    "tags": ["baseline"],
+                },
+                "authority": {
+                    "entrypoint": (
+                        "tournament/top40-v4-r2/teams/team-01/"
+                        f"candidates/{candidate_id}/strategy.py"
+                    ),
+                    "source_bundle_sha256": source_sha256,
+                },
+                "research_session": {
+                    "path": (
+                        "tournament/top40-v4-r2/research-sessions/team-01/"
+                        f"{source_sha256}.json"
+                    ),
+                    "sha256": "c" * 64,
+                    "source_bundle_sha256": source_sha256,
+                },
+                "output_path": f"reports-top40-v4-r2/is/team-01/trial-{number}",
+            },
+        )
+        journal_v4.append(
+            journal,
+            "is_failed",
+            {
+                "team_id": "team-01",
+                "run_id": f"team01-is-{number:02d}-prefix",
+                "candidate_id": candidate_id,
+                "request_sha256": accepted["record_sha256"],
+                "failure": "bounded candidate failure",
+            },
+        )
+    team = tmp_path / orchestrator_v4.TOP40_V4_LAYOUT.team_root("team-01")
+    outbox = team / "outbox/batch-2.json"
+    outbox.parent.mkdir(parents=True)
+    rows = [
+        {
+            "candidate_id": candidate_id,
+            "entrypoint": f"candidates/{candidate_id}/strategy.py",
+            "purpose": f"refinement {number}",
+        }
+        for number, candidate_id in enumerate(
+            ("candidate-1", "candidate-9", "candidate-10", "candidate-11"), start=1
+        )
+    ]
+    outbox.write_text(
+        json.dumps({"schema_version": 1, "operation": "is-batch", "requests": rows}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(orchestrator_v4.activation_v4, "validate", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        orchestrator_v4.isolation_v4, "audit_team_surface", lambda *_: {}
+    )
+    monkeypatch.setattr(
+        orchestrator_v4.top40_v4,
+        "load_config",
+        lambda **_kwargs: SimpleNamespace(raw={}),
+    )
+    monkeypatch.setattr(
+        orchestrator_v4.research_runtime_v4, "validate_launch_authority", lambda *_: {}
+    )
+    monkeypatch.setattr(
+        orchestrator_v4.runner_v4,
+        "capture_source_bundle",
+        lambda *_: SimpleNamespace(files=(), sha256="d" * 64),
+    )
+    monkeypatch.setattr(
+        orchestrator_v4,
+        "_candidate_metadata",
+        lambda _root, _config, _team, entrypoint, *, capture: (
+            {
+                "candidate_id": entrypoint.split("/candidates/", 1)[1].split("/", 1)[0],
+                "mechanism": "one causal mechanism",
+                "tags": ["baseline"],
+            },
+            "candidate.json",
+        ),
+    )
+    monkeypatch.setattr(
+        orchestrator_v4.research_runtime_v4,
+        "_static_source_findings",
+        lambda _files: (["strategy.py"], []),
+    )
+    before = journal.read_bytes()
+    with pytest.raises(orchestrator_v4.CandidateBatchRejectedError, match="earlier phase"):
+        orchestrator_v4.preflight_is_batch.__wrapped__(
+            tmp_path, "team-01", "refinement", require_receipts=False
+        )
+    assert journal.read_bytes() == before
+    assert ("team-01", "refinement") not in journal_v4.read(journal).batch_preflights
+
+
+def test_preflighted_batch_rejects_changed_accepted_prefix_purpose_without_mutation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    journal = tmp_path / orchestrator_v4.TOP40_V4_LAYOUT.journal_path
+    journal.parent.mkdir(parents=True)
+    journal_v4.initialize(journal)
+    monkeypatch.setattr(orchestrator_v4, "_batch_broker_frame", lambda *_: 123)
+    candidate_ids = [f"candidate-{number}" for number in range(1, 9)]
+    source_hashes = [f"{number:064x}" for number in range(1, 9)]
+    original_rows = [
+        {
+            "candidate_id": candidate_id,
+            "entrypoint": f"candidates/{candidate_id}/strategy.py",
+            "purpose": f"trial {number}",
+        }
+        for number, candidate_id in enumerate(candidate_ids, start=1)
+    ]
+    original_payload = json.dumps(
+        {"schema_version": 1, "operation": "is-batch", "requests": original_rows}
+    ).encode()
+    preflight = journal_v4.append(
+        journal,
+        "batch_preflighted",
+        {
+            "team_id": "team-01",
+            "phase": "discovery",
+            "outbox_sha256": hashlib.sha256(original_payload).hexdigest(),
+            "candidate_ids": candidate_ids,
+            "source_bundle_sha256s": source_hashes,
+        },
+    )
+    accepted = journal_v4.append(
+        journal,
+        "is_accepted",
+        {
+            "team_id": "team-01",
+            "run_id": "team01-is-01-prefix",
+            "trial_number": 1,
+            "candidate_id": "candidate-1",
+            "purpose": "trial 1",
+            "metadata": {
+                "candidate_id": "candidate-1",
+                "mechanism": "one causal mechanism",
+                "tags": ["baseline"],
+            },
+            "authority": {
+                "entrypoint": (
+                    "tournament/top40-v4-r2/teams/team-01/"
+                    "candidates/candidate-1/strategy.py"
+                ),
+                "source_bundle_sha256": source_hashes[0],
+            },
+            "research_session": {
+                "path": (
+                    "tournament/top40-v4-r2/research-sessions/team-01/"
+                    f"{source_hashes[0]}.json"
+                ),
+                "sha256": "e" * 64,
+                "source_bundle_sha256": source_hashes[0],
+            },
+            "output_path": "reports-top40-v4-r2/is/team-01/trial-1",
+        },
+    )
+    journal_v4.append(
+        journal,
+        "is_failed",
+        {
+            "team_id": "team-01",
+            "run_id": "team01-is-01-prefix",
+            "candidate_id": "candidate-1",
+            "request_sha256": accepted["record_sha256"],
+            "failure": "bounded candidate failure",
+        },
+    )
+    changed_rows = deepcopy(original_rows)
+    changed_rows[0]["purpose"] = "changed after acceptance"
+    team = tmp_path / orchestrator_v4.TOP40_V4_LAYOUT.team_root("team-01")
+    outbox = team / "outbox/batch-1.json"
+    outbox.parent.mkdir(parents=True)
+    outbox.write_text(
+        json.dumps({"schema_version": 1, "operation": "is-batch", "requests": changed_rows}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(orchestrator_v4.activation_v4, "validate", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        orchestrator_v4.isolation_v4, "audit_team_surface", lambda *_: {}
+    )
+    monkeypatch.setattr(
+        orchestrator_v4.top40_v4,
+        "load_config",
+        lambda **_kwargs: SimpleNamespace(raw={}),
+    )
+    monkeypatch.setattr(
+        orchestrator_v4.research_runtime_v4, "validate_launch_authority", lambda *_: {}
+    )
+    before = journal.read_bytes()
+    with pytest.raises(orchestrator_v4.OrchestratorError, match="accepted batch prefix"):
+        orchestrator_v4.preflight_is_batch.__wrapped__(
+            tmp_path, "team-01", "discovery", require_receipts=False
+        )
+    assert journal.read_bytes() == before
+    assert journal_v4.read(journal).batch_preflights[("team-01", "discovery")][
+        "record_sha256"
+    ] == preflight["record_sha256"]
+
+
 def test_orchestrator_rejects_discovery_batch_at_trial_zero(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     journal = tmp_path / orchestrator_v4.TOP40_V4_LAYOUT.journal_path
     journal.parent.mkdir(parents=True)
     journal_v4.initialize(journal)
+    monkeypatch.setattr(orchestrator_v4, "_batch_broker_frame", lambda *_: 123)
     monkeypatch.setattr(orchestrator_v4.activation_v4, "validate", lambda *_args, **_kwargs: {})
     monkeypatch.setattr(
         orchestrator_v4.isolation_v4, "audit_team_surface", lambda *_: {}
     )
     monkeypatch.setattr(orchestrator_v4, "_write_nomination_registry", lambda *_: None)
+    outbox = (
+        tmp_path
+        / orchestrator_v4.TOP40_V4_LAYOUT.team_root("team-01")
+        / "outbox/batch-1.json"
+    )
+    outbox.parent.mkdir(parents=True)
+    payload = b'{"invalid":"batch"}\n'
+    outbox.write_bytes(payload)
+    capability = orchestrator_v4._BatchRejectionCapability(
+        seal=orchestrator_v4._BATCH_CAPABILITY_SEAL,
+        root=str(tmp_path.resolve()),
+        team_id="team-01",
+        phase="discovery",
+        outbox_sha256=hashlib.sha256(payload).hexdigest(),
+        candidate_ids=(),
+        journal_head_sha256=journal_v4.GENESIS_SHA256,
+        broker_frame_id=123,
+    )
+    error = orchestrator_v4.CandidateBatchRejectedError(
+        "deterministic score-blind admission failure", capability=capability
+    )
     result = orchestrator_v4.reject_batch_before_evaluation.__wrapped__(
         tmp_path,
-        "team-01",
-        "discovery",
-        reason="deterministic score-blind admission failure",
-        outbox_sha256="2" * 64,
-        candidate_ids=[f"candidate-{number}" for number in range(1, 9)],
+        error,
     )
     state = journal_v4.read(journal)
     assert result["retired"] is True
@@ -3424,6 +4199,147 @@ def test_run_team_crash_recovers_rejected_batch_outbox_archive(
     assert archive.read_bytes() == payload
 
 
+@pytest.mark.parametrize("archive_kind", ["corrupt", "symlink", "hardlink"])
+def test_run_team_rejects_unsafe_rejected_batch_archive_without_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    archive_kind: str,
+) -> None:
+    broker = _broker_module()
+    team_id = "team-01"
+    phase = "discovery"
+    payload = b'{"operation":"is-batch"}\n'
+    digest = hashlib.sha256(payload).hexdigest()
+    journal = tmp_path / broker.TOP40_V4_LAYOUT.journal_path
+    journal.parent.mkdir(parents=True, exist_ok=True)
+    broker.journal_v4.initialize(journal)
+    broker.journal_v4.append(
+        journal,
+        "batch_rejected",
+        {
+            "team_id": team_id,
+            "phase": phase,
+            "reason": "deterministic score-blind admission failure",
+            "outbox_sha256": digest,
+            "candidate_ids": [f"candidate-{number}" for number in range(1, 9)],
+        },
+    )
+    archive_directory = (
+        tmp_path
+        / "tournament/top40-v4-r2/research-sessions/outboxes"
+        / team_id
+    )
+    archive_directory.mkdir(parents=True, mode=0o700)
+    archive = archive_directory / f"{phase}-{digest}.json"
+    external = tmp_path / f"outside-{archive_kind}.json"
+    external.write_bytes(payload)
+    external.chmod(0o600)
+    if archive_kind == "corrupt":
+        archive.write_bytes(b"corrupt\n")
+        archive.chmod(0o600)
+    elif archive_kind == "symlink":
+        archive.symlink_to(external)
+    else:
+        os.link(external, archive)
+    journal_before = journal.read_bytes()
+    external_before = external.read_bytes()
+    external_mode = stat.S_IMODE(external.stat().st_mode)
+    monkeypatch.setattr(broker.activation_v4, "validate", lambda _root: {})
+    monkeypatch.setattr(
+        broker, "_restore_lane_markers_before_authority", lambda *_args: ()
+    )
+
+    with pytest.raises(broker.BrokerError, match="archive"):
+        broker.run_team.__wrapped__(tmp_path, team_id)
+
+    assert journal.read_bytes() == journal_before
+    assert external.read_bytes() == external_before
+    assert stat.S_IMODE(external.stat().st_mode) == external_mode
+    assert os.path.lexists(archive)
+
+
+@pytest.mark.parametrize("malformed_kind", ["wrong-count", "bad-purpose"])
+def test_run_team_terminally_classifies_published_malformed_model_batch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    malformed_kind: str,
+) -> None:
+    broker = _broker_module()
+    journal = tmp_path / broker.TOP40_V4_LAYOUT.journal_path
+    journal.parent.mkdir(parents=True)
+    broker.journal_v4.initialize(journal)
+    team = tmp_path / broker.TOP40_V4_LAYOUT.team_root("team-01")
+    outbox = team / "outbox/batch-1.json"
+    outbox.parent.mkdir(parents=True)
+    rows = [
+        {
+            "candidate_id": f"candidate-{number}",
+            "entrypoint": f"candidates/candidate-{number}/strategy.py",
+            "purpose": f"trial {number}",
+        }
+        for number in range(1, 9)
+    ]
+    if malformed_kind == "wrong-count":
+        rows.pop()
+    else:
+        rows[0]["purpose"] = "bad\ncontrol"
+    payload = json.dumps(
+        {"schema_version": 1, "operation": "is-batch", "requests": rows}
+    ).encode() + b"\n"
+
+    def interrupted_launch(_root: Path, _team_id: str, _phase: str) -> None:
+        outbox.write_bytes(payload)
+        outbox.chmod(0o600)
+        raise research_runtime_v4.ResearchRuntimeError(
+            "published model batch failed post-process admission"
+        )
+
+    monkeypatch.setattr(broker, "launch_phase", interrupted_launch)
+    monkeypatch.setattr(
+        broker, "_restore_lane_markers_before_authority", lambda *_args: ()
+    )
+    monkeypatch.setattr(broker.activation_v4, "validate", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        broker.activation_v4, "require_completed_pretrial_recovery", lambda *_args: {}
+    )
+    monkeypatch.setattr(
+        broker.orchestrator_v4.isolation_v4, "audit_team_surface", lambda *_args: {}
+    )
+    monkeypatch.setattr(
+        broker.orchestrator_v4.top40_v4,
+        "load_config",
+        lambda **_kwargs: SimpleNamespace(raw={}),
+    )
+    monkeypatch.setattr(
+        broker.orchestrator_v4.research_runtime_v4,
+        "validate_launch_authority",
+        lambda *_args: {},
+    )
+    monkeypatch.setattr(
+        broker.orchestrator_v4, "_batch_broker_frame", lambda *_args: 123
+    )
+    monkeypatch.setattr(
+        broker.orchestrator_v4, "_write_nomination_registry", lambda *_args: None
+    )
+
+    result = broker.run_team.__wrapped__(tmp_path, "team-01")
+    state = broker.journal_v4.read(journal)
+    terminal = state.retired["team-01"]
+    assert result["terminal"] == "retired"
+    assert terminal["event_type"] == "batch_rejected"
+    assert state.trials_by_team["team-01"] == 0
+    assert state.is_requests == {}
+    assert terminal["payload"]["outbox_sha256"] == hashlib.sha256(payload).hexdigest()
+    archive = (
+        tmp_path
+        / "tournament/top40-v4-r2/research-sessions/outboxes/team-01"
+        / f"discovery-{hashlib.sha256(payload).hexdigest()}.json"
+    )
+    assert archive.read_bytes() == payload
+    assert not outbox.exists()
+    assert not (team / "feedback/discovery.json").exists()
+
+
 def test_consume_batch_preflight_infrastructure_failure_is_resumable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -3446,7 +4362,9 @@ def test_consume_batch_preflight_infrastructure_failure_is_resumable(
     monkeypatch.setattr(
         broker.orchestrator_v4,
         "preflight_is_batch",
-        lambda *_: (_ for _ in ()).throw(OSError("temporary preflight storage failure")),
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            OSError("temporary preflight storage failure")
+        ),
     )
     retired: list[str] = []
     monkeypatch.setattr(

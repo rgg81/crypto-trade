@@ -21,7 +21,11 @@ from crypto_trade.tournament.layout_v4 import TOP40_V4_LAYOUT
 _SCHEMA_PREFIX = (
     TOP40_V4_LAYOUT.name if TOP40_V4_LAYOUT.name.endswith("-r2") else "top40-v4-r1"
 )
-SCHEMA_VERSION = f"{_SCHEMA_PREFIX}-lifecycle-journal-v1"
+SCHEMA_VERSION = (
+    f"{_SCHEMA_PREFIX}-lifecycle-journal-v2"
+    if TOP40_V4_LAYOUT.name.endswith("-r2")
+    else f"{_SCHEMA_PREFIX}-lifecycle-journal-v1"
+)
 GENESIS_SHA256 = "0" * 64
 MAX_RECORD_BYTES = 1_048_576
 
@@ -151,6 +155,15 @@ if TOP40_V4_LAYOUT.name.endswith("-r2"):
             "candidate_ids",
         }
     )
+    _EVENT_KEYS["batch_preflighted"] = frozenset(
+        {
+            "team_id",
+            "phase",
+            "outbox_sha256",
+            "candidate_ids",
+            "source_bundle_sha256s",
+        }
+    )
 
 
 class JournalError(ValueError):
@@ -165,6 +178,7 @@ class JournalState:
     is_requests: Mapping[str, Mapping[str, Any]]
     is_terminals: Mapping[str, Mapping[str, Any]]
     is_successes: Mapping[str, Mapping[str, Any]]
+    batch_preflights: Mapping[tuple[str, str], Mapping[str, Any]]
     nominations: Mapping[str, Mapping[str, Any]]
     retired: Mapping[str, Mapping[str, Any]]
     selection: Mapping[str, Any] | None
@@ -294,22 +308,29 @@ def _validate_payload(event_type: str, payload: object) -> Mapping[str, Any]:
         _text(payload[key], key)
     if event_type in {"retired", "batch_rejected"}:
         _text(payload["reason"], "reason")
-    if event_type == "batch_rejected":
+    if event_type in {"batch_preflighted", "batch_rejected"}:
         phase = payload["phase"]
         candidate_ids = payload["candidate_ids"]
         if not isinstance(phase, str) or phase not in ("discovery", "refinement"):
-            raise JournalError("batch rejection phase is invalid")
+            raise JournalError("batch phase is invalid")
         expected_count = 8 if phase == "discovery" else 4
         _hash(payload["outbox_sha256"], "outbox_sha256")
         if (
             not isinstance(candidate_ids, list)
-            or len(candidate_ids) != expected_count
+            or len(candidate_ids) > expected_count
             or any(not isinstance(candidate_id, str) for candidate_id in candidate_ids)
-            or len(set(candidate_ids)) != expected_count
+            or len(set(candidate_ids)) != len(candidate_ids)
+            or (event_type == "batch_preflighted" and len(candidate_ids) != expected_count)
         ):
-            raise JournalError("batch rejection candidate list is invalid")
+            raise JournalError("batch candidate list is invalid")
         for candidate_id in candidate_ids:
             _identifier(candidate_id, "candidate_id")
+        if event_type == "batch_preflighted":
+            source_hashes = payload["source_bundle_sha256s"]
+            if not isinstance(source_hashes, list) or len(source_hashes) != expected_count:
+                raise JournalError("batch source authority list is invalid")
+            for source_hash in source_hashes:
+                _hash(source_hash, "source_bundle_sha256")
     for key in (
         "output_path",
         "summary_path",
@@ -392,6 +413,7 @@ def replay_bytes(payload: bytes) -> JournalState:
     is_requests: dict[str, Mapping[str, Any]] = {}
     is_terminals: dict[str, Mapping[str, Any]] = {}
     is_successes: dict[str, Mapping[str, Any]] = {}
+    batch_preflights: dict[tuple[str, str], Mapping[str, Any]] = {}
     nominations: dict[str, Mapping[str, Any]] = {}
     retired: dict[str, Mapping[str, Any]] = {}
     selection: Mapping[str, Any] | None = None
@@ -431,6 +453,23 @@ def replay_bytes(payload: bytes) -> JournalState:
             if selection is not None:
                 raise JournalError("IS trial accepted after selection freeze")
             team_id = str(event["team_id"])
+            if TOP40_V4_LAYOUT.name.endswith("-r2"):
+                trial_number = int(event["trial_number"])
+                phase = "discovery" if trial_number <= 8 else "refinement"
+                batch = batch_preflights.get((team_id, phase))
+                index = trial_number - (1 if phase == "discovery" else 9)
+                batch_payload = batch["payload"] if batch is not None else None
+                if (
+                    batch_payload is None
+                    or index < 0
+                    or index >= len(batch_payload["candidate_ids"])
+                    or event["candidate_id"] != batch_payload["candidate_ids"][index]
+                    or event["authority"].get("source_bundle_sha256")
+                    != batch_payload["source_bundle_sha256s"][index]
+                ):
+                    raise JournalError(
+                        "accepted trial lacks its exact whole-batch preflight authority"
+                    )
             candidate_key = (team_id, str(event["candidate_id"]))
             if candidate_key in seen_candidates:
                 raise JournalError("candidate consumed more than one IS observation")
@@ -455,6 +494,30 @@ def replay_bytes(payload: bytes) -> JournalState:
             is_terminals[request_hash] = record
             if event_type == "is_succeeded":
                 is_successes[digest] = record
+        elif event_type == "batch_preflighted":
+            if selection is not None:
+                raise JournalError("batch preflight recorded after selection freeze")
+            team_id = str(event["team_id"])
+            phase = str(event["phase"])
+            key = (team_id, phase)
+            expected_trials = 0 if phase == "discovery" else 8
+            if (
+                team_id in nominations
+                or team_id in retired
+                or key in batch_preflights
+                or trials[team_id] != expected_trials
+                or any(
+                    request_hash not in is_terminals
+                    for request_hash, request in is_requests.items()
+                    if request["payload"]["team_id"] == team_id
+                )
+                or any(
+                    (team_id, candidate_id) in seen_candidates
+                    for candidate_id in event["candidate_ids"]
+                )
+            ):
+                raise JournalError("batch preflight is outside its exact phase boundary")
+            batch_preflights[key] = record
         elif event_type in {"nominated", "retired", "batch_rejected"}:
             if selection is not None:
                 raise JournalError("team disposition changed after selection freeze")
@@ -463,7 +526,10 @@ def replay_bytes(payload: bytes) -> JournalState:
                 raise JournalError("team has more than one terminal IS disposition")
             if event_type == "batch_rejected":
                 expected_trials = 0 if event["phase"] == "discovery" else 8
-                if trials[team_id] != expected_trials:
+                if (
+                    trials[team_id] != expected_trials
+                    or (team_id, str(event["phase"])) in batch_preflights
+                ):
                     raise JournalError("batch rejection is outside its exact phase boundary")
                 if any(
                     request_hash not in is_terminals
@@ -571,6 +637,7 @@ def replay_bytes(payload: bytes) -> JournalState:
         is_requests=MappingProxyType(is_requests),
         is_terminals=MappingProxyType(is_terminals),
         is_successes=MappingProxyType(is_successes),
+        batch_preflights=MappingProxyType(batch_preflights),
         nominations=MappingProxyType(nominations),
         retired=MappingProxyType(retired),
         selection=selection,

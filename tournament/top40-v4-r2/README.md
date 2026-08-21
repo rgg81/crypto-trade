@@ -52,9 +52,11 @@ so no hidden Codex session state crosses a research phase.
 
 Before any request in a discovery or refinement batch is accepted, the broker score-blind
 preflights the complete batch's captured metadata, attestation, research receipt, static source,
-and mechanism sequence. A deterministic admission defect retires the lane without opening score
-data or consuming a trial; transient organizer failures remain resumable. This prevents a malformed
-late request from stranding a lane after earlier outcomes exist.
+and mechanism sequence. The canonical serial broker durably records that exact ordered batch and
+holds the process-local capability required by every later trial admission. A deterministic
+admission defect retires the lane without opening score data or consuming a trial; transient
+organizer failures remain resumable. This prevents a malformed late request from stranding a lane
+after earlier outcomes exist or a direct library/CLI call from bypassing whole-batch admission.
 
 The evaluator's separate strategy worker reconstructs its environment and binds the exact frozen
 `src` path needed to resolve the organizer module before the child masks the repository. A real

@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 import sys
 from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
@@ -100,6 +101,9 @@ def _archive_outbox(root: Path, team_id: str, phase: str, path: Path, payload: b
         f"{phase}-{digest}.json"
     )
     research_runtime_v4._write_immutable(root / relative, payload)  # noqa: SLF001
+    archive = _phase_archive(root, team_id, phase)
+    if archive is None or archive.relative_to(root).as_posix() != relative:
+        raise BrokerError("immutable outbox archive authority differs")
     path.unlink()
     return relative
 
@@ -153,6 +157,24 @@ def _validate_batch(
 ) -> tuple[list[Mapping[str, str]], Path, bytes]:
     request, path, payload = _read_request(root, team_id, phase)
     return _normalize_batch_request(root, team_id, phase, request), path, payload
+
+
+def _reject_failed_preflight(
+    root: Path,
+    team_id: str,
+    phase: str,
+    error: orchestrator_v4.CandidateBatchRejectedError,
+) -> Mapping[str, Any]:
+    name = "batch-1.json" if phase == "discovery" else "batch-2.json"
+    path = root / TOP40_V4_LAYOUT.team_root(team_id) / "outbox" / name
+    payload = research_runtime_v4._stable_bytes(path)  # noqa: SLF001
+    rejected = orchestrator_v4.reject_batch_before_evaluation(root, error)
+    archive = _archive_outbox(root, team_id, phase, path, payload)
+    return {
+        **rejected,
+        "outbox_sha256": hashlib.sha256(payload).hexdigest(),
+        "outbox_archive_path": archive,
+    }
 
 
 def _accepted_record(
@@ -209,7 +231,12 @@ def _phase_archive(root: Path, team_id: str, phase: str) -> Path | None:
     directory = root / "tournament/top40-v4-r2/research-sessions/outboxes" / team_id
     if not directory.exists():
         return None
-    if directory.is_symlink() or not directory.is_dir():
+    directory_stat = directory.lstat()
+    if (
+        not stat.S_ISDIR(directory_stat.st_mode)
+        or directory_stat.st_uid != os.geteuid()
+        or directory_stat.st_mode & 0o077
+    ):
         raise BrokerError("broker outbox archive directory is unsafe")
     matches = []
     for path in directory.iterdir():
@@ -222,7 +249,32 @@ def _phase_archive(root: Path, team_id: str, phase: str) -> Path | None:
         matches.append(path)
     if len(matches) > 1:
         raise BrokerError("broker phase has multiple archived outboxes")
-    return matches[0] if matches else None
+    if not matches:
+        return None
+    path = matches[0]
+    try:
+        before = path.lstat()
+        payload = research_runtime_v4._stable_bytes(path)  # noqa: SLF001
+        after = path.lstat()
+    except (OSError, research_runtime_v4.ResearchRuntimeError) as exc:
+        raise BrokerError("broker outbox archive file is unsafe") from exc
+    if (
+        not stat.S_ISREG(before.st_mode)
+        or not stat.S_ISREG(after.st_mode)
+        or before.st_uid != os.geteuid()
+        or after.st_uid != os.geteuid()
+        or before.st_nlink != 1
+        or after.st_nlink != 1
+        or before.st_mode & 0o077
+        or after.st_mode & 0o077
+        or (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
+        != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
+    ):
+        raise BrokerError("broker outbox archive file is unsafe")
+    digest = hashlib.sha256(payload).hexdigest()
+    if path.name != f"{phase}-{digest}.json":
+        raise BrokerError("broker outbox archive digest differs")
+    return path
 
 
 def _validate_completed_phase(root: Path, team_id: str, phase: str) -> Mapping[str, Any]:
@@ -362,29 +414,20 @@ def consume_batch(root: Path, team_id: str, phase: str) -> Mapping[str, Any]:
     _restore_lane_markers_before_authority(root, team_id)
     activation_v4.validate(root)
     TOP40_V4_LAYOUT.require_team(team_id)
+    try:
+        orchestrator_v4.preflight_is_batch(
+            root, team_id, phase, require_receipts=False
+        )
+    except orchestrator_v4.CandidateBatchRejectedError as exc:
+        return _reject_failed_preflight(root, team_id, phase, exc)
     requests, path, payload = _validate_batch(root, team_id, phase)
     _validate_consume_transition(root, team_id, phase, requests)
-    research_runtime_v4.recover_candidate_receipts(root, team_id, phase, path)
     try:
-        orchestrator_v4.preflight_is_batch(root, team_id, phase, requests)
+        capability = orchestrator_v4.preflight_is_batch(root, team_id, phase)
     except orchestrator_v4.CandidateBatchRejectedError as exc:
-        outbox_sha256 = hashlib.sha256(payload).hexdigest()
-        rejected = orchestrator_v4.reject_batch_before_evaluation(
-            root,
-            team_id,
-            phase,
-            reason=(
-                f"{phase} batch failed deterministic score-blind admission preflight: {exc}"
-            ),
-            outbox_sha256=outbox_sha256,
-            candidate_ids=[request["candidate_id"] for request in requests],
-        )
-        archive = _archive_outbox(root, team_id, phase, path, payload)
-        return {
-            **rejected,
-            "outbox_sha256": outbox_sha256,
-            "outbox_archive_path": archive,
-        }
+        return _reject_failed_preflight(root, team_id, phase, exc)
+    if capability is None:
+        raise BrokerError("batch preflight did not issue an evaluation capability")
     rows: list[Mapping[str, Any]] = []
     for request in requests:
         entrypoint = f"{TOP40_V4_LAYOUT.team_root(team_id)}/{request['entrypoint']}"
@@ -399,6 +442,7 @@ def consume_batch(root: Path, team_id: str, phase: str) -> Mapping[str, Any]:
                     team_id,
                     entrypoint,
                     purpose=request["purpose"],
+                    _batch_capability=capability,
                 )
             except Exception:
                 # Runtime failures are already terminal and consume a trial. Admission failures
@@ -574,7 +618,16 @@ def run_team(root: Path, team_id: str) -> Mapping[str, Any]:
         feedback = team / "feedback" / f"{phase}.json"
         if not feedback.exists():
             if not outbox.exists():
-                results.append(launch_phase(root, team_id, phase))
+                try:
+                    results.append(launch_phase(root, team_id, phase))
+                except research_runtime_v4.ResearchRuntimeError:
+                    # A completed model can durably publish an invalid outbox before the
+                    # launcher's post-process validation classifies it.  Once the exact outbox
+                    # exists, the broker-held whole-batch admission path—not a second model
+                    # session—is the sole authority to reject it score-blind or recover exact
+                    # receipts.  With no outbox, the failure remains infrastructure-resumable.
+                    if not os.path.lexists(outbox):
+                        raise
             results.append(consume_batch(root, team_id, phase))
         elif outbox.exists():
             results.append(consume_batch(root, team_id, phase))

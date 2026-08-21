@@ -92,8 +92,11 @@ ordering.
 Before opening score data or appending the first accepted record for a batch, the organizer captures
 and validates the entire batch against exact receipts, metadata/attestations, the static source
 subset, and a simulated mechanism history. Deterministic batch defects retire the lane at that
-score-blind boundary. Filesystem, receipt, lock, or other infrastructure failures do not retire the
-lane and remain safely resumable.
+score-blind boundary. This includes a deterministic immutable receipt schema, phase, hash, or
+binding conflict. Filesystem I/O, isolation-probe, runtime, lock, or other infrastructure failures
+do not retire the lane and remain safely resumable. The journal binds the exact ordered preflight,
+and only the live canonical serial-broker consume frame receives the capability to reject or admit
+that batch; direct library and organizer CLI trial calls are fail-closed before mutation.
 
 One blocking process-wide broker lease encloses every model session and evaluation command. The
 pre-activation bootstrap runs under the distinct result lock so its committed-scope test child can

@@ -396,6 +396,10 @@ class CandidateSourceRejectedError(ResearchRuntimeError):
     """The exact candidate bytes deterministically violate the frozen source contract."""
 
 
+class CandidateReceiptRejectedError(ResearchRuntimeError):
+    """A candidate's existing receipt deterministically differs from frozen authority."""
+
+
 def _is_bounded_single_line(value: object, *, maximum: int = 2048) -> bool:
     return (
         isinstance(value, str)
@@ -1581,7 +1585,12 @@ def _launch_relative(team_id: str, phase: str) -> str:
     return f"{isolation_v4.RESEARCH_SESSION_ROOT}/launches/{team_id}/{phase}.json"
 
 
-def _write_immutable(path: Path, payload: bytes) -> None:
+def _write_immutable(
+    path: Path,
+    payload: bytes,
+    *,
+    conflict_error: type[ResearchRuntimeError] = ResearchRuntimeError,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     try:
         descriptor = os.open(
@@ -1591,7 +1600,7 @@ def _write_immutable(path: Path, payload: bytes) -> None:
         )
     except FileExistsError:
         if _stable_bytes(path) != payload:
-            raise ResearchRuntimeError("immutable research receipt already differs")
+            raise conflict_error("immutable research receipt already differs")
         return
     with os.fdopen(descriptor, "wb") as handle:
         if handle.write(payload) != len(payload):
@@ -1718,10 +1727,15 @@ def record_candidate_receipts(
                 team_id,
                 candidate_id,
                 capture.sha256,
+                expected_phase=phase,
             )
             recorded.append(existing)
             continue
-        _write_immutable(root_path / relative, payload)
+        _write_immutable(
+            root_path / relative,
+            payload,
+            conflict_error=CandidateReceiptRejectedError,
+        )
         recorded.append(
             {
                 "path": relative,
@@ -1737,6 +1751,8 @@ def validate_candidate_receipt(
     team_id: str,
     candidate_id: str,
     source_bundle_sha256: str,
+    *,
+    expected_phase: str | None = None,
 ) -> Mapping[str, str]:
     """Verify the organizer-only session receipt bound to one captured candidate."""
 
@@ -1748,13 +1764,24 @@ def validate_candidate_receipt(
     try:
         receipt = json.loads(payload)
     except (UnicodeError, json.JSONDecodeError) as exc:
-        raise ResearchRuntimeError("research session receipt is invalid JSON") from exc
+        raise CandidateReceiptRejectedError(
+            "research session receipt is invalid JSON"
+        ) from exc
     if not isinstance(receipt, Mapping) or set(receipt) != _RECEIPT_KEYS:
-        raise ResearchRuntimeError("research session receipt schema differs")
+        raise CandidateReceiptRejectedError("research session receipt schema differs")
     probes = receipt.get("probes")
-    command_authority = _model_command_authority(root_path, team_id, str(receipt.get("phase")))
+    receipt_phase = str(receipt.get("phase"))
+    if _PHASE.fullmatch(receipt_phase) is None:
+        raise CandidateReceiptRejectedError(
+            "research session receipt phase is invalid"
+        )
+    if expected_phase is not None and receipt_phase != expected_phase:
+        raise CandidateReceiptRejectedError(
+            "research session receipt belongs to another phase"
+        )
+    command_authority = _model_command_authority(root_path, team_id, receipt_phase)
     launch_authority = validate_launch_authority(
-        root_path, team_id, str(receipt.get("phase"))
+        root_path, team_id, receipt_phase
     )
     expected = {
         **command_authority,
@@ -1773,19 +1800,23 @@ def validate_candidate_receipt(
     }
     for key, value in expected.items():
         if receipt.get(key) != value:
-            raise ResearchRuntimeError(f"research session receipt differs in {key}")
-    if _PHASE.fullmatch(str(receipt.get("phase"))) is None:
-        raise ResearchRuntimeError("research session receipt phase is invalid")
+            raise CandidateReceiptRejectedError(
+                f"research session receipt differs in {key}"
+            )
     if (
         receipt.get("codex_version") != _codex_version(_codex_binary())
         or not isinstance(receipt.get("recorded_at_utc"), str)
         or _UTC.fullmatch(str(receipt["recorded_at_utc"])) is None
     ):
-        raise ResearchRuntimeError("research session runtime authority differs")
+        raise CandidateReceiptRejectedError(
+            "research session runtime authority differs"
+        )
     if not isinstance(probes, Mapping) or set(probes) != _PROBE_KEYS or not all(
         value is True for value in probes.values()
     ):
-        raise ResearchRuntimeError("research session receipt probes did not pass")
+        raise CandidateReceiptRejectedError(
+            "research session receipt probes did not pass"
+        )
     return {
         "path": relative,
         "sha256": hashlib.sha256(payload).hexdigest(),
@@ -3064,6 +3095,7 @@ def launch_team_phase(
 __all__ = [
     "LAUNCHER_VERSION",
     "PROFILE_NAME",
+    "CandidateReceiptRejectedError",
     "CandidateSourceRejectedError",
     "ResearchRuntimeError",
     "broker_lease",

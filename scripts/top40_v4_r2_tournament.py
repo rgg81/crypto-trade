@@ -34,7 +34,9 @@ def _parser() -> argparse.ArgumentParser:
     )
     commands.add_parser("status", help="show the disclosure-safe lifecycle projection")
 
-    run_is = commands.add_parser("is-run", help="accept and evaluate one structured IS trial")
+    run_is = commands.add_parser(
+        "is-run", help="disabled in R2; trials are admitted only by the batch broker"
+    )
     run_is.add_argument("team_id")
     run_is.add_argument("entrypoint")
     run_is.add_argument("--purpose", required=True)
@@ -82,11 +84,8 @@ def main(argv: list[str] | None = None) -> int:
             elif arguments.command == "status":
                 result = orchestrator_v4.status(root)
             elif arguments.command == "is-run":
-                result = orchestrator_v4.run_is(
-                    root,
-                    arguments.team_id,
-                    arguments.entrypoint,
-                    purpose=arguments.purpose,
+                raise orchestrator_v4.OrchestratorError(
+                    "R2 per-trial IS execution is disabled; use the sequential batch broker"
                 )
             elif arguments.command == "nominate":
                 result = orchestrator_v4.nominate(

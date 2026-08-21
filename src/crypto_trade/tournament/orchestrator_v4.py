@@ -6,6 +6,7 @@ import contextlib
 import dataclasses
 import fcntl
 import hashlib
+import inspect
 import io
 import json
 import math
@@ -86,9 +87,77 @@ class OrchestratorError(RuntimeError):
 class CandidateBatchRejectedError(OrchestratorError):
     """A complete score-blind research batch failed deterministic admission."""
 
+    def __init__(self, message: str, *, capability: object | None = None) -> None:
+        super().__init__(message)
+        self._capability = capability
+
 
 class ResultCommandBusyError(OrchestratorError):
     """Another result-bearing V4 command owns the kernel lock."""
+
+
+_BATCH_CAPABILITY_SEAL = object()
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class _BatchCandidate:
+    candidate_id: str
+    entrypoint: str
+    purpose: str
+    source_bundle_sha256: str
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class _BatchCapability:
+    seal: object
+    root: str
+    team_id: str
+    phase: str
+    outbox_sha256: str
+    candidates: tuple[_BatchCandidate, ...]
+    preflight_record_sha256: str
+    broker_frame_id: int
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class _BatchRejectionCapability:
+    seal: object
+    root: str
+    team_id: str
+    phase: str
+    outbox_sha256: str
+    candidate_ids: tuple[str, ...]
+    journal_head_sha256: str
+    broker_frame_id: int
+
+
+def _batch_broker_frame(root: Path, team_id: str, phase: str) -> int:
+    """Bind admission authority to the live canonical broker consume frame."""
+
+    expected = (root / "scripts/top40_v4_r2_team_broker.py").resolve()
+    frame = inspect.currentframe()
+    try:
+        while frame is not None:
+            code_path = Path(frame.f_code.co_filename).resolve()
+            broker_function = frame.f_globals.get("consume_batch")
+            broker_original = getattr(broker_function, "__wrapped__", None)
+            if (
+                frame.f_code.co_name == "consume_batch"
+                and code_path == expected
+                and Path(str(frame.f_globals.get("__file__", ""))).resolve()
+                == expected
+                and getattr(broker_original, "__code__", None) is frame.f_code
+                and Path(frame.f_locals.get("root", "")).resolve() == root
+                and frame.f_locals.get("team_id") == team_id
+                and frame.f_locals.get("phase") == phase
+            ):
+                return id(frame)
+            frame = frame.f_back
+    finally:
+        del frame
+    raise OrchestratorError(
+        "whole-batch admission is available only inside the canonical broker consume frame"
+    )
 
 
 def _wraps_os_error(error: BaseException) -> bool:
@@ -910,20 +979,78 @@ def preflight_is_batch(
     root: str | Path,
     team_id: str,
     phase: str,
-    requests: Sequence[Mapping[str, str]],
-) -> Mapping[str, Any]:
-    """Validate an entire batch before accepting or evaluating its first new trial."""
+    *,
+    require_receipts: bool = True,
+) -> _BatchCapability | None:
+    """Validate and durably authorize a whole batch before its first evaluation."""
 
     root_path = _safe_root(root)
+    broker_frame_id = _batch_broker_frame(root_path, team_id, phase)
     with _result_lock(root_path):
         isolation_v4.audit_team_surface(root_path, team_id)
         activation_v4.validate(root_path, verify_universe_snapshot=False)
         loaded = top40_v4.load_config(root=root_path)
-        state = journal_v4.read(_journal_path(root_path))
+        state = _close_interrupted_is_requests(root_path)
         TOP40_V4_LAYOUT.require_team(team_id)
         if phase not in {"discovery", "refinement"}:
             raise OrchestratorError("batch preflight phase is invalid")
         phase_start = 0 if phase == "discovery" else 8
+        expected_count = 8 if phase == "discovery" else 4
+        if (
+            state.selection is not None
+            or team_id in state.nominations
+            or team_id in state.retired
+            or not phase_start
+            <= state.trials_by_team.get(team_id, 0)
+            <= phase_start + expected_count
+            or any(
+                request_hash not in state.is_terminals
+                for request_hash, request in state.is_requests.items()
+                if request["payload"]["team_id"] == team_id
+            )
+        ):
+            raise OrchestratorError("batch preflight journal range is out of phase")
+        research_runtime_v4.validate_launch_authority(root_path, team_id, phase)
+        outbox_name = "batch-1.json" if phase == "discovery" else "batch-2.json"
+        outbox_relative = f"{TOP40_V4_LAYOUT.team_root(team_id)}/outbox/{outbox_name}"
+        outbox_payload = _stable_authority_bytes(_path(root_path, outbox_relative))
+        outbox_sha256 = _sha256(outbox_payload)
+        existing = state.batch_preflights.get((team_id, phase))
+
+        def rejection_capability(candidate_ids: Sequence[str] = ()) -> _BatchRejectionCapability:
+            return _BatchRejectionCapability(
+                seal=_BATCH_CAPABILITY_SEAL,
+                root=str(root_path),
+                team_id=team_id,
+                phase=phase,
+                outbox_sha256=outbox_sha256,
+                candidate_ids=tuple(candidate_ids),
+                journal_head_sha256=state.head_sha256,
+                broker_frame_id=broker_frame_id,
+            )
+
+        try:
+            request_object = _strict_object_bytes(outbox_payload, outbox_relative)
+            candidate_ids = research_runtime_v4._validate_phase_request(  # noqa: SLF001
+                request_object, phase
+            )
+        except (OrchestratorError, research_runtime_v4.ResearchRuntimeError) as exc:
+            if _wraps_os_error(exc):
+                raise
+            if existing is not None:
+                raise OrchestratorError("preflighted batch outbox authority changed") from exc
+            raise CandidateBatchRejectedError(
+                f"batch outbox failed deterministic score-blind admission: {exc}",
+                capability=rejection_capability(),
+            ) from exc
+        rows = tuple(
+            {
+                "candidate_id": str(row["candidate_id"]),
+                "entrypoint": str(row["entrypoint"]),
+                "purpose": str(row["purpose"]),
+            }
+            for row in request_object["requests"]
+        )
         accepted = sorted(
             (
                 request["payload"]
@@ -932,14 +1059,27 @@ def preflight_is_batch(
             ),
             key=lambda payload: payload["trial_number"],
         )
-        if len(accepted) < phase_start or len(accepted) > phase_start + len(requests):
-            raise OrchestratorError("batch preflight journal range is out of phase")
         current = accepted[phase_start:]
+        if len(current) > expected_count:
+            raise OrchestratorError("batch preflight accepted prefix is too long")
+        for index, accepted_request in enumerate(current):
+            expected = rows[index]
+            if (
+                accepted_request["candidate_id"] != expected["candidate_id"]
+                or accepted_request["purpose"] != expected["purpose"]
+                or accepted_request["authority"].get("entrypoint")
+                != f"{TOP40_V4_LAYOUT.team_root(team_id)}/{expected['entrypoint']}"
+            ):
+                raise OrchestratorError(
+                    "accepted batch prefix differs from the exact live outbox"
+                )
         history: list[Mapping[str, Any]] = [
-            request["metadata"] for request in accepted[:phase_start]
+            {**request["metadata"], "candidate_id": request["candidate_id"]}
+            for request in accepted[:phase_start]
         ]
-        evidence: list[Mapping[str, str]] = []
-        for index, request in enumerate(requests):
+        prior_ids = {str(request["candidate_id"]) for request in accepted[:phase_start]}
+        candidates: list[_BatchCandidate] = []
+        for index, request in enumerate(rows):
             entrypoint = f"{TOP40_V4_LAYOUT.team_root(team_id)}/{request['entrypoint']}"
             try:
                 capture = runner_v4.capture_source_bundle(root_path, team_id, entrypoint)
@@ -964,57 +1104,135 @@ def preflight_is_batch(
                     raise OrchestratorError(
                         f"candidate failed static source admission: {detail}"
                     )
+                if str(metadata["candidate_id"]) in prior_ids:
+                    raise OrchestratorError(
+                        "batch candidate reuses a candidate from an earlier phase"
+                    )
+                _validate_open_lane_mechanism_history(history, metadata)
+            except (
+                OrchestratorError,
+                isolation_v4.IsolationError,
+                runner_v4.StrategySandboxError,
+                ValueError,
+            ) as exc:
+                if _wraps_os_error(exc):
+                    raise
+                if existing is not None:
+                    raise OrchestratorError(
+                        "preflighted batch candidate authority changed"
+                    ) from exc
+                raise CandidateBatchRejectedError(
+                    f"{request['candidate_id']}: {exc}",
+                    capability=rejection_capability(candidate_ids),
+                ) from exc
+            if index < len(current):
+                accepted_request = current[index]
+                if (
+                    metadata != accepted_request["metadata"]
+                    or capture.sha256
+                    != accepted_request["authority"].get("source_bundle_sha256")
+                ):
+                    raise OrchestratorError(
+                        "accepted batch prefix differs from captured source authority"
+                    )
+            history.append(metadata)
+            candidates.append(
+                _BatchCandidate(
+                    candidate_id=str(metadata["candidate_id"]),
+                    entrypoint=str(request["entrypoint"]),
+                    purpose=str(request["purpose"]),
+                    source_bundle_sha256=capture.sha256,
+                )
+            )
+        if not require_receipts:
+            return None
+        try:
+            research_runtime_v4.recover_candidate_receipts(
+                root_path,
+                team_id,
+                phase,
+                _path(root_path, outbox_relative),
+            )
+            for candidate in candidates:
                 research_runtime_v4.validate_candidate_receipt(
                     root_path,
                     team_id,
-                    str(metadata["candidate_id"]),
-                    capture.sha256,
+                    candidate.candidate_id,
+                    candidate.source_bundle_sha256,
+                    expected_phase=phase,
                 )
-                if index < len(current) and metadata != current[index]["metadata"]:
-                    raise OrchestratorError(
-                        "accepted batch prefix metadata differs from captured source"
-                    )
-                _validate_open_lane_mechanism_history(history, metadata)
-            except OrchestratorError as exc:
-                raise CandidateBatchRejectedError(
-                    f"{request['candidate_id']}: {exc}"
+        except research_runtime_v4.CandidateReceiptRejectedError as exc:
+            if existing is not None:
+                raise OrchestratorError(
+                    "preflighted batch receipt authority changed"
                 ) from exc
-            except (isolation_v4.IsolationError, ValueError) as exc:
-                if _wraps_os_error(exc):
-                    raise
-                raise CandidateBatchRejectedError(
-                    f"{request['candidate_id']}: {exc}"
+            raise CandidateBatchRejectedError(
+                f"batch receipts failed deterministic score-blind admission: {exc}",
+                capability=rejection_capability(candidate_ids),
+            ) from exc
+        except (
+            isolation_v4.IsolationError,
+            runner_v4.StrategySandboxError,
+        ) as exc:
+            if _wraps_os_error(exc):
+                raise
+            if existing is not None:
+                raise OrchestratorError(
+                    "preflighted batch receipt source authority changed"
                 ) from exc
-            history.append(metadata)
-            evidence.append(
-                {
-                    "candidate_id": str(metadata["candidate_id"]),
-                    "source_bundle_sha256": capture.sha256,
-                }
-            )
-        return {
-            "ok": True,
+            raise CandidateBatchRejectedError(
+                f"batch receipt source failed deterministic score-blind admission: {exc}",
+                capability=rejection_capability(candidate_ids),
+            ) from exc
+        event = {
             "team_id": team_id,
             "phase": phase,
-            "candidate_count": len(evidence),
-            "candidates": evidence,
-            "score_data_opened": False,
+            "outbox_sha256": outbox_sha256,
+            "candidate_ids": [candidate.candidate_id for candidate in candidates],
+            "source_bundle_sha256s": [
+                candidate.source_bundle_sha256 for candidate in candidates
+            ],
         }
+        if existing is None:
+            record = journal_v4.append(
+                _journal_path(root_path), "batch_preflighted", event
+            )
+        else:
+            if existing["payload"] != event:
+                raise OrchestratorError("durable batch preflight authority differs")
+            record = existing
+        return _BatchCapability(
+            seal=_BATCH_CAPABILITY_SEAL,
+            root=str(root_path),
+            team_id=team_id,
+            phase=phase,
+            outbox_sha256=outbox_sha256,
+            candidates=tuple(candidates),
+            preflight_record_sha256=str(record["record_sha256"]),
+            broker_frame_id=broker_frame_id,
+        )
 
 
 @research_runtime_v4.serialized_activated_r2_command
 def reject_batch_before_evaluation(
     root: str | Path,
-    team_id: str,
-    phase: str,
-    *,
-    reason: str,
-    outbox_sha256: str,
-    candidate_ids: Sequence[str],
+    rejection: CandidateBatchRejectedError,
 ) -> Mapping[str, Any]:
     """Terminally reject a deterministic invalid batch before opening score data."""
 
     root_path = _safe_root(root)
+    capability = getattr(rejection, "_capability", None)
+    if (
+        type(rejection) is not CandidateBatchRejectedError
+        or not isinstance(capability, _BatchRejectionCapability)
+        or capability.seal is not _BATCH_CAPABILITY_SEAL
+        or capability.root != str(root_path)
+    ):
+        raise OrchestratorError("batch rejection lacks a sealed failed-preflight authority")
+    team_id = capability.team_id
+    phase = capability.phase
+    if _batch_broker_frame(root_path, team_id, phase) != capability.broker_frame_id:
+        raise OrchestratorError("batch rejection broker authority changed")
     with _result_lock(root_path):
         isolation_v4.audit_team_surface(root_path, team_id)
         activation_v4.validate(root_path, verify_universe_snapshot=False)
@@ -1026,17 +1244,24 @@ def reject_batch_before_evaluation(
         expected_candidates = 8 if phase == "discovery" else 4
         normalized_ids = [
             _validate_identifier(candidate_id, "candidate_id")
-            for candidate_id in candidate_ids
+            for candidate_id in capability.candidate_ids
         ]
+        outbox_name = "batch-1.json" if phase == "discovery" else "batch-2.json"
+        outbox = _path(
+            root_path,
+            f"{TOP40_V4_LAYOUT.team_root(team_id)}/outbox/{outbox_name}",
+        )
+        live_outbox_sha256 = _sha256(_stable_authority_bytes(outbox))
         if (
             state.selection is not None
             or team_id in state.nominations
             or team_id in state.retired
+            or state.head_sha256 != capability.journal_head_sha256
             or state.trials_by_team.get(team_id, 0) != expected_trials
-            or len(normalized_ids) != expected_candidates
-            or len(set(normalized_ids)) != expected_candidates
-            or not isinstance(outbox_sha256, str)
-            or _SHA256.fullmatch(outbox_sha256) is None
+            or len(normalized_ids) > expected_candidates
+            or len(set(normalized_ids)) != len(normalized_ids)
+            or live_outbox_sha256 != capability.outbox_sha256
+            or (team_id, phase) in state.batch_preflights
             or any(
                 request_hash not in state.is_terminals
                 for request_hash, request in state.is_requests.items()
@@ -1044,7 +1269,7 @@ def reject_batch_before_evaluation(
             )
         ):
             raise OrchestratorError("batch cannot be rejected in its current lifecycle state")
-        _validate_text(reason, "reason")
+        reason = _validate_text(str(rejection), "reason")
         record = journal_v4.append(
             _journal_path(root_path),
             "batch_rejected",
@@ -1052,7 +1277,7 @@ def reject_batch_before_evaluation(
                 "team_id": team_id,
                 "phase": phase,
                 "reason": reason,
-                "outbox_sha256": outbox_sha256,
+                "outbox_sha256": capability.outbox_sha256,
                 "candidate_ids": normalized_ids,
             },
         )
@@ -1067,6 +1292,88 @@ def reject_batch_before_evaluation(
         }
 
 
+def _validated_batch_capability(
+    root: Path,
+    state: journal_v4.JournalState,
+    team_id: str,
+    entrypoint: str,
+    purpose: str,
+    capability: object,
+) -> _BatchCandidate | None:
+    if not TOP40_V4_LAYOUT.name.endswith("-r2"):
+        return None
+    if (
+        not isinstance(capability, _BatchCapability)
+        or capability.seal is not _BATCH_CAPABILITY_SEAL
+        or capability.root != str(root)
+        or capability.team_id != team_id
+        or _batch_broker_frame(root, team_id, capability.phase)
+        != capability.broker_frame_id
+    ):
+        raise OrchestratorError("R2 IS evaluation requires a sealed whole-batch capability")
+    phase_start = 0 if capability.phase == "discovery" else 8
+    preflight = state.batch_preflights.get((team_id, capability.phase))
+    expected_event = {
+        "team_id": team_id,
+        "phase": capability.phase,
+        "outbox_sha256": capability.outbox_sha256,
+        "candidate_ids": [candidate.candidate_id for candidate in capability.candidates],
+        "source_bundle_sha256s": [
+            candidate.source_bundle_sha256 for candidate in capability.candidates
+        ],
+    }
+    accepted = sorted(
+        (
+            request["payload"]
+            for request in state.is_requests.values()
+            if request["payload"]["team_id"] == team_id
+        ),
+        key=lambda payload: payload["trial_number"],
+    )
+    current = accepted[phase_start:]
+    if (
+        capability.phase not in {"discovery", "refinement"}
+        or preflight is None
+        or preflight["record_sha256"] != capability.preflight_record_sha256
+        or preflight["payload"] != expected_event
+        or len(current) >= len(capability.candidates)
+        or any(
+            request_hash not in state.is_terminals
+            for request_hash, request in state.is_requests.items()
+            if request["payload"]["team_id"] == team_id
+        )
+    ):
+        raise OrchestratorError("whole-batch capability is stale or out of phase")
+    for index, accepted_request in enumerate(current):
+        expected = capability.candidates[index]
+        if (
+            accepted_request["candidate_id"] != expected.candidate_id
+            or accepted_request["purpose"] != expected.purpose
+            or accepted_request["authority"].get("entrypoint")
+            != f"{TOP40_V4_LAYOUT.team_root(team_id)}/{expected.entrypoint}"
+            or accepted_request["authority"].get("source_bundle_sha256")
+            != expected.source_bundle_sha256
+        ):
+            raise OrchestratorError("accepted prefix differs from whole-batch authority")
+    candidate = capability.candidates[len(current)]
+    if (
+        entrypoint != f"{TOP40_V4_LAYOUT.team_root(team_id)}/{candidate.entrypoint}"
+        or purpose != candidate.purpose
+    ):
+        raise OrchestratorError("IS request is not the next whole-batch candidate")
+    outbox_name = "batch-1.json" if capability.phase == "discovery" else "batch-2.json"
+    outbox = _path(
+        root,
+        f"{TOP40_V4_LAYOUT.team_root(team_id)}/outbox/{outbox_name}",
+    )
+    if _sha256(_stable_authority_bytes(outbox)) != capability.outbox_sha256:
+        raise OrchestratorError("live batch outbox differs from whole-batch authority")
+    capture = runner_v4.capture_source_bundle(root, team_id, entrypoint)
+    if capture.sha256 != candidate.source_bundle_sha256:
+        raise OrchestratorError("candidate source differs from whole-batch authority")
+    return candidate
+
+
 @research_runtime_v4.serialized_activated_r2_command
 def run_is(
     root: str | Path,
@@ -1074,15 +1381,27 @@ def run_is(
     entrypoint: str,
     *,
     purpose: str,
+    _batch_capability: object | None = None,
 ) -> Mapping[str, Any]:
     root_path = _safe_root(root)
+    if TOP40_V4_LAYOUT.name.endswith("-r2") and (
+        not isinstance(_batch_capability, _BatchCapability)
+        or _batch_capability.seal is not _BATCH_CAPABILITY_SEAL
+        or _batch_capability.root != str(root_path)
+        or _batch_capability.team_id != team_id
+    ):
+        raise OrchestratorError("R2 IS evaluation is available only through the batch broker")
+    if TOP40_V4_LAYOUT.name.endswith("-r2") and _batch_broker_frame(
+        root_path, team_id, _batch_capability.phase
+    ) != _batch_capability.broker_frame_id:
+        raise OrchestratorError("R2 IS evaluation broker authority changed")
     with _result_lock(root_path):
         isolation_v4.audit_team_surface(root_path, team_id)
         # Candidate acceptance must be durable before any snapshot file is opened. The runner
         # performs the full frozen-universe audit after the accepted record is fsynced.
         activation_v4.validate(root_path, verify_universe_snapshot=False)
         loaded = top40_v4.load_config(root=root_path)
-        state = _close_interrupted_is_requests(root_path)
+        state = journal_v4.read(_journal_path(root_path))
         TOP40_V4_LAYOUT.require_team(team_id)
         if state.selection is not None:
             raise OrchestratorError("IS is closed")
@@ -1092,7 +1411,20 @@ def run_is(
         if state.trials_by_team[team_id] >= maximum:
             raise OrchestratorError(f"team exhausted its {maximum} accepted trials")
         _validate_text(purpose, "purpose")
+        batch_candidate = _validated_batch_capability(
+            root_path,
+            state,
+            team_id,
+            entrypoint,
+            purpose,
+            _batch_capability,
+        )
         authority, metadata = _derive_authority(root_path, loaded, team_id, entrypoint)
+        if batch_candidate is not None and (
+            authority.candidate_id != batch_candidate.candidate_id
+            or authority.source_bundle_sha256 != batch_candidate.source_bundle_sha256
+        ):
+            raise OrchestratorError("derived candidate differs from whole-batch capability")
         research_session = research_runtime_v4.validate_candidate_receipt(
             root_path,
             team_id,
