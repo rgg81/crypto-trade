@@ -326,6 +326,19 @@ def _readiness(arguments: argparse.Namespace) -> Mapping[str, object]:
                 raise ValueError(f"{team_id} produced a non-finite return at {multiplier}x")
             if float(returns["equity"].min()) <= 0.0:
                 raise ValueError(f"{team_id} went insolvent at {multiplier}x")
+        # Score the seed on the research window too. The qualification bar is stated in these
+        # units, and a bar nobody has ever measured against is a guess that becomes immutable at
+        # activation.
+        scored = score_in_sample_point(replay.costs, regime_labels=research.regime_labels)
+        summary["in_sample"] = _point_report(scored)
+        verdict = evaluate_eligibility(
+            {
+                "is_score": scored.score,
+                "is_regime_scores": dict(scored.regime_scores),
+            }
+        )
+        summary["would_qualify"] = verdict.eligible
+        summary["qualification_note"] = verdict.reason
         base = summary["1"]
         if float(base["activity"]) >= 0.05:
             deployed_lanes += 1
