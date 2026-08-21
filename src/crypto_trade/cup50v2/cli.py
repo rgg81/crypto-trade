@@ -50,6 +50,7 @@ from crypto_trade.cup50v2.lifecycle import (
     observation_order,
     observe_point,
     recover_interrupted_points,
+    restart_interrupted_points,
     start_observation_batch,
     verify_field,
 )
@@ -884,6 +885,15 @@ def _observe(arguments: argparse.Namespace) -> Mapping[str, object]:
     if arguments.action == "recover":
         interrupted = recover_interrupted_points(arguments.journal)
         return {"status": "recovered", "terminal_interruptions": len(interrupted)}
+    if arguments.action == "restart":
+        outcome = restart_interrupted_points(
+            arguments.journal, private_stage=arguments.private_stage
+        )
+        return {
+            "status": "restarted",
+            "completed_from_evidence": len(outcome["completed"]),
+            "resumable": len(outcome["resumable"]),
+        }
     if os.environ.get("CUP50V2_SANDBOX") != "network-none-read-only":
         raise RuntimeError(
             "sealed point observation must run in the frozen network-disabled sandbox"
@@ -1180,7 +1190,7 @@ def parser() -> argparse.ArgumentParser:
     close.set_defaults(handler=_field_close)
 
     observe = commands.add_parser("observe")
-    observe.add_argument("action", choices=("start", "point", "resume", "recover"))
+    observe.add_argument("action", choices=("start", "point", "resume", "recover", "restart"))
     observe.add_argument("--field", required=True)
     observe.add_argument("--signing-key", required=True)
     observe.add_argument("--journal", required=True)

@@ -1,0 +1,14 @@
+{
+  "amendment_id": "A8",
+  "amendment_sha256": "3c7d46fc3c1ea3b218acf42c912e5ded1b93ca04afc3d79a7579c4ff6f730efb",
+  "authorised_by": "the user, who directed that restarting on error is acceptable",
+  "evidence_handling": "A point whose evidence file already exists finished its work and died before journalling. It is completed from the durable evidence rather than re-run, so no sealed data is read twice and no evidence file is written twice.",
+  "found_at_phase": "field close preparation, before the first sealed read",
+  "interface": "cup50v2 observe restart --journal ... --private-stage ...",
+  "namespace": "cup50v2",
+  "prior_behaviour": "recover_interrupted_points turned every started-without-terminal point into a permanent zero with reason interrupted-after-durable-start. An in-process organizer error journals observation-paused and resumes cleanly, but a hard kill -- OOM, power loss, Ctrl-C -- writes nothing, so an unattended ten-hour run that died at hour six would have DNF'd whichever point was in flight.",
+  "title": "a hard interruption is resumable; a candidate failure still is not",
+  "what_did_not_change": "A candidate failure is still a permanent zero and can never be retried. CandidateFailureError settles its terminal record inside observe_point before any interruption can occur, so such a point is never in the interrupted set. This is the distinction that actually carries the integrity guarantee, and the test asserts it directly rather than asserting only that restart works.",
+  "why_it_does_not_apply_here": "Observation is silent, and this was verified rather than assumed. observe_point returns {'status': 'point-terminal'} and nothing else; the score is written to the private stage and the journal records only an evidence_sha256. An interrupted point therefore tells the organizer nothing about its outcome, so re-running it cannot be outcome-shopping. The guard was costing a rerun it never bought.",
+  "why_the_old_rule_existed": "To stop an organizer who sees a bad partial result from killing the run and retrying until a lane scores better."
+}

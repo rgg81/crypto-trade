@@ -197,6 +197,69 @@ def recover_interrupted_points(journal_path: str | Path) -> tuple[str, ...]:
     return interrupted
 
 
+def restart_interrupted_points(
+    journal_path: str | Path, *, private_stage: str | Path
+) -> Mapping[str, tuple[str, ...]]:
+    """Make a hard interruption resumable instead of a permanent zero.
+
+    An in-process organizer error already journals ``observation-paused`` and resumes. A hard kill
+    -- OOM, power loss, Ctrl-C -- writes nothing, and ``recover_interrupted_points`` then turns the
+    in-flight point into a permanent zero. That rule exists to stop an organizer who sees a bad
+    partial result from killing the run and retrying, and on this path there is no such result to
+    see: ``observe_point`` returns only ``{"status": "point-terminal"}``, the score goes to the
+    private stage and the journal carries an ``evidence_sha256`` and nothing else. An interrupted
+    point therefore tells the organizer nothing about its outcome, so re-running it cannot be
+    outcome-shopping.
+
+    A candidate failure is untouched. ``CandidateFailureError`` writes its terminal zero before any
+    interruption can occur, so it is never in the interrupted set and can never be retried here --
+    which is the distinction that actually carries the integrity guarantee.
+
+    A point whose evidence file exists finished its work and died before journalling; it is
+    completed from the evidence on disk rather than re-run, so no sealed data is read twice.
+    """
+    stage = Path(private_stage)
+    records = read_records(journal_path)
+    started: dict[str, Mapping[str, object]] = {}
+    settled: set[str] = set()
+    for record in records:
+        payload = record["payload"]
+        point_id = str(payload.get("point_id", ""))
+        if record["event"] == "point-start":
+            started[point_id] = payload
+        elif record["event"] in {"point-terminal", "observation-paused"}:
+            settled.add(point_id)
+        elif record["event"] == "point-resume":
+            settled.discard(point_id)
+    interrupted = sorted(set(started) - settled)
+    completed: list[str] = []
+    resumable: list[str] = []
+    for point_id in interrupted:
+        evidence_path = stage / f"{point_id}.json"
+        if evidence_path.exists():
+            evidence_bytes = evidence_path.read_bytes()
+            append_record(
+                journal_path,
+                "point-terminal",
+                {
+                    "team_id": started[point_id]["team_id"],
+                    "point_id": point_id,
+                    "status": "succeeded",
+                    "evidence_sha256": hashlib.sha256(evidence_bytes).hexdigest(),
+                    "reason": "completed-from-durable-evidence-after-interruption",
+                },
+            )
+            completed.append(point_id)
+            continue
+        append_record(
+            journal_path,
+            "observation-paused",
+            {"point_id": point_id, "reason": "hard-interruption"},
+        )
+        resumable.append(point_id)
+    return {"completed": tuple(completed), "resumable": tuple(resumable)}
+
+
 def observe_point(
     journal_path: str | Path,
     *,
