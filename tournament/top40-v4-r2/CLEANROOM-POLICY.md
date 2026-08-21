@@ -95,6 +95,7 @@ subset, and a simulated mechanism history. Deterministic batch defects retire th
 score-blind boundary. This includes a deterministic immutable receipt schema, phase, hash, or
 binding conflict. Filesystem I/O, isolation-probe, runtime, lock, or other infrastructure failures
 do not retire the lane and remain safely resumable. The journal binds the exact ordered preflight,
+source hashes, and private canonical receipt hashes,
 and only the live canonical serial-broker consume frame receives the capability to reject or admit
 that batch; direct library and organizer CLI trial calls are fail-closed before mutation.
 

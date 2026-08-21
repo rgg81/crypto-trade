@@ -106,6 +106,7 @@ class _BatchCandidate:
     entrypoint: str
     purpose: str
     source_bundle_sha256: str
+    receipt_sha256: str = ""
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -1161,14 +1162,22 @@ def preflight_is_batch(
                 phase,
                 _path(root_path, outbox_relative),
             )
+            validated_candidates: list[_BatchCandidate] = []
             for candidate in candidates:
-                research_runtime_v4.validate_candidate_receipt(
+                receipt = research_runtime_v4.validate_candidate_receipt(
                     root_path,
                     team_id,
                     candidate.candidate_id,
                     candidate.source_bundle_sha256,
                     expected_phase=phase,
                 )
+                validated_candidates.append(
+                    dataclasses.replace(
+                        candidate,
+                        receipt_sha256=str(receipt["sha256"]),
+                    )
+                )
+            candidates = validated_candidates
         except research_runtime_v4.CandidateReceiptRejectedError as exc:
             if existing is not None:
                 raise OrchestratorError(
@@ -1200,6 +1209,7 @@ def preflight_is_batch(
             "source_bundle_sha256s": [
                 candidate.source_bundle_sha256 for candidate in candidates
             ],
+            "receipt_sha256s": [candidate.receipt_sha256 for candidate in candidates],
         }
         if existing is None:
             record = journal_v4.append(
@@ -1336,6 +1346,9 @@ def _validated_batch_capability(
         "source_bundle_sha256s": [
             candidate.source_bundle_sha256 for candidate in capability.candidates
         ],
+        "receipt_sha256s": [
+            candidate.receipt_sha256 for candidate in capability.candidates
+        ],
     }
     accepted = sorted(
         (
@@ -1445,7 +1458,19 @@ def run_is(
             team_id,
             authority.candidate_id,
             authority.source_bundle_sha256,
+            expected_phase=(
+                _batch_capability.phase
+                if isinstance(_batch_capability, _BatchCapability)
+                else None
+            ),
         )
+        if (
+            batch_candidate is not None
+            and research_session.get("sha256") != batch_candidate.receipt_sha256
+        ):
+            raise OrchestratorError(
+                "candidate receipt differs from whole-batch authority"
+            )
         _validate_open_lane_mechanism(state, team_id=team_id, metadata=metadata)
         trial = state.trials_by_team[team_id] + 1
         run_id = f"{team_id.replace('-', '')}-is-{trial:02d}-{authority.source_bundle_sha256[:12]}"

@@ -52,7 +52,8 @@ so no hidden Codex session state crosses a research phase.
 
 Before any request in a discovery or refinement batch is accepted, the broker score-blind
 preflights the complete batch's captured metadata, attestation, research receipt, static source,
-and mechanism sequence. The canonical serial broker durably records that exact ordered batch and
+and mechanism sequence. The canonical serial broker durably records that exact ordered batch,
+including every source and canonical receipt hash, and
 holds the process-local capability required by every later trial admission. A deterministic
 admission defect retires the lane without opening score data or consuming a trial; transient
 organizer failures remain resumable. This prevents a malformed late request from stranding a lane

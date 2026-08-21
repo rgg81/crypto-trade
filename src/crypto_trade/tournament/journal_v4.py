@@ -162,6 +162,7 @@ if TOP40_V4_LAYOUT.name.endswith("-r2"):
             "outbox_sha256",
             "candidate_ids",
             "source_bundle_sha256s",
+            "receipt_sha256s",
         }
     )
 
@@ -327,10 +328,18 @@ def _validate_payload(event_type: str, payload: object) -> Mapping[str, Any]:
             _identifier(candidate_id, "candidate_id")
         if event_type == "batch_preflighted":
             source_hashes = payload["source_bundle_sha256s"]
-            if not isinstance(source_hashes, list) or len(source_hashes) != expected_count:
-                raise JournalError("batch source authority list is invalid")
+            receipt_hashes = payload["receipt_sha256s"]
+            if (
+                not isinstance(source_hashes, list)
+                or len(source_hashes) != expected_count
+                or not isinstance(receipt_hashes, list)
+                or len(receipt_hashes) != expected_count
+            ):
+                raise JournalError("batch source or receipt authority list is invalid")
             for source_hash in source_hashes:
                 _hash(source_hash, "source_bundle_sha256")
+            for receipt_hash in receipt_hashes:
+                _hash(receipt_hash, "receipt_sha256")
     for key in (
         "output_path",
         "summary_path",
@@ -466,6 +475,8 @@ def replay_bytes(payload: bytes) -> JournalState:
                     or event["candidate_id"] != batch_payload["candidate_ids"][index]
                     or event["authority"].get("source_bundle_sha256")
                     != batch_payload["source_bundle_sha256s"][index]
+                    or event["research_session"].get("sha256")
+                    != batch_payload["receipt_sha256s"][index]
                 ):
                     raise JournalError(
                         "accepted trial lacks its exact whole-batch preflight authority"

@@ -3409,10 +3409,125 @@ def test_r2_journal_requires_durable_whole_batch_authority_before_acceptance(
             "outbox_sha256": "5" * 64,
             "candidate_ids": [f"candidate-{number}" for number in range(1, 9)],
             "source_bundle_sha256s": [source_sha256, *["6" * 64] * 7],
+            "receipt_sha256s": ["4" * 64, *["7" * 64] * 7],
         },
     )
+    wrong_receipt = deepcopy(accepted)
+    wrong_receipt["research_session"]["sha256"] = "8" * 64
+    before = journal.read_bytes()
+    with pytest.raises(journal_v4.JournalError, match="whole-batch preflight"):
+        journal_v4.append(journal, "is_accepted", wrong_receipt)
+    assert journal.read_bytes() == before
     journal_v4.append(journal, "is_accepted", accepted)
     assert journal_v4.read(journal).trials_by_team["team-01"] == 1
+
+
+def test_run_is_rejects_post_preflight_receipt_substitution_before_acceptance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    journal = tmp_path / orchestrator_v4.TOP40_V4_LAYOUT.journal_path
+    journal.parent.mkdir(parents=True)
+    journal_v4.initialize(journal)
+    source_sha256 = "1" * 64
+    receipt_sha256 = "2" * 64
+    broker_frame = object()
+    candidate = orchestrator_v4._BatchCandidate(
+        candidate_id="candidate-1",
+        entrypoint="candidates/candidate-1/strategy.py",
+        purpose="trial 1",
+        source_bundle_sha256=source_sha256,
+        receipt_sha256=receipt_sha256,
+    )
+    capability = orchestrator_v4._BatchCapability(
+        seal=orchestrator_v4._BATCH_CAPABILITY_SEAL,
+        root=str(tmp_path.resolve()),
+        team_id="team-01",
+        phase="discovery",
+        outbox_sha256="3" * 64,
+        candidates=(candidate,),
+        preflight_record_sha256="4" * 64,
+        broker_frame=broker_frame,  # type: ignore[arg-type]
+    )
+    authority = orchestrator_v4.CandidateAuthority(
+        team_id="team-01",
+        candidate_id="candidate-1",
+        candidate_root=(
+            "tournament/top40-v4-r2/teams/team-01/candidates/candidate-1"
+        ),
+        entrypoint=(
+            "tournament/top40-v4-r2/teams/team-01/"
+            "candidates/candidate-1/strategy.py"
+        ),
+        source_bundle_sha256=source_sha256,
+        source_archive_path="archive/candidate-1.json",
+        source_archive_sha256="5" * 64,
+        strategy_sha256="6" * 64,
+        risk_policy_sha256="7" * 64,
+        config_sha256="8" * 64,
+        dependency_lock_sha256="9" * 64,
+        data_manifest_sha256="a" * 64,
+        evaluator_sha256="b" * 64,
+    )
+    monkeypatch.setattr(
+        orchestrator_v4, "_batch_broker_frame", lambda *_args: broker_frame
+    )
+    monkeypatch.setattr(
+        orchestrator_v4.isolation_v4, "audit_team_surface", lambda *_args: {}
+    )
+    monkeypatch.setattr(
+        orchestrator_v4.activation_v4, "validate", lambda *_args, **_kwargs: {}
+    )
+    monkeypatch.setattr(
+        orchestrator_v4.top40_v4,
+        "load_config",
+        lambda **_kwargs: SimpleNamespace(
+            raw={"research": {"maximum_accepted_trials_per_team": 12}}
+        ),
+    )
+    monkeypatch.setattr(
+        orchestrator_v4,
+        "_validated_batch_capability",
+        lambda *_args, **_kwargs: candidate,
+    )
+    monkeypatch.setattr(
+        orchestrator_v4,
+        "_derive_authority",
+        lambda *_args, **_kwargs: (authority, {"candidate_id": "candidate-1"}),
+    )
+    observed_phase: list[str | None] = []
+
+    def substituted_receipt(
+        *_args: object, expected_phase: str | None = None, **_kwargs: object
+    ) -> dict[str, str]:
+        observed_phase.append(expected_phase)
+        return {
+            "path": "replacement-receipt.json",
+            "sha256": "c" * 64,
+            "source_bundle_sha256": source_sha256,
+        }
+
+    monkeypatch.setattr(
+        orchestrator_v4.research_runtime_v4,
+        "validate_candidate_receipt",
+        substituted_receipt,
+    )
+    monkeypatch.setattr(
+        orchestrator_v4,
+        "_validate_open_lane_mechanism",
+        lambda *_args, **_kwargs: pytest.fail("mechanism gate reached after receipt swap"),
+    )
+    before = journal.read_bytes()
+    with pytest.raises(orchestrator_v4.OrchestratorError, match="receipt differs"):
+        orchestrator_v4.run_is.__wrapped__(
+            tmp_path,
+            "team-01",
+            authority.entrypoint,
+            purpose="trial 1",
+            _batch_capability=capability,
+        )
+    assert observed_phase == ["discovery"]
+    assert journal.read_bytes() == before
+    assert not (tmp_path / orchestrator_v4.TOP40_V4_LAYOUT.reports_root / "is").exists()
 
 
 def test_unauthorized_direct_and_cli_is_run_leave_pending_journal_byte_exact(
@@ -3431,6 +3546,7 @@ def test_unauthorized_direct_and_cli_is_run_leave_pending_journal_byte_exact(
             "outbox_sha256": "8" * 64,
             "candidate_ids": [f"candidate-{number}" for number in range(1, 9)],
             "source_bundle_sha256s": [source_sha256, *["9" * 64] * 7],
+            "receipt_sha256s": ["a" * 64, *["b" * 64] * 7],
         },
     )
     journal_v4.append(
@@ -3729,7 +3845,7 @@ def test_preflight_receipt_failure_is_resumable_then_durably_authorizes_batch(
     monkeypatch.setattr(
         orchestrator_v4.research_runtime_v4,
         "validate_candidate_receipt",
-        lambda *_args, **_kwargs: {},
+        lambda *_args, **_kwargs: {"sha256": "8" * 64},
     )
     capability = orchestrator_v4.preflight_is_batch.__wrapped__(
         tmp_path, "team-01", "discovery"
@@ -3976,6 +4092,7 @@ def test_refinement_preflight_rejects_candidate_reuse_from_discovery(
             "outbox_sha256": "b" * 64,
             "candidate_ids": discovery_ids,
             "source_bundle_sha256s": discovery_hashes,
+            "receipt_sha256s": ["c" * 64] * 8,
         },
     )
     for number, (candidate_id, source_sha256) in enumerate(
@@ -4196,6 +4313,7 @@ def test_preflighted_batch_rejects_changed_accepted_prefix_purpose_without_mutat
             "outbox_sha256": hashlib.sha256(original_payload).hexdigest(),
             "candidate_ids": candidate_ids,
             "source_bundle_sha256s": source_hashes,
+            "receipt_sha256s": ["e" * 64, *["f" * 64] * 7],
         },
     )
     accepted = journal_v4.append(
