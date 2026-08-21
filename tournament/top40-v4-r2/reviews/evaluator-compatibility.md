@@ -2,194 +2,164 @@
 
 Review date: 2026-08-21
 
-Review target: exact implementation commit
-`9d95e7c69706744c357c0b10bd20472a38942862` on branch
-`quant-portfolio-blind-top40-v4-r1-v2-restart4` (R6). The review covered the evaluator and
-scoring contract, past-only execution, immutable source capture and archived worker staging,
-the sanitized worker bootstrap, the July-2026-inclusive snapshot and its full raw authority,
-A6, the exact stopped R5 worker-bootstrap incident, competitive-artifact non-reuse, activation
-bootstrap/journal safety, the frozen launcher-v10 smoke authority, and R1 external behavior.
+Review target: exact R7 implementation commit
+`e4b87be0e49362e321fb3e2781d8c10812918d31` on branch
+`quant-portfolio-blind-top40-v4-r1-v2-restart5`; review-assembly HEAD at final write was
+`fcee2c7aaf5376715732418e41e229086cb309b4`.
 
-This review did not activate R6, launch a team or model, evaluate a candidate, or inspect a
-predecessor score or summary payload. All R5 incident checks used filenames, hashes, canonical
-journal structure, and terminal event types only.
+The review covered the evaluator/scoring and past-only contract, July-2026-inclusive snapshot,
+A6 universe authority, candidate capture/archive/receipt identity, R2 lifecycle-journal v2 and its
+new whole-batch authority, selection/release compatibility, the exact stopped R6 incident, fresh
+15-lane non-reuse, activation bindings, and default-edition R1 behavior. It did not activate R7,
+launch a team or model, evaluate a candidate, or decode any R6 score or summary payload.
 
 ## Gate status
 
 **PASSED. Unresolved findings: 0.**
 
-The evaluator/data/R1/incident-compatibility gate is closed for the exact implementation commit
-above. The checked-in adversarial aggregate still describes the superseded R5 review set; the
-organizer must refresh that aggregate after all three R6 reports are final and commit the frozen
-review bytes before activation. That expected post-review binding step is not an evaluator finding,
-and this review does not authorize activation by itself.
+The evaluator/data/R1/incident-compatibility gate is closed for the implementation bytes above.
+The remaining reviewer report and aggregate still require their normal final commit and activation
+binding; this report does not itself authorize activation or team launch.
 
-## R6 restart authority and exact clean state
+## Fresh R7 and exact R6 incident authority
 
-- `FRESH-RESTART-AUTHORITY.json` is regular, single-link canonical evidence with exact SHA-256
-  `f71896a9cd2da6071441bd65f5eeb42f2c2b0c953de016998019d082bc234e68`, equal to the
-  activation constant. Schema 3 binds the predecessor attempts, the R4 skill incident, and the
-  R5 worker-bootstrap incident; it explicitly sets `results_reused: false`.
-- The active layout branch is exactly
-  `quant-portfolio-blind-top40-v4-r1-v2-restart4`, matching Git. The implementation-commit check
-  requires the exact clean HEAD rather than an ancestor or dirty frozen-scope tree.
-- Read-only prerequisite validation accepts the fresh-restart authority and reports recovery
-  pending false. The preactivation journal pathname is absent, as required for this untouched R6
-  seed. Canonical activation alone may create it: `journal_v4.initialize` pins its parent, uses
-  no-follow exclusive creation, requires a current-owner regular nlink-1 mode-0600 zero-byte file,
-  fsyncs the new file and parent, and then the activation seed binds an empty journal. The synthetic
-  genesis binding is 15 lanes, 94 seed files, and seed head
-  `e7940b2cccf10bf53b45d9ee54af1167d4fb36621685bcfde258b2bd782dc1ba`.
-- Every lane contains exactly `ACCESS-POLICY.json`, `TEAM-BRIEF.md`, `candidates/README.md`, and
-  newline `.keep` markers in `feedback`, `outbox`, and `work`. All 15 lanes passed exact surface,
-  payload, regularity, and single-link checks. No lane contains candidate code, feedback, an
-  outbox request, a certificate, or work product.
-- R6 has no activation freeze/test output/result lock, research journal, research-session tree,
-  private model runtime, source archive, IS result/receipt, nomination, selection, historical
-  result, or release. `reports-top40-v4-r2` contains only the two frozen common BTC authorities.
-  The permitted broker lock is byte-empty, private, regular, and single-link.
+- `FRESH-RESTART-AUTHORITY.json` is canonical schema 4 evidence with SHA-256
+  `7610daae55d4f9cec3e242162cf100d4236e5f5a3d330f07349715f94dd47910`, exactly matching
+  the activation constant. Read-only recovery validation accepts it and reports no pending
+  pretrial recovery.
+- The authority binds the exact stopped R6 branch
+  `quant-portfolio-blind-top40-v4-r1-v2-restart4` and implementation
+  `aec9b2ae911e81a3b8fb55c6655dfcaebec909bf`. Independent read-only hashing reproduced its
+  activation file `51ff34df...ace0f`, activation record `bb3942b4...ea1af`, activation-test
+  output `a2b325a8...94cfe`, Team-02 discovery launch `08a21e53...cafcb`, and live outbox
+  `de29894b...2f85` authorities.
+- Pure byte replay of the R6 journal reproduced file hash `7452d4a5...b9229`, head
+  `2d918690...38c26`, and 37 records. Team 02 has exactly six accepted and six terminal trials,
+  three success event types, no pending request, no nomination, and no selection. No summary body
+  or score was opened.
+- The two rejected, never-accepted R6 candidates retain exact bundle/receipt identities:
+  `ad51a1d4...14e56` / `81b4acbd...16dbf` and
+  `82d8793e...a26` / `2fb7bb1a...2eec`. Neither has a trial receipt, source archive, or result.
+  Team-02 discovery feedback was not disclosed and its outbox was not archived before the stop.
+- R7 has exactly 15 seed lanes. Every lane contains only `ACCESS-POLICY.json`, `TEAM-BRIEF.md`,
+  `candidates/README.md`, and newline `.keep` files in `feedback`, `outbox`, and `work`; all are
+  regular single-link nodes. The activation seed binding contains 94 files and an empty synthetic
+  journal authority.
+- There is no R7 activation freeze/test output, journal, result lock, research-session/private
+  runtime tree, candidate, feedback, outbox request, source archive, trial receipt, IS result,
+  nomination, selection, historical observation, or release. The only report artifacts are the
+  two frozen common BTC files; the permitted broker lock is byte-empty. Thus no competitive R6
+  byte, trial, feedback, score, receipt, or source authority is reused.
 
-## Journal and activation bootstrap safety
+## Whole-batch journal and evaluator admission
 
-- Preactivation `status` and preactivation `validate` never call recovery-capable journal reads.
-  An absent journal maps to an in-memory genesis state; an existing journal must pass the exact
-  empty `initialize` gate. Unterminated or hard-linked evidence is rejected without truncation.
-- The broker's whole-team entrypoint validates activation before any journal read, including its
-  already-terminal branch. Direct and canonical-CLI regressions prove a preactivation fragment is
-  preserved.
-- Runtime `read` and `append` pin the owner-controlled parent and an existing journal through
-  no-follow descriptors, require regular/current-owner/nlink-1/mode-0600 topology, lock the file,
-  and compare descriptor, lexical file, and parent identities before and after recovery or append.
-  R2 append never recreates a missing runtime journal. Existing hardlinks and injected pathname
-  substitutions reject without mutating either the opened inode or replacement path.
-- Crash-tail recovery remains limited to an unterminated suffix whose complete newline-committed
-  prefix first replays successfully. New no-mutation regressions cover activation, status,
-  validation, broker run, hardlinks, substitution, and missing-file cases.
-
-## Exact R5 worker-bootstrap incident and non-reuse
-
-The preserved private R5 worktree remains at implementation commit
-`718249a8216245d7d6e29dd0af7f6f2318b189e7`. No R5 score or summary was opened.
-
-- Independent hashes match every schema-3 incident fact: activation file/record/test output,
-  discovery and refinement launches, discovery feedback, discovery outbox archive, journal file
-  and head, all eight research receipts, all eight source archives, and all eight trial receipts.
-- Pure replay accepts exactly 16 chained records: eight `is_accepted` followed by eight
-  `is_failed`. There are zero `is_succeeded`, pending requests, nominations, selections,
-  historical observations, or releases. No result artifact was created.
-- R5 has 12 Team-01 candidate directories, four empty after the interrupted refinement phase.
-  Rehashing the declared competitive roots as canonical sorted `{path,size,sha256}` rows produces
-  exactly 75 files and digest
-  `8a7d2ef7618ee971b623b775af56311f41982e9ae9f666a148580cc7261ae120`, matching the
-  R6 incident authority.
-- The R5 failures occurred before strategy initialization because the sanitized worker process
-  could not resolve the frozen worker module. Discovery feedback was disclosed to Team 01, so the
-  entire R5 research provenance is expressly non-reusable even though no score/result existed.
-  R6 copies no R5 candidate, feedback, outbox, research receipt, source archive, trial receipt,
-  journal, or result byte.
+- R2 alone uses lifecycle schema
+  `quant-portfolio-blind-top40-v4-r2-lifecycle-journal-v2`; R1 remains on journal v1.
+  `batch_preflighted` can occur only once at the exact discovery-zero or refinement-eight boundary,
+  with no pending request or terminal lane. It binds phase, exact outbox hash, ordered candidate
+  IDs, ordered source-bundle hashes, and ordered receipt hashes.
+- Journal replay refuses every R2 `is_accepted` record unless its trial position, candidate,
+  source-bundle identity, and accepted research-session hash equal the durable whole-batch record.
+  `batch_preflighted` itself does not increment trial counts, create a success, or enter ranking.
+- The canonical broker score-blind validates the entire outbox, source tree, metadata/mechanism
+  sequence, static-source policy, prior-phase evidence, and private canonical receipt set before
+  appending the preflight record or opening evaluator data. Deterministic failure can append only
+  a sealed `batch_rejected` disposition; infrastructure/OSError chains remain resumable and do not
+  retire the lane.
+- The in-memory evaluation capability is sealed to the exact live canonical broker frame, root,
+  team, phase, outbox, ordered candidates, sources, receipts, and durable preflight record. Before
+  every acceptance, `run_is` rechecks the live outbox, source capture, expected receipt phase, and
+  exact receipt SHA-256. The post-preflight receipt-substitution regression leaves the journal
+  byte-exact and creates no result path.
+- Candidate receipts are current-owner mode-0600 regular nlink-1 files read with no-follow stable
+  descriptor/lexical identity checks. Duplicate JSON keys, non-finite constants, noncanonical
+  ordering/whitespace, a missing newline, wrong phase, wrong authority, and concurrent replacement
+  all fail closed.
+- Direct `run_is`, direct preflight/rejection calls, and the organizer `is-run` CLI cannot issue a
+  capability. Refusal happens before pending-trial recovery, candidate acceptance, snapshot/score
+  access, or result creation; regressions preserve a pending journal byte-for-byte.
+- `batch_rejected` maps to the existing retired disposition for resolution and close-IS purposes,
+  while ordinary retirement still requires at least eight accepted trials. Accepted-trial counts,
+  field-adjusted confidence, nomination ranking, finalist selection, historical terminal ordering,
+  and atomic release logic are otherwise unchanged. Selection still advances nominated teams only.
 
 ## Snapshot, July 2026, and A6
 
 - The manifest SHA-256 is
   `c21fdcefc39961cd4408277e6cbb4833c31178cf86fa5d166499a3df6a8e7af7`. All 12 declared
-  output files independently match their exact sizes and hashes and are regular nlink-1 files.
-- The complete ignored raw authority is materialized locally rather than linked to a predecessor:
-  94,816 current-owner regular nlink-1 files, zero symlinks/non-regular nodes, and 316,214,915
-  bytes. File count and byte count equal the exact R5 neutral-data source.
-- An independent single-core `snapshot.verify_snapshot_manifest` replay completed successfully in
-  906.487 seconds. It verified 46,608 canonical provenance rows, official archive/checksum pairs,
-  REST provenance, builder/config authorities, the 12 published outputs, and the manifest window.
-- Config and manifest use the exclusive hard end `2026-08-01T00:00:00Z`; July 2026 is included.
-  Direct timestamp scans found 59,605 July transaction bars, 42,138 July funding rows, 28,494 July
-  mark rows, and 160 July membership rows, with zero rows at or after August 1. Maxima are July 31
-  16:00 for bars/marks, July 31 23:00 for funding, and July 27 for membership.
-- Deterministic A6 regeneration returns report hash
+  published files match exact size/hash authority and are regular nlink-1 files.
+- The complete local raw authority contains 94,816 regular nlink-1 files, zero symlinks, and
+  316,214,915 bytes. The prior mandatory one-core replay passed over the same frozen snapshot and
+  produced the exact manifest above; this re-review intentionally did not duplicate that expensive
+  replay, and instead rechecked the unchanged manifest, every published hash, raw topology/count,
+  timestamp boundary, and regenerated A6 report.
+- Config, manifest, and historical-OOS split all use exclusive hard end
+  `2026-08-01T00:00:00Z`, so all of July 2026 is included. Direct scans found 59,605 July bars,
+  42,138 July funding rows, 28,494 July mark rows, and 160 July membership rows, with zero rows at
+  or after August 1. Maxima are July 31 16:00 for bars/marks, July 31 23:00 for funding, and July
+  27 for membership.
+- Deterministic A6 regeneration returned hash
   `a1f9175b7728efde33d9d421b08c6cbcfe904783ba0f856b52504a28a453776e`, status `passed`,
-  and zero violations. It binds 670 contract-metadata symbols, 328 membership symbols, 13,026
-  membership rows, and the explicit exclusion of unreviewed archive-only symbols. The runner
-  repeats the same A6 audit before and after every result command and removes a newly created output
-  if the postcheck fails or differs.
+  and zero violations. It binds 670 contract-metadata symbols, 328 distinct membership symbols,
+  and 13,026 membership rows. Activation and every result command retain the required pre/post A6
+  enforcement.
 
-## Evaluator, scoring, and worker bootstrap
+## Evaluator, scoring, source archive, and activation
 
-- `engine_v2`, `scoring_v4`, `source_archive_v4`, `snapshot`, `pure_crypto_universe_v4_r2`,
-  `top40_v4`, and `_strategy_worker_v4` are byte-identical to the reviewed R5 evaluator. The R6
-  runner change is limited to the worker-bootstrap repair: its explicitly sanitized environment now
-  sets `PYTHONPATH` to the exact resolved R6 `src` directory so Python can import the frozen worker
-  module before that trusted module masks the repository.
-- After module resolution, the worker's namespace setup masks the repository and other worktrees,
-  rewrites runtime paths to the staged bundle and isolated dependencies, applies resource,
-  Landlock, seccomp, audit, network, import, and filesystem restrictions, and only then imports
-  candidate code. A real namespaced startup regression runs the exact sanitized environment and
-  exits successfully. No organizer credentials, proxies, user site, or arbitrary inherited
-  `PYTHONPATH` enter the worker environment.
-- The current evaluator authority hash, including the repaired runner and frozen worker, is
-  `c32164e30c02a3a9c0ef523bdbfb5f6ca710ca7668d445c2eadb7354ec207b8b`. Candidate
-  acceptance and result publication bind and recheck this authority.
+- `engine_v2`, `scoring_v4`, `runner_v4`, `_score_worker_v2`, `source_archive_v4`, `snapshot`,
+  `pure_crypto_universe_v4_r2`, `top40_v4`, config, and manifest are byte-identical to the final
+  reviewed R6 versions. The current evaluator authority is
+  `5a84bb354bfa85c88c1c95dd99a0aa3fcc2985ebe5eb02deb531f91589438b74`; its change from R6
+  is the expected frozen layout/branch binding, not evaluator behavior.
 - Strategies receive only eligible-symbol bars closed by the decision and funding strictly before
-  the decision. Targets fill at the next executable transaction open. Funding at a rebalance
-  boundary is charged to the carried pretrade position; interior and forced-exit-boundary funding
-  remain included. Mark price sizes notional exposure, while transaction opens determine fills,
-  participation, fees, and slippage.
-- Base, double-cost, and triple-cost paths are independent reruns over the same canonical grid,
-  including risk-action costs. Participation limits, residual delisting settlement, risk actions,
-  insolvency, malformed/nonfinite values, and grid drift fail closed.
-- Nomination-time sign inversion requires a cited accepted baseline, equal mechanism/grid/control
-  metadata and risk-policy authority, equal canonical target index/columns/rebalance flags, and
-  exact elementwise negation of every target value.
-- Team confidence uses the bounded Bonferroni adjustment
-  `max(0, min(1, 1 - trials * (1 - probability)))`. Selection recomputes it over all accepted
-  field trials, applies the frozen inclusive field-confidence floor, and uses the deterministic
-  ranking key. Historical OOS remains nine quarters through July 2026 with a minimum five positive
-  quarters for winner eligibility.
+  the decision. Targets fill at the next executable transaction open. Boundary funding is charged
+  to carried pretrade positions; interior and forced-exit funding remain included. Mark prices size
+  notional exposure while transaction opens determine fills, participation, fees, and slippage.
+- Base, double-cost, and triple-cost paths are independent reruns on the same canonical grid,
+  including risk-action costs. Participation limits, residual delisting settlement, insolvency,
+  grid drift, malformed/nonfinite values, and output substitution fail closed.
+- Sign inversion requires a cited accepted baseline, matching mechanism/grid/control metadata and
+  risk authority, identical target index/columns/rebalance flags, and exact elementwise target
+  negation. Team confidence remains the bounded Bonferroni adjustment; close-IS recomputes the
+  inclusive field adjustment over accepted trials only. Historical winner eligibility remains nine
+  quarters through July 2026 with at least five positive quarters.
+- Candidate source capture pins every candidate directory component and enumerates/opens files
+  descriptor-relatively with no-follow, regularity, size, owner/link, and final identity checks.
+  Symlink, FIFO, hardlink, parent replacement, lexical substitution, and concurrent replacement
+  regressions fail closed.
+- The content-addressed R2 archive schema remains
+  `quant-portfolio-blind-top40-v4-r2-candidate-source-archive-v1`. It binds candidate root,
+  entrypoint, ordered manifest, exact bytes, and bundle fingerprint; the worker is staged only from
+  those archived bytes and the staged manifest is reverified before execution.
+- The frozen launcher-v11 smoke file hash is
+  `7896fadce3923654b790014d6e6429287e4be44290116b17ac58b4d33a7ce5a1`, with record hash
+  `3fe6257ef1df37ecf03879a4875ec835be155e30e232d98432dffaa44a327873`. Read-only semantic
+  validation passed its Codex 0.148.0, command, prompt, environment, model-runtime, profile,
+  session UUID, empty skill catalog, denied peer/host/private access, isolated TMPDIR, sentinel,
+  and cleanup bindings.
+- The active branch equals the R7 layout branch, and the clean implementation check resolved exact
+  HEAD before report assembly. Activation scope and fresh-seed binding recompute from exact report
+  bytes; activation must wait for all final reviews/aggregate to be committed. No activation or
+  runtime artifact was created by this review.
 
-## Source archive and launcher-v10 authority
+## R1 compatibility and focused evidence
 
-- Source capture pins every candidate directory component with no-follow directory descriptors,
-  enumerates descriptor-relative entries, accepts only bounded UTF-8 regular single-link files,
-  and verifies descriptor/final-entry plus full before/after tree identities. Symlinks, FIFOs,
-  hardlinks, opaque/generated files, parent substitution, and concurrent lexical substitution are
-  fail-closed regression cases.
-- The content-addressed archive binds candidate root, entrypoint, ordered manifest, exact bytes,
-  and bundle fingerprint. The runner rereads and rehashes that archive, proves equality with the
-  accepted live capture, then stages the worker only from archived `.py` bytes and re-verifies the
-  staged manifest/fingerprint. The stable schema remains
-  `top40-v4-r2-candidate-source-archive-v1`.
-- The frozen smoke receipt has file SHA-256
-  `596bdbe528f3648f250c471feb591b40af2d3c84d195015d8b3a775e6786a6f8` and record hash
-  `55d83cfa8c277a07b9f31db4341ba641f788139e91cba1fc16e2576929390660`. Semantic validation
-  recomputes launcher `top40-v4-r2-research-runtime-v10`, Codex `0.148.0`, command, prompt,
-  environment, model-runtime, profile, session UUID, sentinel, empty skill catalog, denied peer and
-  host-skill access, isolated TMPDIR, and verified cleanup bindings.
-- Launcher-v10 restores only absent organizer-owned `outbox/.keep` and `work/.keep` markers after
-  a completed, failed, interrupted, or timed-out phase. Restoration pins the lane directory,
-  creates exact newline mode-0644 nlink-1 markers exclusively and durably, and rejects conflicting
-  bytes or topology. Preactivation broker/direct-launch resume performs the same validation before
-  activation authority is consulted.
-
-## R1 compatibility
-
-The default-edition external suite passes 24/24. R1 retains its original branch, 12 teams,
-five-team advance count, paths, schemas, worker bundle behavior, evaluator behavior, and missing
-journal initialization behavior. R2-only fresh restart, 15-lane, A6, field adjustment, strict
-runtime-journal, launcher-v10, marker-resume, and worker-bootstrap rules remain edition-selected.
-
-## Focused evidence
+R2 selection remains explicit; the default edition retains 12 teams, a five-team advance count,
+R1 paths, lifecycle-journal v1, source-archive v1, missing-journal behavior, direct R1 `run_is`, and
+the original evaluator/runner behavior. The default-edition suite passed 24 tests and the legacy
+source-archive suite passed 5 more.
 
 ```text
-Exact R2 contract/activation/evaluator/security suite                 135 passed
+Exact R7 contract/activation/evaluator/security suite                 165 passed
 Default-edition R1 external-contract suite                             24 passed
-Full raw snapshot replay                                      passed / 906.487 s
-Raw authority                                         94,816 files / nlink1
+Legacy source-archive regression suite                                  5 passed
+R7-changed-file Ruff / git diff --check                        passed / passed
 Published manifest                                   12 files / hashes exact
 July rows / rows at or after 2026-08-01                    present / zero
 A6 deterministic report                                    passed / zero violations
-R5 incident journal                         8 accepted / 8 failed / 0 succeeded
-R5 receipt/source/trial hash sets                            8 / 8 / 8 exact
-R5 declared competitive surface                    75 files / digest exact
-R6 copied competitive artifacts                                      zero
-R6 seed                                                15 lanes / 94-file binding
-R6-changed-file Ruff / git diff --check                        passed / passed
+R6 incident journal                 37 records / Team02 6 accepted + 6 terminal
+R7 copied competitive artifacts                                      zero
+R7 seed                                                15 lanes / 94-file binding
 ```
 
 **Final result: PASSED, zero unresolved findings.**
