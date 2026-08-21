@@ -99,6 +99,35 @@ each team's live phases, so client state cannot cross lane boundaries.
 
 ## Clean restart authority
 
+### R7 zero-candidate completion
+
+The fifth restart completed all 15 lanes serially, closed selection, and published the July-2026
+historical release without leakage. It nevertheless produced no admissible candidate: every lane's
+first candidate used ordinary Python/pandas constructs that the frozen static checker rejected,
+including `Series`, `get`, `range`, local list construction, or other calls absent from its narrow
+positive allowlist. The prose described a compact stateless subset but did not expose the exact
+call allowlist or provide one accepted strategy template. Deterministic whole-batch rejection was
+safe, but making that first hidden mismatch terminal for each lane was an operational design
+failure.
+
+R7 remains a completed private incident. Its 17-record journal contains exactly 15 score-blind
+`batch_rejected` records, one empty selection freeze, and one cash-only historical release. It has
+15 launch authorities, 15 archived outboxes, 120 score-free research receipts, no IS result file,
+no source archive, no team feedback, no finalist, and no winner. R8 reuses none of those candidate,
+receipt, launch, outbox, journal, feedback, selection, or result bytes. The authority file binds the
+R7 activation/test/review/journal/selection/release hashes and the exact generated 750-file artifact
+surface while preserving the identical manifest-authorized market snapshot as neutral
+infrastructure.
+
+R8 publishes an accepted `templates/strategy.py` plus `ADMISSION-CHECKER.md` with the exact direct
+and method-call allowlists. More importantly, the organizer now validates the complete unaccepted
+batch before creating candidate receipts or opening score data. A deterministic failure produces
+an immutable, lane-local report containing only admission findings and permits up to three
+uniform serial repair sessions under the same frozen prompt, profile, command, private-runtime
+cleanup, launch authority, and broker lease. Only a batch still invalid after all repairs reaches
+terminal score-blind rejection. This changes no holdout, evaluator, selection, leakage, or
+one-team-at-a-time guardrail.
+
 The original worktree later encountered a separate organizer contract defect after two private
 Team-01 trials: free-form control prose in `mechanism` was treated as an undocumented exact epoch
 identifier. That edition is preserved privately and is not continued. No feedback was disclosed,

@@ -87,7 +87,7 @@
     "trials_accepted": 0,
     "trials_evaluated": 0
   },
-  "schema_version": 4,
+  "schema_version": 5,
   "skill_boundary_incident": {
     "activation_file_sha256": "839a849904db69769e0ea79e0215ea670bbd72f8f595b1ba52eafafca55d39e9",
     "activation_record_sha256": "302528e9f29b1dea57cd524f14aa12c0fd0bc40767e66cdc297a36cfd79600bb",
@@ -180,7 +180,7 @@
     "trials_failed": 8,
     "trials_succeeded": 0
   },
-  "status": "fresh-restart-after-private-aborted-incidents",
+  "status": "fresh-restart-after-private-aborted-and-zero-candidate-incidents",
   "successful_prefix": [
     {
       "candidate_id": "pressure-reversal-f24-r1-baseline",
@@ -195,5 +195,37 @@
       "terminal_record_sha256": "ffc9d322a1133267ef63efe2fcb96a179f73cf2e5df811a30d414f7437599631"
     }
   ],
-  "tournament": "quant-portfolio-blind-top40-v4-r2"
+  "tournament": "quant-portfolio-blind-top40-v4-r2",
+  "zero_candidate_incident": {
+    "activation_file_sha256": "9a9e1d32e919cc5481c8e0fb3b2cbac2d5dd6bcfaa17b98e976e07d5bcd82f2d",
+    "activation_record_sha256": "dbdf9c305fe59f99a2e41b56718ab9eb58d6186e7ce8348df5b949bbb10a2407",
+    "activation_tests_sha256": "5baec89337afc38eb36425a21d17b2b62ded3d11aa9cb67c2589b7267e3e7a7b",
+    "adversarial_review_sha256": "45fe179e62753fca6dd44655682055af790a4574209b1f183d6efa0dfd535f2d",
+    "artifact_surface": {
+      "algorithm": "sha256-canonical-json-sorted-path-size-sha256-over-generated-lane-and-research-files",
+      "file_count": 750,
+      "sha256": "b8be2b2e712c2877d4549318b854b73a161b965270818870888ed524787058ef"
+    },
+    "batch_rejected_count": 15,
+    "branch": "quant-portfolio-blind-top40-v4-r1-v2-restart5",
+    "feedback_disclosed": false,
+    "historical_release_manifest_sha256": "108bfc1e4b10aec9c2139c391c23826dc7a3411b349edd42b3245f64b33aa12d",
+    "holdout_end_exclusive": "2026-08-01T00:00:00Z",
+    "holdout_start": "2024-07-01T00:00:00Z",
+    "implementation_commit": "420dc9728aa30ff84b1e9d06debdd5997a48e9b8",
+    "is_result_files": 0,
+    "journal_file_sha256": "992cd1f811e681660957326ec715e44a65f8b26895b2313858c82f8330bc90a4",
+    "journal_head_sha256": "783570895229389ac658c47982723c24f976d86b4486208a22015063536f7e29",
+    "journal_records": 17,
+    "launch_count": 15,
+    "outbox_archive_count": 15,
+    "research_provenance_reused": false,
+    "research_receipt_count": 120,
+    "results_reused": false,
+    "selected_finalists": 0,
+    "selection_freeze_sha256": "f88ce0e3ea3e0fe7e6478628d4a11f5c09c4d256963a8e1eff9f949046ee60a1",
+    "source_archive_files": 0,
+    "status": "completed-no-admissible-candidate",
+    "winner": null
+  }
 }

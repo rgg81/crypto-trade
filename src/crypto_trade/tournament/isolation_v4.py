@@ -16,12 +16,15 @@ ATTESTATION_FILENAME = "cleanroom-attestation.json"
 TEAM_KIT_ROOT = "tournament/top40-v4-r2/team-kit"
 RESEARCH_SESSION_ROOT = "tournament/top40-v4-r2/research-sessions"
 _TEAM_KIT_FILES = (
+    "ADMISSION-CHECKER.md",
     "RULES.md",
     "STRATEGY-API.md",
+    "admission-call-allowlist.json",
     "templates/candidate.json",
     "templates/cleanroom-attestation.json",
     "templates/research-certificate.json",
     "templates/risk-policy.json",
+    "templates/strategy.py",
 )
 _DENY_CATEGORIES = (
     "other-team-workspaces",
@@ -105,6 +108,10 @@ Before any official run, create a new candidate directory under `candidates/` co
 `cleanroom-attestation.json`. Put broker requests only in `outbox/`. The attestation is an
 integrity statement, not a substitute for organizer-side causal review. Every accepted material
 trial consumes one slot, including runtime failures.
+
+Start from the supplied accepted strategy template and follow `ADMISSION-CHECKER.md` literally.
+If the organizer places an `admission-*.json` report in `feedback/`, it contains only score-blind
+deterministic findings; repair the complete unaccepted batch in place before finishing again.
 
 The team process exits before the organizer evaluates a batch. A later clean-room session receives
 only this lane's normalized feedback. Never infer sealed performance from timing, errors,

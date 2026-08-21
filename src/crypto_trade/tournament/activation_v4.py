@@ -41,14 +41,14 @@ _PRETRIAL_INCIDENT_STAGE = f"{_PRETRIAL_INCIDENT_ROOT}/.{_PRETRIAL_INCIDENT_ID}.
 _PRETRIAL_INCIDENT_FINAL = f"{_PRETRIAL_INCIDENT_ROOT}/{_PRETRIAL_INCIDENT_ID}"
 _PRETRIAL_SMOKE_RECEIPT_PATH = "tournament/top40-v4-r2/PRETRIAL-MODEL-SMOKE.json"
 _PRETRIAL_SMOKE_RECEIPT_SHA256 = (
-    "7896fadce3923654b790014d6e6429287e4be44290116b17ac58b4d33a7ce5a1"
+    "8ce7c6adab43167b54dffdffce8a42b01717762b4d7f821e8d46c996ee5ce5b5"
 )
 _PRETRIAL_SMOKE_RECORD_SHA256 = (
-    "3fe6257ef1df37ecf03879a4875ec835be155e30e232d98432dffaa44a327873"
+    "4194ba3f54e6986877024eac0b0a12d673cdcdba00dbe4547fe09b8eda05c62b"
 )
 _FRESH_RESTART_AUTHORITY_PATH = "tournament/top40-v4-r2/FRESH-RESTART-AUTHORITY.json"
 _FRESH_RESTART_AUTHORITY_SHA256 = (
-    "7610daae55d4f9cec3e242162cf100d4236e5f5a3d330f07349715f94dd47910"
+    "20df6a9f7e325e8fa999ebe8482153bd4c006bd884dfd9c1987c08f97752f896"
 )
 _FRESH_LANE_MARKER_PAYLOAD = b"\n"
 _PRETRIAL_OLD_ACTIVATION_FILE_SHA256 = (
@@ -113,12 +113,15 @@ if _IS_R2:
         "tournament/top40-v4-r2/TEAM-PLAYBOOK.md",
         "tournament/top40-v4-r2/config.toml",
         "tournament/top40-v4-r2/data-manifest.json",
+        "tournament/top40-v4-r2/team-kit/ADMISSION-CHECKER.md",
         "tournament/top40-v4-r2/team-kit/RULES.md",
         "tournament/top40-v4-r2/team-kit/STRATEGY-API.md",
+        "tournament/top40-v4-r2/team-kit/admission-call-allowlist.json",
         "tournament/top40-v4-r2/team-kit/templates/candidate.json",
         "tournament/top40-v4-r2/team-kit/templates/cleanroom-attestation.json",
         "tournament/top40-v4-r2/team-kit/templates/research-certificate.json",
         "tournament/top40-v4-r2/team-kit/templates/risk-policy.json",
+        "tournament/top40-v4-r2/team-kit/templates/strategy.py",
         _REVIEW_RECORD_PATH,
         *_REVIEW_REPORT_PATHS,
         "tournament/top40-v4-r2/templates/candidate.json",
@@ -733,13 +736,14 @@ def _fresh_restart_authority(root: Path) -> Mapping[str, Any]:
         "successful_prefix",
         "tournament",
         "worker_bootstrap_incident",
+        "zero_candidate_incident",
     }
     if (
         set(authority) != expected_keys
-        or authority.get("schema_version") != 4
+        or authority.get("schema_version") != 5
         or authority.get("tournament") != TOP40_V4_LAYOUT.name
         or authority.get("status")
-        != "fresh-restart-after-private-aborted-incidents"
+        != "fresh-restart-after-private-aborted-and-zero-candidate-incidents"
         or authority.get("feedback_disclosed") is not False
         or authority.get("research_provenance_reused") is not False
         or authority.get("results_reused") is not False
@@ -751,6 +755,7 @@ def _fresh_restart_authority(root: Path) -> Mapping[str, Any]:
     restart = authority.get("restart_attempt")
     skill_incident = authority.get("skill_boundary_incident")
     worker_incident = authority.get("worker_bootstrap_incident")
+    zero_candidate_incident = authority.get("zero_candidate_incident")
     prefix = authority.get("successful_prefix")
     expected_batch_keys = {
         "activation_file_sha256",
@@ -1056,6 +1061,88 @@ def _fresh_restart_authority(root: Path) -> Mapping[str, Any]:
         or _SHA256.fullmatch(str(artifact_surface["sha256"])) is None
     ):
         raise ActivationError("fresh restart worker-bootstrap incident changed")
+    expected_zero_candidate_keys = {
+        "activation_file_sha256",
+        "activation_record_sha256",
+        "activation_tests_sha256",
+        "adversarial_review_sha256",
+        "artifact_surface",
+        "batch_rejected_count",
+        "branch",
+        "feedback_disclosed",
+        "historical_release_manifest_sha256",
+        "holdout_end_exclusive",
+        "holdout_start",
+        "implementation_commit",
+        "is_result_files",
+        "journal_file_sha256",
+        "journal_head_sha256",
+        "journal_records",
+        "launch_count",
+        "outbox_archive_count",
+        "research_provenance_reused",
+        "research_receipt_count",
+        "results_reused",
+        "selected_finalists",
+        "selection_freeze_sha256",
+        "source_archive_files",
+        "status",
+        "winner",
+    }
+    zero_surface = (
+        zero_candidate_incident.get("artifact_surface")
+        if isinstance(zero_candidate_incident, Mapping)
+        else None
+    )
+    if (
+        not isinstance(zero_candidate_incident, Mapping)
+        or set(zero_candidate_incident) != expected_zero_candidate_keys
+        or zero_candidate_incident.get("branch")
+        != "quant-portfolio-blind-top40-v4-r1-v2-restart5"
+        or zero_candidate_incident.get("implementation_commit")
+        != "420dc9728aa30ff84b1e9d06debdd5997a48e9b8"
+        or zero_candidate_incident.get("status")
+        != "completed-no-admissible-candidate"
+        or zero_candidate_incident.get("journal_records") != 17
+        or zero_candidate_incident.get("batch_rejected_count") != 15
+        or zero_candidate_incident.get("launch_count") != 15
+        or zero_candidate_incident.get("outbox_archive_count") != 15
+        or zero_candidate_incident.get("research_receipt_count") != 120
+        or zero_candidate_incident.get("selected_finalists") != 0
+        or zero_candidate_incident.get("is_result_files") != 0
+        or zero_candidate_incident.get("source_archive_files") != 0
+        or zero_candidate_incident.get("winner") is not None
+        or zero_candidate_incident.get("feedback_disclosed") is not False
+        or zero_candidate_incident.get("research_provenance_reused") is not False
+        or zero_candidate_incident.get("results_reused") is not False
+        or zero_candidate_incident.get("holdout_start") != "2024-07-01T00:00:00Z"
+        or zero_candidate_incident.get("holdout_end_exclusive")
+        != "2026-08-01T00:00:00Z"
+        or any(
+            not isinstance(zero_candidate_incident.get(field), str)
+            or _SHA256.fullmatch(str(zero_candidate_incident[field])) is None
+            for field in (
+                "activation_file_sha256",
+                "activation_record_sha256",
+                "activation_tests_sha256",
+                "adversarial_review_sha256",
+                "historical_release_manifest_sha256",
+                "journal_file_sha256",
+                "journal_head_sha256",
+                "selection_freeze_sha256",
+            )
+        )
+        or not isinstance(zero_surface, Mapping)
+        or set(zero_surface) != {"algorithm", "file_count", "sha256"}
+        or zero_surface.get("algorithm")
+        != (
+            "sha256-canonical-json-sorted-path-size-sha256-over-generated-"
+            "lane-and-research-files"
+        )
+        or zero_surface.get("file_count") != 750
+        or _SHA256.fullmatch(str(zero_surface.get("sha256"))) is None
+    ):
+        raise ActivationError("fresh restart zero-candidate incident changed")
     return authority
 
 

@@ -15,9 +15,11 @@ may cover several preregistered cells. Failures count. At least eight trials are
 nomination or retirement.
 
 Before trial one of each batch, validate every candidate against the frozen schema and source
-subset. Each neighborhood coordinate must exactly match a finite non-boolean numeric material
-parameter; use no coordinates for ordinary controls or role checks. The organizer preflights the
-whole batch score-blind and terminally rejects a deterministic invalid batch before evaluation.
+subset using the accepted strategy template and exact machine-readable call allowlist. Each
+neighborhood coordinate must exactly match a finite non-boolean numeric material parameter; use no
+coordinates for ordinary controls or role checks. The organizer checks the whole batch before
+receipts or scores and permits three uniform score-blind repair sessions. Only a batch still
+invalid after all repairs is terminally rejected before evaluation.
 
 ## Keep the implementation causal
 

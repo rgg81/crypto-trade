@@ -49,6 +49,11 @@ allowlist of transparent Python/NumPy/pandas operations. The fixed `seed` argume
 random APIs are not admitted in this edition. Candidate code has no network, subprocess,
 credential, repository, or host-write access during an official run.
 
+The sanitized team kit now includes an accepted `templates/strategy.py`, the exact prose contract
+in `ADMISSION-CHECKER.md`, and machine-readable `admission-call-allowlist.json`; activation tests
+require the JSON call sets to equal the organizer checker. A complete unaccepted batch may receive
+up to three uniform score-blind repair sessions before terminal rejection.
+
 ## Past-only context
 
 At a decision boundary, `context.decision_time` is a timezone-aware UTC pandas timestamp.

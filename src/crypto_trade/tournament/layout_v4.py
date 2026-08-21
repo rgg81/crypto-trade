@@ -104,7 +104,7 @@ TOP40_V4_LAYOUT = TournamentLayoutV4(
 
 TOP40_V4_R2_LAYOUT = TournamentLayoutV4(
     name="quant-portfolio-blind-top40-v4-r2",
-    branch="quant-portfolio-blind-top40-v4-r1-v2-restart5",
+    branch="quant-portfolio-blind-top40-v4-r1-v2-restart6",
     tournament_root="tournament/top40-v4-r2",
     reports_root="reports-top40-v4-r2",
     orchestrator_script="scripts/top40_v4_r2_tournament.py",

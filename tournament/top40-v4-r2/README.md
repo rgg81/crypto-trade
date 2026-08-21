@@ -90,3 +90,10 @@ authority for every runtime read and append; it is never recreated after activat
 command reads the holdout. Heavy result
 commands serialize under one kernel lock. During the historical phase, `status` reveals only the
 frozen finalist count and a constant sealed state.
+
+Before candidate receipts or any score-bearing journal record exist, the launcher applies the
+same deterministic whole-batch source/metadata checks used by admission. An invalid batch receives
+up to three serial score-blind repair sessions through immutable lane-local admission feedback.
+The fixed prompt, permissions, launch authority, private-runtime cleanup, and one-team lease remain
+unchanged across those retries. Only a batch that is still invalid after all three repairs reaches
+the terminal score-blind rejection path.

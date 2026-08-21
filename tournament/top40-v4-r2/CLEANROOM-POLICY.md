@@ -91,8 +91,12 @@ ordering.
 
 Before opening score data or appending the first accepted record for a batch, the organizer captures
 and validates the entire batch against exact receipts, metadata/attestations, the static source
-subset, and a simulated mechanism history. Deterministic batch defects retire the lane at that
-score-blind boundary. This includes a deterministic immutable receipt schema, phase, hash, or
+subset, and a simulated mechanism history. Before receipts exist, the launcher applies the same
+checks and may issue at most three immutable lane-local repair reports. Each report contains only
+deterministic findings and explicitly binds that no score data was opened; every repair runs under
+the same offline profile, fixed prompt/command, cleaned private runtime, launch authority, and
+global serial lease. Deterministic batch defects that remain after all repairs retire the lane at
+that score-blind boundary. This includes a deterministic immutable receipt schema, phase, hash, or
 binding conflict. Filesystem I/O, isolation-probe, runtime, lock, or other infrastructure failures
 do not retire the lane and remain safely resumable. The journal binds the exact ordered preflight,
 source hashes, and private canonical receipt hashes,

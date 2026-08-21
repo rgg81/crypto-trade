@@ -617,17 +617,27 @@ def run_team(root: Path, team_id: str) -> Mapping[str, Any]:
         outbox = team / "outbox" / outbox_name
         feedback = team / "feedback" / f"{phase}.json"
         if not feedback.exists():
-            if not outbox.exists():
+            state = journal_v4.read(root / TOP40_V4_LAYOUT.journal_path)
+            phase_start = 0 if phase == "discovery" else 8
+            trial_count = state.trials_by_team.get(team_id, 0)
+            if trial_count == phase_start:
                 try:
                     results.append(launch_phase(root, team_id, phase))
-                except research_runtime_v4.ResearchRuntimeError:
-                    # A completed model can durably publish an invalid outbox before the
-                    # launcher's post-process validation classifies it.  Once the exact outbox
-                    # exists, the broker-held whole-batch admission path—not a second model
-                    # session—is the sole authority to reject it score-blind or recover exact
-                    # receipts.  With no outbox, the failure remains infrastructure-resumable.
-                    if not os.path.lexists(outbox):
-                        raise
+                except research_runtime_v4.CandidateRepairExhaustedError as exc:
+                    # The exact invalid batch remains live so the broker-held preflight can
+                    # durably retire it without opening scores. Infrastructure failures are not
+                    # caught here and remain restart-resumable.
+                    results.append(
+                        {
+                            "ok": False,
+                            "team_id": team_id,
+                            "phase": phase,
+                            "repair_exhausted": True,
+                            "reason": str(exc),
+                        }
+                    )
+            elif not outbox.exists():
+                raise BrokerError("accepted batch prefix has no live outbox authority")
             results.append(consume_batch(root, team_id, phase))
         elif outbox.exists():
             results.append(consume_batch(root, team_id, phase))

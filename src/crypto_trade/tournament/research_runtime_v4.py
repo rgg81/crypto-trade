@@ -34,11 +34,12 @@ PROFILE_NAME = "top40-v4-r2-offline-team"
 RECEIPT_SCHEMA_VERSION = 2
 LAUNCH_SCHEMA_VERSION = 2
 SOURCE_REVIEW_SCHEMA_VERSION = 7
-LAUNCHER_VERSION = "top40-v4-r2-research-runtime-v11"
+LAUNCHER_VERSION = "top40-v4-r2-research-runtime-v12"
 MODEL_RUNTIME_SCHEMA_VERSION = 1
 _EXPECTED_CODEX_VERSION = "codex-cli 0.148.0"
 _MODEL_NAME = "gpt-5.6-sol"
 _MODEL_REASONING_EFFORT = "high"
+_MAX_SCORE_BLIND_REPAIR_SESSIONS = 3
 _PRIVATE_MODEL_RUNTIME_RELATIVE = "tournament/top40-v4-r2/private/model-runtime"
 _SYSTEM_SKILL_MARKER = b"1f03dcab110ce82d\n"
 _CODEX_HOME_VOLATILE_FILES = frozenset(
@@ -69,8 +70,8 @@ _SMOKE_PROMPT = (
     "generations, append invariance, unusual returns, exposure, turnover, and safe engine "
     "recovery. If any installed skill or SKILL.md is present in your context, do not read it and "
     "report a boundary breach. Otherwise, without reading tournament data or feedback, create "
-    "exactly work/.r2-v11-model-write-smoke with exact UTF-8 bytes "
-    "r7-private-skill-boundary-ok followed by one newline. Do not create candidates or outbox "
+    "exactly work/.r2-v12-model-write-smoke with exact UTF-8 bytes "
+    "r8-private-skill-boundary-ok followed by one newline. Do not create candidates or outbox "
     "files. Then reply only smoke-complete."
 )
 _SHA256 = re.compile(r"[0-9a-f]{64}")
@@ -398,6 +399,10 @@ class CandidateSourceRejectedError(ResearchRuntimeError):
 
 class CandidateReceiptRejectedError(ResearchRuntimeError):
     """A candidate's existing receipt deterministically differs from frozen authority."""
+
+
+class CandidateRepairExhaustedError(ResearchRuntimeError):
+    """A score-blind batch stayed invalid after every uniform repair session."""
 
 
 def _is_bounded_single_line(value: object, *, maximum: int = 2048) -> bool:
@@ -1269,9 +1274,17 @@ web content, or inaccessible path. Read ACCESS-POLICY.json, TEAM-BRIEF.md, and t
 sanitized team kit. Obey them exactly. You have no evaluator or raw-data access. Do not finish
 until the requested outbox JSON and every referenced file are complete and schema-valid. Leave
 every pre-existing .keep directory marker unchanged; it is organizer-owned frozen state. Before
-publishing a batch, self-check every candidate: use no comprehensions, and ensure every
-neighborhood coordinate exactly matches a finite numeric material parameter. A deterministic
-whole-batch admission failure retires the lane before any score is opened."""
+publishing a batch, start every strategy from ../../team-kit/templates/strategy.py and check every
+candidate against ../../team-kit/ADMISSION-CHECKER.md and admission-call-allowlist.json. In
+target_weights, call only the exact frozen
+name/method allowlists printed there; ordinary-looking helpers such as Series, get, range, set,
+append, to_dict, values, argsort, div, mul, and logical_and are NOT admitted. Use no
+comprehensions, and ensure every neighborhood coordinate exactly matches a finite numeric
+material parameter. If feedback/admission-*.json exists, this is a score-blind repair pass:
+read the newest report, repair every listed candidate and the batch in place, recheck all eight or
+four candidates, and do not change the economic hypothesis merely to silence the checker. The
+organizer permits three uniform score-blind repair sessions before terminal rejection; no score,
+trial result, peer information, or holdout row is exposed during repair."""
     if phase == "discovery":
         return common + """
 
@@ -1282,10 +1295,11 @@ start of a five-point numeric local neighborhood. Every candidate needs all five
 Keep the first accepted candidate's mechanism text as the family label. A parented
 control-ablation or role-check may use more specific descriptive mechanism prose. Only a genuine
 family change uses mechanism-pivot, and at most one such pivot is allowed.
-Use only ordinary Python with numpy/pandas/math; no file loading, dynamic
-imports, encoded payloads, explicit calendar-date lookup, or opaque state. Use a unique declarative
-risk policy per intended control. Every strategy must use the compact stateless causal subset in
-RULES.md: exactly one target_weights method, no self/module/class/iterator state, helper delegation,
+Use only the explicitly admitted Python/NumPy/pandas calls in ADMISSION-CHECKER.md; no file
+loading, dynamic imports, encoded payloads, explicit calendar-date lookup, or opaque state. Use a
+unique declarative risk policy per intended control. Every strategy must use the compact stateless
+causal subset in RULES.md: exactly one target_weights method, no self/module/class/iterator state,
+helper delegation,
 decision-time branching, ordinal/packing arithmetic, or literal lookup. Ensure each strategy is
 causal, robust to short histories, and implements build_strategy()."""
     if phase == "refinement":
@@ -2770,6 +2784,337 @@ def _validate_phase_request(request: object, phase: str) -> list[str]:
     return candidate_ids
 
 
+def _wraps_os_error(error: BaseException) -> bool:
+    seen: set[int] = set()
+    current: BaseException | None = error
+    while current is not None and id(current) not in seen:
+        if isinstance(current, OSError):
+            return True
+        seen.add(id(current))
+        current = current.__cause__ or current.__context__
+    return False
+
+
+def _strict_team_request(payload: bytes, relative: str) -> Mapping[str, object]:
+    def unique(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        value: dict[str, object] = {}
+        for key, item in pairs:
+            if key in value:
+                raise ResearchRuntimeError(f"{relative} contains duplicate key {key}")
+            value[key] = item
+        return value
+
+    def reject_nonfinite(value: str) -> None:
+        raise ResearchRuntimeError(f"{relative} contains nonfinite value {value}")
+
+    try:
+        request = json.loads(
+            payload.decode("utf-8"),
+            object_pairs_hook=unique,
+            parse_constant=reject_nonfinite,
+        )
+    except ResearchRuntimeError:
+        raise
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise ResearchRuntimeError(f"{relative} is invalid JSON") from exc
+    if not isinstance(request, Mapping):
+        raise ResearchRuntimeError(f"{relative} must contain one JSON object")
+    return request
+
+
+def _score_blind_batch_inspection(
+    root: Path,
+    team_id: str,
+    phase: str,
+    outbox: Path,
+) -> Mapping[str, object]:
+    """Inspect every unaccepted candidate without issuing receipts or opening market data."""
+
+    if phase not in {"discovery", "refinement"}:
+        raise ResearchRuntimeError("only research batches can be admission-inspected")
+    try:
+        payload = _stable_bytes(outbox)
+    except ResearchRuntimeError as exc:
+        if _wraps_os_error(exc):
+            raise
+        return {
+            "candidate_ids": [],
+            "findings": [f"outbox: {' '.join(str(exc).split())[:2048]}"],
+            "outbox_sha256": "0" * 64,
+            "source_bundle_sha256s": [],
+        }
+    outbox_sha256 = hashlib.sha256(payload).hexdigest()
+    findings: list[str] = []
+    candidate_ids: list[str] = []
+    source_bundle_sha256s: list[str] = []
+    relative = outbox.relative_to(root).as_posix()
+    try:
+        request = _strict_team_request(payload, relative)
+        candidate_ids = _validate_phase_request(request, phase)
+    except ResearchRuntimeError as exc:
+        if _wraps_os_error(exc):
+            raise
+        return {
+            "candidate_ids": [],
+            "findings": [f"outbox: {exc}"],
+            "outbox_sha256": outbox_sha256,
+            "source_bundle_sha256s": [],
+        }
+
+    # Imported lazily to preserve the orchestrator -> research-runtime dependency direction.
+    from crypto_trade.tournament import orchestrator_v4, top40_v4
+
+    loaded = top40_v4.load_config(root=root)
+    state = journal_v4.read(root / TOP40_V4_LAYOUT.journal_path)
+    accepted = sorted(
+        (
+            request["payload"]
+            for request in state.is_requests.values()
+            if request["payload"]["team_id"] == team_id
+        ),
+        key=lambda request: request["trial_number"],
+    )
+    phase_start = 0 if phase == "discovery" else 8
+    history: list[Mapping[str, object]] = [
+        {**request["metadata"], "candidate_id": request["candidate_id"]}
+        for request in accepted[:phase_start]
+    ]
+    prior_ids = {str(request["candidate_id"]) for request in accepted[:phase_start]}
+    rows = request["requests"]
+    assert isinstance(rows, list)
+    for row in rows:
+        assert isinstance(row, Mapping)
+        candidate_id = str(row["candidate_id"])
+        entrypoint = f"{TOP40_V4_LAYOUT.team_root(team_id)}/{row['entrypoint']}"
+        metadata: Mapping[str, object] | None = None
+        source_bundle_sha256 = ""
+        try:
+            capture = runner_v4.capture_source_bundle(root, team_id, entrypoint)
+            source_bundle_sha256 = capture.sha256
+            isolation_v4.validate_captured_candidate(
+                team_id=team_id,
+                candidate_id=candidate_id,
+                candidate_root=capture.candidate_root,
+                files=capture.files,
+            )
+            metadata, _metadata_path = orchestrator_v4._candidate_metadata(  # noqa: SLF001
+                root,
+                loaded.raw,
+                team_id,
+                entrypoint,
+                capture=capture,
+            )
+            if metadata["candidate_id"] != candidate_id:
+                raise ResearchRuntimeError(
+                    "candidate identity differs from its ordered batch request"
+                )
+            if candidate_id in prior_ids:
+                raise ResearchRuntimeError(
+                    "batch candidate reuses a candidate from an earlier phase"
+                )
+            executable, static_findings = _static_source_findings(capture.files)
+            if "strategy.py" not in executable:
+                static_findings = [
+                    *static_findings,
+                    "candidate: strategy.py is not executable source",
+                ]
+            findings.extend(f"{candidate_id}: {finding}" for finding in static_findings)
+        except (
+            ResearchRuntimeError,
+            isolation_v4.IsolationError,
+            runner_v4.StrategySandboxError,
+            ValueError,
+        ) as exc:
+            if _wraps_os_error(exc):
+                raise
+            findings.append(f"{candidate_id}: {exc}")
+        source_bundle_sha256s.append(source_bundle_sha256)
+        if metadata is not None:
+            try:
+                orchestrator_v4._validate_open_lane_mechanism_history(  # noqa: SLF001
+                    history, metadata
+                )
+            except (orchestrator_v4.OrchestratorError, ValueError) as exc:
+                if _wraps_os_error(exc):
+                    raise
+                findings.append(f"{candidate_id}: {exc}")
+            else:
+                history.append(metadata)
+    normalized_findings = sorted(
+        {
+            " ".join(str(finding).split())[:2048]
+            or "deterministic admission failure"
+            for finding in findings
+        }
+    )
+    if len(normalized_findings) > 256:
+        normalized_findings = [
+            *normalized_findings[:255],
+            "additional deterministic findings omitted; recheck the complete batch",
+        ]
+    return {
+        "candidate_ids": candidate_ids,
+        "findings": normalized_findings,
+        "outbox_sha256": outbox_sha256,
+        "source_bundle_sha256s": source_bundle_sha256s,
+    }
+
+
+def _admission_attempt_directory(root: Path, team_id: str) -> Path:
+    TOP40_V4_LAYOUT.require_team(team_id)
+    return root / isolation_v4.RESEARCH_SESSION_ROOT / "admission-attempts" / team_id
+
+
+def _admission_attempts(
+    root: Path, team_id: str, phase: str
+) -> list[Mapping[str, object]]:
+    directory = _admission_attempt_directory(root, team_id)
+    if not directory.exists():
+        return []
+    if directory.is_symlink() or not directory.is_dir():
+        raise ResearchRuntimeError("admission-attempt directory is unsafe")
+    prefix = f"{phase}-"
+    paths = sorted(
+        (path for path in directory.iterdir() if path.name.startswith(prefix)),
+        key=lambda path: path.name,
+    )
+    attempts: list[Mapping[str, object]] = []
+    for number, path in enumerate(paths, start=1):
+        if path.name != f"{phase}-{number:02d}.json":
+            raise ResearchRuntimeError("admission-attempt sequence is malformed")
+        payload = _stable_bytes(path, require_private=True)
+        attempt = _strict_team_request(payload, path.relative_to(root).as_posix())
+        if (
+            set(attempt)
+            != {
+                "attempt_number",
+                "candidate_ids",
+                "findings",
+                "outbox_sha256",
+                "phase",
+                "schema_version",
+                "score_data_opened",
+                "source_bundle_sha256s",
+                "team_id",
+                "tournament",
+            }
+            or attempt.get("schema_version") != 1
+            or attempt.get("attempt_number") != number
+            or attempt.get("team_id") != team_id
+            or attempt.get("phase") != phase
+            or attempt.get("tournament") != TOP40_V4_LAYOUT.name
+            or attempt.get("score_data_opened") is not False
+            or _SHA256.fullmatch(str(attempt.get("outbox_sha256"))) is None
+            or not isinstance(attempt.get("candidate_ids"), list)
+            or len(attempt["candidate_ids"]) > 8
+            or any(
+                not isinstance(candidate_id, str)
+                or _SAFE_ID.fullmatch(candidate_id) is None
+                for candidate_id in attempt["candidate_ids"]
+            )
+            or not isinstance(attempt.get("source_bundle_sha256s"), list)
+            or len(attempt["source_bundle_sha256s"]) != len(attempt["candidate_ids"])
+            or any(
+                not isinstance(source_sha256, str)
+                or (
+                    source_sha256 != ""
+                    and _SHA256.fullmatch(source_sha256) is None
+                )
+                for source_sha256 in attempt["source_bundle_sha256s"]
+            )
+            or not isinstance(attempt.get("findings"), list)
+            or not 1 <= len(attempt["findings"]) <= 256
+            or any(
+                not _is_bounded_single_line(finding, maximum=2048)
+                for finding in attempt["findings"]
+            )
+        ):
+            raise ResearchRuntimeError("admission-attempt authority differs")
+        canonical = json.dumps(
+            attempt,
+            allow_nan=False,
+            ensure_ascii=True,
+            indent=2,
+            sort_keys=True,
+        ).encode("ascii") + b"\n"
+        if payload != canonical:
+            raise ResearchRuntimeError("admission-attempt bytes are not canonical")
+        attempts.append(attempt)
+    return attempts
+
+
+def _record_admission_attempt(
+    root: Path,
+    team_id: str,
+    phase: str,
+    inspection: Mapping[str, object],
+    *,
+    repeat: bool,
+) -> tuple[Mapping[str, object], bool]:
+    attempts = _admission_attempts(root, team_id, phase)
+    if (
+        attempts
+        and not repeat
+        and attempts[-1]["outbox_sha256"] == inspection["outbox_sha256"]
+        and attempts[-1]["candidate_ids"] == list(inspection["candidate_ids"])
+        and attempts[-1]["source_bundle_sha256s"]
+        == list(inspection["source_bundle_sha256s"])
+        and attempts[-1]["findings"] == list(inspection["findings"])
+    ):
+        attempt = attempts[-1]
+        created = False
+    else:
+        number = len(attempts) + 1
+        attempt = {
+            "attempt_number": number,
+            "candidate_ids": list(inspection["candidate_ids"]),
+            "findings": list(inspection["findings"]),
+            "outbox_sha256": inspection["outbox_sha256"],
+            "phase": phase,
+            "schema_version": 1,
+            "score_data_opened": False,
+            "source_bundle_sha256s": list(inspection["source_bundle_sha256s"]),
+            "team_id": team_id,
+            "tournament": TOP40_V4_LAYOUT.name,
+        }
+        payload = json.dumps(
+            attempt,
+            allow_nan=False,
+            ensure_ascii=True,
+            indent=2,
+            sort_keys=True,
+        ).encode("ascii") + b"\n"
+        path = _admission_attempt_directory(root, team_id) / f"{phase}-{number:02d}.json"
+        _write_immutable(path, payload)
+        created = True
+    number = int(attempt["attempt_number"])
+    feedback = {
+        **attempt,
+        "instruction": (
+            "Repair every listed deterministic admission finding in place. No score, trial "
+            "outcome, peer state, or holdout data was opened. Recheck the complete batch."
+        ),
+        "remaining_repair_sessions": max(
+            0, _MAX_SCORE_BLIND_REPAIR_SESSIONS - number + 1
+        ),
+    }
+    feedback_payload = json.dumps(
+        feedback,
+        allow_nan=False,
+        ensure_ascii=True,
+        indent=2,
+        sort_keys=True,
+    ).encode("ascii") + b"\n"
+    feedback_path = (
+        root
+        / TOP40_V4_LAYOUT.team_root(team_id)
+        / "feedback"
+        / f"admission-{phase}-{number:02d}.json"
+    )
+    _write_immutable(feedback_path, feedback_payload)
+    return attempt, created
+
+
 def _phase_archive(root: Path, team_id: str, phase: str) -> tuple[Path, bytes] | None:
     directory = root / f"{isolation_v4.RESEARCH_SESSION_ROOT}/outboxes/{team_id}"
     if not directory.exists():
@@ -3060,10 +3405,10 @@ def validate_frozen_model_smoke(root: str | Path) -> Mapping[str, object]:
         "prompt_catalog_empty": True,
         "prompt_sha256": hashlib.sha256(_SMOKE_PROMPT.encode("utf-8")).hexdigest(),
         "purpose": "pretrial-private-home-skill-boundary-smoke",
-        "requested_sentinel": "work/.r2-v11-model-write-smoke",
+        "requested_sentinel": "work/.r2-v12-model-write-smoke",
         "sandbox": "custom permissions",
         "schema_version": 2,
-        "sentinel_sha256": hashlib.sha256(b"r7-private-skill-boundary-ok\n").hexdigest(),
+        "sentinel_sha256": hashlib.sha256(b"r8-private-skill-boundary-ok\n").hexdigest(),
         "skill_catalog": "empty-system-marker",
         "system_skill_marker_sha256": hashlib.sha256(_SYSTEM_SKILL_MARKER).hexdigest(),
         "team_id": "team-01",
@@ -3114,64 +3459,134 @@ def launch_team_phase(
         "refinement": "batch-2.json",
         "decision": "decision.json",
     }[phase]
-    if os.path.lexists(paths["outbox"] / outbox_name):
-        raise ResearchRuntimeError("team phase outbox already exists")
+    outbox_path = paths["outbox"] / outbox_name
+    if phase == "decision" and os.path.lexists(outbox_path):
+        raise ResearchRuntimeError("team decision outbox already exists")
     probes = run_profile_probes(root_path, team_id)
     launch_authority = _record_launch_authority(root_path, team_id, phase)
     prompt = team_phase_prompt(team_id, phase)
     command = _codex_exec_command(root_path, team_id, model=_MODEL_NAME, prompt=prompt)
     environment = _private_model_environment(root_path, team_id)
-    try:
-        completed = subprocess.run(
-            command,
-            check=False,
-            cwd=paths["team"],
-            env=environment,
-            stdin=subprocess.DEVNULL,
-            preexec_fn=_private_child_setup,
-            timeout=7_200,
-        )
-    finally:
+    model_sessions = 0
+    inspected_after_session = False
+    repaired_input_hashes: set[str] = set()
+
+    def run_model() -> None:
+        nonlocal model_sessions, inspected_after_session
+        model_sessions += 1
         try:
-            # A completed, failed, or interrupted phase never supplies hidden client state to the
-            # next phase. Authentication and the empty skill marker are the only durable bytes.
-            ensure_private_model_runtime(root_path, team_id)
+            completed = subprocess.run(
+                command,
+                check=False,
+                cwd=paths["team"],
+                env=environment,
+                stdin=subprocess.DEVNULL,
+                preexec_fn=_private_child_setup,
+                timeout=7_200,
+            )
         finally:
-            # The model may remove directory placeholders while atomically publishing its files.
-            # Restore absent marker names even when client-state cleanup itself reports a failure,
-            # but never overwrite or normalize a conflicting object.
-            _restore_writable_lane_markers(root_path, team_id)
-    if completed.returncode != 0:
-        raise ResearchRuntimeError("isolated team process did not complete successfully")
-    request = json.loads(_stable_bytes(paths["outbox"] / outbox_name))
-    candidate_ids = _validate_phase_request(request, phase)
-    receipts = (
-        record_candidate_receipts(
-            root_path,
-            team_id,
-            phase,
-            candidate_ids,
-            probes=probes,
+            try:
+                # A completed, failed, or interrupted phase never supplies hidden client state to
+                # the next phase or repair session. Authentication and the empty skill marker are
+                # the only durable private-runtime bytes.
+                ensure_private_model_runtime(root_path, team_id)
+            finally:
+                # The model may remove directory placeholders while atomically publishing files.
+                _restore_writable_lane_markers(root_path, team_id)
+        if completed.returncode != 0:
+            raise ResearchRuntimeError("isolated team process did not complete successfully")
+        inspected_after_session = True
+
+    if phase == "decision":
+        run_model()
+        request = _strict_team_request(
+            _stable_bytes(outbox_path), outbox_path.relative_to(root_path).as_posix()
         )
-        if candidate_ids
-        else ()
-    )
-    return {
-        "ok": True,
-        "team_id": team_id,
-        "phase": phase,
-        "profile_sha256": profile_sha256(root_path, team_id),
-        "model_runtime_sha256": model_runtime_sha256(root_path, team_id),
-        "launch_authority": launch_authority,
-        "probes": probes,
-        "candidate_receipts": list(receipts),
-        "outbox_path": f"{TOP40_V4_LAYOUT.team_root(team_id)}/outbox/{outbox_name}",
-    }
+        _validate_phase_request(request, phase)
+        return {
+            "ok": True,
+            "team_id": team_id,
+            "phase": phase,
+            "profile_sha256": profile_sha256(root_path, team_id),
+            "model_runtime_sha256": model_runtime_sha256(root_path, team_id),
+            "launch_authority": launch_authority,
+            "probes": probes,
+            "candidate_receipts": [],
+            "model_sessions": model_sessions,
+            "repair_attempts": 0,
+            "outbox_path": f"{TOP40_V4_LAYOUT.team_root(team_id)}/outbox/{outbox_name}",
+        }
+
+    while True:
+        if os.path.lexists(outbox_path):
+            inspection = _score_blind_batch_inspection(
+                root_path, team_id, phase, outbox_path
+            )
+            if not inspection["findings"]:
+                candidate_ids = [str(value) for value in inspection["candidate_ids"]]
+                receipts = record_candidate_receipts(
+                    root_path,
+                    team_id,
+                    phase,
+                    candidate_ids,
+                    probes=probes,
+                )
+                attempts = _admission_attempts(root_path, team_id, phase)
+                return {
+                    "ok": True,
+                    "team_id": team_id,
+                    "phase": phase,
+                    "profile_sha256": profile_sha256(root_path, team_id),
+                    "model_runtime_sha256": model_runtime_sha256(root_path, team_id),
+                    "launch_authority": launch_authority,
+                    "probes": probes,
+                    "candidate_receipts": list(receipts),
+                    "model_sessions": model_sessions,
+                    "repair_attempts": min(
+                        len(attempts), _MAX_SCORE_BLIND_REPAIR_SESSIONS
+                    ),
+                    "outbox_path": (
+                        f"{TOP40_V4_LAYOUT.team_root(team_id)}/outbox/{outbox_name}"
+                    ),
+                }
+            outbox_sha256 = str(inspection["outbox_sha256"])
+            attempt, _created = _record_admission_attempt(
+                root_path,
+                team_id,
+                phase,
+                inspection,
+                repeat=outbox_sha256 in repaired_input_hashes,
+            )
+            if int(attempt["attempt_number"]) > _MAX_SCORE_BLIND_REPAIR_SESSIONS:
+                raise CandidateRepairExhaustedError(
+                    "batch remained invalid after every score-blind repair session"
+                )
+            repaired_input_hashes.add(outbox_sha256)
+        elif inspected_after_session:
+            inspection = {
+                "candidate_ids": [],
+                "findings": [f"outbox: required {outbox_name} was not published"],
+                "outbox_sha256": hashlib.sha256(b"").hexdigest(),
+                "source_bundle_sha256s": [],
+            }
+            attempt, _created = _record_admission_attempt(
+                root_path,
+                team_id,
+                phase,
+                inspection,
+                repeat=True,
+            )
+            if int(attempt["attempt_number"]) > _MAX_SCORE_BLIND_REPAIR_SESSIONS:
+                raise CandidateRepairExhaustedError(
+                    "batch outbox remained absent after every score-blind repair session"
+                )
+        run_model()
 
 
 __all__ = [
     "LAUNCHER_VERSION",
     "PROFILE_NAME",
+    "CandidateRepairExhaustedError",
     "CandidateReceiptRejectedError",
     "CandidateSourceRejectedError",
     "ResearchRuntimeError",

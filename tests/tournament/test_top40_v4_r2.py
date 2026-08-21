@@ -212,7 +212,7 @@ def test_r2_layout_has_fifteen_fresh_lanes_and_six_finalists() -> None:
         f"team-{number:02d}" for number in range(1, 16)
     )
     assert TOP40_V4_R2_LAYOUT.advance_count == 6
-    assert TOP40_V4_R2_LAYOUT.branch == "quant-portfolio-blind-top40-v4-r1-v2-restart5"
+    assert TOP40_V4_R2_LAYOUT.branch == "quant-portfolio-blind-top40-v4-r1-v2-restart6"
     assert TOP40_V4_R2_LAYOUT.tournament_root == "tournament/top40-v4-r2"
     assert TOP40_V4_R2_LAYOUT.reports_root == "reports-top40-v4-r2"
 
@@ -1632,6 +1632,15 @@ def test_fresh_restart_authority_is_an_explicit_alternative_to_incident_recovery
     assert worker_incident["discovery_feedback_disclosed_to_team_01"] is True
     assert worker_incident["holdout_rows_disclosed_to_team"] is False
     assert worker_incident["results_reused"] is False
+    zero_candidate = authority["zero_candidate_incident"]
+    assert zero_candidate["batch_rejected_count"] == 15
+    assert zero_candidate["selected_finalists"] == 0
+    assert zero_candidate["winner"] is None
+    assert zero_candidate["is_result_files"] == 0
+    assert zero_candidate["feedback_disclosed"] is False
+    assert zero_candidate["results_reused"] is False
+    assert zero_candidate["research_provenance_reused"] is False
+    assert zero_candidate["holdout_end_exclusive"] == "2026-08-01T00:00:00Z"
 
     old_launch = tmp_path / activation_v4._PRETRIAL_OLD_LAUNCH_PATH
     old_launch.parent.mkdir(parents=True)
@@ -2592,6 +2601,354 @@ def build_strategy():
     executable, findings = research_runtime_v4._static_source_findings((item,))
     assert executable == ["strategy.py"]
     assert findings == []
+
+
+def test_team_kit_strategy_template_passes_the_exact_static_checker() -> None:
+    payload = (
+        ROOT / "tournament/top40-v4-r2/team-kit/templates/strategy.py"
+    ).read_bytes()
+    item = runner_v4.source_archive_v4.SourceFile(
+        path="strategy.py",
+        size=len(payload),
+        sha256=hashlib.sha256(payload).hexdigest(),
+        content=payload,
+    )
+    executable, findings = research_runtime_v4._static_source_findings((item,))
+    assert executable == ["strategy.py"]
+    assert findings == []
+    checker = (
+        ROOT / "tournament/top40-v4-r2/team-kit/ADMISSION-CHECKER.md"
+    ).read_text(encoding="utf-8")
+    for rejected_call in ("Series", "get", "range", "append", "to_dict"):
+        assert rejected_call in checker
+    allowlist = json.loads(
+        (
+            ROOT
+            / "tournament/top40-v4-r2/team-kit/admission-call-allowlist.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert set(allowlist) == {
+        "allowed_attribute_calls",
+        "allowed_name_calls",
+        "schema_version",
+    }
+    assert allowlist["schema_version"] == 1
+    assert set(allowlist["allowed_name_calls"]) == set(
+        research_runtime_v4._TARGET_ALLOWED_NAME_CALLS
+    )
+    assert set(allowlist["allowed_attribute_calls"]) == set(
+        research_runtime_v4._TARGET_ALLOWED_ATTRIBUTE_CALLS
+    )
+
+
+def test_launcher_repairs_invalid_batch_before_recording_any_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    team = tmp_path / TOP40_V4_R2_LAYOUT.team_root("team-01")
+    for directory in ("candidates", "feedback", "outbox", "work"):
+        (team / directory).mkdir(parents=True, exist_ok=True)
+    outbox = team / "outbox/batch-1.json"
+    calls: list[int] = []
+    recorded: list[tuple[str, ...]] = []
+
+    monkeypatch.setattr(activation_v4, "validate", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        activation_v4, "require_completed_pretrial_recovery", lambda *_args: {}
+    )
+    monkeypatch.setattr(
+        research_runtime_v4, "validate_frozen_model_smoke", lambda *_args: {}
+    )
+    monkeypatch.setattr(
+        research_runtime_v4, "_validate_runtime_launch_lifecycle", lambda *_args: None
+    )
+    monkeypatch.setattr(
+        research_runtime_v4.isolation_v4, "audit_team_surface", lambda *_args: {}
+    )
+    monkeypatch.setattr(
+        research_runtime_v4, "run_profile_probes", lambda *_args: {"passed": True}
+    )
+    monkeypatch.setattr(
+        research_runtime_v4,
+        "_record_launch_authority",
+        lambda *_args: {"path": "launch.json", "sha256": "1" * 64},
+    )
+    monkeypatch.setattr(research_runtime_v4, "_codex_exec_command", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(research_runtime_v4, "_private_model_environment", lambda *_args: {})
+    monkeypatch.setattr(research_runtime_v4, "ensure_private_model_runtime", lambda *_args: {})
+    monkeypatch.setattr(
+        research_runtime_v4, "_restore_writable_lane_markers", lambda *_args: ()
+    )
+    monkeypatch.setattr(
+        research_runtime_v4,
+        "_restore_writable_lane_markers_before_activation",
+        lambda *_args: (),
+    )
+    monkeypatch.setattr(research_runtime_v4, "profile_sha256", lambda *_args: "2" * 64)
+    monkeypatch.setattr(
+        research_runtime_v4, "model_runtime_sha256", lambda *_args: "3" * 64
+    )
+
+    def run_model(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        calls.append(len(calls) + 1)
+        outbox.write_bytes(b"invalid\n" if len(calls) == 1 else b"valid\n")
+        return SimpleNamespace(returncode=0)
+
+    def inspect(*_args: object, **_kwargs: object) -> dict[str, object]:
+        if outbox.read_bytes() == b"invalid\n":
+            return {
+                "candidate_ids": ["candidate-1"],
+                "findings": [
+                    "candidate-1: strategy.py: target_weights method call is outside pure "
+                    "allowlist: get"
+                ],
+                "outbox_sha256": hashlib.sha256(b"invalid\n").hexdigest(),
+                "source_bundle_sha256s": ["4" * 64],
+            }
+        return {
+            "candidate_ids": ["candidate-1"],
+            "findings": [],
+            "outbox_sha256": hashlib.sha256(b"valid\n").hexdigest(),
+            "source_bundle_sha256s": ["5" * 64],
+        }
+
+    def receipts(
+        _root: Path,
+        _team_id: str,
+        _phase: str,
+        candidate_ids: list[str],
+        **_kwargs: object,
+    ) -> tuple[dict[str, str], ...]:
+        recorded.append(tuple(candidate_ids))
+        return ({"path": "receipt.json", "sha256": "6" * 64},)
+
+    monkeypatch.setattr(research_runtime_v4.subprocess, "run", run_model)
+    monkeypatch.setattr(research_runtime_v4, "_score_blind_batch_inspection", inspect)
+    monkeypatch.setattr(research_runtime_v4, "record_candidate_receipts", receipts)
+
+    result = research_runtime_v4.launch_team_phase.__wrapped__(
+        tmp_path, "team-01", "discovery"
+    )
+    assert calls == [1, 2]
+    assert recorded == [("candidate-1",)]
+    assert result["model_sessions"] == 2
+    assert result["repair_attempts"] == 1
+    private_attempt = (
+        tmp_path
+        / "tournament/top40-v4-r2/research-sessions/admission-attempts/team-01/"
+        "discovery-01.json"
+    )
+    attempt = json.loads(private_attempt.read_text(encoding="utf-8"))
+    assert attempt["score_data_opened"] is False
+    assert attempt["outbox_sha256"] == hashlib.sha256(b"invalid\n").hexdigest()
+    feedback = json.loads(
+        (team / "feedback/admission-discovery-01.json").read_text(encoding="utf-8")
+    )
+    assert feedback["remaining_repair_sessions"] == 3
+    assert feedback["findings"] == attempt["findings"]
+
+
+def test_launcher_exhausts_exactly_three_uniform_repairs_without_receipts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    team = tmp_path / TOP40_V4_R2_LAYOUT.team_root("team-01")
+    for directory in ("candidates", "feedback", "outbox", "work"):
+        (team / directory).mkdir(parents=True, exist_ok=True)
+    outbox = team / "outbox/batch-1.json"
+    calls: list[int] = []
+
+    monkeypatch.setattr(activation_v4, "validate", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        activation_v4, "require_completed_pretrial_recovery", lambda *_args: {}
+    )
+    monkeypatch.setattr(
+        research_runtime_v4, "validate_frozen_model_smoke", lambda *_args: {}
+    )
+    monkeypatch.setattr(
+        research_runtime_v4, "_validate_runtime_launch_lifecycle", lambda *_args: None
+    )
+    monkeypatch.setattr(
+        research_runtime_v4.isolation_v4, "audit_team_surface", lambda *_args: {}
+    )
+    monkeypatch.setattr(
+        research_runtime_v4, "run_profile_probes", lambda *_args: {"passed": True}
+    )
+    monkeypatch.setattr(
+        research_runtime_v4,
+        "_record_launch_authority",
+        lambda *_args: {"path": "launch.json", "sha256": "1" * 64},
+    )
+    monkeypatch.setattr(research_runtime_v4, "_codex_exec_command", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(research_runtime_v4, "_private_model_environment", lambda *_args: {})
+    monkeypatch.setattr(research_runtime_v4, "ensure_private_model_runtime", lambda *_args: {})
+    monkeypatch.setattr(
+        research_runtime_v4, "_restore_writable_lane_markers", lambda *_args: ()
+    )
+    monkeypatch.setattr(
+        research_runtime_v4,
+        "_restore_writable_lane_markers_before_activation",
+        lambda *_args: (),
+    )
+
+    def run_model(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        calls.append(len(calls) + 1)
+        outbox.write_text(f"invalid-{len(calls)}\n", encoding="utf-8")
+        return SimpleNamespace(returncode=0)
+
+    def inspect(*_args: object, **_kwargs: object) -> dict[str, object]:
+        payload = outbox.read_bytes()
+        return {
+            "candidate_ids": ["candidate-1"],
+            "findings": ["candidate-1: deterministic source finding"],
+            "outbox_sha256": hashlib.sha256(payload).hexdigest(),
+            "source_bundle_sha256s": ["4" * 64],
+        }
+
+    monkeypatch.setattr(research_runtime_v4.subprocess, "run", run_model)
+    monkeypatch.setattr(research_runtime_v4, "_score_blind_batch_inspection", inspect)
+    monkeypatch.setattr(
+        research_runtime_v4,
+        "record_candidate_receipts",
+        lambda *_args, **_kwargs: pytest.fail("invalid batch received a receipt"),
+    )
+    with pytest.raises(
+        research_runtime_v4.CandidateRepairExhaustedError,
+        match="every score-blind repair",
+    ):
+        research_runtime_v4.launch_team_phase.__wrapped__(
+            tmp_path, "team-01", "discovery"
+        )
+    assert calls == [1, 2, 3, 4]
+    attempts = sorted(
+        (
+            tmp_path
+            / "tournament/top40-v4-r2/research-sessions/admission-attempts/team-01"
+        ).glob("discovery-*.json")
+    )
+    assert [path.name for path in attempts] == [
+        "discovery-01.json",
+        "discovery-02.json",
+        "discovery-03.json",
+        "discovery-04.json",
+    ]
+
+
+def test_score_blind_refinement_inspection_includes_discovery_mechanism_history(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    team = tmp_path / TOP40_V4_R2_LAYOUT.team_root("team-01")
+    outbox = team / "outbox/batch-2.json"
+    outbox.parent.mkdir(parents=True)
+    rows = [
+        {
+            "candidate_id": f"candidate-{number}",
+            "entrypoint": f"candidates/candidate-{number}/strategy.py",
+            "purpose": f"refinement {number}",
+        }
+        for number in range(9, 13)
+    ]
+    outbox.write_text(
+        json.dumps(
+            {"schema_version": 1, "operation": "is-batch", "requests": rows}
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    prior_requests = {
+        f"{number:064x}": {
+            "payload": {
+                "team_id": "team-01",
+                "trial_number": number,
+                "candidate_id": f"candidate-{number}",
+                "metadata": {
+                    "candidate_id": f"candidate-{number}",
+                    "mechanism": "accepted discovery mechanism",
+                    "tags": ["baseline"],
+                },
+            }
+        }
+        for number in range(1, 9)
+    }
+    monkeypatch.setattr(
+        research_runtime_v4.journal_v4,
+        "read",
+        lambda _path: SimpleNamespace(is_requests=prior_requests),
+    )
+    monkeypatch.setattr(
+        top40_v4, "load_config", lambda **_kwargs: SimpleNamespace(raw={})
+    )
+    monkeypatch.setattr(
+        research_runtime_v4.runner_v4,
+        "capture_source_bundle",
+        lambda _root, _team_id, entrypoint: SimpleNamespace(
+            candidate_root=entrypoint.rsplit("/", 1)[0],
+            files=(),
+            sha256=hashlib.sha256(entrypoint.encode()).hexdigest(),
+        ),
+    )
+    monkeypatch.setattr(
+        research_runtime_v4.isolation_v4,
+        "validate_captured_candidate",
+        lambda **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        orchestrator_v4,
+        "_candidate_metadata",
+        lambda _root, _config, _team_id, entrypoint, **_kwargs: (
+            {
+                "candidate_id": entrypoint.split("/candidates/", 1)[1].split("/", 1)[0],
+                "mechanism": (
+                    "undocumented new mechanism"
+                    if "candidate-9/" in entrypoint
+                    else "accepted discovery mechanism"
+                ),
+                "parent_candidate_id": None,
+                "tags": ["role-check"] if "candidate-9/" in entrypoint else ["baseline"],
+            },
+            "candidate.json",
+        ),
+    )
+    monkeypatch.setattr(
+        research_runtime_v4,
+        "_static_source_findings",
+        lambda _files: (["strategy.py"], []),
+    )
+
+    inspection = research_runtime_v4._score_blind_batch_inspection(
+        tmp_path, "team-01", "refinement", outbox
+    )
+    assert any(
+        "descriptive mechanism variants require a current-epoch parent" in finding
+        for finding in inspection["findings"]
+    )
+    assert len(inspection["source_bundle_sha256s"]) == 4
+
+
+def test_repair_resume_detects_changed_source_with_unchanged_outbox(
+    tmp_path: Path,
+) -> None:
+    first = {
+        "candidate_ids": ["candidate-1"],
+        "findings": ["candidate-1: first deterministic finding"],
+        "outbox_sha256": "1" * 64,
+        "source_bundle_sha256s": ["2" * 64],
+    }
+    second = {
+        **first,
+        "findings": ["candidate-1: remaining deterministic finding"],
+        "source_bundle_sha256s": ["3" * 64],
+    }
+    original, created = research_runtime_v4._record_admission_attempt(
+        tmp_path, "team-01", "discovery", first, repeat=False
+    )
+    changed, changed_created = research_runtime_v4._record_admission_attempt(
+        tmp_path, "team-01", "discovery", second, repeat=False
+    )
+    repeated, repeated_created = research_runtime_v4._record_admission_attempt(
+        tmp_path, "team-01", "discovery", second, repeat=False
+    )
+    assert created is True and original["attempt_number"] == 1
+    assert changed_created is True and changed["attempt_number"] == 2
+    assert repeated_created is False and repeated == changed
 
 
 def test_static_semantic_subset_rejects_alias_and_helper_delegation() -> None:
@@ -4543,7 +4900,7 @@ def test_run_team_rejects_unsafe_rejected_batch_archive_without_mutation(
 
 
 @pytest.mark.parametrize("malformed_kind", ["wrong-count", "bad-purpose"])
-def test_run_team_terminally_classifies_published_malformed_model_batch(
+def test_run_team_terminally_classifies_malformed_batch_after_repairs_exhausted(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     malformed_kind: str,
@@ -4574,8 +4931,8 @@ def test_run_team_terminally_classifies_published_malformed_model_batch(
     def interrupted_launch(_root: Path, _team_id: str, _phase: str) -> None:
         outbox.write_bytes(payload)
         outbox.chmod(0o600)
-        raise research_runtime_v4.ResearchRuntimeError(
-            "published model batch failed post-process admission"
+        raise research_runtime_v4.CandidateRepairExhaustedError(
+            "published model batch remained invalid after score-blind repairs"
         )
 
     monkeypatch.setattr(broker, "launch_phase", interrupted_launch)

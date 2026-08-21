@@ -18,6 +18,10 @@ the experiment and is archived, but it is never mounted in the strategy worker; 
 runtime parameter must be explicit in Python source and `candidate.json`. The complete tree is
 capped at 10 MiB; each file is capped at 2 MiB.
 
+Copy `templates/strategy.py` as the starting structure and follow the exact call allowlists in
+`ADMISSION-CHECKER.md`. They are the executable contract: a Python/pandas call that is not printed
+there is rejected even when it is pure in ordinary application code.
+
 Every `neighborhood_coordinates` key must be repeated in `material_parameters` with exactly the
 same finite non-boolean numeric value. Use `{}` for non-neighborhood controls and role checks.
 Before any trial in a batch is accepted, the organizer score-blind preflights the complete batch;

@@ -27,9 +27,12 @@ five-point local neighborhood around any prospective nominee. Every accepted req
 of twelve slots, including failures. A team may retire honestly; nomination is never required.
 
 The organizer performs one score-blind admission preflight over the entire batch before accepting
-its first request. A deterministic metadata, attestation, receipt, mechanism, or static-source
-failure terminally retires the lane without opening score data or consuming a trial. Validate all
-candidates before publishing the outbox. For `neighborhood_coordinates`, every key must also exist
+its first request. Before terminal rejection, every lane receives up to three uniform repair
+sessions containing only deterministic admission findings; no score, trial outcome, peer state,
+or holdout data is opened. A batch that remains invalid after those repairs terminally retires the
+lane without consuming a trial. Validate all candidates from `templates/strategy.py` against the
+exact call allowlists in `ADMISSION-CHECKER.md` before publishing the outbox. For
+`neighborhood_coordinates`, every key must also exist
 in `material_parameters` as the same finite non-boolean numeric value. Use an empty object for a
 control or role check that is not itself a local-neighborhood point; `neighborhood_id` may be null.
 
