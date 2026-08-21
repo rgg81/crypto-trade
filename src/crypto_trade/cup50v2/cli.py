@@ -573,12 +573,16 @@ def _research_eval(arguments: argparse.Namespace) -> Mapping[str, object]:
     parameters = _json(arguments.parameters).get("centre", {}) if arguments.parameters else {}
     if parameters:
         apply_strategy_parameters(strategy, parameters)
+    # The team-visible audit, not the organizer's: a cessation dated after the split is a sealed
+    # fact. Without it the replay demands an executable price from a contract that had stopped
+    # trading, which is a real event in this window rather than a data defect.
     replay = run_candidate(
         strategy,
         snapshot=snapshot,
         start=snapshot.window_start,
         end=snapshot.window_end,
         seed=int(arguments.seed),
+        unavailability=load_unavailability_audit(arguments.unavailability_audit),
         record_events=False,
     )
     scored = score_in_sample_point(replay.costs, regime_labels=snapshot.regime_labels)
@@ -1127,6 +1131,9 @@ def parser() -> argparse.ArgumentParser:
     research.add_argument("--parameters")
     research.add_argument("--seed", type=int, default=0)
     research.add_argument("--purpose", required=True)
+    research.add_argument(
+        "--unavailability-audit", default="tournament/cup50v2/is-unavailability.json"
+    )
     research.add_argument("--research-journal", required=True)
     research.add_argument("--output", required=True)
     research.set_defaults(handler=_research_eval)
