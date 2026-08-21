@@ -113,3 +113,7 @@ notebooks/.ipynb_checkpoints/
 
 # SDD scratch workspaces: hold build ledgers that can name sealed-window symbols
 .superpowers/
+
+# Frozen tournament bundles are hashed file-by-file and the paper desk re-verifies that digest on
+# every tick, so bytecode inside one would stop a desk days later and look like tampering.
+tournament/cup50v2/teams/**/__pycache__/

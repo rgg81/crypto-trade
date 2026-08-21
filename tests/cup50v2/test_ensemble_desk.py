@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import sys
+import shutil
 import types
 from pathlib import Path
 
@@ -67,9 +67,16 @@ def _context(symbols: list[str], bars: int = 400) -> object:
 
 
 def _build(tmp_path: Path, members: list[tuple[str, str]]):
+    """Copy the bundle into tmp_path and run it there.
+
+    The first version wrote finalists.json into the real bundle and exec'd the module in place.
+    That mutated a bundle the desk verifies by digest on every tick, left a __pycache__ inside it,
+    and would have left the bundle dirty had a test failed between write and restore. A frozen
+    bundle is not a scratch directory.
+    """
     finalists = []
     for team_id, source in members:
-        bundle = tmp_path / team_id
+        bundle = tmp_path / "members" / team_id
         bundle.mkdir(parents=True, exist_ok=True)
         (bundle / "strategy.py").write_text(source)
         finalists.append({"team_id": team_id, "centre": {}, "bundle": str(bundle)})
@@ -85,25 +92,17 @@ def _build(tmp_path: Path, members: list[tuple[str, str]]):
             "risk_maximum_scale": 3.0,
         },
     }
-    ensemble_dir = Path("tournament/cup50v2/teams/ensemble-eq3")
-    original = (ensemble_dir / "finalists.json").read_text() if (
-        ensemble_dir / "finalists.json"
-    ).exists() else None
-    (ensemble_dir / "finalists.json").write_text(json.dumps(manifest))
-    sys.path.insert(0, str(ensemble_dir))
-    try:
-        spec = importlib.util.spec_from_file_location(
-            "ensemble_eq3_under_test", ensemble_dir / "strategy.py"
-        )
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        return module.build_strategy()
-    finally:
-        sys.path.remove(str(ensemble_dir))
-        if original is None:
-            (ensemble_dir / "finalists.json").unlink()
-        else:
-            (ensemble_dir / "finalists.json").write_text(original)
+    working = tmp_path / "ensemble-eq3"
+    working.mkdir(parents=True, exist_ok=True)
+    source_bundle = Path("tournament/cup50v2/teams/ensemble-eq3")
+    shutil.copy2(source_bundle / "strategy.py", working / "strategy.py")
+    (working / "finalists.json").write_text(json.dumps(manifest))
+    spec = importlib.util.spec_from_file_location(
+        "ensemble_eq3_under_test", working / "strategy.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.build_strategy()
 
 
 def test_a_loud_finalist_does_not_dominate_a_quiet_one(tmp_path: Path) -> None:
