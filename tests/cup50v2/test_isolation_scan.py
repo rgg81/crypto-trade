@@ -142,3 +142,28 @@ def test_every_shipped_lane_seed_passes_the_scan(tmp_path: Path) -> None:
         shutil.copyfile(seed / "strategy.py", root / "strategy.py")
         shutil.copyfile(seed / "parameters.json", root / "parameters.json")
         assert scan_research_root(root) == (), seed.name
+
+
+def test_the_repository_path_is_not_a_prior_edition(tmp_path: Path) -> None:
+    """This edition's checkout is named for the tournament it hosts.
+
+    The worktree is `quant-portfolio-blind-top50-v2`, so any team source that writes down where the
+    repository lives contains the token the scan hunts for. A gate that rejects that rejects honest
+    work: a team found this by having to move its own analysis scripts out of its workspace.
+    """
+    source = CLEAN.replace(
+        "lookback_bars = 189",
+        "lookback_bars = 189  # data at "
+        "/home/roberto/crypto-trade/.worktrees/quant-portfolio-blind-top50-v2/data/cup50v2/team-is",
+    )
+    assert scan_research_root(_workspace(tmp_path, source)) == ()
+
+
+def test_the_exemption_does_not_shelter_a_real_prior_edition(tmp_path: Path) -> None:
+    """It is one exact literal, so nothing else can hide behind it."""
+    source = CLEAN.replace(
+        "lookback_bars = 189",
+        "lookback_bars = 189  # in quant-portfolio-blind-top50-v2, and also tournament/cup50/teams",
+    )
+    violations = scan_research_root(_workspace(tmp_path, source))
+    assert any("prior-namespace" in item and "cup50" in item for item in violations), violations

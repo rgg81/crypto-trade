@@ -1,0 +1,18 @@
+{
+  "amendment": "A1",
+  "amendment_sha256": "258cd41c9dc055b410e0fca0c50d7a907ccaf0a73ac840802cb64b2b79c5fd2c",
+  "class": "organizer gate defect; no scoring, qualification or execution rule is touched",
+  "date": "2026-08-21",
+  "defect": "scan_research_root rejected any team source containing the repository path. This edition's worktree is named quant-portfolio-blind-top50-v2, so the path contains the token PRIOR_NAMESPACE hunts for, and the gate read a team writing down where the data lives as a reach into a prior edition.",
+  "fix": "One exact literal exemption for this edition's own worktree name, applied to source text before matching. A real prior-edition token in the same file still fails, and a test asserts both halves.",
+  "namespace": "cup50v2",
+  "note": "Found before any charged trial and before any sealed read, which is the only window in which the charter permits a fix rather than voiding the edition. The superseded activation record is preserved beside this amendment as evidence.",
+  "phase": "pre-sealed-read",
+  "reported_by": "team-02, which had to move its own analysis scripts out of its workspace",
+  "schema_version": 1,
+  "status": "fixed-and-reactivated",
+  "superseded_activation_sha256": "8b074ad23c4bdeddc5dde5910740f7b13a9b8ae7f5bc1a7fd36d82a5f89c21c9",
+  "superseded_git_commit": "abd81e027c4d0968d4a88702745bb2bce2943c16",
+  "trials_affected": 0,
+  "trials_recharged": 0
+}

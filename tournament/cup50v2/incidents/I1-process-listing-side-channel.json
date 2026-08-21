@@ -1,0 +1,19 @@
+{
+  "cause": "Organizer scheduling, not team conduct. Running all twelve lanes as concurrent processes on one host makes the process table a shared surface. Container isolation or serial execution would have closed it; the clean-room scan and the transcript audit cannot, because neither governs what the operating system will tell any process about the others.",
+  "date": "2026-08-21",
+  "disclosed_by": "team-07, unprompted, in its own final report",
+  "exposure_bound": "Command lines only. The team-visible snapshot is identical for every lane, so nothing sealed and no other lane's source, parameters or results were reachable this way.",
+  "follow_up": [
+    "The transcript audit still runs on team-07 at field close, judged with this record present.",
+    "Recorded as a disclosed limitation in the charter rather than quietly closed.",
+    "A future edition should run lanes in the sandbox container, where the process table is not shared, or stagger them."
+  ],
+  "incident": "I1",
+  "incident_sha256": "4a6b4a5863b4b4abb2af8c63ce1818872cd3b5e8dc360dbcb2dad14767ca8652",
+  "namespace": "cup50v2",
+  "phase": "pre-sealed-read",
+  "ruling": "No disqualification. The team disclosed voluntarily, states it read no other lane's files, and scoped every later check to its own patterns. The leak was created by an organizer choice and the observation was incidental to a legitimate operational check. Penalising an unprompted disclosure would teach every future lane to stay quiet about the same thing, which costs more than this exposure did.",
+  "schema_version": 1,
+  "title": "Process listings are a side channel between concurrently running lanes",
+  "what_happened": "While checking whether its own evaluations were still running, team-07 used `pgrep -af`. The system-wide output included other lanes' command lines, which carry --team-id, --strategy paths and the free-text --purpose of each running research evaluation."
+}

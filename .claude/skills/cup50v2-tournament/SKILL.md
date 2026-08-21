@@ -76,13 +76,22 @@ retry a terminal: an interrupted candidate point is a terminal zero and that is 
 two next-ranked eligible lanes, and the equal-risk ensemble. Minimum 183 official days before the
 capital rule is even evaluated.
 
+## Before you scan a workspace
+
+Remove tool droppings first — `__pycache__`, `.pytest_cache`, `.ruff_cache`. The scan flags them
+and it is right to: a research root should carry source, not caches. But they reappear whenever
+anyone runs Python in the workspace, so a scan that fails on them is telling you to tidy up, not
+that a team leaked anything. Clean, then scan, then judge what is left.
+
 ## Things that will bite
 
 - A held decision is an all-NaN row in `raw_targets`. Reduce with `np.nanmax`.
 - The per-symbol 0.20 cap binds before the gross 1.0 cap on a book with few names.
 - The risk unit can only shrink a book onto the target; a calm book is held at its ceiling.
-- `PRIOR_NAMESPACE` matches digits possessively. If you ever relax that, every source importing this
-  tournament's own toolkit is rejected.
+- `PRIOR_NAMESPACE` matches digits possessively, and exempts this edition's own worktree name.
+  Relax the first and every source importing this tournament's toolkit is rejected; drop the
+  second and every source that writes down where the repository lives is rejected. Both were
+  found by teams, not by tests.
 - The event lane is legitimately flat between events. Judge it on the field-level floor, not a
   per-lane turnover assertion.
 

@@ -237,6 +237,13 @@ deployment. The tournament result never authorises capital; only the forward rec
    organizer's snapshot are authoritative, and the two differ by the open-to-close gap.
 5. **Organizer-side blindness during scoring remains detection, not prevention.** The transcript
    audit and the quarantine receipt record what was read; neither is an operating-system control.
+6. **Lanes running concurrently on one host share a process table.** A lane checking on its own
+   work can see other lanes' command lines, including the free-text purpose of a running
+   evaluation. A team disclosed this unprompted during the research phase (incident I1); the
+   exposure is command lines only, since the team-visible snapshot is identical for every lane and
+   no source, parameters or results are reachable this way. The clean-room scan and the transcript
+   audit cannot close it, because neither governs what the operating system will tell one process
+   about another. Running lanes inside the sandbox container, or staggering them, would.
 6. **A calm book cannot reach the volatility target**, because the caps bind before the risk unit
    does, and a concentrated book is capped harder than a diversified one. Drawdowns across lanes are
    comparable in kind, not in scale.

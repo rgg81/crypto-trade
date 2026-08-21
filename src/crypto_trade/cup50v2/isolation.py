@@ -54,6 +54,11 @@ FORBIDDEN_NAMES = frozenset(
 # rejects every source that imports this tournament's own toolkit.
 PRIOR_NAMESPACE = re.compile(r"(?:cup|top)\d++(?!v2)")
 DATE_LITERAL = re.compile(r"\b20\d{2}-\d{2}-\d{2}\b")
+# This edition's own checkout is named for the tournament it hosts, so the repository path
+# contains the very token the scan hunts for. A team that writes down where the repository lives
+# has not reached into a prior edition, and a gate that says otherwise rejects honest work. The
+# exemption is one exact literal rather than a pattern, so nothing else can hide behind it.
+OWN_WORKTREE = "quant-portfolio-blind-top50-v2"
 FORBIDDEN_CACHE_SUFFIXES = frozenset(
     {".arrow", ".csv", ".feather", ".joblib", ".parquet", ".pickle", ".pkl"}
 )
@@ -104,7 +109,8 @@ def _source_violations(path: Path, relative: Path, *, cutoff: str) -> list[str]:
     except (OSError, UnicodeError):
         return [f"invalid-python:{relative.as_posix()}"]
     violations: list[str] = []
-    for match in PRIOR_NAMESPACE.finditer(text.lower()):
+    searchable = text.lower().replace(OWN_WORKTREE, "<this-worktree>")
+    for match in PRIOR_NAMESPACE.finditer(searchable):
         violations.append(f"prior-namespace:{relative.as_posix()}:{match.group(0)}")
     for literal in sorted({m.group(0) for m in DATE_LITERAL.finditer(text) if m.group(0) > cutoff}):
         # A date after the in-sample end is evidence the source was written knowing what came
