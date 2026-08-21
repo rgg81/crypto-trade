@@ -1,0 +1,18 @@
+{
+  "status": "passed",
+  "violations": {
+    "_probe_workspace": [],
+    "team-01": [],
+    "team-02": [],
+    "team-03": [],
+    "team-04": [],
+    "team-05": [],
+    "team-06": [],
+    "team-07": [],
+    "team-08": [],
+    "team-09": [],
+    "team-10": [],
+    "team-11": [],
+    "team-12": []
+  }
+}
