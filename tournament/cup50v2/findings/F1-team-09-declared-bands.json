@@ -1,0 +1,18 @@
+{
+  "candidate_id": "team09-final-001",
+  "declared": "'a name whose formation-window traded value exceeded twice its own 60-day median is not held at all, and between one and two times it is held at half weight.'",
+  "effect": "Every band is shifted one step looser. The implemented exclusion threshold is four times a name's 60-day median traded value, not the declared two. A name at three times its median was held at half weight; the declaration says it was not held at all. The declaration names this leg one of three load-bearing exposure conditioners, so the misstatement is about a control the lane itself presents as material.",
+  "explicitly_not_the_reason": "team-09 is already ineligible on the IS bar (S 25.58 against 35) and cannot win. That is not why the ruling is what it is, and the finding was investigated to the same depth it would have received had the lane been leading. Recording this because the temptation to under-investigate a finding that cannot change the outcome is real and should be visible on the record.",
+  "finding_id": "F1",
+  "finding_sha256": "d92f51c0786020b417cceb94a09e105493c2d46149b96fac01fd64995a94f91b",
+  "forward_fix": "The declaration-versus-source cross-check becomes part of nomination validation rather than a post-hoc audit, and the next edition's playbook states that numeric thresholds in a declaration must be quoted from the frozen parameters. A lane should not be able to describe a control more strictly than it implemented it and have nothing notice.",
+  "found_by": "organizer cross-check of every risk declaration against its nominated source, prompted by amendment A5 and carried out before the first sealed read",
+  "implemented": "with vol_confirm = 2.0: ratio <= 2.0 -> full weight; 2.0 < ratio <= 4.0 -> half weight; ratio > 4.0 -> dropped. Verified by reading the comparison operators at candidates/team09-final-001/strategy.py lines 268-275.",
+  "method_note": "The six lanes checked first were selected by a cosmetic candidate_id mismatch. This defect is unrelated to that mismatch and would have been missed entirely had the check stopped there -- so the remaining six lanes, whose ids matched, are being cross-checked on the same standard.",
+  "namespace": "cup50v2",
+  "not_a_stale_copy": "Checked. The sibling ablation-sign-inverted carries the identical quantisation, and official-seed-001 has no volume confirmation at all. No candidate in the workspace implements the declared bands, so this is a misdescription of the nominated source rather than an accurate description of a different one.",
+  "ruling": "Disclosed, no disposition change. There is no allowlisted disqualification code for an inaccurate declaration -- risk_declaration_default covers a declaration that was never made, which is not this. Minting a code after the fact and applying it to the one lane the new check caught is the retroactive correction this edition exists to prevent, and is the same reasoning that spared team-10 over the scan findings in A4.",
+  "scoring_impact": "None. The frozen source is what the evaluator ran and what every score reflects. The declaration is a disclosure artifact and is not an input to scoring, so no cell, point or score is affected.",
+  "team_id": "team-09",
+  "title": "declared volume-confirmation bands are one step tighter than the implemented ones"
+}
