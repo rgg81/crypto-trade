@@ -1,0 +1,13 @@
+{
+  "amendment_id": "A10",
+  "amendment_sha256": "dbef59eab81571a6b9d61d3861ebc4fef67c79991572eebf4d3f78be6eedfe7c",
+  "defect": "A1 and A2 were each followed by a re-activation commit. A3 was not. tournament/cup50v2/activation-freeze.json was moved into amendments as activation-freeze-superseded-A3.json and never replaced, so the field ran through nomination, the critic pass and field-close preparation -- twelve commits -- with no activation record at its canonical path.",
+  "fix": "Re-activate before field close so the record binds the code that will actually run the sealed observation, together with amendments A1 through A10 and a preflight provenance artifact stating how each of the eight checks was established.",
+  "found_at_phase": "field close preparation, before the first sealed read",
+  "found_by": "organizer, looking for the activation digest that field close requires and finding the record absent from its canonical path",
+  "namespace": "cup50v2",
+  "title": "amendment A3 superseded the activation and no re-activation followed",
+  "what_was_NOT_compromised": "Checked before writing this, because the first framing was wrong and would have overstated the harm. config.toml, TOURNAMENT-CHARTER-CUP50-V2.md and scoring.py are bit-identical to activation fb8748cb. The qualification bar of 35.0 and 15.0, the frozen score and the charter have therefore been continuously hash-bound since before any lane nominated, which is what C9 actually requires. No lane was judged against an unbound rule.",
+  "what_was_genuinely_missing": "The record itself, and a binding for the five modules that changed after it: cli.py, falsifiers.py, isolation.py, lifecycle.py and qualification.py. qualification.py in particular has changed twice since -- A3's placeholder fix and A5's candidate binding -- so the validator that will run at field close is not the one the last activation bound.",
+  "why_it_went_unnoticed": "Nothing requires an activation record to exist until field close asks for its digest. The supersession step removes the file and the re-activation step is a separate manual act, so omitting the second leaves a state that looks tidy -- amendments filed, tests green -- and is missing its binding. The next edition should make supersession and re-activation one operation, or refuse every lifecycle command while no activation record is present."
+}
