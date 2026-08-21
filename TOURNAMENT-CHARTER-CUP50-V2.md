@@ -244,6 +244,14 @@ deployment. The tournament result never authorises capital; only the forward rec
    no source, parameters or results are reachable this way. The clean-room scan and the transcript
    audit cannot close it, because neither governs what the operating system will tell one process
    about another. Running lanes inside the sandbox container, or staggering them, would.
+7. **Lanes were also given a shared scratch directory.** Workspaces were isolated; the scratch root
+   was not. Twelve lanes wrote there under generic filenames, one collision silently replaced a
+   lane's own tooling with another's, and that lane saw a handful of unattributed score summaries
+   before recognising what had happened (incident I2). Every nominated bundle and every
+   hash-chained research ledger was verified intact afterwards, so the tournament record is
+   unaffected, but the isolation claim for the research phase is weaker than the container model
+   implies. Both this and the process-table channel were found and reported by teams, unprompted,
+   rather than by the organizer's own gates.
 6. **A calm book cannot reach the volatility target**, because the caps bind before the risk unit
    does, and a concentrated book is capped harder than a diversified one. Drawdowns across lanes are
    comparable in kind, not in scale.
