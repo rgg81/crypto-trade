@@ -69,13 +69,27 @@ REQUIRED_CONTROLS = (
 _PLACEHOLDERS = ("REPLACE-ME", "REPLACE:")
 
 
-def verify_risk_declaration(declaration: Mapping[str, object]) -> None:
+def verify_risk_declaration(
+    declaration: Mapping[str, object], *, candidate_id: str | None = None
+) -> None:
     """Require a decision about every control, including the decision to have none.
 
     CUP-20's risk template defaulted to all-disabled, so a team that never considered risk shipped
     the same bytes as one that thought hard and chose nothing, and the artifact could not tell them
     apart. Silence is not a declaration: "none, deliberately" is, and it is one sentence away.
+
+    A declaration also has to say which candidate it is about, and be right. The field was in
+    the schema from the start and nothing ever compared it with the nomination it accompanied,
+    so a lane could have declared risk for a variant it never nominated and passed (A5).
     """
+    if candidate_id is not None:
+        declared = str(declaration.get("candidate_id", "")).strip()
+        if not declared:
+            raise ValueError("risk declaration does not name the candidate it declares for")
+        if declared != candidate_id:
+            raise ValueError(
+                f"risk declaration is for {declared!r}, not the nominated {candidate_id!r}"
+            )
     if int(declaration.get("schema_version", 0)) != 1:
         raise ValueError("risk declaration schema_version must be 1")
     controls = declaration.get("controls")

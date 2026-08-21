@@ -1,0 +1,14 @@
+{
+  "amendment_id": "A5",
+  "amendment_sha256": "a75ff188bf2c6663fe020b64eebed197ac545c29f0c594cfb0c7e266cc52ce22",
+  "defect": "verify_risk_declaration() checks that every one of the six required controls carries a real decision and that the rationale is in the team's own words. It never reads candidate_id. The field exists in every declaration and in the schema, and nothing in the pipeline compared it with the nomination it accompanies. A lane could have declared risk for an earlier variant, or for a strategy it never nominated, and the validator would have passed it.",
+  "family": "A4 was a gate that never ran. A5 is a gate that ran and never looked. Both were invisible to a green suite because the suite asserted the validator accepts good declarations and rejects placeholder ones -- never that it notices which candidate a declaration is about. A fixture constant along the tested dimension cannot detect a change along it.",
+  "forward_fix": "verify_risk_declaration() now takes the expected candidate id and rejects a declaration that does not name it. The next edition's playbook states that the declaration's candidate_id must equal the nominated trial id exactly, and the template carries the trial id already filled in.",
+  "found_at_phase": "post-nomination integrity review, before the first sealed read",
+  "found_by": "the independent critic, reading the twelve declarations against the twelve nominations",
+  "materiality": "Checked before ruling. For all six the named string is a descriptive re-spelling of the nominated candidate -- a team prefix added or dropped, a trial suffix dropped, or the lane mechanism spelled out in words. In no case does the named string correspond to another frozen candidate in that lane's workspace, so no lane declared risk for a strategy other than the one it nominated. A substantive control-by-control cross-check of each declaration against its nominated source is recorded alongside this amendment.",
+  "namespace": "cup50v2",
+  "observed": "Six of twelve declarations name a candidate string that differs from the nomination's candidate_id: team-02, team-04, team-06, team-07, team-09, team-11.",
+  "ruling": "No disposition changes. The defect is in the organizer's validator, not in the teams' work: the playbook asked for a candidate_id and never said it had to be the trial id verbatim, and nothing rejected a descriptive one. Penalising six lanes for satisfying the instruction as written, under a rule discovered afterwards, is the retroactive correction this edition exists to make impossible.",
+  "title": "risk declaration was never bound to the candidate it declares for"
+}

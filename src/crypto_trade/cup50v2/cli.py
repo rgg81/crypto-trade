@@ -733,7 +733,9 @@ def _nominate(arguments: argparse.Namespace) -> Mapping[str, object]:
 
     reject_inert_dimensions(neighbourhood, target_digest)
 
-    verify_risk_declaration(_json(arguments.risk_declaration))
+    verify_risk_declaration(
+        _json(arguments.risk_declaration), candidate_id=str(arguments.trial_id)
+    )
     verify_certificate(Path(arguments.certificate))
 
     # Score every declared point on the research window. CUP-50 replayed each point's target stream

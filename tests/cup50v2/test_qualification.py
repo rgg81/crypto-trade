@@ -216,3 +216,36 @@ def test_a_blank_rationale_is_refused() -> None:
 
     with pytest.raises(ValueError, match="rationale"):
         verify_risk_declaration({**DECLARED, "rationale": "n/a"})
+
+
+def test_a_declaration_must_name_the_candidate_it_declares_for() -> None:
+    """Amendment A5: the field was in the schema and nothing ever read it.
+
+    The prior tests all passed a declaration with no candidate_id at all, so the fixture was
+    constant along the dimension the binding lives on and could not have detected its absence.
+    This test asserts the dimension is live in both directions: the same declaration is accepted
+    under its own id and rejected under another's.
+    """
+    import pytest
+
+    from crypto_trade.cup50v2.qualification import verify_risk_declaration
+
+    declaration = {**DECLARED, "candidate_id": "team-04-regime-ensemble-001"}
+
+    # Unbound, it passes -- which is exactly how six declarations naming the wrong candidate
+    # reached a frozen nomination.
+    verify_risk_declaration(declaration)
+
+    verify_risk_declaration(declaration, candidate_id="team-04-regime-ensemble-001")
+
+    with pytest.raises(ValueError, match="not the nominated"):
+        verify_risk_declaration(declaration, candidate_id="team-04-regime-ensemble-002")
+
+    nameless = {k: v for k, v in DECLARED.items() if k != "candidate_id"}
+    with pytest.raises(ValueError, match="does not name the candidate"):
+        verify_risk_declaration(nameless, candidate_id="team-04-regime-ensemble-001")
+
+    # DECLARED has carried a candidate_id since the fixture was written, and every test above
+    # passes it without one being expected. That is the defect in miniature.
+    assert DECLARED["candidate_id"] == "centre-v1"
+    verify_risk_declaration(DECLARED)
