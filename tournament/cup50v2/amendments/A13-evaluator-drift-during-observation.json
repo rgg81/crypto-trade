@@ -1,0 +1,17 @@
+{
+  "amendment_id": "A13",
+  "amendment_sha256": "7104dc100c115dbd795da063ddb6172f8a8962d1c169ddf13faecea271f05104",
+  "bound_cli_sha256": "502d7d0bf64a2ddb3246a7ec6a0a57afb7bb810c10112579950d39f89dfd9a28",
+  "defect": "A12 edited cli.py AFTER the re-activation commit, so activation 5adaa599 binds the pre-A12 cli.py while every observe point subprocess imports the post-A12 one. The sealed observation is therefore running an evaluator that no activation record binds. This is a sequencing mistake on my part: A12 should have preceded re-activation, or re-activation should have followed it.",
+  "diff_sha256": "5f4551d74f4fd1bab59faab270d615f470e93fe527c07699f41faa6be93eb812",
+  "found_at_phase": "during the sealed observation, roughly ten minutes in",
+  "found_by": "organizer, checking before editing anything else that the observation in flight still matches the digests activation bound",
+  "namespace": "cup50v2",
+  "prevention": "Activation should refuse when any evaluator path differs from the last activation record, and observe should refuse to start when the current tree does not match the activation the field names. Both are one comparison against digests that already exist. The general lesson is the one this edition keeps relearning: a binding nobody compares is not a binding.",
+  "remedy": "Re-activate after the observation completes and before release, so the published result binds the evaluator that actually produced it. The field record continues to name 5adaa599, which is historically accurate: that is the activation under which the field was closed.",
+  "running_cli_sha256": "61c0a92159ff16bb58ecb8891ab0ef4b9878914ccb2b4e3c4349fe97e69c77f3",
+  "title": "the running evaluator differs from the activated one by one file, and that is my error",
+  "what_the_difference_is": "The entire diff is the A12 validation block added to _observe, before the evaluator closure: verify the field record, require the lane to be nominated in it, require the job's nomination digest to equal the field's, and require the point id to be one the field froze. It adds no capability, and changes no computation, scoring, replay, universe or data path. It can only raise earlier on conditions that were already violations. Anyone can check that claim: the diff is one contiguous insertion and its digest is recorded above.",
+  "what_this_costs": "The chain of custody for this observation is weaker than intended. The leaderboard will be produced by an evaluator whose orchestration file was not bound at activation, and the record says so rather than implying otherwise. The replay, scoring and risk modules -- everything that computes a number -- are bit-identical to what activation bound, and that is checked and recorded, but it is a narrower claim than the one activation is supposed to support.",
+  "why_the_run_was_not_stopped": "The remedies available mid-run are worse than the defect. Re-closing the field after sealed data has been read is the retroactive change this edition exists to make impossible, and CUP-50's incident 3 is exactly that mistake. Re-activating mid-run would bind a working tree that currently contains a half-built paper desk. The code actually running is strictly more validating than the code activation bound, so continuing cannot admit anything the bound version would have rejected."
+}
