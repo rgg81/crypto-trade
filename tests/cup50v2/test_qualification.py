@@ -249,3 +249,61 @@ def test_a_declaration_must_name_the_candidate_it_declares_for() -> None:
     # passes it without one being expected. That is the defect in miniature.
     assert DECLARED["candidate_id"] == "centre-v1"
     verify_risk_declaration(DECLARED)
+
+
+def test_field_close_derives_the_order_and_refuses_a_supplied_one(tmp_path) -> None:
+    """Amendment A6: the derivation existed, was tested, and the lifecycle never called it.
+
+    test_the_observation_order_is_derived_not_numeric proves the helper works. It does not prove
+    anything calls it, and for the whole research phase nothing did -- _field_close took whatever
+    order the dispositions payload carried, so the order C17 requires to be key-derived was in
+    practice the organizer's to choose. Testing a helper is not testing the path.
+    """
+    import argparse
+    import json
+
+    import pytest
+
+    from crypto_trade.cup50v2.cli import _field_close
+    from crypto_trade.cup50v2.lifecycle import TEAM_IDS, observation_order
+
+    activation = "a" * 64
+    key_path = tmp_path / "field.key"
+    key_path.write_bytes(b"k" * 32)
+    derived = observation_order(b"k" * 32, activation_sha256=activation)
+    assert list(derived) != list(TEAM_IDS), "fixture must not be numeric order"
+
+    dispositions = {
+        team: {
+            "state": "nominated",
+            "eligible": True,
+            "eligibility_reason": "fixture",
+            "nomination_sha256": "d" * 64,
+            "point_ids": [f"{team}-p0"],
+        }
+        for team in TEAM_IDS
+    }
+
+    def close(payload, name):
+        path = tmp_path / name
+        source = tmp_path / f"{name}.json"
+        source.write_text(json.dumps(payload))
+        return _field_close(
+            argparse.Namespace(
+                dispositions=str(source),
+                activation_sha256=activation,
+                signing_key=str(key_path),
+                output=str(path),
+            )
+        )
+
+    # An order the organizer picked is refused outright.
+    with pytest.raises(ValueError, match="derived from the signing key"):
+        close(
+            {"dispositions": dispositions, "observation_order": list(TEAM_IDS)},
+            "picked",
+        )
+
+    # Omitting it entirely is the intended call, and the frozen record carries the derived order.
+    record = close({"dispositions": dispositions}, "derived")
+    assert list(record["observation_order"]) == list(derived)

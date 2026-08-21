@@ -47,6 +47,7 @@ from crypto_trade.cup50v2.lifecycle import (
     compile_leaderboard,
     freeze_field,
     integrity_review,
+    observation_order,
     observe_point,
     recover_interrupted_points,
     start_observation_batch,
@@ -839,12 +840,24 @@ class _InvertedStrategy:
 
 def _field_close(arguments: argparse.Namespace) -> Mapping[str, object]:
     payload = _json(arguments.dispositions)
+    key = _key(arguments.signing_key)
+    # Derive the order here rather than accept one. lifecycle.observation_order has existed and
+    # been tested since the fork, and nothing on the lifecycle path ever called it -- so the order
+    # C17 requires to be key-derived was in practice whatever the organizer typed. An organizer who
+    # picks the order picks which lanes are read first, which is the fact C17 exists to remove.
+    order = observation_order(key, activation_sha256=arguments.activation_sha256)
+    supplied = payload.get("observation_order")
+    if supplied is not None and tuple(str(team) for team in supplied) != order:
+        raise ValueError(
+            "observation order is derived from the signing key and may not be supplied; "
+            "remove observation_order from the dispositions payload"
+        )
     return freeze_field(
         arguments.output,
         dispositions=payload["dispositions"],
-        observation_order=payload["observation_order"],
+        observation_order=order,
         activation_sha256=arguments.activation_sha256,
-        signing_key=_key(arguments.signing_key),
+        signing_key=key,
     )
 
 

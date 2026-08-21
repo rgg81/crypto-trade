@@ -1,0 +1,14 @@
+{
+  "amendment_id": "A6",
+  "amendment_sha256": "09c229441fa22ceec8c878a49597ce4b86f8bf4138649f67aa8819f53e7313ed",
+  "caught_before_use": "Yes. No field has been closed and no sealed point has been read. The defect is being fixed before the mechanism was ever exercised, unlike A4, which was found after every evaluation had already run outside the sandbox it claimed.",
+  "defect": "lifecycle.observation_order(signing_key, activation_sha256=...) has existed since the fork and is covered by test_the_observation_order_is_derived_not_numeric, which proves it is deterministic and not numeric. Nothing on the lifecycle path called it. cli._field_close read observation_order straight out of the dispositions payload, so the order lanes are observed in was whatever the organizer wrote into a JSON file.",
+  "family": "Third of its kind. A4 was a container gate nothing invoked; A5 was a validator that ran and never read the field it was given; A6 is a derivation that existed, passed its own test, and sat unreachable from the only path that needed it. In all three the unit test was green and asserted something true about a component, and in none of them did anything assert the component was wired to the lifecycle. A test of a helper is not a test of the path.",
+  "fix": "_field_close now derives the order from the signing key and the activation digest, and raises if the payload supplies a conflicting one rather than silently preferring either. The dispositions file no longer carries an observation_order at all.",
+  "found_at_phase": "field close preparation, before the first sealed read",
+  "found_by": "organizer, preparing field close and checking where the order actually comes from before supplying one",
+  "namespace": "cup50v2",
+  "test": "The new test asserts the derived order is not numeric, that a hand-picked order is refused, and that omitting it produces a frozen record carrying the derived order. The pre-existing test exercised the helper in isolation, which is why it stayed green while the path ignored the helper entirely.",
+  "title": "the observation order C17 requires to be key-derived was the organizer's to choose",
+  "why_it_matters": "C17 exists because CUP-50 observed team-01 through team-12 in numeric order, and order carries information: an organizer watching results arrive learns the early lanes first, and if observation pauses mid-batch, which lanes have been read becomes a fact about the schedule. A derivation the organizer can override does not remove that -- it only records that it was removed."
+}
