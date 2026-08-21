@@ -428,9 +428,44 @@ def integrity_review(
     terminal_points = {str(record["payload"]["point_id"]) for record in terminals}
     if terminal_points != expected_points:
         raise ValueError("observation terminals do not cover the exact frozen point field")
-    for start, terminal in zip(starts, terminals, strict=True):
-        if start["payload"]["point_id"] != terminal["payload"]["point_id"]:
-            raise ValueError("point terminal ordering differs from durable start ordering")
+    # Verify the relation, not the position. The original check paired the i-th start with the
+    # i-th terminal, which holds only when points are observed strictly one at a time; under
+    # concurrency within a lane the terminals land in completion order and the pairing fails while
+    # nothing is actually wrong. What it was standing in for is asserted directly here, and more
+    # explicitly than position ever did: no point starts or terminates twice, and every terminal
+    # is preceded in the durable journal by its own start (amendment A14).
+    started_at: dict[str, int] = {}
+    for index, record in enumerate(records):
+        point_id = str(record["payload"].get("point_id", ""))
+        if record["event"] == "point-start":
+            if point_id in started_at:
+                raise ValueError(f"point {point_id} started twice")
+            started_at[point_id] = index
+        elif record["event"] == "point-terminal":
+            if point_id not in started_at:
+                raise ValueError(f"point {point_id} terminated without a durable start")
+            if started_at[point_id] > index:
+                raise ValueError(f"point {point_id} terminated before its own start")
+    settled = [
+        str(record["payload"]["point_id"])
+        for record in records
+        if record["event"] == "point-terminal"
+    ]
+    if len(settled) != len(set(settled)):
+        raise ValueError("a point carries more than one terminal record")
+    # Lanes are read in the order the field froze; concurrency is permitted only inside one lane.
+    lanes: list[str] = []
+    for record in starts:
+        team_id = str(record["payload"]["team_id"])
+        if not lanes or lanes[-1] != team_id:
+            if team_id in lanes:
+                raise ValueError(f"lane {team_id} was resumed after another lane began")
+            lanes.append(team_id)
+    frozen_order = [str(team) for team in field.get("observation_order", [])]
+    if frozen_order and lanes != [team for team in frozen_order if team in set(lanes)]:
+        # The old positional check never verified this at all. observe_point enforces it while
+        # writing; the review now also confirms it in the finished record.
+        raise ValueError("lanes were not observed in the order the field froze")
     review = {
         "status": "passed",
         "field_sha256": field["field_sha256"],
