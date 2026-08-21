@@ -18,6 +18,11 @@ the experiment and is archived, but it is never mounted in the strategy worker; 
 runtime parameter must be explicit in Python source and `candidate.json`. The complete tree is
 capped at 10 MiB; each file is capped at 2 MiB.
 
+Every `neighborhood_coordinates` key must be repeated in `material_parameters` with exactly the
+same finite non-boolean numeric value. Use `{}` for non-neighborhood controls and role checks.
+Before any trial in a batch is accepted, the organizer score-blind preflights the complete batch;
+a deterministic admission failure retires the lane without consuming a trial or opening scores.
+
 ## Entrypoint
 
 `build_strategy()` returns one object implementing the frozen stateless causal subset:

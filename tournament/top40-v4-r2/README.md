@@ -38,7 +38,7 @@ Activation performs the expensive full raw-source replay once. Each later result
 the bound pure-crypto classification audit and canonical-file hashes before and after execution,
 without re-reading tens of thousands of immutable source archives.
 
-This worktree is the fourth clean restart after private predecessor incidents. No predecessor is
+This worktree is the fifth clean restart after private predecessor incidents. No predecessor is
 continued: no candidate, feedback, result, source archive, research receipt, or decision is reused,
 and all 15 lanes begin at trial zero. The exact score-blind incident facts and predecessor hashes
 are frozen in `FRESH-RESTART-AUTHORITY.json`; teams cannot read that organizer authority or any
@@ -49,6 +49,12 @@ organizer-private, skill-empty, per-team Codex runtime; the exact model, prompt,
 environment, and runtime identities are bound into every launch and candidate receipt. Client
 databases, logs, queues, wrappers, and scratch are validated and removed after every subprocess,
 so no hidden Codex session state crosses a research phase.
+
+Before any request in a discovery or refinement batch is accepted, the broker score-blind
+preflights the complete batch's captured metadata, attestation, research receipt, static source,
+and mechanism sequence. A deterministic admission defect retires the lane without opening score
+data or consuming a trial; transient organizer failures remain resumable. This prevents a malformed
+late request from stranding a lane after earlier outcomes exist.
 
 The evaluator's separate strategy worker reconstructs its environment and binds the exact frozen
 `src` path needed to resolve the organizer module before the child masks the repository. A real

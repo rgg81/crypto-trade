@@ -365,6 +365,26 @@ def consume_batch(root: Path, team_id: str, phase: str) -> Mapping[str, Any]:
     requests, path, payload = _validate_batch(root, team_id, phase)
     _validate_consume_transition(root, team_id, phase, requests)
     research_runtime_v4.recover_candidate_receipts(root, team_id, phase, path)
+    try:
+        orchestrator_v4.preflight_is_batch(root, team_id, phase, requests)
+    except orchestrator_v4.CandidateBatchRejectedError as exc:
+        outbox_sha256 = hashlib.sha256(payload).hexdigest()
+        rejected = orchestrator_v4.reject_batch_before_evaluation(
+            root,
+            team_id,
+            phase,
+            reason=(
+                f"{phase} batch failed deterministic score-blind admission preflight: {exc}"
+            ),
+            outbox_sha256=outbox_sha256,
+            candidate_ids=[request["candidate_id"] for request in requests],
+        )
+        archive = _archive_outbox(root, team_id, phase, path, payload)
+        return {
+            **rejected,
+            "outbox_sha256": outbox_sha256,
+            "outbox_archive_path": archive,
+        }
     rows: list[Mapping[str, Any]] = []
     for request in requests:
         entrypoint = f"{TOP40_V4_LAYOUT.team_root(team_id)}/{request['entrypoint']}"
@@ -526,6 +546,22 @@ def run_team(root: Path, team_id: str) -> Mapping[str, Any]:
     results: list[Mapping[str, Any]] = []
     state = journal_v4.read(root / TOP40_V4_LAYOUT.journal_path)
     if team_id in state.nominations or team_id in state.retired:
+        retired = state.retired.get(team_id)
+        if retired is not None and retired["event_type"] == "batch_rejected":
+            event = retired["payload"]
+            phase = str(event["phase"])
+            name = "batch-1.json" if phase == "discovery" else "batch-2.json"
+            outbox = root / TOP40_V4_LAYOUT.team_root(team_id) / "outbox" / name
+            if outbox.exists():
+                payload = research_runtime_v4._stable_bytes(outbox)  # noqa: SLF001
+                if hashlib.sha256(payload).hexdigest() != event["outbox_sha256"]:
+                    raise BrokerError("rejected batch outbox differs from journal authority")
+                _archive_outbox(root, team_id, phase, outbox, payload)
+            archive = _phase_archive(root, team_id, phase)
+            if archive is None or archive.name != (
+                f"{phase}-{event['outbox_sha256']}.json"
+            ):
+                raise BrokerError("rejected batch lacks its immutable outbox archive")
         decision = root / TOP40_V4_LAYOUT.team_root(team_id) / "outbox/decision.json"
         if decision.exists():
             _request, path, payload = _read_request(root, team_id, "decision")
@@ -553,6 +589,14 @@ def run_team(root: Path, team_id: str) -> Mapping[str, Any]:
                     "authority": authority,
                 }
             )
+        state = journal_v4.read(root / TOP40_V4_LAYOUT.journal_path)
+        if team_id in state.retired:
+            return {
+                "ok": True,
+                "team_id": team_id,
+                "terminal": "retired",
+                "steps": results,
+            }
     state = journal_v4.read(root / TOP40_V4_LAYOUT.journal_path)
     if team_id not in state.nominations and team_id not in state.retired:
         decision = root / TOP40_V4_LAYOUT.team_root(team_id) / "outbox/decision.json"

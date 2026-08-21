@@ -83,8 +83,23 @@ class OrchestratorError(RuntimeError):
     """A V4 organizer command was refused without changing tournament semantics."""
 
 
+class CandidateBatchRejectedError(OrchestratorError):
+    """A complete score-blind research batch failed deterministic admission."""
+
+
 class ResultCommandBusyError(OrchestratorError):
     """Another result-bearing V4 command owns the kernel lock."""
+
+
+def _wraps_os_error(error: BaseException) -> bool:
+    seen: set[int] = set()
+    current: BaseException | None = error
+    while current is not None and id(current) not in seen:
+        if isinstance(current, OSError):
+            return True
+        seen.add(id(current))
+        current = current.__cause__ or current.__context__
+    return False
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -819,25 +834,11 @@ def _write_trial_receipt(
     return relative
 
 
-def _validate_open_lane_mechanism(
-    state: journal_v4.JournalState,
-    *,
-    team_id: str,
-    metadata: Mapping[str, Any],
+def _validate_open_lane_mechanism_history(
+    history: Sequence[Mapping[str, Any]], metadata: Mapping[str, Any]
 ) -> None:
-    """Allow one explicit mechanism transition and keep both epochs internally consistent."""
+    """Validate one candidate against an explicit, score-free metadata history."""
 
-    if not TOP40_V4_LAYOUT.name.endswith("-r2"):
-        return
-    requests = sorted(
-        (
-            request["payload"]
-            for request in state.is_requests.values()
-            if request["payload"]["team_id"] == team_id
-        ),
-        key=lambda payload: payload["trial_number"],
-    )
-    history = [request["metadata"] for request in requests]
     mechanism = str(metadata["mechanism"])
     pivot_tagged = "mechanism-pivot" in metadata["tags"]
     if not history:
@@ -865,7 +866,7 @@ def _validate_open_lane_mechanism(
     variant_tags = {"control-ablation", "role-check"}
     parent_id = metadata.get("parent_candidate_id")
     current_epoch_ids = {
-        str(request["candidate_id"]) for request in requests[epoch_start:]
+        str(candidate["candidate_id"]) for candidate in history[epoch_start:]
     }
     if (
         not isinstance(parent_id, str)
@@ -875,6 +876,195 @@ def _validate_open_lane_mechanism(
         raise OrchestratorError(
             "descriptive mechanism variants require a current-epoch parent and control tag"
         )
+
+
+def _validate_open_lane_mechanism(
+    state: journal_v4.JournalState,
+    *,
+    team_id: str,
+    metadata: Mapping[str, Any],
+) -> None:
+    """Allow one explicit mechanism transition and keep both epochs internally consistent."""
+
+    if not TOP40_V4_LAYOUT.name.endswith("-r2"):
+        return
+    requests = sorted(
+        (
+            request["payload"]
+            for request in state.is_requests.values()
+            if request["payload"]["team_id"] == team_id
+        ),
+        key=lambda payload: payload["trial_number"],
+    )
+    _validate_open_lane_mechanism_history(
+        [
+            {**request["metadata"], "candidate_id": request["candidate_id"]}
+            for request in requests
+        ],
+        metadata,
+    )
+
+
+@research_runtime_v4.serialized_activated_r2_command
+def preflight_is_batch(
+    root: str | Path,
+    team_id: str,
+    phase: str,
+    requests: Sequence[Mapping[str, str]],
+) -> Mapping[str, Any]:
+    """Validate an entire batch before accepting or evaluating its first new trial."""
+
+    root_path = _safe_root(root)
+    with _result_lock(root_path):
+        isolation_v4.audit_team_surface(root_path, team_id)
+        activation_v4.validate(root_path, verify_universe_snapshot=False)
+        loaded = top40_v4.load_config(root=root_path)
+        state = journal_v4.read(_journal_path(root_path))
+        TOP40_V4_LAYOUT.require_team(team_id)
+        if phase not in {"discovery", "refinement"}:
+            raise OrchestratorError("batch preflight phase is invalid")
+        phase_start = 0 if phase == "discovery" else 8
+        accepted = sorted(
+            (
+                request["payload"]
+                for request in state.is_requests.values()
+                if request["payload"]["team_id"] == team_id
+            ),
+            key=lambda payload: payload["trial_number"],
+        )
+        if len(accepted) < phase_start or len(accepted) > phase_start + len(requests):
+            raise OrchestratorError("batch preflight journal range is out of phase")
+        current = accepted[phase_start:]
+        history: list[Mapping[str, Any]] = [
+            request["metadata"] for request in accepted[:phase_start]
+        ]
+        evidence: list[Mapping[str, str]] = []
+        for index, request in enumerate(requests):
+            entrypoint = f"{TOP40_V4_LAYOUT.team_root(team_id)}/{request['entrypoint']}"
+            try:
+                capture = runner_v4.capture_source_bundle(root_path, team_id, entrypoint)
+                metadata, _metadata_path = _candidate_metadata(
+                    root_path,
+                    loaded.raw,
+                    team_id,
+                    entrypoint,
+                    capture=capture,
+                )
+                if metadata["candidate_id"] != request["candidate_id"]:
+                    raise OrchestratorError(
+                        "batch candidate identity differs from captured metadata"
+                    )
+                executable, findings = research_runtime_v4._static_source_findings(  # noqa: SLF001
+                    capture.files
+                )
+                if "strategy.py" not in executable or findings:
+                    detail = "; ".join(findings[:8]) or (
+                        "strategy.py is not executable source"
+                    )
+                    raise OrchestratorError(
+                        f"candidate failed static source admission: {detail}"
+                    )
+                research_runtime_v4.validate_candidate_receipt(
+                    root_path,
+                    team_id,
+                    str(metadata["candidate_id"]),
+                    capture.sha256,
+                )
+                if index < len(current) and metadata != current[index]["metadata"]:
+                    raise OrchestratorError(
+                        "accepted batch prefix metadata differs from captured source"
+                    )
+                _validate_open_lane_mechanism_history(history, metadata)
+            except OrchestratorError as exc:
+                raise CandidateBatchRejectedError(
+                    f"{request['candidate_id']}: {exc}"
+                ) from exc
+            except (isolation_v4.IsolationError, ValueError) as exc:
+                if _wraps_os_error(exc):
+                    raise
+                raise CandidateBatchRejectedError(
+                    f"{request['candidate_id']}: {exc}"
+                ) from exc
+            history.append(metadata)
+            evidence.append(
+                {
+                    "candidate_id": str(metadata["candidate_id"]),
+                    "source_bundle_sha256": capture.sha256,
+                }
+            )
+        return {
+            "ok": True,
+            "team_id": team_id,
+            "phase": phase,
+            "candidate_count": len(evidence),
+            "candidates": evidence,
+            "score_data_opened": False,
+        }
+
+
+@research_runtime_v4.serialized_activated_r2_command
+def reject_batch_before_evaluation(
+    root: str | Path,
+    team_id: str,
+    phase: str,
+    *,
+    reason: str,
+    outbox_sha256: str,
+    candidate_ids: Sequence[str],
+) -> Mapping[str, Any]:
+    """Terminally reject a deterministic invalid batch before opening score data."""
+
+    root_path = _safe_root(root)
+    with _result_lock(root_path):
+        isolation_v4.audit_team_surface(root_path, team_id)
+        activation_v4.validate(root_path, verify_universe_snapshot=False)
+        state = journal_v4.read(_journal_path(root_path))
+        TOP40_V4_LAYOUT.require_team(team_id)
+        if phase not in {"discovery", "refinement"}:
+            raise OrchestratorError("batch rejection phase is invalid")
+        expected_trials = 0 if phase == "discovery" else 8
+        expected_candidates = 8 if phase == "discovery" else 4
+        normalized_ids = [
+            _validate_identifier(candidate_id, "candidate_id")
+            for candidate_id in candidate_ids
+        ]
+        if (
+            state.selection is not None
+            or team_id in state.nominations
+            or team_id in state.retired
+            or state.trials_by_team.get(team_id, 0) != expected_trials
+            or len(normalized_ids) != expected_candidates
+            or len(set(normalized_ids)) != expected_candidates
+            or not isinstance(outbox_sha256, str)
+            or _SHA256.fullmatch(outbox_sha256) is None
+            or any(
+                request_hash not in state.is_terminals
+                for request_hash, request in state.is_requests.items()
+                if request["payload"]["team_id"] == team_id
+            )
+        ):
+            raise OrchestratorError("batch cannot be rejected in its current lifecycle state")
+        _validate_text(reason, "reason")
+        record = journal_v4.append(
+            _journal_path(root_path),
+            "batch_rejected",
+            {
+                "team_id": team_id,
+                "phase": phase,
+                "reason": reason,
+                "outbox_sha256": outbox_sha256,
+                "candidate_ids": normalized_ids,
+            },
+        )
+        _write_nomination_registry(root_path, journal_v4.read(_journal_path(root_path)))
+        return {
+            "ok": True,
+            "team_id": team_id,
+            "phase": phase,
+            "retired": True,
+            "score_data_opened": False,
+            "journal_record_sha256": record["record_sha256"],
+        }
 
 
 @research_runtime_v4.serialized_activated_r2_command
@@ -2301,6 +2491,7 @@ def historical_release(root: str | Path) -> Mapping[str, Any]:
 
 
 __all__ = [
+    "CandidateBatchRejectedError",
     "CandidateAuthority",
     "OrchestratorError",
     "ResultCommandBusyError",
@@ -2308,6 +2499,8 @@ __all__ = [
     "close_is",
     "historical_release",
     "nominate",
+    "preflight_is_batch",
+    "reject_batch_before_evaluation",
     "retire",
     "run_is",
     "status",

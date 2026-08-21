@@ -142,6 +142,15 @@ if TOP40_V4_LAYOUT.name.endswith("-r2"):
     _EVENT_KEYS["is_accepted"] = frozenset(
         {*_EVENT_KEYS["is_accepted"], "research_session"}
     )
+    _EVENT_KEYS["batch_rejected"] = frozenset(
+        {
+            "team_id",
+            "phase",
+            "reason",
+            "outbox_sha256",
+            "candidate_ids",
+        }
+    )
 
 
 class JournalError(ValueError):
@@ -283,8 +292,24 @@ def _validate_payload(event_type: str, payload: object) -> Mapping[str, Any]:
     if event_type.endswith("failed"):
         key = "failure" if event_type == "is_failed" else "failure_code"
         _text(payload[key], key)
-    if event_type == "retired":
+    if event_type in {"retired", "batch_rejected"}:
         _text(payload["reason"], "reason")
+    if event_type == "batch_rejected":
+        phase = payload["phase"]
+        candidate_ids = payload["candidate_ids"]
+        if not isinstance(phase, str) or phase not in ("discovery", "refinement"):
+            raise JournalError("batch rejection phase is invalid")
+        expected_count = 8 if phase == "discovery" else 4
+        _hash(payload["outbox_sha256"], "outbox_sha256")
+        if (
+            not isinstance(candidate_ids, list)
+            or len(candidate_ids) != expected_count
+            or any(not isinstance(candidate_id, str) for candidate_id in candidate_ids)
+            or len(set(candidate_ids)) != expected_count
+        ):
+            raise JournalError("batch rejection candidate list is invalid")
+        for candidate_id in candidate_ids:
+            _identifier(candidate_id, "candidate_id")
     for key in (
         "output_path",
         "summary_path",
@@ -430,13 +455,24 @@ def replay_bytes(payload: bytes) -> JournalState:
             is_terminals[request_hash] = record
             if event_type == "is_succeeded":
                 is_successes[digest] = record
-        elif event_type in {"nominated", "retired"}:
+        elif event_type in {"nominated", "retired", "batch_rejected"}:
             if selection is not None:
                 raise JournalError("team disposition changed after selection freeze")
             team_id = str(event["team_id"])
             if team_id in nominations or team_id in retired:
                 raise JournalError("team has more than one terminal IS disposition")
-            if event_type == "retired":
+            if event_type == "batch_rejected":
+                expected_trials = 0 if event["phase"] == "discovery" else 8
+                if trials[team_id] != expected_trials:
+                    raise JournalError("batch rejection is outside its exact phase boundary")
+                if any(
+                    request_hash not in is_terminals
+                    for request_hash, request in is_requests.items()
+                    if request["payload"]["team_id"] == team_id
+                ):
+                    raise JournalError("batch rejected while an accepted trial was pending")
+                retired[team_id] = record
+            elif event_type == "retired":
                 if trials[team_id] < 8:
                     raise JournalError("team retired before eight accepted trials")
                 retired[team_id] = record

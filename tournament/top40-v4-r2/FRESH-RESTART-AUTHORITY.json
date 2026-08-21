@@ -1,4 +1,41 @@
 {
+  "batch_admission_incident": {
+    "activation_file_sha256": "51ff34df9b5c51a0976758ed19bfec09ba88944c993213d6df3da9ed164ace0f",
+    "activation_record_sha256": "bb3942b40135f261098ed5c759336c5452ea8a50d55f8e3347dcb3d98cfea1af",
+    "activation_tests_sha256": "a2b325a83b7634a32986e331d5e5b78694b5e970c195e15837d88afd93194cfe",
+    "branch": "quant-portfolio-blind-top40-v4-r1-v2-restart4",
+    "discovery_feedback_disclosed": false,
+    "discovery_launch_sha256": "08a21e53cccd2ddabe09e297f6194b0c7c0b4f75d400b9357e7b6b01cafcbf9f",
+    "discovery_outbox_archived": false,
+    "discovery_outbox_sha256": "de29894b8e4eadb26c486f7a15c8ad2265a76c754f8f8b7d7447fcfce5752f85",
+    "implementation_commit": "aec9b2ae911e81a3b8fb55c6655dfcaebec909bf",
+    "journal_file_sha256": "7452d4a515ab1e0d25b6b40b975c8278dde7cb12dcd588ca935290549a0b9229",
+    "journal_head_sha256": "2d918690301a2e1702f3c8eea3f79c58418880adee8bf8a5f3b27d657c338c26",
+    "journal_records": 37,
+    "preservation": "exact-stopped-runtime-artifacts-preserved-in-private-r6-worktree",
+    "reason": "whole-batch-coordinate-semantics-were-validated-lazily-and-not-explicitly-disclosed",
+    "rejected_candidates": [
+      {
+        "candidate_id": "taker-pressure-r6-long-only",
+        "research_receipt_sha256": "81b4acbd35d32bb3eeacb8f600d1125fb194d1344dfdeb3aba084d020bb16dbf",
+        "source_bundle_sha256": "ad51a1d4fc22362b51576e0a77a51577d5092653eb3a4f8f12e9f97d00e14e56",
+        "trial_accepted": false,
+        "trial_evaluated": false
+      },
+      {
+        "candidate_id": "taker-pressure-r6-short-only",
+        "research_receipt_sha256": "2fb7bb1a33b0659b27df57eee064711a997a264ec49301c55a95566cd0c12eec",
+        "source_bundle_sha256": "82d8793e067594f311b99db4053717853e4ebad952714b507fe2a09b29669a26",
+        "trial_accepted": false,
+        "trial_evaluated": false
+      }
+    ],
+    "research_provenance_reused": false,
+    "results_reused": false,
+    "team_01_terminal": true,
+    "team_02_terminal_trials": 6,
+    "team_02_trials_accepted": 6
+  },
   "feedback_disclosed": false,
   "predecessor": {
     "activation_file_sha256": "b80cd016b9572fe75c63abd485990b345901bfe671937f3e1e0b60044e792f17",
@@ -22,6 +59,7 @@
     "trial_evaluated": false
   },
   "results_reused": false,
+  "research_provenance_reused": false,
   "restart_attempt": {
     "activation_file_sha256": "0082eab1741b23cf9497afdf9398078b6c78be614cf85ea7e1041dcdfc871310",
     "activation_record_sha256": "ebd5b97788258492bfd22612db10316a425a00f854f90f3a95cb01be66768c10",
@@ -49,7 +87,7 @@
     "trials_accepted": 0,
     "trials_evaluated": 0
   },
-  "schema_version": 3,
+  "schema_version": 4,
   "skill_boundary_incident": {
     "activation_file_sha256": "839a849904db69769e0ea79e0215ea670bbd72f8f595b1ba52eafafca55d39e9",
     "activation_record_sha256": "302528e9f29b1dea57cd524f14aa12c0fd0bc40767e66cdc297a36cfd79600bb",

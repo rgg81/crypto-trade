@@ -18,6 +18,10 @@ contain these UTF-8 text files:
 Candidate identifiers use lowercase letters, digits, dots, underscores, or hyphens and begin with
 a letter or digit. The tree may contain only text source/configuration—no symlinks, generated
 caches, fitted objects, data, timestamp-keyed targets, returns, scores, fills, or positions.
+Every `neighborhood_coordinates` key must also exist in `material_parameters` with exactly the same
+finite non-boolean numeric value. Use `{}` for controls and role checks that are not neighborhood
+points. The organizer score-blind preflights the entire batch before accepting its first request;
+a deterministic admission failure retires the lane without opening scores or consuming a trial.
 
 ## Entrypoint contract
 

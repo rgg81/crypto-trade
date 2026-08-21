@@ -26,6 +26,13 @@ horizons, two rebalance horizons, three risk/control profiles, long/short role c
 five-point local neighborhood around any prospective nominee. Every accepted request consumes one
 of twelve slots, including failures. A team may retire honestly; nomination is never required.
 
+The organizer performs one score-blind admission preflight over the entire batch before accepting
+its first request. A deterministic metadata, attestation, receipt, mechanism, or static-source
+failure terminally retires the lane without opening score data or consuming a trial. Validate all
+candidates before publishing the outbox. For `neighborhood_coordinates`, every key must also exist
+in `material_parameters` as the same finite non-boolean numeric value. Use an empty object for a
+control or role check that is not itself a local-neighborhood point; `neighborhood_id` may be null.
+
 The team process exits before the organizer runs a batch. Put only a schema-valid broker request
 in `outbox/`; a later isolated session receives normalized results only under `feedback/`. Never
 infer results from elapsed time or host state. Historical holdout data and every field-wide status
@@ -42,7 +49,8 @@ Keep executable source compact and transparent: exactly one `strategy.py`, at mo
 The executable subset is deliberately stateless: `target_weights` cannot read or mutate `self`,
 branch on `context.decision_time`, delegate to candidate helper code, use persistent module/class
 state or iterators, while loops, bit/packing arithmetic, modulo, powers, literal indexing,
-character/ordinal conversion, RNG APIs, or executable docstrings. It must contain exactly one
+character/ordinal conversion, RNG APIs, executable docstrings, or any list/set/dict/generator
+comprehension. It must contain exactly one
 direct module-level class method with the exact `target_weights(self, context, *, seed)` signature,
 no decorators or defaults, and no other candidate-defined helper function. Non-docstring
 operational strings are ASCII, at most 64 characters each, must be one of the frozen API

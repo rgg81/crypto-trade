@@ -1,5 +1,31 @@
 # Pretrial executor incident
 
+## Whole-batch admission incident and fifth clean restart
+
+The fourth clean restart activated successfully. Team 01 reached a terminal retirement, and Team
+02 produced an eight-candidate discovery batch under the reviewed clean-room boundary. Six Team
+02 candidates received durable accepted-and-terminal journal pairs. Before candidate seven was
+accepted, the organizer correctly rejected its score-blind metadata because
+`neighborhood_coordinates.active_role` had no equal numeric `material_parameters.active_role`;
+candidate eight carried the same defect. No seventh trial, source archive, trial receipt, result,
+feedback packet, or outbox archive was created.
+
+The enforced coordinate/material equality invariant was illustrated by the template but not stated
+in the team-facing prose, and admission validated requests lazily instead of validating the whole
+batch before request one. The frozen lifecycle then offered neither a fair preacceptance repair nor
+retirement before eight trials. Retrying would repeat the rejection; editing receipt-bound model
+output or fabricating a trial would violate provenance. The fourth-restart worktree is therefore
+preserved privately and stopped. No candidate, receipt, feedback, journal record, result, work,
+private model state, or research provenance from it is reused.
+
+`FRESH-RESTART-AUTHORITY.json` schema 4 binds the exact fourth-restart activation, test, journal,
+launch, outbox, rejected candidate bundle/receipt hashes, trial counts, and no-feedback facts. The
+successor starts all 15 lanes at trial zero. Team rules now state the exact coordinate semantics and
+permit `{}` for non-neighborhood controls. The broker captures and score-blind preflights every
+candidate's metadata, attestation, receipt, static source, and simulated mechanism epoch before
+accepting the first request in either batch. A deterministic failure terminally retires the lane
+without opening score data; transient infrastructure failures remain resumable.
+
 ## Evaluator-worker bootstrap incident and fourth clean restart
 
 The third clean restart activated successfully and Team 01 produced one eight-candidate discovery
@@ -20,7 +46,7 @@ journal, discovery/refinement launch receipts, discovery feedback/outbox archive
 receipts, eight source archives, eight score-free trial receipts, and interrupted private model
 runtime. None of those candidates, receipts, feedback, research context, or results is reused.
 
-`FRESH-RESTART-AUTHORITY.json` schema 3 binds those exact incident hashes, counts, the common
+`FRESH-RESTART-AUTHORITY.json` binds those exact incident hashes, counts, the common
 failure signature/root cause, and a canonical digest over the declared 75-file competitive
 surface. The successor again starts all 15 lanes from the exact seed-only, byte-empty-journal
 genesis. The strategy worker receives only the exact worktree `src` bootstrap in its reconstructed
@@ -53,7 +79,7 @@ is therefore preserved privately and aborted in full. No candidate, feedback, sc
 source archive, receipt, nomination, or decision from it is reused, and all 15 lanes restart from
 trial zero.
 
-`FRESH-RESTART-AUTHORITY.json` schema 3 binds the stopped activation/test/journal/decision-launch
+`FRESH-RESTART-AUTHORITY.json` binds the stopped activation/test/journal/decision-launch
 hashes, the 49-record head, the exposed skill hash, the exact 478-file runtime artifact-surface
 digest, and the no-decision/no-nomination facts. The successor uses a new launcher and branch. Each
 team's model process receives its own organizer-private skill-empty `HOME`, `CODEX_HOME`, and

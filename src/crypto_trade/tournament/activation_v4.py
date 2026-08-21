@@ -41,14 +41,14 @@ _PRETRIAL_INCIDENT_STAGE = f"{_PRETRIAL_INCIDENT_ROOT}/.{_PRETRIAL_INCIDENT_ID}.
 _PRETRIAL_INCIDENT_FINAL = f"{_PRETRIAL_INCIDENT_ROOT}/{_PRETRIAL_INCIDENT_ID}"
 _PRETRIAL_SMOKE_RECEIPT_PATH = "tournament/top40-v4-r2/PRETRIAL-MODEL-SMOKE.json"
 _PRETRIAL_SMOKE_RECEIPT_SHA256 = (
-    "596bdbe528f3648f250c471feb591b40af2d3c84d195015d8b3a775e6786a6f8"
+    "7896fadce3923654b790014d6e6429287e4be44290116b17ac58b4d33a7ce5a1"
 )
 _PRETRIAL_SMOKE_RECORD_SHA256 = (
-    "55d83cfa8c277a07b9f31db4341ba641f788139e91cba1fc16e2576929390660"
+    "3fe6257ef1df37ecf03879a4875ec835be155e30e232d98432dffaa44a327873"
 )
 _FRESH_RESTART_AUTHORITY_PATH = "tournament/top40-v4-r2/FRESH-RESTART-AUTHORITY.json"
 _FRESH_RESTART_AUTHORITY_SHA256 = (
-    "f71896a9cd2da6071441bd65f5eeb42f2c2b0c953de016998019d082bc234e68"
+    "7610daae55d4f9cec3e242162cf100d4236e5f5a3d330f07349715f94dd47910"
 )
 _FRESH_LANE_MARKER_PAYLOAD = b"\n"
 _PRETRIAL_OLD_ACTIVATION_FILE_SHA256 = (
@@ -719,10 +719,12 @@ def _fresh_restart_authority(root: Path) -> Mapping[str, Any]:
         raise ActivationError("fresh restart authority changed")
     authority = _pretrial_object_bytes(payload, "fresh restart authority")
     expected_keys = {
+        "batch_admission_incident",
         "feedback_disclosed",
         "predecessor",
         "reason",
         "rejected_preacceptance_residue",
+        "research_provenance_reused",
         "results_reused",
         "restart_attempt",
         "schema_version",
@@ -734,20 +736,104 @@ def _fresh_restart_authority(root: Path) -> Mapping[str, Any]:
     }
     if (
         set(authority) != expected_keys
-        or authority.get("schema_version") != 3
+        or authority.get("schema_version") != 4
         or authority.get("tournament") != TOP40_V4_LAYOUT.name
         or authority.get("status")
         != "fresh-restart-after-private-aborted-incidents"
         or authority.get("feedback_disclosed") is not False
+        or authority.get("research_provenance_reused") is not False
         or authority.get("results_reused") is not False
     ):
         raise ActivationError("fresh restart authority identity changed")
+    batch_incident = authority.get("batch_admission_incident")
     predecessor = authority.get("predecessor")
     rejected = authority.get("rejected_preacceptance_residue")
     restart = authority.get("restart_attempt")
     skill_incident = authority.get("skill_boundary_incident")
     worker_incident = authority.get("worker_bootstrap_incident")
     prefix = authority.get("successful_prefix")
+    expected_batch_keys = {
+        "activation_file_sha256",
+        "activation_record_sha256",
+        "activation_tests_sha256",
+        "branch",
+        "discovery_feedback_disclosed",
+        "discovery_launch_sha256",
+        "discovery_outbox_archived",
+        "discovery_outbox_sha256",
+        "implementation_commit",
+        "journal_file_sha256",
+        "journal_head_sha256",
+        "journal_records",
+        "preservation",
+        "reason",
+        "rejected_candidates",
+        "research_provenance_reused",
+        "results_reused",
+        "team_01_terminal",
+        "team_02_terminal_trials",
+        "team_02_trials_accepted",
+    }
+    rejected_candidates = (
+        batch_incident.get("rejected_candidates")
+        if isinstance(batch_incident, Mapping)
+        else None
+    )
+    expected_rejected = [
+        {
+            "candidate_id": "taker-pressure-r6-long-only",
+            "research_receipt_sha256": (
+                "81b4acbd35d32bb3eeacb8f600d1125fb194d1344dfdeb3aba084d020bb16dbf"
+            ),
+            "source_bundle_sha256": (
+                "ad51a1d4fc22362b51576e0a77a51577d5092653eb3a4f8f12e9f97d00e14e56"
+            ),
+            "trial_accepted": False,
+            "trial_evaluated": False,
+        },
+        {
+            "candidate_id": "taker-pressure-r6-short-only",
+            "research_receipt_sha256": (
+                "2fb7bb1a33b0659b27df57eee064711a997a264ec49301c55a95566cd0c12eec"
+            ),
+            "source_bundle_sha256": (
+                "82d8793e067594f311b99db4053717853e4ebad952714b507fe2a09b29669a26"
+            ),
+            "trial_accepted": False,
+            "trial_evaluated": False,
+        },
+    ]
+    if (
+        not isinstance(batch_incident, Mapping)
+        or set(batch_incident) != expected_batch_keys
+        or batch_incident.get("branch")
+        != "quant-portfolio-blind-top40-v4-r1-v2-restart4"
+        or batch_incident.get("implementation_commit")
+        != "aec9b2ae911e81a3b8fb55c6655dfcaebec909bf"
+        or batch_incident.get("journal_records") != 37
+        or batch_incident.get("team_01_terminal") is not True
+        or batch_incident.get("team_02_trials_accepted") != 6
+        or batch_incident.get("team_02_terminal_trials") != 6
+        or batch_incident.get("discovery_feedback_disclosed") is not False
+        or batch_incident.get("discovery_outbox_archived") is not False
+        or batch_incident.get("research_provenance_reused") is not False
+        or batch_incident.get("results_reused") is not False
+        or rejected_candidates != expected_rejected
+        or any(
+            not isinstance(batch_incident.get(field), str)
+            or _SHA256.fullmatch(str(batch_incident[field])) is None
+            for field in (
+                "activation_file_sha256",
+                "activation_record_sha256",
+                "activation_tests_sha256",
+                "discovery_launch_sha256",
+                "discovery_outbox_sha256",
+                "journal_file_sha256",
+                "journal_head_sha256",
+            )
+        )
+    ):
+        raise ActivationError("fresh restart batch-admission incident changed")
     if (
         not isinstance(predecessor, Mapping)
         or predecessor.get("journal_records") != 4

@@ -37,7 +37,7 @@ objects, weights, performance tables, and strategy code are not allowed.
 
 This clean worktree is score-blind with respect to its privately preserved predecessor. The
 frozen `FRESH-RESTART-AUTHORITY.json` records the private predecessor incidents and that no
-candidate, feedback, result, or receipt is reused. It is organizer-only and outside every team
+candidate, feedback, result, receipt, or research provenance is reused. It is organizer-only and outside every team
 profile. A launch requires either
 the exact completed v7 incident archive or this exact clean-restart authority; a stale v7 launch,
 missing authority, unsafe file, or changed hash fails closed.
@@ -88,6 +88,12 @@ Each language-model process exits before the organizer evaluates its outbox. A l
 receives only lane-local normalized feedback. Organizer commands silently queue, lane validation
 never scans peers, and shared status exposes no counts, dispositions, journal growth, timing, or
 ordering.
+
+Before opening score data or appending the first accepted record for a batch, the organizer captures
+and validates the entire batch against exact receipts, metadata/attestations, the static source
+subset, and a simulated mechanism history. Deterministic batch defects retire the lane at that
+score-blind boundary. Filesystem, receipt, lock, or other infrastructure failures do not retire the
+lane and remain safely resumable.
 
 One blocking process-wide broker lease encloses every model session and evaluation command. The
 pre-activation bootstrap runs under the distinct result lock so its committed-scope test child can

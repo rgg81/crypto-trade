@@ -34,7 +34,7 @@ PROFILE_NAME = "top40-v4-r2-offline-team"
 RECEIPT_SCHEMA_VERSION = 2
 LAUNCH_SCHEMA_VERSION = 2
 SOURCE_REVIEW_SCHEMA_VERSION = 7
-LAUNCHER_VERSION = "top40-v4-r2-research-runtime-v10"
+LAUNCHER_VERSION = "top40-v4-r2-research-runtime-v11"
 MODEL_RUNTIME_SCHEMA_VERSION = 1
 _EXPECTED_CODEX_VERSION = "codex-cli 0.148.0"
 _MODEL_NAME = "gpt-5.6-sol"
@@ -69,8 +69,8 @@ _SMOKE_PROMPT = (
     "generations, append invariance, unusual returns, exposure, turnover, and safe engine "
     "recovery. If any installed skill or SKILL.md is present in your context, do not read it and "
     "report a boundary breach. Otherwise, without reading tournament data or feedback, create "
-    "exactly work/.r2-v10-model-write-smoke with exact UTF-8 bytes "
-    "r6-private-skill-boundary-ok followed by one newline. Do not create candidates or outbox "
+    "exactly work/.r2-v11-model-write-smoke with exact UTF-8 bytes "
+    "r7-private-skill-boundary-ok followed by one newline. Do not create candidates or outbox "
     "files. Then reply only smoke-complete."
 )
 _SHA256 = re.compile(r"[0-9a-f]{64}")
@@ -1220,7 +1220,10 @@ must not use or discuss any earlier tournament, remembered post-cutoff market pr
 web content, or inaccessible path. Read ACCESS-POLICY.json, TEAM-BRIEF.md, and the complete
 sanitized team kit. Obey them exactly. You have no evaluator or raw-data access. Do not finish
 until the requested outbox JSON and every referenced file are complete and schema-valid. Leave
-every pre-existing .keep directory marker unchanged; it is organizer-owned frozen state."""
+every pre-existing .keep directory marker unchanged; it is organizer-owned frozen state. Before
+publishing a batch, self-check every candidate: use no comprehensions, and ensure every
+neighborhood coordinate exactly matches a finite numeric material parameter. A deterministic
+whole-batch admission failure retires the lane before any score is opened."""
     if phase == "discovery":
         return common + """
 
@@ -2945,14 +2948,14 @@ def validate_frozen_model_smoke(root: str | Path) -> Mapping[str, object]:
         "private_runtime_removed_before_activation": True,
         "process_returncode": 0,
         "profile_sha256": profile_sha256(root_path, "team-01"),
-        "prompt_catalog_bytes": 8852,
+        "prompt_catalog_bytes": 8853,
         "prompt_catalog_empty": True,
         "prompt_sha256": hashlib.sha256(_SMOKE_PROMPT.encode("utf-8")).hexdigest(),
         "purpose": "pretrial-private-home-skill-boundary-smoke",
-        "requested_sentinel": "work/.r2-v10-model-write-smoke",
+        "requested_sentinel": "work/.r2-v11-model-write-smoke",
         "sandbox": "custom permissions",
         "schema_version": 2,
-        "sentinel_sha256": hashlib.sha256(b"r6-private-skill-boundary-ok\n").hexdigest(),
+        "sentinel_sha256": hashlib.sha256(b"r7-private-skill-boundary-ok\n").hexdigest(),
         "skill_catalog": "empty-system-marker",
         "system_skill_marker_sha256": hashlib.sha256(_SYSTEM_SKILL_MARKER).hexdigest(),
         "team_id": "team-01",

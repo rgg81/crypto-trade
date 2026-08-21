@@ -14,6 +14,11 @@ holding horizons, risk-control ablations, role checks, and a five-point local ne
 may cover several preregistered cells. Failures count. At least eight trials are required before
 nomination or retirement.
 
+Before trial one of each batch, validate every candidate against the frozen schema and source
+subset. Each neighborhood coordinate must exactly match a finite non-boolean numeric material
+parameter; use no coordinates for ordinary controls or role checks. The organizer preflights the
+whole batch score-blind and terminally rejects a deterministic invalid batch before evaluation.
+
 ## Keep the implementation causal
 
 The strategy receives past-truncated contexts and emits target weights. Fit or refit only from

@@ -212,7 +212,7 @@ def test_r2_layout_has_fifteen_fresh_lanes_and_six_finalists() -> None:
         f"team-{number:02d}" for number in range(1, 16)
     )
     assert TOP40_V4_R2_LAYOUT.advance_count == 6
-    assert TOP40_V4_R2_LAYOUT.branch == "quant-portfolio-blind-top40-v4-r1-v2-restart4"
+    assert TOP40_V4_R2_LAYOUT.branch == "quant-portfolio-blind-top40-v4-r1-v2-restart5"
     assert TOP40_V4_R2_LAYOUT.tournament_root == "tournament/top40-v4-r2"
     assert TOP40_V4_R2_LAYOUT.reports_root == "reports-top40-v4-r2"
 
@@ -516,6 +516,62 @@ validate_candidate_attestation(
     )
     assert rejected.returncode != 0
     assert "attestation is missing or false" in rejected.stderr
+
+
+def test_candidate_metadata_requires_coordinate_to_match_material_parameter(
+    tmp_path: Path,
+) -> None:
+    team_root = orchestrator_v4.TOP40_V4_LAYOUT.team_root("team-01")
+    candidate = tmp_path / team_root / "candidates/role-control"
+    candidate.mkdir(parents=True)
+    (candidate / "strategy.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (candidate / "candidate.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "team_id": "team-01",
+                "candidate_id": "role-control",
+                "parent_candidate_id": "baseline",
+                "mechanism": "role control",
+                "hypothesis": "causal role check",
+                "falsifier": "role contribution is absent",
+                "formation_horizon": "six completed bars",
+                "rebalance_horizon": "every completed boundary",
+                "control_profile": "long role only",
+                "neighborhood_id": None,
+                "neighborhood_coordinates": {"active_role": 1},
+                "tags": ["role-check"],
+                "material_parameters": {"formation_bars": 6},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (candidate / "cleanroom-attestation.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "tournament": orchestrator_v4.TOP40_V4_LAYOUT.name,
+                "team_id": "team-01",
+                "candidate_id": "role-control",
+                "access_policy_followed": True,
+                "other_team_artifacts_accessed": False,
+                "legacy_tournament_artifacts_accessed": False,
+                "sealed_data_accessed": False,
+                "timestamp_target_table_embedded": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(
+        orchestrator_v4.OrchestratorError,
+        match="coordinate must match a numeric material parameter",
+    ):
+        orchestrator_v4._candidate_metadata(
+            tmp_path,
+            {"mandates": {"team-01": "open-independent-mechanism"}},
+            "team-01",
+            f"{team_root}/candidates/role-control/strategy.py",
+        )
 
 
 def test_accepted_trial_receipt_preserves_certificate_request_hash(tmp_path: Path) -> None:
@@ -3079,6 +3135,9 @@ def test_consume_batch_preserves_preacceptance_admission_error(
     monkeypatch.setattr(
         broker.research_runtime_v4, "recover_candidate_receipts", lambda *_: None
     )
+    monkeypatch.setattr(
+        broker.orchestrator_v4, "preflight_is_batch", lambda *_: {"ok": True}
+    )
     monkeypatch.setattr(broker, "_maybe_accepted_record", lambda *_: None)
 
     def rejected(*_args: object, **_kwargs: object) -> None:
@@ -3109,6 +3168,9 @@ def test_consume_batch_swallows_only_a_durable_terminal_runtime_failure(
     monkeypatch.setattr(broker, "_validate_consume_transition", lambda *_: None)
     monkeypatch.setattr(
         broker.research_runtime_v4, "recover_candidate_receipts", lambda *_: None
+    )
+    monkeypatch.setattr(
+        broker.orchestrator_v4, "preflight_is_batch", lambda *_: {"ok": True}
     )
     calls = 0
 
@@ -3159,6 +3221,9 @@ def test_consume_batch_reraises_when_accepted_request_has_no_terminal(
     monkeypatch.setattr(
         broker.research_runtime_v4, "recover_candidate_receipts", lambda *_: None
     )
+    monkeypatch.setattr(
+        broker.orchestrator_v4, "preflight_is_batch", lambda *_: {"ok": True}
+    )
     calls = 0
 
     def accepted(*_args: object) -> object:
@@ -3176,6 +3241,222 @@ def test_consume_batch_reraises_when_accepted_request_has_no_terminal(
     monkeypatch.setattr(broker.orchestrator_v4, "run_is", interrupted)
     with pytest.raises(OSError, match="interrupted infrastructure"):
         broker.consume_batch(tmp_path, "team-01", "discovery")
+
+
+def test_consume_batch_preflight_rejection_retires_before_any_trial(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    broker = _broker_module()
+    requests = [
+        {
+            "candidate_id": f"candidate-{number}",
+            "entrypoint": f"candidates/candidate-{number}/strategy.py",
+            "purpose": f"trial {number}",
+        }
+        for number in range(1, 9)
+    ]
+    outbox = tmp_path / "batch-1.json"
+    monkeypatch.setattr(broker.activation_v4, "validate", lambda _root: {})
+    monkeypatch.setattr(
+        broker, "_validate_batch", lambda *_: (requests, outbox, b"{}\n")
+    )
+    monkeypatch.setattr(broker, "_validate_consume_transition", lambda *_: None)
+    monkeypatch.setattr(
+        broker.research_runtime_v4, "recover_candidate_receipts", lambda *_: None
+    )
+
+    def reject_preflight(*_args: object) -> None:
+        raise broker.orchestrator_v4.CandidateBatchRejectedError(
+            "candidate-7: neighborhood coordinate mismatch"
+        )
+
+    monkeypatch.setattr(
+        broker.orchestrator_v4, "preflight_is_batch", reject_preflight
+    )
+    retired: list[str] = []
+
+    def retire(
+        _root: Path,
+        _team_id: str,
+        _phase: str,
+        *,
+        reason: str,
+        outbox_sha256: str,
+        candidate_ids: list[str],
+    ) -> dict[str, object]:
+        retired.append(reason)
+        assert len(outbox_sha256) == 64
+        assert candidate_ids == [request["candidate_id"] for request in requests]
+        return {
+            "ok": True,
+            "team_id": "team-01",
+            "phase": "discovery",
+            "retired": True,
+            "score_data_opened": False,
+        }
+
+    monkeypatch.setattr(
+        broker.orchestrator_v4, "reject_batch_before_evaluation", retire
+    )
+    monkeypatch.setattr(
+        broker,
+        "_archive_outbox",
+        lambda *_: "tournament/top40-v4-r2/research-sessions/outboxes/"
+        "team-01/discovery-placeholder.json",
+    )
+    evaluations: list[str] = []
+    monkeypatch.setattr(
+        broker.orchestrator_v4,
+        "run_is",
+        lambda *_args, **_kwargs: evaluations.append("evaluated"),
+    )
+    result = broker.consume_batch(tmp_path, "team-01", "discovery")
+    assert result["retired"] is True
+    assert result["score_data_opened"] is False
+    assert len(retired) == 1
+    assert evaluations == []
+
+
+def test_journal_records_preacceptance_batch_rejection_without_weakening_retirement(
+    tmp_path: Path,
+) -> None:
+    journal = tmp_path / "research-journal.jsonl"
+    journal_v4.initialize(journal)
+    candidate_ids = [f"candidate-{number}" for number in range(1, 9)]
+    record = journal_v4.append(
+        journal,
+        "batch_rejected",
+        {
+            "team_id": "team-01",
+            "phase": "discovery",
+            "reason": "deterministic score-blind admission failure",
+            "outbox_sha256": "1" * 64,
+            "candidate_ids": candidate_ids,
+        },
+    )
+    state = journal_v4.read(journal)
+    assert state.trials_by_team["team-01"] == 0
+    assert state.retired["team-01"]["record_sha256"] == record["record_sha256"]
+    assert state.retired["team-01"]["event_type"] == "batch_rejected"
+
+    second = tmp_path / "ordinary-retirement.jsonl"
+    journal_v4.initialize(second)
+    with pytest.raises(journal_v4.JournalError, match="retired before eight"):
+        journal_v4.append(
+            second,
+            "retired",
+            {"team_id": "team-01", "reason": "must remain forbidden"},
+        )
+    assert journal_v4.read(second).record_count == 0
+
+
+def test_orchestrator_rejects_discovery_batch_at_trial_zero(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    journal = tmp_path / orchestrator_v4.TOP40_V4_LAYOUT.journal_path
+    journal.parent.mkdir(parents=True)
+    journal_v4.initialize(journal)
+    monkeypatch.setattr(orchestrator_v4.activation_v4, "validate", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        orchestrator_v4.isolation_v4, "audit_team_surface", lambda *_: {}
+    )
+    monkeypatch.setattr(orchestrator_v4, "_write_nomination_registry", lambda *_: None)
+    result = orchestrator_v4.reject_batch_before_evaluation.__wrapped__(
+        tmp_path,
+        "team-01",
+        "discovery",
+        reason="deterministic score-blind admission failure",
+        outbox_sha256="2" * 64,
+        candidate_ids=[f"candidate-{number}" for number in range(1, 9)],
+    )
+    state = journal_v4.read(journal)
+    assert result["retired"] is True
+    assert result["score_data_opened"] is False
+    assert state.record_count == 1
+    assert state.retired["team-01"]["event_type"] == "batch_rejected"
+
+
+def test_run_team_crash_recovers_rejected_batch_outbox_archive(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    broker = _broker_module()
+    team_id = "team-01"
+    phase = "discovery"
+    payload = b'{"operation":"is-batch"}\n'
+    digest = hashlib.sha256(payload).hexdigest()
+    outbox = (
+        tmp_path
+        / broker.TOP40_V4_LAYOUT.team_root(team_id)
+        / "outbox"
+        / "batch-1.json"
+    )
+    outbox.parent.mkdir(parents=True)
+    outbox.write_bytes(payload)
+    outbox.chmod(0o600)
+    journal = tmp_path / broker.TOP40_V4_LAYOUT.journal_path
+    journal.parent.mkdir(parents=True, exist_ok=True)
+    broker.journal_v4.initialize(journal)
+    broker.journal_v4.append(
+        journal,
+        "batch_rejected",
+        {
+            "team_id": team_id,
+            "phase": phase,
+            "reason": "deterministic score-blind admission failure",
+            "outbox_sha256": digest,
+            "candidate_ids": [f"candidate-{number}" for number in range(1, 9)],
+        },
+    )
+    monkeypatch.setattr(broker.activation_v4, "validate", lambda _root: {})
+    monkeypatch.setattr(
+        broker, "_restore_lane_markers_before_authority", lambda *_: ()
+    )
+
+    result = broker.run_team.__wrapped__(tmp_path, team_id)
+    archive = (
+        tmp_path
+        / "tournament/top40-v4-r2/research-sessions/outboxes"
+        / team_id
+        / f"{phase}-{digest}.json"
+    )
+    assert result["already_terminal"] is True
+    assert not outbox.exists()
+    assert archive.read_bytes() == payload
+
+
+def test_consume_batch_preflight_infrastructure_failure_is_resumable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    broker = _broker_module()
+    request = {
+        "candidate_id": "candidate-1",
+        "entrypoint": "candidates/candidate-1/strategy.py",
+        "purpose": "trial 1",
+    }
+    monkeypatch.setattr(broker.activation_v4, "validate", lambda _root: {})
+    monkeypatch.setattr(
+        broker,
+        "_validate_batch",
+        lambda *_: ([request], tmp_path / "batch-1.json", b"{}\n"),
+    )
+    monkeypatch.setattr(broker, "_validate_consume_transition", lambda *_: None)
+    monkeypatch.setattr(
+        broker.research_runtime_v4, "recover_candidate_receipts", lambda *_: None
+    )
+    monkeypatch.setattr(
+        broker.orchestrator_v4,
+        "preflight_is_batch",
+        lambda *_: (_ for _ in ()).throw(OSError("temporary preflight storage failure")),
+    )
+    retired: list[str] = []
+    monkeypatch.setattr(
+        broker.orchestrator_v4,
+        "reject_batch_before_evaluation",
+        lambda *_args, **_kwargs: retired.append("retired"),
+    )
+    with pytest.raises(OSError, match="temporary preflight storage failure"):
+        broker.consume_batch(tmp_path, "team-01", "discovery")
+    assert retired == []
 
 
 def test_runtime_decision_schema_and_terminal_launch_fail_closed(
