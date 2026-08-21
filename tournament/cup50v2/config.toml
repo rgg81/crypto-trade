@@ -125,8 +125,19 @@ qualification_gates = "in-sample-bar-v1"
 # admits it "cannot recreate pre-OOS finalist blindness" and it demoted the highest-scoring entry.
 # A bar, not a rank: in-sample position carries almost no information about sealed position, but a
 # lane that showed no in-sample edge at all should not win on a single sealed draw.
-minimum_is_score = 45.0
-minimum_is_regime_score = 35.0
+# Calibrated against the measured seed field before any sealed read, not chosen for roundness.
+# The twelve naive seeds score S = [3.0, 7.9, 16.8, 17.3, 17.7, 18.7, 27.1, 28.4, 30.1, 40.1, 44.9,
+# 47.6] and worst-regime = [0.0, 0.0, 0.4, 0.4, 0.5, 3.9, 5.3, 6.1, 6.2, 9.6, 11.6, 24.3]. Both
+# thresholds sit inside an observed gap in those distributions rather than on a number that merely
+# sounds strict: 30.1 -> 40.1 for the overall score, and 11.6 -> 24.3 for the worst regime.
+#
+# Under them exactly one seed qualifies today -- the regime-allocated ensemble, the lane built to be
+# all-weather. That is the intended message: a nomination has to be at least as regime-robust as a
+# deliberately balanced naive construction, and every team has twelve charged trials to get there.
+# The first draft of this bar (45 / 35) admitted nobody at all, which is a hurdle rather than a
+# floor, and would have made "no winner" the likely outcome of a working tournament.
+minimum_is_score = 35.0
+minimum_is_regime_score = 15.0
 
 [regimes]
 # A month is labelled from the return of an equal-weight index of that week's members. The rule is

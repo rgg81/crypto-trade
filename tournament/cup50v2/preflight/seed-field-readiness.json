@@ -1,0 +1,502 @@
+{
+  "decision_boundaries": 5895,
+  "deployed_lanes": 12,
+  "is_manifest_sha256": "b89318917a44cf7b2317867b09f1529ab95ae57218bf39511e173e2303654009",
+  "lanes": {
+    "team-01": {
+      "1": {
+        "activity": 0.9791073124406457,
+        "annualized_volatility": 0.10028426911458531,
+        "final_equity": 98079.40323495127,
+        "turnover": 33.64268988897635
+      },
+      "2": {
+        "activity": 0.9791073124406457,
+        "annualized_volatility": 0.10028641505538295,
+        "final_equity": 95633.24911718423,
+        "turnover": 33.645648199643944
+      },
+      "3": {
+        "activity": 0.9791073124406457,
+        "annualized_volatility": 0.10028856189099207,
+        "final_equity": 93247.4388150369,
+        "turnover": 33.648619209873175
+      },
+      "in_sample": {
+        "all_window": 10.614922549686522,
+        "fold_scores": {
+          "I1": 27.29572663074422,
+          "I2": 54.36038332356853,
+          "I3": 22.15784450071742,
+          "I4": 0.9183372060947848,
+          "I5": 14.555381920283745,
+          "I6": 91.52084746520984
+        },
+        "generalization": 19.484300412147004,
+        "regime": 17.63305771792969,
+        "regime_scores": {
+          "bear": 29.30229556159135,
+          "bull": 23.220806002584506,
+          "chop": 9.612713609672138
+        },
+        "score": 17.691083059223605
+      },
+      "qualification_note": "in-sample score 17.691083 is below the 45.000000 bar",
+      "would_qualify": false
+    },
+    "team-02": {
+      "1": {
+        "activity": 0.9202279202279202,
+        "annualized_volatility": 0.1040037252417536,
+        "final_equity": 134922.65759739917,
+        "turnover": 89.85859737179399
+      },
+      "2": {
+        "activity": 0.9202279202279202,
+        "annualized_volatility": 0.10400851569354784,
+        "final_equity": 126130.00738794048,
+        "turnover": 89.86341796467192
+      },
+      "3": {
+        "activity": 0.9202279202279202,
+        "annualized_volatility": 0.10401342932350909,
+        "final_equity": 117909.25857047689,
+        "turnover": 89.86827572972673
+      },
+      "in_sample": {
+        "all_window": 62.69777240818219,
+        "fold_scores": {
+          "I1": 0.8919121546462216,
+          "I2": 88.24131297886727,
+          "I3": 14.865208560235374,
+          "I4": 83.6602805380478,
+          "I5": 98.47021125937914,
+          "I6": 95.09283941193434
+        },
+        "generalization": 39.69740874827997,
+        "regime": 46.758064550013344,
+        "regime_scores": {
+          "bear": 84.10026611647304,
+          "bull": 5.322112786884825,
+          "chop": 94.33464160814509
+        },
+        "score": 44.912627247698644
+      },
+      "qualification_note": "in-sample score 44.912627 is below the 45.000000 bar",
+      "would_qualify": false
+    },
+    "team-03": {
+      "1": {
+        "activity": 0.9107312440645774,
+        "annualized_volatility": 0.09744366521857412,
+        "final_equity": 111461.10795988631,
+        "turnover": 58.86062102446188
+      },
+      "2": {
+        "activity": 0.9107312440645774,
+        "annualized_volatility": 0.09744678150097005,
+        "final_equity": 106647.60213318294,
+        "turnover": 58.860218768298296
+      },
+      "3": {
+        "activity": 0.9107312440645774,
+        "annualized_volatility": 0.09744989854640085,
+        "final_equity": 102041.71316447157,
+        "turnover": 58.859830602915075
+      },
+      "in_sample": {
+        "all_window": 29.317805687989384,
+        "fold_scores": {
+          "I1": 3.9752690321892485,
+          "I2": 85.8507683829303,
+          "I3": 0.7961789783227499,
+          "I4": 28.774472391988795,
+          "I5": 97.69124043223653,
+          "I6": 62.51048369061844
+        },
+        "generalization": 24.84253229437906,
+        "regime": 36.437435256314714,
+        "regime_scores": {
+          "bear": 62.86935399411131,
+          "bull": 0.35741197834250393,
+          "chop": 86.98961534455037
+        },
+        "score": 28.41254904390452
+      },
+      "qualification_note": "in-sample score 28.412549 is below the 45.000000 bar",
+      "would_qualify": false
+    },
+    "team-04": {
+      "1": {
+        "activity": 0.9924026590693258,
+        "annualized_volatility": 0.0968068843542424,
+        "final_equity": 128871.32440297508,
+        "turnover": 60.88558538444361
+      },
+      "2": {
+        "activity": 0.9924026590693258,
+        "annualized_volatility": 0.09680995029111973,
+        "final_equity": 123117.11340911554,
+        "turnover": 60.887463532972866
+      },
+      "3": {
+        "activity": 0.9924026590693258,
+        "annualized_volatility": 0.09681306224445806,
+        "final_equity": 117620.67895268819,
+        "turnover": 60.889403141763935
+      },
+      "in_sample": {
+        "all_window": 54.834209460796124,
+        "fold_scores": {
+          "I1": 96.6015435457086,
+          "I2": 80.11147206316286,
+          "I3": 35.50799858220836,
+          "I4": 9.487655660047196,
+          "I5": 84.79758878153547,
+          "I6": 87.46737342875699
+        },
+        "generalization": 46.217577641413286,
+        "regime": 46.74340096919509,
+        "regime_scores": {
+          "bear": 82.54685452681923,
+          "bull": 24.277602949461617,
+          "chop": 60.317428630334774
+        },
+        "score": 47.64152824626616
+      },
+      "qualification_note": "in-sample bull regime score 24.277603 is below the 35.000000 bar",
+      "would_qualify": false
+    },
+    "team-05": {
+      "1": {
+        "activity": 0.9810066476733144,
+        "annualized_volatility": 0.09936993612876499,
+        "final_equity": 99525.69859867409,
+        "turnover": 51.55221002690617
+      },
+      "2": {
+        "activity": 0.9810066476733144,
+        "annualized_volatility": 0.09937245565315696,
+        "final_equity": 95750.13936272076,
+        "turnover": 51.55620926475993
+      },
+      "3": {
+        "activity": 0.9810066476733144,
+        "annualized_volatility": 0.09937497595099548,
+        "final_equity": 92117.04645596191,
+        "turnover": 51.56021781100466
+      },
+      "in_sample": {
+        "all_window": 13.28378042329948,
+        "fold_scores": {
+          "I1": 62.21782584281124,
+          "I2": 2.9663920976199196,
+          "I3": 14.649274954618075,
+          "I4": 20.249181248111135,
+          "I5": 95.60632259070692,
+          "I6": 5.977413796993387
+        },
+        "generalization": 16.91762587334161,
+        "regime": 18.448641493156845,
+        "regime_scores": {
+          "bear": 25.129788435970084,
+          "bull": 11.584593877601408,
+          "chop": 25.58704011782558
+        },
+        "score": 16.7553029607891
+      },
+      "qualification_note": "in-sample score 16.755303 is below the 45.000000 bar",
+      "would_qualify": false
+    },
+    "team-06": {
+      "1": {
+        "activity": 0.9848053181386515,
+        "annualized_volatility": 0.10360241215021732,
+        "final_equity": 115042.8080531776,
+        "turnover": 38.231867979316725
+      },
+      "2": {
+        "activity": 0.9848053181386515,
+        "annualized_volatility": 0.10360689947944417,
+        "final_equity": 111791.3508596834,
+        "turnover": 38.233434701924814
+      },
+      "3": {
+        "activity": 0.9848053181386515,
+        "annualized_volatility": 0.103611386846134,
+        "final_equity": 108631.3349492578,
+        "turnover": 38.235013570681325
+      },
+      "in_sample": {
+        "all_window": 28.91033604419226,
+        "fold_scores": {
+          "I1": 96.43949437667848,
+          "I2": 0.07276102608013507,
+          "I3": 42.20419315646482,
+          "I4": 95.68491110462176,
+          "I5": 76.4304355128116,
+          "I6": 74.17942731404946
+        },
+        "generalization": 43.351848614092724,
+        "regime": 38.995342938714025,
+        "regime_scores": {
+          "bear": 3.889845121921465,
+          "bull": 62.16554681473576,
+          "chop": 92.0037816666628
+        },
+        "score": 40.09649530976298
+      },
+      "qualification_note": "in-sample score 40.096495 is below the 45.000000 bar",
+      "would_qualify": false
+    },
+    "team-07": {
+      "1": {
+        "activity": 0.9905033238366572,
+        "annualized_volatility": 0.10422779139519174,
+        "final_equity": 110572.07047858463,
+        "turnover": 320.06543041473077
+      },
+      "2": {
+        "activity": 0.9905033238366572,
+        "annualized_volatility": 0.10424733283059778,
+        "final_equity": 86967.0766821504,
+        "turnover": 320.2709875393931
+      },
+      "3": {
+        "activity": 0.9905033238366572,
+        "annualized_volatility": 0.10426460791271083,
+        "final_equity": 68375.84121237845,
+        "turnover": 320.425361859847
+      },
+      "in_sample": {
+        "all_window": 10.058319081944074,
+        "fold_scores": {
+          "I1": 44.113981776699404,
+          "I2": 99.40423297184525,
+          "I3": 74.8914607883071,
+          "I4": 4.586023580171811,
+          "I5": 1.660968611110995,
+          "I6": 0.6343073502916772
+        },
+        "generalization": 17.580359587266365,
+        "regime": 20.91645530630582,
+        "regime_scores": {
+          "bear": 63.55960449144262,
+          "bull": 16.955211541095938,
+          "chop": 6.235941891377026
+        },
+        "score": 17.286077441227885
+      },
+      "qualification_note": "in-sample score 17.286077 is below the 45.000000 bar",
+      "would_qualify": false
+    },
+    "team-08": {
+      "1": {
+        "activity": 0.6793289015511238,
+        "annualized_volatility": 0.10571071067146096,
+        "final_equity": 96407.66562816779,
+        "turnover": 47.63439659806654
+      },
+      "2": {
+        "activity": 0.6793289015511238,
+        "annualized_volatility": 0.10571442781626084,
+        "final_equity": 93033.88119717751,
+        "turnover": 47.63523190548925
+      },
+      "3": {
+        "activity": 0.6793289015511238,
+        "annualized_volatility": 0.10571816412290443,
+        "final_equity": 89778.03501350014,
+        "turnover": 47.636059436251045
+      },
+      "in_sample": {
+        "all_window": 16.495641465396407,
+        "fold_scores": {
+          "I1": 3.588134340865456,
+          "I2": 16.272687220258838,
+          "I3": 16.46531506662764,
+          "I4": 40.43395462644247,
+          "I5": 47.634763876509815,
+          "I6": 19.491867220038475
+        },
+        "generalization": 15.74929471470727,
+        "regime": 26.931180028579004,
+        "regime_scores": {
+          "bear": 90.31474312093471,
+          "bull": 0.03686497417430046,
+          "chop": 29.499329724349707
+        },
+        "score": 18.656718055778576
+      },
+      "qualification_note": "in-sample score 18.656718 is below the 45.000000 bar",
+      "would_qualify": false
+    },
+    "team-09": {
+      "1": {
+        "activity": 0.956315289648623,
+        "annualized_volatility": 0.11735649513346005,
+        "final_equity": 70668.87716186291,
+        "turnover": 258.2586559637514
+      },
+      "2": {
+        "activity": 0.956315289648623,
+        "annualized_volatility": 0.11737178743205708,
+        "final_equity": 58214.079403326934,
+        "turnover": 258.3047301373084
+      },
+      "3": {
+        "activity": 0.956315289648623,
+        "annualized_volatility": 0.11738690129418122,
+        "final_equity": 47949.92618954908,
+        "turnover": 258.3508361614845
+      },
+      "in_sample": {
+        "all_window": 0.1585810101986837,
+        "fold_scores": {
+          "I1": 21.919578941822213,
+          "I2": 0.0858801902720116,
+          "I3": 0.10056112061455375,
+          "I4": 0.3005515943846565,
+          "I5": 42.579561495060204,
+          "I6": 2.962892416185245
+        },
+        "generalization": 4.338372565947558,
+        "regime": 1.6532571561532694,
+        "regime_scores": {
+          "bear": 1.4701775066524425,
+          "bull": 0.048349123025015484,
+          "chop": 5.940146713225144
+        },
+        "score": 3.0401249801366546
+      },
+      "qualification_note": "in-sample score 3.040125 is below the 45.000000 bar",
+      "would_qualify": false
+    },
+    "team-10": {
+      "1": {
+        "activity": 0.9145299145299145,
+        "annualized_volatility": 0.09984559006239165,
+        "final_equity": 118813.07984211882,
+        "turnover": 95.01633491792651
+      },
+      "2": {
+        "activity": 0.9145299145299145,
+        "annualized_volatility": 0.0998499975317735,
+        "final_equity": 110640.04669861669,
+        "turnover": 95.02429593621149
+      },
+      "3": {
+        "activity": 0.9145299145299145,
+        "annualized_volatility": 0.0998543993793778,
+        "final_equity": 103027.48058743702,
+        "turnover": 95.03228245568974
+      },
+      "in_sample": {
+        "all_window": 34.42147876279226,
+        "fold_scores": {
+          "I1": 1.818473369640821,
+          "I2": 92.98990856834962,
+          "I3": 96.08208416877517,
+          "I4": 16.69324305973494,
+          "I5": 9.553070880196518,
+          "I6": 76.02371464651519
+        },
+        "generalization": 26.89486250987221,
+        "regime": 35.14985173210728,
+        "regime_scores": {
+          "bear": 41.17335129712691,
+          "bull": 98.6958006625645,
+          "chop": 6.117372420912617
+        },
+        "score": 30.087602253368985
+      },
+      "qualification_note": "in-sample score 30.087602 is below the 45.000000 bar",
+      "would_qualify": false
+    },
+    "team-11": {
+      "1": {
+        "activity": 0.8974358974358975,
+        "annualized_volatility": 0.09419335737960369,
+        "final_equity": 87316.24433170835,
+        "turnover": 146.91886797603175
+      },
+      "2": {
+        "activity": 0.8974358974358975,
+        "annualized_volatility": 0.09420024402661539,
+        "final_equity": 78201.85757249309,
+        "turnover": 146.9397567014619
+      },
+      "3": {
+        "activity": 0.8974358974358975,
+        "annualized_volatility": 0.09420713375844617,
+        "final_equity": 70035.6472003815,
+        "turnover": 146.96077537177914
+      },
+      "in_sample": {
+        "all_window": 1.8632634404584973,
+        "fold_scores": {
+          "I1": 4.728392383625842,
+          "I2": 3.988737033370064,
+          "I3": 0.34362795079430075,
+          "I4": 0.43971485110524733,
+          "I5": 82.23211635133464,
+          "I6": 40.81577093603685
+        },
+        "generalization": 8.772783629044609,
+        "regime": 9.36755182242077,
+        "regime_scores": {
+          "bear": 2.197347246409202,
+          "bull": 0.4748177919664176,
+          "chop": 42.354693762574
+        },
+        "score": 7.8850476491007315
+      },
+      "qualification_note": "in-sample score 7.885048 is below the 45.000000 bar",
+      "would_qualify": false
+    },
+    "team-12": {
+      "1": {
+        "activity": 0.7749287749287749,
+        "annualized_volatility": 0.0898734644892211,
+        "final_equity": 103093.50037612757,
+        "turnover": 25.393000208760466
+      },
+      "2": {
+        "activity": 0.7749287749287749,
+        "annualized_volatility": 0.08987446462456448,
+        "final_equity": 101147.83350435553,
+        "turnover": 25.393221736354192
+      },
+      "3": {
+        "activity": 0.7749287749287749,
+        "annualized_volatility": 0.08987546492474148,
+        "final_equity": 99238.65436389207,
+        "turnover": 25.393443606125466
+      },
+      "in_sample": {
+        "all_window": 22.274686022652322,
+        "fold_scores": {
+          "I1": 19.889345039762517,
+          "I2": 29.572280685583298,
+          "I3": 76.75801947102582,
+          "I4": 26.6917170234602,
+          "I5": 2.1268753713564847,
+          "I6": 73.14161100841899
+        },
+        "generalization": 22.958403729929234,
+        "regime": 39.73755133403946,
+        "regime_scores": {
+          "bear": 84.79214294806663,
+          "bull": 75.34256159813057,
+          "chop": 0.3527085299739291
+        },
+        "score": 27.050632974865252
+      },
+      "qualification_note": "in-sample score 27.050633 is below the 45.000000 bar",
+      "would_qualify": false
+    }
+  },
+  "qualification_note": "Each lane's would_qualify flag records the verdict under the DRAFT bar in force when this run executed (in-sample score >= 45, worst regime >= 35), which admitted none of the twelve. The bar was then recalibrated from these very scores to 35 / 15, both thresholds placed inside an observed gap in this distribution. The scores are the evidence; the flags are history. Derive the current verdict from the scores and the active policy.",
+  "sealed_manifest_sha256": "ba15f6ad7a3587b663e09bc7b1273152b615e6a84b11a88b39b733b56a7375ab",
+  "status": "ready"
+}

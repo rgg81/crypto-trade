@@ -163,7 +163,15 @@ team id. Score fields use decimal round-half-even at 1e-6.
 ## Qualification and the winner
 
 Every nominated lane is observed. A lane is **eligible** to win when its nomination's in-sample S is
-at least **45** and every in-sample regime cost score of its centre is at least **35**. This is a bar,
+at least **35** and every in-sample regime cost score of its centre is at least **15**.
+
+Both numbers were calibrated against the measured seed field before any sealed data was opened, and
+both sit inside an observed gap in that distribution rather than being chosen for roundness. The
+twelve naive seeds score S from 3.0 to 47.6, with a gap between 30.1 and 40.1; their worst-regime
+scores run from 0.0 to 24.3, with a gap between 11.6 and 24.3. Exactly one seed clears both today —
+the regime-allocated ensemble, the lane deliberately built to be all-weather — so a nomination must
+be at least as regime-robust as a balanced naive construction, and every team has twelve charged
+trials to get there. This is a bar,
 not a rank: in-sample position carries almost no information about sealed position — CUP-50's sealed
 winner ranked ninth of twelve in sample, and CUP-20's in-sample leader lost money out of sample — but
 a lane that showed no in-sample edge at all should not win on one sealed draw. Requiring the bar in
