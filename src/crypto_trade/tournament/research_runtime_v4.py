@@ -3269,6 +3269,11 @@ def _record_admission_attempt(
         ) as directory:
             _write_pinned_admission_authority(directory, name, payload)
         created = True
+    _ensure_admission_feedback(root, team_id, phase, attempt)
+    return attempt, created
+
+
+def _admission_feedback_payload(attempt: Mapping[str, object]) -> bytes:
     number = int(attempt["attempt_number"])
     feedback = {
         **attempt,
@@ -3280,21 +3285,43 @@ def _record_admission_attempt(
             0, _MAX_SCORE_BLIND_REPAIR_SESSIONS - number + 1
         ),
     }
-    feedback_payload = json.dumps(
+    return json.dumps(
         feedback,
         allow_nan=False,
         ensure_ascii=True,
         indent=2,
         sort_keys=True,
     ).encode("ascii") + b"\n"
+
+
+def _ensure_admission_feedback(
+    root: Path,
+    team_id: str,
+    phase: str,
+    attempt: Mapping[str, object],
+) -> None:
+    """Recover or validate the exact score-blind feedback for one durable attempt."""
+
+    number = int(attempt["attempt_number"])
     feedback_path = (
         root
         / TOP40_V4_LAYOUT.team_root(team_id)
         / "feedback"
         / f"admission-{phase}-{number:02d}.json"
     )
-    _write_immutable(feedback_path, feedback_payload)
-    return attempt, created
+    _write_immutable(feedback_path, _admission_feedback_payload(attempt))
+
+
+def _ensure_admission_feedback_chain(
+    root: Path,
+    team_id: str,
+    phase: str,
+    attempts: Sequence[Mapping[str, object]],
+) -> None:
+    """Make every issued repair's visible input durable before another model session."""
+
+    for attempt in attempts:
+        _ensure_admission_feedback(root, team_id, phase, attempt)
 
 
 def _canonical_admission_session(issue: Mapping[str, object]) -> bytes:
@@ -3481,7 +3508,13 @@ def _phase_archive(root: Path, team_id: str, phase: str) -> tuple[Path, bytes] |
     directory = root / f"{isolation_v4.RESEARCH_SESSION_ROOT}/outboxes/{team_id}"
     if not directory.exists():
         return None
-    if directory.is_symlink() or not directory.is_dir():
+    details = directory.lstat()
+    if (
+        directory.is_symlink()
+        or not stat.S_ISDIR(details.st_mode)
+        or details.st_uid != os.geteuid()
+        or stat.S_IMODE(details.st_mode) & 0o077
+    ):
         raise ResearchRuntimeError("research outbox archive is missing or unsafe")
     prefix = f"{phase}-"
     matches = [
@@ -3493,7 +3526,7 @@ def _phase_archive(root: Path, team_id: str, phase: str) -> tuple[Path, bytes] |
         raise ResearchRuntimeError("research outbox archive is not unique")
     if not matches:
         return None
-    payload = _stable_bytes(matches[0])
+    payload = _stable_bytes(matches[0], require_private=True)
     digest = hashlib.sha256(payload).hexdigest()
     if matches[0].name != f"{phase}-{digest}.json":
         raise ResearchRuntimeError("research outbox archive digest differs")
@@ -3905,6 +3938,10 @@ def launch_team_phase(
 
     while True:
         attempts = _admission_attempts(root_path, team_id, phase)
+        # A crash may occur after the private attempt is fsynced but before its lane-visible
+        # feedback is published. Recover or validate that exact guidance before another issue or
+        # model process can be created.
+        _ensure_admission_feedback_chain(root_path, team_id, phase, attempts)
         issues = _admission_session_issues(
             root_path, team_id, phase, launch_authority["sha256"]
         )

@@ -2938,6 +2938,94 @@ def test_unchanged_repair_crash_never_grants_an_extra_model_session(
     ) == 4
 
 
+def test_admission_attempt_feedback_publish_crash_recovers_exact_guidance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    team = tmp_path / TOP40_V4_R2_LAYOUT.team_root("team-01")
+    (team / "feedback").mkdir(parents=True)
+    inspection = {
+        "candidate_ids": ["candidate-1"],
+        "findings": ["candidate-1: deterministic source finding"],
+        "outbox_sha256": "1" * 64,
+        "source_bundle_sha256s": ["2" * 64],
+    }
+    original_write = research_runtime_v4._write_immutable
+
+    def interrupt_feedback(path: Path, payload: bytes, **kwargs: object) -> None:
+        if path.parent == team / "feedback":
+            raise OSError("host interrupted feedback publication")
+        original_write(path, payload, **kwargs)
+
+    monkeypatch.setattr(research_runtime_v4, "_write_immutable", interrupt_feedback)
+    with pytest.raises(OSError, match="interrupted feedback"):
+        research_runtime_v4._record_admission_attempt(
+            tmp_path, "team-01", "discovery", inspection, repeat=True
+        )
+    attempts = research_runtime_v4._admission_attempts(
+        tmp_path, "team-01", "discovery"
+    )
+    assert len(attempts) == 1
+    feedback = team / "feedback/admission-discovery-01.json"
+    assert not feedback.exists()
+
+    monkeypatch.setattr(research_runtime_v4, "_write_immutable", original_write)
+    research_runtime_v4._ensure_admission_feedback_chain(
+        tmp_path, "team-01", "discovery", attempts
+    )
+    assert feedback.read_bytes() == research_runtime_v4._admission_feedback_payload(
+        attempts[0]
+    )
+
+
+def test_close_is_revalidates_abandoned_batch_evidence_before_registry_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    state = SimpleNamespace(
+        retired={
+            "team-01": {
+                "event_type": "batch_abandoned",
+                "payload": {
+                    "team_id": "team-01",
+                    "phase": "discovery",
+                    "reason": "model batch remained absent",
+                    "admission_attempt_path": (
+                        "tournament/top40-v4-r2/research-sessions/"
+                        "admission-attempts/team-01/discovery-04.json"
+                    ),
+                    "admission_attempt_sha256": "1" * 64,
+                },
+            }
+        }
+    )
+    monkeypatch.setattr(orchestrator_v4.isolation_v4, "audit_surface", lambda *_args: {})
+    monkeypatch.setattr(orchestrator_v4.activation_v4, "validate", lambda *_args: {})
+    monkeypatch.setattr(orchestrator_v4.top40_v4, "load_config", lambda **_kwargs: {})
+    monkeypatch.setattr(
+        orchestrator_v4, "_close_interrupted_is_requests", lambda *_args: state
+    )
+    monkeypatch.setattr(
+        orchestrator_v4.research_runtime_v4,
+        "_phase_archive",
+        lambda *_args: None,
+    )
+    monkeypatch.setattr(
+        orchestrator_v4.research_runtime_v4,
+        "validate_missing_batch_exhaustion",
+        lambda *_args: (_ for _ in ()).throw(
+            research_runtime_v4.ResearchRuntimeError("attempt evidence is missing")
+        ),
+    )
+    monkeypatch.setattr(
+        orchestrator_v4,
+        "_write_nomination_registry",
+        lambda *_args: pytest.fail("invalid terminal evidence mutated the registry"),
+    )
+    with pytest.raises(
+        research_runtime_v4.ResearchRuntimeError, match="attempt evidence is missing"
+    ):
+        orchestrator_v4.close_is.__wrapped__(tmp_path)
+
+
 def test_missing_batch_exhaustion_terminally_resolves_without_fabricated_outbox(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

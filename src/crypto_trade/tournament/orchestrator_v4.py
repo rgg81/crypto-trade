@@ -2108,6 +2108,48 @@ def _capped_inverse_vol_weights(
     return {team_id: float(weights[team_id]) for team_id in sorted(weights)}, float(cash)
 
 
+def _validate_retired_research_authorities(
+    root: Path, state: journal_v4.JournalState
+) -> None:
+    """Require the exact score-blind evidence behind terminal batch dispositions."""
+
+    if not TOP40_V4_LAYOUT.name.endswith("-r2"):
+        return
+    for team_id, record in sorted(state.retired.items()):
+        event_type = str(record["event_type"])
+        if event_type not in {"batch_rejected", "batch_abandoned"}:
+            continue
+        event = record["payload"]
+        phase = str(event["phase"])
+        outbox_name = "batch-1.json" if phase == "discovery" else "batch-2.json"
+        live_outbox = _path(
+            root,
+            f"{TOP40_V4_LAYOUT.team_root(team_id)}/outbox/{outbox_name}",
+        )
+        archive = research_runtime_v4._phase_archive(root, team_id, phase)  # noqa: SLF001
+        if event_type == "batch_rejected":
+            if os.path.lexists(live_outbox):
+                raise OrchestratorError(
+                    "rejected batch still has a live outbox; broker recovery is required"
+                )
+            if archive is None:
+                raise OrchestratorError("rejected batch lacks its immutable outbox archive")
+            _archive_path, archive_payload = archive
+            if _sha256(archive_payload) != event["outbox_sha256"]:
+                raise OrchestratorError("rejected batch archive differs from journal authority")
+            continue
+        if os.path.lexists(live_outbox) or archive is not None:
+            raise OrchestratorError("abandoned missing batch gained an outbox authority")
+        evidence = research_runtime_v4.validate_missing_batch_exhaustion(
+            root, team_id, phase
+        )
+        if (
+            evidence["path"] != event["admission_attempt_path"]
+            or evidence["sha256"] != event["admission_attempt_sha256"]
+        ):
+            raise OrchestratorError("abandoned batch evidence differs from journal authority")
+
+
 @research_runtime_v4.serialized_activated_r2_command
 def close_is(root: str | Path) -> Mapping[str, Any]:
     root_path = _safe_root(root)
@@ -2116,6 +2158,7 @@ def close_is(root: str | Path) -> Mapping[str, Any]:
         activation = activation_v4.validate(root_path)
         loaded = top40_v4.load_config(root=root_path)
         state = _close_interrupted_is_requests(root_path)
+        _validate_retired_research_authorities(root_path, state)
         _write_nomination_registry(root_path, state)
         if state.selection is not None:
             freeze = _selection_freeze(root_path, state)

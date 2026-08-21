@@ -96,5 +96,8 @@ same deterministic whole-batch source/metadata checks used by admission. An inva
 up to three serial score-blind repair sessions through immutable lane-local admission feedback.
 The fixed prompt, permissions, launch authority, private-runtime cleanup, and one-team lease remain
 unchanged across those retries. A private session-issue receipt is durable before process start,
-making the cap crash-safe. Only a batch that is still invalid—or remains absent—after all three
-repairs reaches a terminal score-blind disposition; a missing model outbox is never fabricated.
+making the cap crash-safe. Each private attempt is also the source of truth for reconstructing or
+validating its exact lane-visible repair feedback before another session can start. Only a batch
+that is still invalid—or remains absent—after all three repairs reaches a terminal score-blind
+disposition; a missing model outbox is never fabricated. IS selection revalidates the immutable
+archive or exhausted-attempt evidence behind every score-blind terminal disposition.
