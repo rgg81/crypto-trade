@@ -9,6 +9,7 @@ import json
 import os
 import shutil
 import tempfile
+from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
@@ -99,6 +100,23 @@ def freeze_field(
                 raise ValueError(f"nominated lane {team_id} lacks unique frozen point_ids")
         if state == "dnf" and not disposition.get("reason"):
             raise ValueError(f"DNF lane {team_id} lacks a reason")
+    # Point ids key the journal and name the private evidence file, both of which are flat across
+    # the whole field. Per-lane uniqueness is not enough: two lanes numbering their points 0..n
+    # collide on the second lane's first point, and the exclusive create of the evidence file turns
+    # that into a hard stop partway through a ten-hour one-shot run. The per-lane check above
+    # cannot see it, because the dimension it collides on is the one that check does not range over.
+    every_point = [
+        str(point)
+        for lane in dispositions.values()
+        for point in (lane.get("point_ids") or ())
+    ]
+    if len(every_point) != len(set(every_point)):
+        counted = Counter(every_point)
+        clashing = sorted(point for point, times in counted.items() if times > 1)
+        raise ValueError(
+            "point ids must be unique across the field, not only within a lane: "
+            f"{clashing[:5]}"
+        )
     body: dict[str, object] = {
         "schema_version": 1,
         "namespace": "cup50v2",

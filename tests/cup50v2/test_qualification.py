@@ -307,3 +307,54 @@ def test_field_close_derives_the_order_and_refuses_a_supplied_one(tmp_path) -> N
     # Omitting it entirely is the intended call, and the frozen record carries the derived order.
     record = close({"dispositions": dispositions}, "derived")
     assert list(record["observation_order"]) == list(derived)
+
+
+def test_point_ids_must_be_unique_across_the_field_not_only_within_a_lane(tmp_path) -> None:
+    """The per-lane check cannot see the collision that actually bites.
+
+    Point ids key the journal and name the private evidence file, both flat across the whole
+    field. Twelve lanes each numbering their points 0..n satisfy per-lane uniqueness and collide
+    on the second lane's first point, where the exclusive create of the evidence file stops a
+    ten-hour one-shot run partway through. The dispositions this edition first generated did
+    exactly that: 208 points, 21 distinct.
+    """
+    import pytest
+
+    from crypto_trade.cup50v2.lifecycle import TEAM_IDS, freeze_field, observation_order
+
+    key = b"k" * 32
+    activation = "a" * 64
+
+    def lanes(point_ids_for):
+        return {
+            team: {
+                "state": "nominated",
+                "eligible": True,
+                "eligibility_reason": "fixture",
+                "nomination_sha256": "d" * 64,
+                "point_ids": point_ids_for(team),
+            }
+            for team in TEAM_IDS
+        }
+
+    # Per-lane unique, field-wide colliding -- the shape that shipped.
+    colliding = lanes(lambda team: ["0", "1", "2"])
+    for lane in colliding.values():
+        assert len(lane["point_ids"]) == len(set(lane["point_ids"])), "fixture is per-lane unique"
+    with pytest.raises(ValueError, match="unique across the field"):
+        freeze_field(
+            tmp_path / "colliding.json",
+            dispositions=colliding,
+            observation_order=observation_order(key, activation_sha256=activation),
+            activation_sha256=activation,
+            signing_key=key,
+        )
+
+    record = freeze_field(
+        tmp_path / "distinct.json",
+        dispositions=lanes(lambda team: [f"{team}-p{index:02d}" for index in range(3)]),
+        observation_order=observation_order(key, activation_sha256=activation),
+        activation_sha256=activation,
+        signing_key=key,
+    )
+    assert record["field_sha256"]

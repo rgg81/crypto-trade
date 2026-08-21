@@ -1,0 +1,13 @@
+{
+  "amendment_id": "A9",
+  "amendment_sha256": "bd60e8fdbc381fb1c2dbfc97b13ad3b14a14f1507b8a71530f21a48f01f7b63e",
+  "cost_if_unfound": "The one-shot observation would have died roughly twenty minutes into a ten-hour run, on the second lane. Recoverable under A8, but only after the fact.",
+  "defect": "The dispositions generated for field close numbered each lane's points from zero, because the frozen points are bare parameter dictionaries with no id of their own and the generator fell back to the index. 208 points carried 21 distinct ids. point_id keys the observation journal and names the private evidence file, both of which are flat across the entire field, and the evidence file is created exclusively -- so the second lane's first point would have raised 'private point evidence already exists' and stopped the run.",
+  "family": "Same root as A4 through A7: a check that was true of the thing it examined and blind to the dimension that mattered. Found this time by reading how the value is consumed before committing to a ten-hour irreversible run, rather than by the run failing.",
+  "fix": "Point ids are now team-scoped (team-NN-pKK) and freeze_field rejects any field whose point ids are not unique across all twelve lanes. The test builds the exact shape that shipped -- per-lane unique, field-wide colliding -- and asserts the per-lane property holds before asserting the field-wide check rejects it.",
+  "found_at_phase": "field close preparation, before the first sealed read",
+  "found_by": "organizer, writing the observation runner and reading how point_id is actually keyed before launching the one-shot run",
+  "namespace": "cup50v2",
+  "title": "point ids were unique per lane and collided across the field",
+  "why_the_existing_check_missed_it": "freeze_field validated len(point_ids) != len(set(point_ids)) per lane. Twelve lanes numbering 0..n each pass that check individually. The collision is between lanes, which is the one dimension a per-lane check does not range over -- the same shape as the fixture blindness this edition has hit repeatedly."
+}
