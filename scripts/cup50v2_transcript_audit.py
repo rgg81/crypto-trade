@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
-"""Audit a team agent's session transcript for reads it was not entitled to make.
+"""Audit a lane's session transcript for accesses it was not entitled to make.
 
 Every prior edition's blindness rested on detection after the fact -- a canary file, an access-time
-tripwire -- or on nothing at all. But a research agent writes a complete log of every file it opened
-and every command it ran, and that log is a better record than any tripwire: it names the path, the
-tool and the moment.
+tripwire -- or on nothing at all. A research agent writes a complete log of every file it opened and
+every command it ran, and that log is a better record than any tripwire: it names the tool, the
+path, and the moment.
+
+Two things this audit had to learn the hard way, both recorded because the mistakes are the useful
+part. It must read *this lane's* transcript and not the organizer's, which contains every lane's
+material by construction. And it must read what the agent *tried to reach* -- tool-use inputs --
+rather than every string in the record, because a brief that lists the forbidden paths by name is
+not an attempt to open them, and a gate that cannot tell those apart flags the lanes for reading
+their own instructions.
 
 This is a gate, not a diagnostic. A hit is an integrity finding with a named code, confirmed
-independently by the organizer before it disqualifies anyone, exactly as every other integrity code
-in this lineage works. Read-only: it never edits a transcript.
+independently by the organizer before it disqualifies anyone. Read-only: it never edits a
+transcript.
 """
 
 from __future__ import annotations
@@ -19,32 +26,72 @@ import re
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 
+# This edition's own checkout is named for the tournament it hosts, so the repository path contains
+# the token the audit hunts for. Same exemption as the clean-room scan: one exact literal.
+OWN_WORKTREE = "quant-portfolio-blind-top50-v2"
+
 PROHIBITED = (
-    re.compile(r"(?:cup|top)\d++(?!v2)"),
+    re.compile(r"\b(?:cup|top)\d++(?!v2)"),
     re.compile(r"data/cup50v2/(?:sealed|is|acquisition)"),
     re.compile(r"tournament/cup50v2/private"),
     re.compile(r"reports-cup50v2"),
     re.compile(r"paper-cup50v2"),
     re.compile(r"briefs-|diary-|analysis/"),
     re.compile(r"ORCHESTRATOR_BRIEF"),
-    re.compile(r"TOURNAMENT-CHARTER-(?!CUP50-V2)"),
 )
 FINDING_CODE = "transcript_prohibited_read"
+TEAM_MARKER = re.compile(r"You are (?:resuming )?(team-\d{2})")
+
+# The tools that actually reach for something, and the fields naming what they reach for.
+ACCESS_TOOLS = {
+    "Read": ("file_path",),
+    "Edit": ("file_path",),
+    "Write": ("file_path",),
+    "NotebookEdit": ("notebook_path",),
+    "Glob": ("path", "pattern"),
+    "Grep": ("path", "pattern", "glob"),
+    "Bash": ("command",),
+}
 
 
-def _texts(record: object) -> Iterator[str]:
-    """Yield every string a record carries, without assuming a transcript schema."""
-    if isinstance(record, str):
-        yield record
-    elif isinstance(record, dict):
-        for value in record.values():
-            yield from _texts(value)
-    elif isinstance(record, list):
-        for value in record:
-            yield from _texts(value)
+def access_attempts(record: object) -> Iterator[tuple[str, str]]:
+    """Yield only what this agent tried to reach: tool name and the argument naming the target."""
+    if not isinstance(record, dict):
+        return
+    message = record.get("message")
+    blocks = message.get("content") if isinstance(message, dict) else None
+    if not isinstance(blocks, list):
+        return
+    for block in blocks:
+        if not isinstance(block, dict) or block.get("type") != "tool_use":
+            continue
+        fields = ACCESS_TOOLS.get(str(block.get("name")))
+        payload = block.get("input")
+        if not fields or not isinstance(payload, dict):
+            continue
+        for field in fields:
+            value = payload.get(field)
+            if isinstance(value, str) and value:
+                yield str(block.get("name")), value
 
 
-def audit_transcript(path: Path, *, team_id: str, own_root: str) -> list[dict[str, object]]:
+def discover_transcripts(roots: Sequence[Path], team_id: str) -> list[Path]:
+    """Transcripts belonging to this lane alone, identified by the dispatch that opens them."""
+    matched: list[Path] = []
+    for root in roots:
+        for path in Path(root).rglob("subagents/*.jsonl"):
+            if not path.is_file():
+                continue
+            try:
+                head = path.read_text(errors="ignore")[:8000]
+            except OSError:
+                continue
+            if set(TEAM_MARKER.findall(head)) == {team_id}:
+                matched.append(path)
+    return sorted(set(matched))
+
+
+def audit_transcript(path: Path, *, team_id: str) -> list[dict[str, object]]:
     findings: list[dict[str, object]] = []
     with path.open() as handle:
         for number, line in enumerate(handle, start=1):
@@ -58,31 +105,21 @@ def audit_transcript(path: Path, *, team_id: str, own_root: str) -> list[dict[st
                     {"code": "transcript_unreadable", "line": number, "path": str(path)}
                 )
                 continue
-            for text in _texts(record):
-                for pattern in PROHIBITED:
-                    match = pattern.search(text)
-                    if match is None:
-                        continue
-                    findings.append(
-                        {
-                            "code": FINDING_CODE,
-                            "team_id": team_id,
-                            "line": number,
-                            "matched": match.group(0),
-                            "excerpt": text[max(0, match.start() - 60) : match.end() + 60],
-                            "path": str(path),
-                        }
-                    )
-            for text in _texts(record):
+            for tool, raw in access_attempts(record):
+                text = raw.replace(OWN_WORKTREE, "<this-worktree>")
+                hits = [m.group(0) for m in (p.search(text) for p in PROHIBITED) if m]
                 other = re.search(r"cup50v2-teams/(team-\d+)", text)
-                if other and other.group(1) != team_id and own_root not in text:
+                if other and other.group(1) != team_id:
+                    hits.append(other.group(0))
+                for hit in hits:
                     findings.append(
                         {
                             "code": FINDING_CODE,
                             "team_id": team_id,
                             "line": number,
-                            "matched": other.group(0),
-                            "excerpt": text[max(0, other.start() - 60) : other.end() + 60],
+                            "tool": tool,
+                            "matched": hit,
+                            "attempt": raw[:300],
                             "path": str(path),
                         }
                     )
@@ -90,26 +127,36 @@ def audit_transcript(path: Path, *, team_id: str, own_root: str) -> list[dict[st
 
 
 def audit_team(roots: Sequence[Path], *, team_id: str, own_root: str) -> dict[str, object]:
-    transcripts = sorted(
-        {path for root in roots for path in Path(root).rglob("*.jsonl") if path.is_file()}
-    )
-    findings: list[dict[str, object]] = []
-    for transcript in transcripts:
-        findings.extend(audit_transcript(transcript, team_id=team_id, own_root=own_root))
-    return {
+    transcripts = discover_transcripts(roots, team_id)
+    body: dict[str, object] = {
         "schema_version": 1,
         "namespace": "cup50v2",
         "team_id": team_id,
+        "own_root": own_root,
         "transcripts_audited": [str(path) for path in transcripts],
-        "status": "clean" if not findings else "finding",
-        "findings": findings,
     }
+    if not transcripts:
+        return {
+            **body,
+            "status": "no-transcript",
+            "findings": [
+                {
+                    "code": "transcript_missing",
+                    "team_id": team_id,
+                    "detail": "no subagent transcript identifies this lane",
+                }
+            ],
+        }
+    findings: list[dict[str, object]] = []
+    for transcript in transcripts:
+        findings.extend(audit_transcript(transcript, team_id=team_id))
+    return {**body, "status": "clean" if not findings else "finding", "findings": findings}
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--team-id", required=True)
-    parser.add_argument("--own-root", required=True, help="the team's own workspace path")
+    parser.add_argument("--own-root", required=True, help="the lane's own workspace path")
     parser.add_argument("--transcript-root", action="append", required=True, type=Path)
     parser.add_argument("--output", type=Path)
     arguments = parser.parse_args(argv)

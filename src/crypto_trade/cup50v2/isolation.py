@@ -52,7 +52,7 @@ FORBIDDEN_NAMES = frozenset(
 # name contains "cup50", so the digits are matched possessively: without that the engine
 # backtracks to "cup5", the lookahead then sees "0v2" instead of "v2" and succeeds, and the scan
 # rejects every source that imports this tournament's own toolkit.
-PRIOR_NAMESPACE = re.compile(r"(?:cup|top)\d++(?!v2)")
+PRIOR_NAMESPACE = re.compile(r"\b(?:cup|top)\d++(?!v2)")
 DATE_LITERAL = re.compile(r"\b20\d{2}-\d{2}-\d{2}\b")
 # This edition's own checkout is named for the tournament it hosts, so the repository path
 # contains the very token the scan hunts for. A team that writes down where the repository lives
