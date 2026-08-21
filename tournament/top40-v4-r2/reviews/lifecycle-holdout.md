@@ -1,125 +1,124 @@
-# Independent adversarial R7 lifecycle and holdout review
+# Independent adversarial R8 lifecycle and holdout review
 
 Review date: 2026-08-21
-Implementation reviewed: `e4b87be0e49362e321fb3e2781d8c10812918d31`
-Branch: `quant-portfolio-blind-top40-v4-r1-v2-restart5`
+Implementation reviewed: `8335719049ddce0fb5b928a3905017b388b1fccd`
+Branch: `quant-portfolio-blind-top40-v4-r1-v2-restart6`
 
-Scope: fresh all-15-team trial-zero genesis; exact preservation of the stopped R6 incident with no
-competitive reuse; activation, restart, crash, and idempotency; canonical-broker-only whole-batch
-preflight and rejection; ordinary retirement; immutable rejected-batch recovery; one-team-at-a-time
-execution; July-2026 holdout, selection, and release; and R1/source-archive compatibility.
+Scope: fresh 15-team trial-zero genesis and exact R7 incident/no-reuse boundary; score-blind
+whole-batch admission repair with one initial session and at most three repairs; missing, malformed,
+unchanged, and source-changing outputs; crash/restart and immutable terminal evidence; refinement
+history; terminal versus infrastructure classification; one-team-at-a-time broker execution;
+July-2026 holdout, selection, and atomic release; and R1/source-archive compatibility.
 
-Method: exact-byte source inspection, read-only physical R7 topology checks, bounded temporary-root
-adversarial regressions, and the complete R7 and R1/source-archive test suites with one CPU. No
-predecessor score, result summary, feedback value, evaluator, model, or team was read or run. This
-review did not activate R7 or mutate competitive runtime state; this report is the only modified
+Method: exact-byte source inspection, read-only physical R8 topology checks, bounded temporary-root
+adversarial crash/corruption regressions, and complete serial one-CPU test suites. No predecessor
+score, summary, or feedback value was inspected. This review did not activate R8, launch a model or
+team, invoke an evaluator, or mutate competitive runtime state; this report is the only modified
 file.
 
 ## Gate status
 
 **PASSED. Unresolved findings: 0.**
 
-The reviewed R7 bytes are activation-ready. They enforce whole-batch admission before any score or
-trial is consumed, distinguish a zero-trial batch rejection from ordinary retirement, preserve
-retryable infrastructure failures, and retain the July-inclusive holdout and one-shot release
-rules.
+R8 is activation-ready on the reviewed bytes. Repair sessions are score-blind, globally serial,
+durably capped across restart, and incapable of opening a trial or score before exact whole-batch
+authority exists. Exhausted malformed and missing batches have distinct evidence-preserving
+terminal paths, while infrastructure failures remain fail-closed at their documented boundary.
 
-## Fresh genesis and predecessor boundary
+## Fresh genesis and R7 boundary
 
-- The exact physical R7 root was clean at the reviewed HEAD and branch before this report edit. All
-  15 lanes are at trial zero: the journal, activation freeze/output, research sessions, feedback,
-  and populated outboxes are absent. All 45 committed lane markers are regular single-link one-byte
-  LF files; the broker lock is an owner-controlled, regular single-link, byte-empty mode-0600 file.
-- The frozen fresh-restart authority binds the stopped R6 incident by exact artifact identities and
-  records the partial Team-02 discovery boundary without importing it into R7. R7 contains no
-  predecessor candidate, receipt, feedback, accepted trial, result, or private research runtime;
-  its authority explicitly forbids research provenance and result reuse.
-- Activation still requires the exact clean implementation commit, restart branch, authority,
-  manifest/snapshot, smoke receipt, frozen seed surface, 15-lane topology, and canonical empty
-  journal. These checks are repeated around activation tests and before the atomic freeze, so an
-  interrupted or contaminated bootstrap remains non-authoritative and retryable only from a
-  validated prefix.
+- The exact physical R8 root was clean at the reviewed HEAD and `restart6` branch before this report
+  edit. All 15 lanes are at trial zero. The journal, activation freeze/output, research sessions,
+  candidate receipts, feedback, populated outboxes, results, selection, and release are absent. All
+  45 committed lane markers retain their frozen regular single-link one-byte LF identity.
+- Schema-5 fresh-restart authority binds the completed R7 zero-candidate incident, including its
+  activation/review/journal/selection/release and generated-artifact identities. R8 imports none of
+  R7's candidates, receipts, launch records, outboxes, journal events, feedback, selection, private
+  runtime, or results; `research_provenance_reused` and `results_reused` are both false.
+- Activation still requires the exact clean implementation commit and branch, authority, frozen
+  smoke/profile/team-kit identities, manifest-authorized snapshot, 15-lane seed topology, and
+  canonical empty journal before and after its tests. Interrupted bootstrap output remains
+  non-authoritative and cannot convert runtime residue into genesis.
 
-## Whole-batch admission and terminal lifecycle
+## Score-blind repair state machine
 
-- Discovery and refinement batches are completely preflighted before the first evaluator call or
-  accepted trial. Admission binds the stable outbox bytes, ordered candidate IDs and source hashes,
-  exact phase range and accepted prefix, purpose, entrypoint, mechanism history, current source
-  authority, and candidate receipt. Refinement additionally requires IDs disjoint from discovery
-  and revalidates the completed discovery feedback and immutable archive before either preflight or
-  rejection can create a refinement terminal transition.
-- Preflight success is durably journaled as `batch_preflighted`; replay must reconstruct the exact
-  phase, outbox hash, candidate order, source hashes, canonical receipt hashes, and accepted-prefix
-  boundary. Replay also binds each accepted request's research-session hash to the corresponding
-  receipt hash. A crash after that append resumes from the same authority rather than rerunning
-  model research or admitting a different batch.
-- Batch capabilities are process-local and valid only in the live canonical broker call frame. The
-  frame is bound by Python `FrameType` identity, exact script/code identity, root, team, phase,
-  outbox, candidate IDs, sources, and module seal. Direct-library/CLI preflight-to-`run_is` bypass,
-  fabricated rejection, stale capability, and a pending accepted request all reject before result
-  mutation.
-- A deterministic whole-batch defect at discovery trial 0 or refinement trial 8 writes the distinct
-  `batch_rejected` transition and archives the rejected outbox. It does not fabricate a trial or
-  weaken ordinary retirement, which still requires the normal accepted-trial threshold. The final
-  rejection path repeats activation, journal-head, phase-boundary, outbox, source, and prior-phase
-  checks under the broker lease.
-- Candidate receipts are stable nofollow reads of owner-owned regular single-link mode-0600 files.
-  They must be exact canonical pretty-printed JSON with one trailing LF; duplicate keys, non-finite
-  values, reordered or compact encodings, missing LF, substitution, and permission drift reject.
-  Final `run_is` admission repeats validation against the capability-bound phase and exact receipt
-  hash before mechanism validation, journal acceptance, evaluator creation, or score access.
-  Deterministic receipt/source mismatches are terminal batch defects, while base or wrapped
-  `OSError` infrastructure failures remain resumable without consuming a trial.
-- Malformed launcher output with a safely published exact outbox is routed through the same broker
-  preflight and terminal classification without a second model launch. If no authoritative outbox
-  was published, the failure remains an infrastructure interruption. No score is read on either
-  preacceptance path.
-- Rejected archives require exact owner-private topology and stable nofollow owner/regular/
-  single-link files whose content digest matches the archive name and journal record. Crash recovery
-  accepts only the exact journal/archive state; missing, corrupt, symlinked, hardlinked, substituted,
-  or mismatched evidence fails closed without mutation.
+- The launcher durably issues one private canonical session authority before the initial model
+  process and before each of at most three repair processes. Session numbers 0 through 3 bind the
+  team, phase, launch authority, session kind, score-data-closed state, and exact preceding attempt.
+  A crash can conservatively consume an issued slot but can never duplicate it or grant a fifth
+  process.
+- Each completed/ambiguous issued session is inspected as a complete batch before candidate receipts,
+  journal acceptance, evaluator creation, market-data access, or score access. Admission validates
+  strict outbox shape, ordered IDs and purposes, current captured source, attestation, the disclosed
+  static semantic subset, metadata, mechanism history, phase range, and refinement disjointness.
+  Refinement starts from the exact accepted discovery history and requires the completed discovery
+  feedback/archive authority.
+- Deterministic findings are stored in owner-private, nofollow, regular single-link canonical
+  attempt records. Attempt numbers 1 through 4 bind outbox hash, ordered candidate IDs, source
+  hashes, normalized findings, phase, and `score_data_opened=false`. Changed source with unchanged
+  outbox creates new authority when its inspection changes; unchanged post-session output still
+  consumes exactly the already-issued opportunity.
+- Lane-visible admission feedback is derived byte-exactly from each durable attempt. A crash after
+  private attempt fsync but before feedback publication is recovered by reconstructing the missing
+  file; an existing conflicting file rejects. The complete feedback chain is recovered/validated
+  before another session can be issued, so no repair process runs without its authorized guidance.
+- A valid repaired batch receives candidate receipts only after its complete score-blind inspection,
+  then enters the existing canonical-broker-only durable `batch_preflighted` path. Ordered source
+  and canonical receipt hashes, accepted prefix, purpose, entrypoint, phase, and live broker-frame
+  capability are revalidated before every accepted trial. Direct-library/CLI trial or fabricated
+  rejection/abandonment paths reject before mutation.
 
-## Restart, serialization, selection, and release
+## Exhaustion, crash recovery, and serial lifecycle
 
-- One reentrant process-wide broker lease covers direct-library and canonical CLI model/evaluator
-  entrypoints. `run-all` retains that lease across the fixed 15-team traversal, and each result path
-  repeats activation and phase authority checks under the broker/result-lock order. Teams therefore
-  run strictly one at a time.
-- Accepted requests are never replaced or repeated. Unterminated infrastructure work remains
-  retryable; deterministic preacceptance rejection is terminal; accepted evaluator failures follow
-  the existing terminal record rules. Exact phase counts, immutable feedback/outbox evidence,
-  nomination retirement, finalist one-shot/DNF handling, and restart reconstruction remain bound to
-  the journal sequence.
-- Selection counts only accepted trials. A batch-rejected zero-trial lane can be represented as
-  terminal without inflating field size or trial count. Trial/field multiplicity adjustment,
-  minimum-positive-quarter eligibility, deterministic empty/no-winner behavior, and minimum
-  two-sleeve ensemble construction remain fail closed.
-- Started historical failures are terminal DNF and cannot be retried or replaced; accepted but
-  unstarted work resumes exactly once. DNF sleeve weight becomes cash rather than being redistributed,
-  including the all-DNF case. Historical results remain undisclosed until the single atomic cohort
-  release.
+- A still-malformed batch after the initial session and three repairs retains its exact live outbox,
+  is terminally `batch_rejected` without a trial or score, and is moved to an owner-private,
+  regular single-link content-addressed archive. Missing, corrupt, substituted, linked, permission-
+  drifted, or digest-mismatched archives fail closed.
+- A batch that remains absent produces exact attempt-04/session-03 authority and terminal
+  `batch_abandoned`; no outbox is fabricated or archived. Restart recognizes the exhausted state
+  without another model process. The journal binds the attempt path/hash, exact phase boundary, no
+  preflight, no pending accepted request, and zero new trials.
+- `run_team` idempotently recovers both terminal forms. `run-all` retains the process-wide broker
+  lease across the fixed 15-team order, so a terminal rejection/abandonment advances to the next
+  team while infrastructure exceptions stop safely. Direct launch, consume, result, and canonical
+  CLI paths use the same reentrant lease and under-lock activation/lifecycle checks; no teams can
+  overlap.
+- Filesystem, isolation, lock, and other failures before durable session issuance remain resumable
+  without consuming a repair or trial. Once a private issue is durable, an ambiguous process/host
+  failure consumes only that authorized slot; restart inspects the resulting unchanged, changed,
+  malformed, valid, or missing output without issuing a duplicate.
+- Selection close revalidates every retired score-blind authority before registry or freeze writes:
+  `batch_rejected` requires the exact immutable outbox archive and no live outbox;
+  `batch_abandoned` requires exact attempt/session exhaustion and no live/archive outbox. Historical
+  release repeats the same validation immediately after journal read and before selection recovery,
+  historical acceptance, snapshot access, or release recovery. Evidence loss or corruption cannot
+  be hidden by a prior selection freeze.
 
-## July 2026 holdout
+## July 2026 holdout and release
 
-- Config, manifest, activation, runner, and scoring share the exclusive hard end
+- Config, manifest, activation, runner, and scoring retain the exclusive hard end
   `2026-08-01T00:00:00Z`: all of July 2026 is included and August is excluded. Historical assessment
   remains the configured nine quarters with the minimum-positive-quarter eligibility gate.
-- The tests exercise the July boundary, truncated/out-of-range snapshot rejection, finalist
-  one-shot behavior, DNF-to-cash disclosure, empty/no-winner handling, and atomic release. No
-  holdout value was inspected during this review.
+- Every finalist identity is durably accepted before the first sealed snapshot read. Accepted but
+  unstarted observations resume once; a started interruption is terminal DNF and cannot be retried
+  or replaced. No interim finalist result is disclosed.
+- Trial/field multiplicity adjustment counts only accepted trials. Batch rejection/abandonment adds
+  none. Minimum-two-sleeve ensemble availability, failed-sleeve weight to cash without
+  redistribution, all-DNF/empty-field no-winner behavior, and the single atomic cohort release
+  remain intact.
 
 ## Verification evidence
 
 ```text
-exact implementation HEAD                          e4b87be0e49362e321fb3e2781d8c10812918d31
-focused batch/receipt/archive/restart adversarial regressions                     26 passed
-complete R7 lifecycle/security/contract suite                                    165 passed
+exact implementation HEAD                          8335719049ddce0fb5b928a3905017b388b1fccd
+focused repair/crash/evidence/serial/holdout adversarial regressions              26 passed
+complete R8 lifecycle/security/contract suite                                    177 passed
 R1 and source-archive compatibility suites                                        29 passed
-Ruff / git diff --check                                            clean / clean before report
+scoped Ruff / git diff --check                                      clean / clean before report
 physical seed lanes / markers / journal records                            15 / 45 / 0
-activation / model launch / team launch by this review                       0 / 0 / 0
+activation / evaluator / model launch / team launch by this review           0 / 0 / 0 / 0
 holdout exclusive hard end                                      2026-08-01T00:00:00Z
 ```
 
-Canonical activation must still bind this final PASS/0 report and rerun its own frozen activation
-checks before any team is started. This review neither activated R7 nor launched a team.
+Canonical activation must still bind this final PASS/0 report and rerun its frozen activation
+checks before any team is started. This review neither activated R8 nor launched a team.
