@@ -1,0 +1,14 @@
+{
+  "amendment_id": "A7",
+  "amendment_sha256": "680867075b8879af8e114dfc4db2e4d0d7024b8a6ef0956b15a342a247b5b12b",
+  "defect": "Every one of the seven transcript-audit tests built its fixture as session/agent.jsonl containing bare top-level {'type': 'tool_use', ...} blocks. The audit discovers transcripts by globbing subagents/*.jsonl and matching the dispatch line naming the lane, and reads accesses out of record['message']['content']. Wrong directory and wrong record shape: the fixtures exercised a path the audit does not have.",
+  "family": "A4, A5 and A6 were components that worked and were never reached by the path. A7 is the mirror: a path that worked while its tests reached a component that did not exist. Same root cause -- the suite verified pieces in isolation and never once verified that the piece it tested was the piece the lifecycle runs.",
+  "fix": "Fixtures now write subagents/<team>.jsonl with a real dispatch line, and emit tool calls in the assistant-message shape the audit actually parses. The clean-session test additionally asserts that discovery found the transcript and that all three of its accesses were parsed, because 'clean' is also what an audit that parsed nothing returns.",
+  "found_at_phase": "field close preparation, before the first sealed read",
+  "found_by": "organizer, running the full cup50v2 suite after the A6 fix",
+  "how_it_surfaced": "The suite went red, not green. When discovery became per-lane during the 25,546-finding fix, every fixture started returning no-transcript, and seven tests failed loudly. Had the rewrite been narrower the fixtures could have kept passing on a shape that no longer existed.",
+  "namespace": "cup50v2",
+  "standing_change": "Every gate that can end a lane now needs a test asserting its fixture is non-degenerate: that the input was found, parsed, and produced the number of observations expected. A pass on an empty parse is indistinguishable from a pass on a clean input, and this edition has now produced that failure twice -- here, and in the readiness fixture whose event lane never fired because the data contained no volume spikes.",
+  "title": "the transcript audit's tests exercised a record shape the audit never sees",
+  "was_the_real_audit_valid": "Yes, and this was checked rather than assumed. The audit found a transcript for all twelve lanes -- one or two each -- and produced eight findings across five lanes, which is the same eight adjudicated in T1. A parser that could not read real records would have returned clean with zero findings for all twelve. The gate worked in production; only its tests were phantom."
+}
