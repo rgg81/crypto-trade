@@ -1,0 +1,20 @@
+{
+  "affects_qualification": false,
+  "affects_scoring": false,
+  "chosen": "Run the third trial at organizer expense, as a charged neighbourhood probe one declared step below each centre on its first declared dimension.",
+  "cost": "ten additional full in-sample replays at three cost levels",
+  "date": "2026-08-21",
+  "decision": "D1",
+  "decision_sha256": "11fe7e3b335742577511474998c1cb83cbbbd974c42989a36944ff8e73ccfab7",
+  "namespace": "cup50v2",
+  "phase": "pre-sealed-read",
+  "rejected": "Lowering the minimum. That is a change to a qualification-adjacent rule made after seeing the field, which is the move that cost the previous edition its credibility. The charter permits repairing an organizer defect before a sealed read; it does not permit relaxing a requirement because the organizer's own defect made it inconvenient.",
+  "schema_version": 1,
+  "supporting": [
+    "The requirement's purpose -- that nobody nominates on a single lucky run -- is already met: these lanes ran between 6 and 110 journaled research evaluations each.",
+    "The mechanical rule independently selects momentum_days=72 for team-04, which is exactly the third trial team-04 requested as 'the worst point in my declared neighbourhood; I would rather spend a charged trial on the thing I doubt'."
+  ],
+  "tension": "The charter requires three charged trials before a nomination. Amendment A2 records that the charged path was unreachable for the entire research phase, so no lane could have spent three even if it wanted to. Nine of them reported hitting that boundary.",
+  "title": "How the three-charged-trial minimum was satisfied after A2",
+  "why_that_rule": "It is mechanical and identical for every lane. Which point a lane should spend a doubt on is a research judgement, and an organizer who picks it makes the tournament partly a measure of his own choices. A uniform rule cannot favour anyone."
+}
