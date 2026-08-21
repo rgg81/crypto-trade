@@ -414,6 +414,17 @@ def consume_batch(root: Path, team_id: str, phase: str) -> Mapping[str, Any]:
     _restore_lane_markers_before_authority(root, team_id)
     activation_v4.validate(root)
     TOP40_V4_LAYOUT.require_team(team_id)
+    outbox_name = "batch-1.json" if phase == "discovery" else "batch-2.json"
+    outbox = root / TOP40_V4_LAYOUT.team_root(team_id) / "outbox" / outbox_name
+    if (
+        not os.path.lexists(outbox)
+        and research_runtime_v4.missing_batch_exhaustion_may_exist(
+            root, team_id, phase
+        )
+    ):
+        return orchestrator_v4.abandon_missing_batch_before_evaluation(
+            root, team_id, phase
+        )
     try:
         orchestrator_v4.preflight_is_batch(
             root, team_id, phase, require_receipts=False
@@ -606,6 +617,21 @@ def run_team(root: Path, team_id: str) -> Mapping[str, Any]:
                 f"{phase}-{event['outbox_sha256']}.json"
             ):
                 raise BrokerError("rejected batch lacks its immutable outbox archive")
+        elif retired is not None and retired["event_type"] == "batch_abandoned":
+            event = retired["payload"]
+            phase = str(event["phase"])
+            name = "batch-1.json" if phase == "discovery" else "batch-2.json"
+            outbox = root / TOP40_V4_LAYOUT.team_root(team_id) / "outbox" / name
+            if os.path.lexists(outbox) or _phase_archive(root, team_id, phase) is not None:
+                raise BrokerError("abandoned missing batch gained an outbox authority")
+            evidence = research_runtime_v4.validate_missing_batch_exhaustion(
+                root, team_id, phase
+            )
+            if (
+                evidence["path"] != event["admission_attempt_path"]
+                or evidence["sha256"] != event["admission_attempt_sha256"]
+            ):
+                raise BrokerError("abandoned batch evidence differs from journal authority")
         decision = root / TOP40_V4_LAYOUT.team_root(team_id) / "outbox/decision.json"
         if decision.exists():
             _request, path, payload = _read_request(root, team_id, "decision")

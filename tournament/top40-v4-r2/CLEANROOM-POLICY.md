@@ -92,13 +92,18 @@ ordering.
 Before opening score data or appending the first accepted record for a batch, the organizer captures
 and validates the entire batch against exact receipts, metadata/attestations, the static source
 subset, and a simulated mechanism history. Before receipts exist, the launcher applies the same
-checks and may issue at most three immutable lane-local repair reports. Each report contains only
+checks, records the initial finding, and may issue at most three immutable score-blind repair
+sessions. A private, canonical issue receipt is durably written before every model process, so a
+host crash can consume but can never duplicate a session. Each post-session report contains only
 deterministic findings and explicitly binds that no score data was opened; every repair runs under
 the same offline profile, fixed prompt/command, cleaned private runtime, launch authority, and
-global serial lease. Deterministic batch defects that remain after all repairs retire the lane at
-that score-blind boundary. This includes a deterministic immutable receipt schema, phase, hash, or
-binding conflict. Filesystem I/O, isolation-probe, runtime, lock, or other infrastructure failures
-do not retire the lane and remain safely resumable. The journal binds the exact ordered preflight,
+global serial lease. Deterministic batch defects—or a batch that remains absent—after all repairs
+retire the lane at that score-blind boundary without fabricating an outbox. This includes a
+deterministic immutable receipt schema, phase, hash, or
+binding conflict. Filesystem I/O, isolation-probe, lock, or other infrastructure failures before
+session issuance do not retire the lane and remain safely resumable. After issuance, an ambiguous
+process/host failure conservatively consumes only that already-authorized slot. The journal binds
+the exact ordered preflight,
 source hashes, and private canonical receipt hashes,
 and only the live canonical serial-broker consume frame receives the capability to reject or admit
 that batch; direct library and organizer CLI trial calls are fail-closed before mutation.

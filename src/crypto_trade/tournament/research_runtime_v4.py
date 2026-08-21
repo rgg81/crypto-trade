@@ -40,6 +40,9 @@ _EXPECTED_CODEX_VERSION = "codex-cli 0.148.0"
 _MODEL_NAME = "gpt-5.6-sol"
 _MODEL_REASONING_EFFORT = "high"
 _MAX_SCORE_BLIND_REPAIR_SESSIONS = 3
+_ADMISSION_AUTHORITY_NAME = re.compile(
+    r"(?:discovery|refinement)-[0-9]{2}\.json"
+)
 _PRIVATE_MODEL_RUNTIME_RELATIVE = "tournament/top40-v4-r2/private/model-runtime"
 _SYSTEM_SKILL_MARKER = b"1f03dcab110ce82d\n"
 _CODEX_HOME_VOLATILE_FILES = frozenset(
@@ -2921,6 +2924,7 @@ def _score_blind_batch_inspection(
             findings.extend(f"{candidate_id}: {finding}" for finding in static_findings)
         except (
             ResearchRuntimeError,
+            orchestrator_v4.OrchestratorError,
             isolation_v4.IsolationError,
             runner_v4.StrategySandboxError,
             ValueError,
@@ -2965,81 +2969,262 @@ def _admission_attempt_directory(root: Path, team_id: str) -> Path:
     return root / isolation_v4.RESEARCH_SESSION_ROOT / "admission-attempts" / team_id
 
 
+@contextlib.contextmanager
+def _pinned_admission_directory(
+    root: Path,
+    team_id: str,
+    category: str,
+) -> Iterator[int]:
+    """Pin one organizer-private authority directory through every path component."""
+
+    TOP40_V4_LAYOUT.require_team(team_id)
+    if category not in {"admission-attempts", "admission-sessions"}:
+        raise ResearchRuntimeError("admission authority category is invalid")
+    parts = (*Path(isolation_v4.RESEARCH_SESSION_ROOT).parts, category, team_id)
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+    )
+    descriptors: list[int] = []
+    identities: list[tuple[int, int]] = []
+    names: list[str] = []
+    try:
+        descriptor = os.open(root, flags)
+        descriptors.append(descriptor)
+        root_details = os.fstat(descriptor)
+        root_lexical = root.lstat()
+        if (
+            not stat.S_ISDIR(root_details.st_mode)
+            or (root_details.st_dev, root_details.st_ino)
+            != (root_lexical.st_dev, root_lexical.st_ino)
+        ):
+            raise ResearchRuntimeError("research root is not a pinned directory")
+        identities.append((root_details.st_dev, root_details.st_ino))
+        for index, part in enumerate(parts):
+            parent = descriptors[-1]
+            private = index >= len(parts) - 2
+            try:
+                os.mkdir(part, 0o700 if private else 0o755, dir_fd=parent)
+            except FileExistsError:
+                pass
+            except OSError as exc:
+                raise ResearchRuntimeError(
+                    "cannot create private admission authority directory"
+                ) from exc
+            try:
+                child = os.open(part, flags, dir_fd=parent)
+                details = os.fstat(child)
+                lexical = os.stat(part, dir_fd=parent, follow_symlinks=False)
+            except OSError as exc:
+                raise ResearchRuntimeError(
+                    "cannot pin private admission authority directory"
+                ) from exc
+            if (
+                not stat.S_ISDIR(details.st_mode)
+                or details.st_uid != os.geteuid()
+                or stat.S_IMODE(details.st_mode) & 0o022
+                or (private and stat.S_IMODE(details.st_mode) & 0o077)
+                or (details.st_dev, details.st_ino)
+                != (lexical.st_dev, lexical.st_ino)
+            ):
+                os.close(child)
+                raise ResearchRuntimeError(
+                    "private admission authority directory is unsafe"
+                )
+            os.fsync(parent)
+            descriptors.append(child)
+            identities.append((details.st_dev, details.st_ino))
+            names.append(part)
+        yield descriptors[-1]
+        for index in range(len(descriptors) - 1, 0, -1):
+            details = os.fstat(descriptors[index])
+            lexical = os.stat(
+                names[index - 1],
+                dir_fd=descriptors[index - 1],
+                follow_symlinks=False,
+            )
+            if (
+                (details.st_dev, details.st_ino) != identities[index]
+                or (lexical.st_dev, lexical.st_ino) != identities[index]
+                or not stat.S_ISDIR(lexical.st_mode)
+            ):
+                raise ResearchRuntimeError(
+                    "private admission authority path changed while pinned"
+                )
+    finally:
+        for descriptor in reversed(descriptors):
+            with contextlib.suppress(OSError):
+                os.close(descriptor)
+
+
+def _pinned_admission_bytes(directory: int, name: str) -> bytes:
+    if _ADMISSION_AUTHORITY_NAME.fullmatch(name) is None:
+        raise ResearchRuntimeError("admission authority filename is invalid")
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
+    try:
+        descriptor = os.open(name, flags, dir_fd=directory)
+        with os.fdopen(descriptor, "rb") as handle:
+            before = os.fstat(handle.fileno())
+            if (
+                not stat.S_ISREG(before.st_mode)
+                or before.st_uid != os.geteuid()
+                or before.st_nlink != 1
+                or stat.S_IMODE(before.st_mode) != 0o600
+                or before.st_size > 2 * 1024 * 1024
+            ):
+                raise ResearchRuntimeError("admission authority is not private and regular")
+            payload = handle.read(2 * 1024 * 1024 + 1)
+            after = os.fstat(handle.fileno())
+        lexical = os.stat(name, dir_fd=directory, follow_symlinks=False)
+    except ResearchRuntimeError:
+        raise
+    except OSError as exc:
+        raise ResearchRuntimeError("cannot read pinned admission authority") from exc
+    identity = lambda value: (  # noqa: E731
+        value.st_dev,
+        value.st_ino,
+        value.st_size,
+        value.st_mtime_ns,
+        value.st_nlink,
+        value.st_uid,
+        value.st_mode,
+    )
+    if (
+        len(payload) > 2 * 1024 * 1024
+        or identity(before) != identity(after)
+        or identity(after) != identity(lexical)
+    ):
+        raise ResearchRuntimeError("admission authority changed while being read")
+    return payload
+
+
+def _write_pinned_admission_authority(directory: int, name: str, payload: bytes) -> None:
+    if _ADMISSION_AUTHORITY_NAME.fullmatch(name) is None:
+        raise ResearchRuntimeError("admission authority filename is invalid")
+    flags = (
+        os.O_WRONLY
+        | os.O_CREAT
+        | os.O_EXCL
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    try:
+        descriptor = os.open(name, flags, 0o600, dir_fd=directory)
+    except FileExistsError:
+        if _pinned_admission_bytes(directory, name) != payload:
+            raise ResearchRuntimeError("immutable admission authority already differs")
+        return
+    except OSError as exc:
+        raise ResearchRuntimeError("cannot create pinned admission authority") from exc
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            os.fchmod(handle.fileno(), 0o600)
+            if handle.write(payload) != len(payload):
+                raise ResearchRuntimeError("short admission authority write")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.fsync(directory)
+        if _pinned_admission_bytes(directory, name) != payload:
+            raise ResearchRuntimeError("new admission authority failed verification")
+    except Exception:
+        raise
+
+
+def _canonical_admission_attempt(attempt: Mapping[str, object]) -> bytes:
+    return json.dumps(
+        attempt,
+        allow_nan=False,
+        ensure_ascii=True,
+        indent=2,
+        sort_keys=True,
+    ).encode("ascii") + b"\n"
+
+
 def _admission_attempts(
     root: Path, team_id: str, phase: str
 ) -> list[Mapping[str, object]]:
-    directory = _admission_attempt_directory(root, team_id)
-    if not directory.exists():
-        return []
-    if directory.is_symlink() or not directory.is_dir():
-        raise ResearchRuntimeError("admission-attempt directory is unsafe")
     prefix = f"{phase}-"
-    paths = sorted(
-        (path for path in directory.iterdir() if path.name.startswith(prefix)),
-        key=lambda path: path.name,
-    )
     attempts: list[Mapping[str, object]] = []
-    for number, path in enumerate(paths, start=1):
-        if path.name != f"{phase}-{number:02d}.json":
-            raise ResearchRuntimeError("admission-attempt sequence is malformed")
-        payload = _stable_bytes(path, require_private=True)
-        attempt = _strict_team_request(payload, path.relative_to(root).as_posix())
-        if (
-            set(attempt)
-            != {
-                "attempt_number",
-                "candidate_ids",
-                "findings",
-                "outbox_sha256",
-                "phase",
-                "schema_version",
-                "score_data_opened",
-                "source_bundle_sha256s",
-                "team_id",
-                "tournament",
-            }
-            or attempt.get("schema_version") != 1
-            or attempt.get("attempt_number") != number
-            or attempt.get("team_id") != team_id
-            or attempt.get("phase") != phase
-            or attempt.get("tournament") != TOP40_V4_LAYOUT.name
-            or attempt.get("score_data_opened") is not False
-            or _SHA256.fullmatch(str(attempt.get("outbox_sha256"))) is None
-            or not isinstance(attempt.get("candidate_ids"), list)
-            or len(attempt["candidate_ids"]) > 8
-            or any(
-                not isinstance(candidate_id, str)
-                or _SAFE_ID.fullmatch(candidate_id) is None
-                for candidate_id in attempt["candidate_ids"]
+    with _pinned_admission_directory(
+        root, team_id, "admission-attempts"
+    ) as directory:
+        names = sorted(os.listdir(directory))
+        if any(_ADMISSION_AUTHORITY_NAME.fullmatch(name) is None for name in names):
+            raise ResearchRuntimeError("admission-attempt directory has unexpected residue")
+        for known_phase in ("discovery", "refinement"):
+            phase_names = [name for name in names if name.startswith(f"{known_phase}-")]
+            if phase_names != [
+                f"{known_phase}-{number:02d}.json"
+                for number in range(1, len(phase_names) + 1)
+            ] or len(phase_names) > _MAX_SCORE_BLIND_REPAIR_SESSIONS + 1:
+                raise ResearchRuntimeError("admission-attempt sequence is malformed")
+        selected = [name for name in names if name.startswith(prefix)]
+        for number, name in enumerate(selected, start=1):
+            if name != f"{phase}-{number:02d}.json":
+                raise ResearchRuntimeError("admission-attempt sequence is malformed")
+            payload = _pinned_admission_bytes(directory, name)
+            relative = (
+                f"{isolation_v4.RESEARCH_SESSION_ROOT}/admission-attempts/"
+                f"{team_id}/{name}"
             )
-            or not isinstance(attempt.get("source_bundle_sha256s"), list)
-            or len(attempt["source_bundle_sha256s"]) != len(attempt["candidate_ids"])
-            or any(
-                not isinstance(source_sha256, str)
-                or (
-                    source_sha256 != ""
-                    and _SHA256.fullmatch(source_sha256) is None
+            attempt = _strict_team_request(payload, relative)
+            if (
+                set(attempt)
+                != {
+                    "attempt_number",
+                    "candidate_ids",
+                    "findings",
+                    "outbox_sha256",
+                    "phase",
+                    "schema_version",
+                    "score_data_opened",
+                    "source_bundle_sha256s",
+                    "team_id",
+                    "tournament",
+                }
+                or attempt.get("schema_version") != 1
+                or attempt.get("attempt_number") != number
+                or attempt.get("team_id") != team_id
+                or attempt.get("phase") != phase
+                or attempt.get("tournament") != TOP40_V4_LAYOUT.name
+                or attempt.get("score_data_opened") is not False
+                or _SHA256.fullmatch(str(attempt.get("outbox_sha256"))) is None
+                or not isinstance(attempt.get("candidate_ids"), list)
+                or len(attempt["candidate_ids"]) > 8
+                or any(
+                    not isinstance(candidate_id, str)
+                    or _SAFE_ID.fullmatch(candidate_id) is None
+                    for candidate_id in attempt["candidate_ids"]
                 )
-                for source_sha256 in attempt["source_bundle_sha256s"]
-            )
-            or not isinstance(attempt.get("findings"), list)
-            or not 1 <= len(attempt["findings"]) <= 256
-            or any(
-                not _is_bounded_single_line(finding, maximum=2048)
-                for finding in attempt["findings"]
-            )
-        ):
-            raise ResearchRuntimeError("admission-attempt authority differs")
-        canonical = json.dumps(
-            attempt,
-            allow_nan=False,
-            ensure_ascii=True,
-            indent=2,
-            sort_keys=True,
-        ).encode("ascii") + b"\n"
-        if payload != canonical:
-            raise ResearchRuntimeError("admission-attempt bytes are not canonical")
-        attempts.append(attempt)
+                or not isinstance(attempt.get("source_bundle_sha256s"), list)
+                or len(attempt["source_bundle_sha256s"])
+                != len(attempt["candidate_ids"])
+                or any(
+                    not isinstance(source_sha256, str)
+                    or (
+                        source_sha256 != ""
+                        and _SHA256.fullmatch(source_sha256) is None
+                    )
+                    for source_sha256 in attempt["source_bundle_sha256s"]
+                )
+                or not isinstance(attempt.get("findings"), list)
+                or not 1 <= len(attempt["findings"]) <= 256
+                or any(
+                    not _is_bounded_single_line(finding, maximum=2048)
+                    for finding in attempt["findings"]
+                )
+            ):
+                raise ResearchRuntimeError("admission-attempt authority differs")
+            if payload != _canonical_admission_attempt(attempt):
+                raise ResearchRuntimeError("admission-attempt bytes are not canonical")
+            attempts.append(attempt)
     return attempts
 
 
@@ -3077,15 +3262,12 @@ def _record_admission_attempt(
             "team_id": team_id,
             "tournament": TOP40_V4_LAYOUT.name,
         }
-        payload = json.dumps(
-            attempt,
-            allow_nan=False,
-            ensure_ascii=True,
-            indent=2,
-            sort_keys=True,
-        ).encode("ascii") + b"\n"
-        path = _admission_attempt_directory(root, team_id) / f"{phase}-{number:02d}.json"
-        _write_immutable(path, payload)
+        payload = _canonical_admission_attempt(attempt)
+        name = f"{phase}-{number:02d}.json"
+        with _pinned_admission_directory(
+            root, team_id, "admission-attempts"
+        ) as directory:
+            _write_pinned_admission_authority(directory, name, payload)
         created = True
     number = int(attempt["attempt_number"])
     feedback = {
@@ -3113,6 +3295,186 @@ def _record_admission_attempt(
     )
     _write_immutable(feedback_path, feedback_payload)
     return attempt, created
+
+
+def _canonical_admission_session(issue: Mapping[str, object]) -> bytes:
+    return json.dumps(
+        issue,
+        allow_nan=False,
+        ensure_ascii=True,
+        indent=2,
+        sort_keys=True,
+    ).encode("ascii") + b"\n"
+
+
+def _admission_session_issues(
+    root: Path,
+    team_id: str,
+    phase: str,
+    launch_authority_sha256: str,
+) -> list[Mapping[str, object]]:
+    attempts = _admission_attempts(root, team_id, phase)
+    issues: list[Mapping[str, object]] = []
+    prefix = f"{phase}-"
+    with _pinned_admission_directory(
+        root, team_id, "admission-sessions"
+    ) as directory:
+        names = sorted(os.listdir(directory))
+        if any(_ADMISSION_AUTHORITY_NAME.fullmatch(name) is None for name in names):
+            raise ResearchRuntimeError("admission-session directory has unexpected residue")
+        for known_phase in ("discovery", "refinement"):
+            phase_names = [name for name in names if name.startswith(f"{known_phase}-")]
+            if phase_names != [
+                f"{known_phase}-{number:02d}.json"
+                for number in range(len(phase_names))
+            ] or len(phase_names) > _MAX_SCORE_BLIND_REPAIR_SESSIONS + 1:
+                raise ResearchRuntimeError("admission-session sequence is malformed")
+        selected = [name for name in names if name.startswith(prefix)]
+        for session_number, name in enumerate(selected):
+            if (
+                name != f"{phase}-{session_number:02d}.json"
+                or session_number > _MAX_SCORE_BLIND_REPAIR_SESSIONS
+                or session_number > len(attempts)
+            ):
+                raise ResearchRuntimeError("admission-session sequence is malformed")
+            payload = _pinned_admission_bytes(directory, name)
+            relative = (
+                f"{isolation_v4.RESEARCH_SESSION_ROOT}/admission-sessions/"
+                f"{team_id}/{name}"
+            )
+            issue = _strict_team_request(payload, relative)
+            input_attempt = attempts[session_number - 1] if session_number else None
+            input_path = (
+                f"{isolation_v4.RESEARCH_SESSION_ROOT}/admission-attempts/{team_id}/"
+                f"{phase}-{session_number:02d}.json"
+                if input_attempt is not None
+                else None
+            )
+            input_sha256 = (
+                hashlib.sha256(_canonical_admission_attempt(input_attempt)).hexdigest()
+                if input_attempt is not None
+                else None
+            )
+            expected = {
+                "input_attempt_path": input_path,
+                "input_attempt_sha256": input_sha256,
+                "launch_authority_sha256": launch_authority_sha256,
+                "phase": phase,
+                "schema_version": 1,
+                "score_data_opened": False,
+                "session_kind": (
+                    "initial" if session_number == 0 else "score-blind-repair"
+                ),
+                "session_number": session_number,
+                "team_id": team_id,
+                "tournament": TOP40_V4_LAYOUT.name,
+            }
+            if issue != expected or payload != _canonical_admission_session(issue):
+                raise ResearchRuntimeError("admission-session authority differs")
+            issues.append(issue)
+    if len(issues) not in {len(attempts), len(attempts) + 1}:
+        raise ResearchRuntimeError("admission session/attempt sequence is contradictory")
+    return issues
+
+
+def _record_admission_session_issue(
+    root: Path,
+    team_id: str,
+    phase: str,
+    launch_authority_sha256: str,
+    session_number: int,
+) -> Mapping[str, object]:
+    attempts = _admission_attempts(root, team_id, phase)
+    if (
+        not 0 <= session_number <= _MAX_SCORE_BLIND_REPAIR_SESSIONS
+        or len(attempts) != session_number
+    ):
+        raise ResearchRuntimeError("admission session issuance is out of sequence")
+    existing = _admission_session_issues(
+        root, team_id, phase, launch_authority_sha256
+    )
+    input_attempt = attempts[-1] if attempts else None
+    issue = {
+        "input_attempt_path": (
+            f"{isolation_v4.RESEARCH_SESSION_ROOT}/admission-attempts/{team_id}/"
+            f"{phase}-{session_number:02d}.json"
+            if input_attempt is not None
+            else None
+        ),
+        "input_attempt_sha256": (
+            hashlib.sha256(_canonical_admission_attempt(input_attempt)).hexdigest()
+            if input_attempt is not None
+            else None
+        ),
+        "launch_authority_sha256": launch_authority_sha256,
+        "phase": phase,
+        "schema_version": 1,
+        "score_data_opened": False,
+        "session_kind": "initial" if session_number == 0 else "score-blind-repair",
+        "session_number": session_number,
+        "team_id": team_id,
+        "tournament": TOP40_V4_LAYOUT.name,
+    }
+    if len(existing) == session_number + 1:
+        if existing[-1] != issue:
+            raise ResearchRuntimeError("existing admission session issue differs")
+        return existing[-1]
+    if len(existing) != session_number:
+        raise ResearchRuntimeError("admission session issuance would skip authority")
+    name = f"{phase}-{session_number:02d}.json"
+    payload = _canonical_admission_session(issue)
+    with _pinned_admission_directory(
+        root, team_id, "admission-sessions"
+    ) as directory:
+        _write_pinned_admission_authority(directory, name, payload)
+    return issue
+
+
+def validate_missing_batch_exhaustion(
+    root: str | Path,
+    team_id: str,
+    phase: str,
+) -> Mapping[str, str]:
+    """Bind terminal missing-output evidence after all issued model sessions."""
+
+    root_path = Path(root).resolve()
+    launch = validate_launch_authority(root_path, team_id, phase)
+    attempts = _admission_attempts(root_path, team_id, phase)
+    issues = _admission_session_issues(root_path, team_id, phase, launch["sha256"])
+    outbox_name = "batch-1.json" if phase == "discovery" else "batch-2.json"
+    outbox = root_path / TOP40_V4_LAYOUT.team_root(team_id) / "outbox" / outbox_name
+    expected_finding = f"outbox: required {outbox_name} was not published"
+    if (
+        os.path.lexists(outbox)
+        or len(attempts) != _MAX_SCORE_BLIND_REPAIR_SESSIONS + 1
+        or len(issues) != _MAX_SCORE_BLIND_REPAIR_SESSIONS + 1
+        or attempts[-1]["attempt_number"] != 4
+        or attempts[-1]["candidate_ids"] != []
+        or attempts[-1]["source_bundle_sha256s"] != []
+        or attempts[-1]["outbox_sha256"] != hashlib.sha256(b"").hexdigest()
+        or attempts[-1]["findings"] != [expected_finding]
+    ):
+        raise ResearchRuntimeError("missing batch has no exact exhausted repair authority")
+    relative = (
+        f"{isolation_v4.RESEARCH_SESSION_ROOT}/admission-attempts/{team_id}/"
+        f"{phase}-04.json"
+    )
+    payload = _canonical_admission_attempt(attempts[-1])
+    return {"path": relative, "sha256": hashlib.sha256(payload).hexdigest()}
+
+
+def missing_batch_exhaustion_may_exist(
+    root: str | Path, team_id: str, phase: str
+) -> bool:
+    """Route only a possible attempt-04 to the authoritative missing-batch validator."""
+
+    root_path = Path(root).resolve()
+    TOP40_V4_LAYOUT.require_team(team_id)
+    if phase not in {"discovery", "refinement"}:
+        return False
+    return os.path.lexists(
+        _admission_attempt_directory(root_path, team_id) / f"{phase}-04.json"
+    )
 
 
 def _phase_archive(root: Path, team_id: str, phase: str) -> tuple[Path, bytes] | None:
@@ -3468,11 +3830,9 @@ def launch_team_phase(
     command = _codex_exec_command(root_path, team_id, model=_MODEL_NAME, prompt=prompt)
     environment = _private_model_environment(root_path, team_id)
     model_sessions = 0
-    inspected_after_session = False
-    repaired_input_hashes: set[str] = set()
 
     def run_model() -> None:
-        nonlocal model_sessions, inspected_after_session
+        nonlocal model_sessions
         model_sessions += 1
         try:
             completed = subprocess.run(
@@ -3495,7 +3855,6 @@ def launch_team_phase(
                 _restore_writable_lane_markers(root_path, team_id)
         if completed.returncode != 0:
             raise ResearchRuntimeError("isolated team process did not complete successfully")
-        inspected_after_session = True
 
     if phase == "decision":
         run_model()
@@ -3517,11 +3876,41 @@ def launch_team_phase(
             "outbox_path": f"{TOP40_V4_LAYOUT.team_root(team_id)}/outbox/{outbox_name}",
         }
 
-    while True:
+    def inspect_current_output() -> Mapping[str, object]:
         if os.path.lexists(outbox_path):
-            inspection = _score_blind_batch_inspection(
+            return _score_blind_batch_inspection(
                 root_path, team_id, phase, outbox_path
             )
+        return {
+            "candidate_ids": [],
+            "findings": [f"outbox: required {outbox_name} was not published"],
+            "outbox_sha256": hashlib.sha256(b"").hexdigest(),
+            "source_bundle_sha256s": [],
+        }
+
+    def matches_attempt(
+        inspection: Mapping[str, object], attempt: Mapping[str, object]
+    ) -> bool:
+        return all(
+            list(inspection[key]) == attempt[key]
+            if key in {"candidate_ids", "findings", "source_bundle_sha256s"}
+            else inspection[key] == attempt[key]
+            for key in (
+                "candidate_ids",
+                "findings",
+                "outbox_sha256",
+                "source_bundle_sha256s",
+            )
+        )
+
+    while True:
+        attempts = _admission_attempts(root_path, team_id, phase)
+        issues = _admission_session_issues(
+            root_path, team_id, phase, launch_authority["sha256"]
+        )
+        outstanding_issue = len(issues) == len(attempts) + 1
+        if outstanding_issue:
+            inspection = inspect_current_output()
             if not inspection["findings"]:
                 candidate_ids = [str(value) for value in inspection["candidate_ids"]]
                 receipts = record_candidate_receipts(
@@ -3531,7 +3920,6 @@ def launch_team_phase(
                     candidate_ids,
                     probes=probes,
                 )
-                attempts = _admission_attempts(root_path, team_id, phase)
                 return {
                     "ok": True,
                     "team_id": team_id,
@@ -3542,44 +3930,46 @@ def launch_team_phase(
                     "probes": probes,
                     "candidate_receipts": list(receipts),
                     "model_sessions": model_sessions,
-                    "repair_attempts": min(
-                        len(attempts), _MAX_SCORE_BLIND_REPAIR_SESSIONS
-                    ),
+                    "repair_attempts": max(0, len(issues) - 1),
                     "outbox_path": (
                         f"{TOP40_V4_LAYOUT.team_root(team_id)}/outbox/{outbox_name}"
                     ),
                 }
-            outbox_sha256 = str(inspection["outbox_sha256"])
             attempt, _created = _record_admission_attempt(
                 root_path,
                 team_id,
                 phase,
                 inspection,
-                repeat=outbox_sha256 in repaired_input_hashes,
+                # One durable issue represents one consumed process opportunity. Even an
+                # unchanged result after a host crash must advance the attempt chain.
+                repeat=True,
             )
             if int(attempt["attempt_number"]) > _MAX_SCORE_BLIND_REPAIR_SESSIONS:
                 raise CandidateRepairExhaustedError(
                     "batch remained invalid after every score-blind repair session"
                 )
-            repaired_input_hashes.add(outbox_sha256)
-        elif inspected_after_session:
-            inspection = {
-                "candidate_ids": [],
-                "findings": [f"outbox: required {outbox_name} was not published"],
-                "outbox_sha256": hashlib.sha256(b"").hexdigest(),
-                "source_bundle_sha256s": [],
-            }
-            attempt, _created = _record_admission_attempt(
-                root_path,
-                team_id,
-                phase,
-                inspection,
-                repeat=True,
-            )
-            if int(attempt["attempt_number"]) > _MAX_SCORE_BLIND_REPAIR_SESSIONS:
-                raise CandidateRepairExhaustedError(
-                    "batch outbox remained absent after every score-blind repair session"
+            continue
+
+        if attempts:
+            current = inspect_current_output()
+            if not current["findings"] or not matches_attempt(current, attempts[-1]):
+                raise ResearchRuntimeError(
+                    "unissued model output differs from its last admission attempt"
                 )
+            if len(attempts) > _MAX_SCORE_BLIND_REPAIR_SESSIONS:
+                raise CandidateRepairExhaustedError(
+                    "batch remained invalid after every score-blind repair session"
+                )
+        elif os.path.lexists(outbox_path):
+            raise ResearchRuntimeError("batch outbox exists without a model-session issue")
+
+        _record_admission_session_issue(
+            root_path,
+            team_id,
+            phase,
+            launch_authority["sha256"],
+            len(attempts),
+        )
         run_model()
 
 

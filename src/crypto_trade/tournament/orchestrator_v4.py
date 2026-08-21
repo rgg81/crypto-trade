@@ -1317,6 +1317,69 @@ def reject_batch_before_evaluation(
         }
 
 
+@research_runtime_v4.serialized_activated_r2_command
+def abandon_missing_batch_before_evaluation(
+    root: str | Path,
+    team_id: str,
+    phase: str,
+) -> Mapping[str, Any]:
+    """Terminally resolve a model batch that stayed absent through every issued repair."""
+
+    root_path = _safe_root(root)
+    broker_frame = _batch_broker_frame(root_path, team_id, phase)
+    with _result_lock(root_path):
+        isolation_v4.audit_team_surface(root_path, team_id)
+        activation_v4.validate(root_path, verify_universe_snapshot=False)
+        TOP40_V4_LAYOUT.require_team(team_id)
+        if phase not in {"discovery", "refinement"}:
+            raise OrchestratorError("batch abandonment phase is invalid")
+        if phase == "refinement":
+            research_runtime_v4._validate_prior_phase_evidence(  # noqa: SLF001
+                root_path, team_id, "discovery"
+            )
+        if _batch_broker_frame(root_path, team_id, phase) is not broker_frame:
+            raise OrchestratorError("batch abandonment broker authority changed")
+        evidence = research_runtime_v4.validate_missing_batch_exhaustion(
+            root_path, team_id, phase
+        )
+        state = journal_v4.read(_journal_path(root_path))
+        expected_trials = 0 if phase == "discovery" else 8
+        if (
+            state.selection is not None
+            or team_id in state.nominations
+            or team_id in state.retired
+            or state.trials_by_team.get(team_id, 0) != expected_trials
+            or (team_id, phase) in state.batch_preflights
+            or any(
+                request_hash not in state.is_terminals
+                for request_hash, request in state.is_requests.items()
+                if request["payload"]["team_id"] == team_id
+            )
+        ):
+            raise OrchestratorError("missing batch cannot be abandoned in this lifecycle state")
+        record = journal_v4.append(
+            _journal_path(root_path),
+            "batch_abandoned",
+            {
+                "team_id": team_id,
+                "phase": phase,
+                "reason": "model batch remained absent after every score-blind repair",
+                "admission_attempt_path": evidence["path"],
+                "admission_attempt_sha256": evidence["sha256"],
+            },
+        )
+        _write_nomination_registry(root_path, journal_v4.read(_journal_path(root_path)))
+        return {
+            "ok": True,
+            "team_id": team_id,
+            "phase": phase,
+            "retired": True,
+            "score_data_opened": False,
+            "missing_outbox": True,
+            "journal_record_sha256": record["record_sha256"],
+        }
+
+
 def _validated_batch_capability(
     root: Path,
     state: journal_v4.JournalState,

@@ -2832,6 +2832,188 @@ def test_launcher_exhausts_exactly_three_uniform_repairs_without_receipts(
     ]
 
 
+def test_unchanged_repair_crash_never_grants_an_extra_model_session(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    team = tmp_path / TOP40_V4_R2_LAYOUT.team_root("team-01")
+    for directory in ("candidates", "feedback", "outbox", "work"):
+        (team / directory).mkdir(parents=True, exist_ok=True)
+    outbox = team / "outbox/batch-1.json"
+    calls: list[int] = []
+    inspections = 0
+    interrupted = False
+
+    monkeypatch.setattr(activation_v4, "validate", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        activation_v4, "require_completed_pretrial_recovery", lambda *_args: {}
+    )
+    monkeypatch.setattr(
+        research_runtime_v4, "validate_frozen_model_smoke", lambda *_args: {}
+    )
+    monkeypatch.setattr(
+        research_runtime_v4, "_validate_runtime_launch_lifecycle", lambda *_args: None
+    )
+    monkeypatch.setattr(
+        research_runtime_v4.isolation_v4, "audit_team_surface", lambda *_args: {}
+    )
+    monkeypatch.setattr(
+        research_runtime_v4, "run_profile_probes", lambda *_args: {"passed": True}
+    )
+    monkeypatch.setattr(
+        research_runtime_v4,
+        "_record_launch_authority",
+        lambda *_args: {"path": "launch.json", "sha256": "1" * 64},
+    )
+    monkeypatch.setattr(
+        research_runtime_v4, "_codex_exec_command", lambda *_args, **_kwargs: []
+    )
+    monkeypatch.setattr(
+        research_runtime_v4, "_private_model_environment", lambda *_args: {}
+    )
+    monkeypatch.setattr(
+        research_runtime_v4, "ensure_private_model_runtime", lambda *_args: {}
+    )
+    monkeypatch.setattr(
+        research_runtime_v4, "_restore_writable_lane_markers", lambda *_args: ()
+    )
+    monkeypatch.setattr(
+        research_runtime_v4,
+        "_restore_writable_lane_markers_before_activation",
+        lambda *_args: (),
+    )
+
+    def run_model(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        calls.append(len(calls) + 1)
+        outbox.write_bytes(b"unchanged-invalid\n")
+        return SimpleNamespace(returncode=0)
+
+    def inspect(*_args: object, **_kwargs: object) -> dict[str, object]:
+        nonlocal inspections, interrupted
+        inspections += 1
+        if inspections == 3 and not interrupted:
+            interrupted = True
+            try:
+                raise OSError("host interrupted post-model inspection")
+            except OSError as exc:
+                raise research_runtime_v4.ResearchRuntimeError(
+                    "post-model inspection unavailable"
+                ) from exc
+        return {
+            "candidate_ids": ["candidate-1"],
+            "findings": ["candidate-1: deterministic source finding"],
+            "outbox_sha256": hashlib.sha256(b"unchanged-invalid\n").hexdigest(),
+            "source_bundle_sha256s": ["4" * 64],
+        }
+
+    monkeypatch.setattr(research_runtime_v4.subprocess, "run", run_model)
+    monkeypatch.setattr(research_runtime_v4, "_score_blind_batch_inspection", inspect)
+    monkeypatch.setattr(
+        research_runtime_v4,
+        "record_candidate_receipts",
+        lambda *_args, **_kwargs: pytest.fail("invalid batch received a receipt"),
+    )
+    with pytest.raises(
+        research_runtime_v4.ResearchRuntimeError,
+        match="post-model inspection unavailable",
+    ):
+        research_runtime_v4.launch_team_phase.__wrapped__(
+            tmp_path, "team-01", "discovery"
+        )
+    assert calls == [1, 2]
+
+    with pytest.raises(research_runtime_v4.CandidateRepairExhaustedError):
+        research_runtime_v4.launch_team_phase.__wrapped__(
+            tmp_path, "team-01", "discovery"
+        )
+    assert calls == [1, 2, 3, 4]
+    assert len(
+        research_runtime_v4._admission_session_issues(
+            tmp_path, "team-01", "discovery", "1" * 64
+        )
+    ) == 4
+    assert len(
+        research_runtime_v4._admission_attempts(
+            tmp_path, "team-01", "discovery"
+        )
+    ) == 4
+
+
+def test_missing_batch_exhaustion_terminally_resolves_without_fabricated_outbox(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    broker = _broker_module()
+    journal = tmp_path / broker.TOP40_V4_LAYOUT.journal_path
+    journal.parent.mkdir(parents=True)
+    broker.journal_v4.initialize(journal)
+    team = tmp_path / broker.TOP40_V4_LAYOUT.team_root("team-01")
+    for directory in ("candidates", "feedback", "outbox", "work"):
+        (team / directory).mkdir(parents=True, exist_ok=True)
+    launch_sha256 = "1" * 64
+    missing = {
+        "candidate_ids": [],
+        "findings": ["outbox: required batch-1.json was not published"],
+        "outbox_sha256": hashlib.sha256(b"").hexdigest(),
+        "source_bundle_sha256s": [],
+    }
+    for session_number in range(4):
+        research_runtime_v4._record_admission_session_issue(
+            tmp_path,
+            "team-01",
+            "discovery",
+            launch_sha256,
+            session_number,
+        )
+        research_runtime_v4._record_admission_attempt(
+            tmp_path, "team-01", "discovery", missing, repeat=True
+        )
+
+    monkeypatch.setattr(
+        broker, "_restore_lane_markers_before_authority", lambda *_args: ()
+    )
+    monkeypatch.setattr(broker.activation_v4, "validate", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        broker.activation_v4,
+        "require_completed_pretrial_recovery",
+        lambda *_args: {},
+    )
+    monkeypatch.setattr(
+        broker.orchestrator_v4.isolation_v4,
+        "audit_team_surface",
+        lambda *_args: {},
+    )
+    monkeypatch.setattr(
+        broker.orchestrator_v4, "_batch_broker_frame", lambda *_args: 123
+    )
+    monkeypatch.setattr(
+        broker.orchestrator_v4, "_write_nomination_registry", lambda *_args: None
+    )
+    monkeypatch.setattr(
+        research_runtime_v4,
+        "validate_launch_authority",
+        lambda *_args: {"path": "launch.json", "sha256": launch_sha256},
+    )
+    monkeypatch.setattr(
+        broker,
+        "launch_phase",
+        lambda *_args: (_ for _ in ()).throw(
+            research_runtime_v4.CandidateRepairExhaustedError(
+                "batch outbox remained absent after every repair"
+            )
+        ),
+    )
+
+    result = broker.run_team.__wrapped__(tmp_path, "team-01")
+    state = broker.journal_v4.read(journal)
+    assert result["terminal"] == "retired"
+    assert state.trials_by_team["team-01"] == 0
+    assert state.retired["team-01"]["event_type"] == "batch_abandoned"
+    assert not (team / "outbox/batch-1.json").exists()
+    assert (
+        broker.run_team.__wrapped__(tmp_path, "team-01")["already_terminal"]
+        is True
+    )
+
+
 def test_score_blind_refinement_inspection_includes_discovery_mechanism_history(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -2890,23 +3072,29 @@ def test_score_blind_refinement_inspection_includes_discovery_mechanism_history(
         "validate_captured_candidate",
         lambda **_kwargs: None,
     )
-    monkeypatch.setattr(
-        orchestrator_v4,
-        "_candidate_metadata",
-        lambda _root, _config, _team_id, entrypoint, **_kwargs: (
-            {
-                "candidate_id": entrypoint.split("/candidates/", 1)[1].split("/", 1)[0],
-                "mechanism": (
-                    "undocumented new mechanism"
-                    if "candidate-9/" in entrypoint
-                    else "accepted discovery mechanism"
-                ),
-                "parent_candidate_id": None,
-                "tags": ["role-check"] if "candidate-9/" in entrypoint else ["baseline"],
-            },
-            "candidate.json",
-        ),
-    )
+    def metadata(
+        _root: Path,
+        _config: object,
+        _team_id: str,
+        entrypoint: str,
+        **_kwargs: object,
+    ) -> tuple[dict[str, object], str]:
+        if "candidate-10/" in entrypoint:
+            raise orchestrator_v4.OrchestratorError(
+                "candidate metadata failed deterministic admission"
+            )
+        return {
+            "candidate_id": entrypoint.split("/candidates/", 1)[1].split("/", 1)[0],
+            "mechanism": (
+                "undocumented new mechanism"
+                if "candidate-9/" in entrypoint
+                else "accepted discovery mechanism"
+            ),
+            "parent_candidate_id": None,
+            "tags": ["role-check"] if "candidate-9/" in entrypoint else ["baseline"],
+        }, "candidate.json"
+
+    monkeypatch.setattr(orchestrator_v4, "_candidate_metadata", metadata)
     monkeypatch.setattr(
         research_runtime_v4,
         "_static_source_findings",
@@ -2918,6 +3106,10 @@ def test_score_blind_refinement_inspection_includes_discovery_mechanism_history(
     )
     assert any(
         "descriptive mechanism variants require a current-epoch parent" in finding
+        for finding in inspection["findings"]
+    )
+    assert any(
+        "candidate metadata failed deterministic admission" in finding
         for finding in inspection["findings"]
     )
     assert len(inspection["source_bundle_sha256s"]) == 4
@@ -2949,6 +3141,61 @@ def test_repair_resume_detects_changed_source_with_unchanged_outbox(
     assert created is True and original["attempt_number"] == 1
     assert changed_created is True and changed["attempt_number"] == 2
     assert repeated_created is False and repeated == changed
+
+
+def test_admission_attempt_authority_rejects_links_and_unexpected_residue(
+    tmp_path: Path,
+) -> None:
+    inspection = {
+        "candidate_ids": ["candidate-1"],
+        "findings": ["candidate-1: deterministic finding"],
+        "outbox_sha256": "1" * 64,
+        "source_bundle_sha256s": ["2" * 64],
+    }
+    research_runtime_v4._record_admission_attempt(
+        tmp_path, "team-01", "discovery", inspection, repeat=False
+    )
+    directory = (
+        tmp_path
+        / "tournament/top40-v4-r2/research-sessions/admission-attempts/team-01"
+    )
+    attempt = directory / "discovery-01.json"
+    alias = tmp_path / "external-attempt-alias.json"
+    os.link(attempt, alias)
+    with pytest.raises(research_runtime_v4.ResearchRuntimeError, match="private and regular"):
+        research_runtime_v4._admission_attempts(
+            tmp_path, "team-01", "discovery"
+        )
+    alias.unlink()
+    unexpected = directory / "unexpected.json"
+    unexpected.write_bytes(b"unexpected\n")
+    unexpected.chmod(0o600)
+    with pytest.raises(research_runtime_v4.ResearchRuntimeError, match="unexpected residue"):
+        research_runtime_v4._admission_attempts(
+            tmp_path, "team-01", "discovery"
+        )
+
+    symlink_root = tmp_path / "symlink-root"
+    symlink_root.mkdir()
+    research_runtime_v4._record_admission_attempt(
+        symlink_root, "team-01", "discovery", inspection, repeat=False
+    )
+    category = (
+        symlink_root
+        / "tournament/top40-v4-r2/research-sessions/admission-attempts"
+    )
+    displaced = category.with_name("admission-attempts-displaced")
+    category.rename(displaced)
+    category.symlink_to(displaced, target_is_directory=True)
+    preserved = (displaced / "team-01/discovery-01.json").read_bytes()
+    with pytest.raises(
+        research_runtime_v4.ResearchRuntimeError,
+        match="cannot pin private admission authority directory",
+    ):
+        research_runtime_v4._admission_attempts(
+            symlink_root, "team-01", "discovery"
+        )
+    assert (displaced / "team-01/discovery-01.json").read_bytes() == preserved
 
 
 def test_static_semantic_subset_rejects_alias_and_helper_delegation() -> None:
@@ -3979,6 +4226,20 @@ def test_direct_batch_rejection_without_failed_preflight_capability_is_forbidden
     error = orchestrator_v4.CandidateBatchRejectedError("caller-supplied rejection")
     with pytest.raises(orchestrator_v4.OrchestratorError, match="sealed failed-preflight"):
         orchestrator_v4.reject_batch_before_evaluation.__wrapped__(tmp_path, error)
+    assert journal.read_bytes() == before
+
+
+def test_direct_missing_batch_abandonment_without_broker_frame_is_forbidden(
+    tmp_path: Path,
+) -> None:
+    journal = tmp_path / orchestrator_v4.TOP40_V4_LAYOUT.journal_path
+    journal.parent.mkdir(parents=True)
+    journal_v4.initialize(journal)
+    before = journal.read_bytes()
+    with pytest.raises(orchestrator_v4.OrchestratorError, match="canonical broker"):
+        orchestrator_v4.abandon_missing_batch_before_evaluation.__wrapped__(
+            tmp_path, "team-01", "discovery"
+        )
     assert journal.read_bytes() == before
 
 

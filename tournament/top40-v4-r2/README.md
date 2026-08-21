@@ -95,5 +95,6 @@ Before candidate receipts or any score-bearing journal record exist, the launche
 same deterministic whole-batch source/metadata checks used by admission. An invalid batch receives
 up to three serial score-blind repair sessions through immutable lane-local admission feedback.
 The fixed prompt, permissions, launch authority, private-runtime cleanup, and one-team lease remain
-unchanged across those retries. Only a batch that is still invalid after all three repairs reaches
-the terminal score-blind rejection path.
+unchanged across those retries. A private session-issue receipt is durable before process start,
+making the cap crash-safe. Only a batch that is still invalid—or remains absent—after all three
+repairs reaches a terminal score-blind disposition; a missing model outbox is never fabricated.

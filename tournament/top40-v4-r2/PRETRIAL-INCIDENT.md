@@ -124,9 +124,11 @@ and method-call allowlists. More importantly, the organizer now validates the co
 batch before creating candidate receipts or opening score data. A deterministic failure produces
 an immutable, lane-local report containing only admission findings and permits up to three
 uniform serial repair sessions under the same frozen prompt, profile, command, private-runtime
-cleanup, launch authority, and broker lease. Only a batch still invalid after all repairs reaches
-terminal score-blind rejection. This changes no holdout, evaluator, selection, leakage, or
-one-team-at-a-time guardrail.
+cleanup, launch authority, and broker lease. A private canonical issue receipt is persisted before
+each process, so restart cannot grant an extra repair; an ambiguous host crash conservatively
+consumes that issued slot. Only a batch still invalid or absent after all repairs reaches a
+terminal score-blind disposition, and a missing model outbox is never synthesized. This changes no
+holdout, evaluator, selection, leakage, or one-team-at-a-time guardrail.
 
 The original worktree later encountered a separate organizer contract defect after two private
 Team-01 trials: free-form control prose in `mechanism` was treated as an undocumented exact epoch

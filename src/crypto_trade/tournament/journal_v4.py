@@ -155,6 +155,15 @@ if TOP40_V4_LAYOUT.name.endswith("-r2"):
             "candidate_ids",
         }
     )
+    _EVENT_KEYS["batch_abandoned"] = frozenset(
+        {
+            "team_id",
+            "phase",
+            "reason",
+            "admission_attempt_path",
+            "admission_attempt_sha256",
+        }
+    )
     _EVENT_KEYS["batch_preflighted"] = frozenset(
         {
             "team_id",
@@ -268,6 +277,7 @@ def _validate_payload(event_type: str, payload: object) -> Mapping[str, Any]:
         "selection_record_sha256",
         "manifest_sha256",
         "bundle_sha256",
+        "admission_attempt_sha256",
     ):
         if key in payload:
             _hash(payload[key], key)
@@ -307,8 +317,18 @@ def _validate_payload(event_type: str, payload: object) -> Mapping[str, Any]:
     if event_type.endswith("failed"):
         key = "failure" if event_type == "is_failed" else "failure_code"
         _text(payload[key], key)
-    if event_type in {"retired", "batch_rejected"}:
+    if event_type in {"retired", "batch_rejected", "batch_abandoned"}:
         _text(payload["reason"], "reason")
+    if event_type == "batch_abandoned":
+        phase = payload["phase"]
+        if not isinstance(phase, str) or phase not in ("discovery", "refinement"):
+            raise JournalError("batch abandonment phase is invalid")
+        expected_path = (
+            f"tournament/top40-v4-r2/research-sessions/admission-attempts/"
+            f"{payload['team_id']}/{phase}-04.json"
+        )
+        if payload["admission_attempt_path"] != expected_path:
+            raise JournalError("batch abandonment attempt path differs")
     if event_type in {"batch_preflighted", "batch_rejected"}:
         phase = payload["phase"]
         candidate_ids = payload["candidate_ids"]
@@ -529,25 +549,34 @@ def replay_bytes(payload: bytes) -> JournalState:
             ):
                 raise JournalError("batch preflight is outside its exact phase boundary")
             batch_preflights[key] = record
-        elif event_type in {"nominated", "retired", "batch_rejected"}:
+        elif event_type in {
+            "nominated",
+            "retired",
+            "batch_rejected",
+            "batch_abandoned",
+        }:
             if selection is not None:
                 raise JournalError("team disposition changed after selection freeze")
             team_id = str(event["team_id"])
             if team_id in nominations or team_id in retired:
                 raise JournalError("team has more than one terminal IS disposition")
-            if event_type == "batch_rejected":
+            if event_type in {"batch_rejected", "batch_abandoned"}:
                 expected_trials = 0 if event["phase"] == "discovery" else 8
                 if (
                     trials[team_id] != expected_trials
                     or (team_id, str(event["phase"])) in batch_preflights
                 ):
-                    raise JournalError("batch rejection is outside its exact phase boundary")
+                    raise JournalError(
+                        "batch disposition is outside its exact phase boundary"
+                    )
                 if any(
                     request_hash not in is_terminals
                     for request_hash, request in is_requests.items()
                     if request["payload"]["team_id"] == team_id
                 ):
-                    raise JournalError("batch rejected while an accepted trial was pending")
+                    raise JournalError(
+                        "batch disposition recorded while an accepted trial was pending"
+                    )
                 retired[team_id] = record
             elif event_type == "retired":
                 if trials[team_id] < 8:
