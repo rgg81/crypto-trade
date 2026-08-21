@@ -1,0 +1,17 @@
+{
+  "amendment": "A3",
+  "amendment_sha256": "150730862b071d09b87d99c15a9202bfe3e65cde0412630159a15753ab69af2d",
+  "class": "organizer gate defect; no scoring, qualification or execution rule is touched",
+  "date": "2026-08-21",
+  "defect": "The certificate and risk-declaration validators looked for the bare string 'replace', case-insensitively. That fires inside the ordinary English word 'replaced', so a lane was rejected for writing 'both changes chosen to be more principled than the ones they replaced'.",
+  "family": "Third defect of one kind: a gate that rejects honest work. A1 rejected any source naming the repository's own path; this rejected ordinary English. Both were found by looking at what the gate did to real inputs rather than at whether its tests passed.",
+  "fix": "Markers are now the exact placeholders the shipped templates carry -- REPLACE-ME and REPLACE: -- matched case-sensitively and with their delimiters. The unedited templates are still refused, which is checked, and prose may contain the word 'replaced', which is also checked.",
+  "found_by": "the organizer, pre-validating every lane's nomination inputs before committing hours of replay to them",
+  "namespace": "cup50v2",
+  "phase": "pre-sealed-read",
+  "schema_version": 1,
+  "status": "fixed",
+  "superseded_activation_sha256": "fb8748cb8fdc94a70ac5ae6fe4dfbdf73981c9d1d6bca400cb70f877520e9268",
+  "trials_affected": 0,
+  "trials_recharged": 0
+}

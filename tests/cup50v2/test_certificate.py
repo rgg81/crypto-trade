@@ -46,3 +46,50 @@ def test_an_unanswered_section_is_refused(tmp_path: Path) -> None:
 def test_the_shipped_template_cannot_be_submitted_unedited() -> None:
     with pytest.raises(ValueError, match="template scaffolding|not answered"):
         verify_certificate(Path("tournament/cup50v2/seeds/team-01/RESEARCH-CERTIFICATE.md"))
+
+
+def test_prose_may_contain_the_word_replaced(tmp_path: Path) -> None:
+    """The marker matched the bare string REPLACE, which fires inside "replaced".
+
+    A lane wrote "both changes chosen to be more principled than the ones they replaced" and its
+    certificate was rejected for containing template scaffolding. Markers are now the exact
+    placeholders the templates carry, matched case-sensitively and with their delimiters.
+    """
+    prose = ANSWER + " These choices were more principled than the ones they replaced."
+    lines = ["# team-01 research certificate", ""]
+    for section in CERTIFICATE_SECTIONS:
+        lines += [f"## {section}", prose, ""]
+    path = tmp_path / "RESEARCH-CERTIFICATE.md"
+    path.write_text("\n".join(lines))
+    verify_certificate(path)
+
+
+@pytest.mark.parametrize("marker", ["REPLACE-ME", "REPLACE:"])
+def test_a_real_placeholder_is_still_refused(tmp_path: Path, marker: str) -> None:
+    lines = ["# team-01 research certificate", ""]
+    for index, section in enumerate(CERTIFICATE_SECTIONS):
+        body = f"{marker} describe this properly" if index == 0 else ANSWER
+        lines += [f"## {section}", body, ""]
+    path = tmp_path / "RESEARCH-CERTIFICATE.md"
+    path.write_text("\n".join(lines))
+    with pytest.raises(ValueError, match="template scaffolding|not answered"):
+        verify_certificate(path)
+
+
+def test_a_risk_declaration_may_say_replaced_too() -> None:
+    """The same bare marker was in the risk-declaration validator."""
+    from crypto_trade.cup50v2.qualification import REQUIRED_CONTROLS, verify_risk_declaration
+
+    declaration = {
+        "schema_version": 1,
+        "candidate_id": "c",
+        "controls": {
+            name: "none, deliberately: the seed's brake was replaced by the common risk unit"
+            for name in REQUIRED_CONTROLS
+        },
+        "rationale": (
+            "Every control the seed carried was replaced by something the organizer already owns, "
+            "so the declaration records refusals rather than mechanisms."
+        ),
+    }
+    verify_risk_declaration(declaration)

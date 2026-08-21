@@ -62,7 +62,10 @@ REQUIRED_CONTROLS = (
     "exposure_conditioning",
     "position_concentration",
 )
-_PLACEHOLDER = "replace"
+# The placeholders the shipped templates actually contain, matched case-sensitively and with
+# their delimiters. A bare "replace" fires inside the ordinary English word "replaced", which
+# rejected a lane for writing "more principled than the ones they replaced".
+_PLACEHOLDERS = ("REPLACE-ME", "REPLACE:")
 
 
 def verify_risk_declaration(declaration: Mapping[str, object]) -> None:
@@ -82,10 +85,10 @@ def verify_risk_declaration(declaration: Mapping[str, object]) -> None:
         raise ValueError(f"risk declaration does not decide: {sorted(missing)}")
     for name in REQUIRED_CONTROLS:
         stated = str(controls[name]).strip()
-        if len(stated) < 8 or _PLACEHOLDER in stated.lower():
+        if len(stated) < 8 or any(marker in stated for marker in _PLACEHOLDERS):
             raise ValueError(f"risk declaration for {name} is a placeholder, not a decision")
     rationale = str(declaration.get("rationale", "")).strip()
-    if len(rationale) < 40 or _PLACEHOLDER in rationale.lower():
+    if len(rationale) < 40 or any(marker in rationale for marker in _PLACEHOLDERS):
         raise ValueError("risk declaration needs a rationale in the team's own words")
 
 
@@ -98,7 +101,12 @@ CERTIFICATE_SECTIONS = (
     "Risk declaration rationale",
     "Known weaknesses",
 )
-_TEMPLATE_MARKERS = ("REPLACE", "> Template.", "must be answered in the team's own words")
+_TEMPLATE_MARKERS = (
+    "REPLACE-ME",
+    "REPLACE:",
+    "> Template.",
+    "must be answered in the team's own words",
+)
 
 
 def verify_certificate(path) -> None:
@@ -113,8 +121,12 @@ def verify_certificate(path) -> None:
     if missing:
         raise ValueError(f"research certificate is missing sections: {missing}")
     for marker in _TEMPLATE_MARKERS:
-        if marker.lower() in lowered:
-            raise ValueError("research certificate still contains its template scaffolding")
+        # Case-sensitive, and with the delimiter the template actually uses: prose is allowed to
+        # contain the word "replaced".
+        if marker in text:
+            raise ValueError(
+                f"research certificate still contains its template scaffolding: {marker!r}"
+            )
     for section in CERTIFICATE_SECTIONS:
         start = lowered.index(section.lower())
         following = [
