@@ -1,0 +1,13 @@
+{
+  "amendment_id": "A12",
+  "amendment_sha256": "0e318a0f6d25c6419e4b15c1379c2b04c655c917d3546f02641f3308e5b3df56",
+  "caught_before_use": "Yes. No field has been closed and no sealed point read. Had it gone unnoticed the field record would have carried a digest per lane that proved nothing, and said so nowhere.",
+  "defect": "freeze_field requires each nominated disposition to carry a non-empty nomination_sha256 and nothing ever compared it with anything. The observation job carries its own nomination_sha256, which observe verifies against the nomination file the job itself names. Both checks are internally consistent and neither ties the observed point to the field. The disposition's digest was decorative.",
+  "family": "A6 again in a different place: a binding that exists in the record, is required to be present, and is compared to nothing. Present-but-unread is its own failure mode and this edition has now produced it twice -- A5 for the risk declaration's candidate_id, A12 for the field's nomination digest.",
+  "fix": "observe point now verifies the field record and requires the job's team to be nominated in it, the job's nomination digest to equal the one the field froze for that lane, and the point id to be one the field froze. The dispositions carry the nomination's own freeze_sha256 so the two digests are the same quantity rather than two different hashes of related things -- the earlier draft hashed the nomination file's bytes, which would have compared unequal against a value it was never meant to equal.",
+  "found_at_phase": "field close preparation, before the first sealed read",
+  "found_by": "organizer, writing the observation runner and checking which of two different nomination digests the job is supposed to carry",
+  "namespace": "cup50v2",
+  "title": "the field freeze did not actually pin which nomination each lane is observed against",
+  "what_this_did_and_did_not_allow": "It did not allow an arbitrary strategy through: verify_nomination checks the nomination's own digest and the source bundle must match its recorded digest, so a substituted point still has to be some internally consistent frozen nomination. What it allowed is that consistency to be with a nomination other than the one the field froze for that lane -- which is precisely the property field close exists to establish."
+}

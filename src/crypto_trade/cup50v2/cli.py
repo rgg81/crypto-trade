@@ -900,6 +900,23 @@ def _observe(arguments: argparse.Namespace) -> Mapping[str, object]:
         )
     job = _json(arguments.job)
 
+    # Bind the job to the frozen field, not merely to the nomination file it names. Without this
+    # the disposition's nomination_sha256 is decorative: freeze_field requires only that it be
+    # non-empty, and nothing compared it with the point actually being observed, so the field
+    # freeze did not in fact pin which nomination each lane is read against.
+    field_record = verify_field(arguments.field, signing_key=_key(arguments.signing_key))
+    disposition = field_record["dispositions"].get(str(job["team_id"]))
+    if disposition is None:
+        raise ValueError("point names a team that is not in the frozen field")
+    if disposition["state"] != "nominated":
+        raise ValueError("point names a lane the field did not record as nominated")
+    if str(disposition["nomination_sha256"]) != str(job["nomination_sha256"]):
+        raise ValueError(
+            "point's nomination digest differs from the one the field froze for this lane"
+        )
+    if str(job["point_id"]) not in {str(value) for value in disposition["point_ids"]}:
+        raise ValueError("point id is not one the field froze for this lane")
+
     def evaluator() -> Mapping[str, object]:
         nomination = verify_nomination(job["nomination"])
         if (
