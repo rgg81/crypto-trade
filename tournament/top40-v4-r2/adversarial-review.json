@@ -3,26 +3,26 @@
     {
       "path": "tournament/top40-v4-r2/reviews/leakage-cleanroom.md",
       "scope": "leakage-cleanroom",
-      "sha256": "b12e71f951f70c62084325fafb919d7beb9e8bb6d6362b5f52d190d47d506126",
+      "sha256": "79d16855e1a942d1cb7512115e82645a1968e0b33f3bcd20cc788fa5ab786e94",
       "status": "passed",
       "unresolved_findings": 0
     },
     {
       "path": "tournament/top40-v4-r2/reviews/lifecycle-holdout.md",
       "scope": "lifecycle-holdout",
-      "sha256": "d39c9f04c3d186049c83501e2065e1e34714a78fda6b8bb3882b2b8966bfd3d1",
+      "sha256": "0979bd6367a7ece5f9a19ef4d941c2f52bb5ce485d2871c58fe64c210241e850",
       "status": "passed",
       "unresolved_findings": 0
     },
     {
       "path": "tournament/top40-v4-r2/reviews/evaluator-compatibility.md",
       "scope": "evaluator-compatibility",
-      "sha256": "285283c4e5a39ef58bd5ae20ceaed6930460b74e8e8aaf966cdd518a9aeec454",
+      "sha256": "68f7912503d353aab406592c4fb7807895fc46aaa5b46177404b23f803ffa5a3",
       "status": "passed",
       "unresolved_findings": 0
     }
   ],
-  "reviewed_scope_head_sha256": "b805b398eadc2e7a54c78aad087e53148b7f9a429d40c3d5ab09c349f6d7609e",
+  "reviewed_scope_head_sha256": "83749a4bff7b6b7887ac1da9305d9c7c364eed1246dc9655370b7cc19e1a6e5c",
   "schema_version": 1,
   "status": "passed-after-remediation",
   "tournament": "quant-portfolio-blind-top40-v4-r2"
