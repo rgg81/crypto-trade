@@ -1,0 +1,10 @@
+{
+  "clean_room_workspace_scan": "passed",
+  "deterministic_hash_seeds": "passed",
+  "deterministic_worker_counts": "passed",
+  "focused_suite": "passed",
+  "full_is_readiness_field": "passed",
+  "full_pytest": "passed",
+  "ruff": "passed",
+  "sandbox_isolation_smoke": "passed"
+}
