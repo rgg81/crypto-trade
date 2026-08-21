@@ -1,149 +1,175 @@
-# Top-40 V4-R2 fourth-restart leakage and clean-room review
+# Top-40 V4-R2 fifth-restart leakage and clean-room review
 
 Review date: 2026-08-21
 Reviewer: independent leakage/clean-room adversarial agent
-Implementation commit: `9d95e7c69706744c357c0b10bd20472a38942862`
-Branch: `quant-portfolio-blind-top40-v4-r1-v2-restart4`
+Reviewed implementation commit: `e4b87be0e49362e321fb3e2781d8c10812918d31`
+Review-integration HEAD before this report: `fcee2c7aaf5376715732418e41e229086cb309b4`
+Branch: `quant-portfolio-blind-top40-v4-r1-v2-restart5`
 Gate status: **PASSED**
 Unresolved findings: **0**
 
 ## Scope and method
 
-This review inspected the exact R6 fresh-successor bytes and physical preactivation surface. It
-covered the R5 worker-bootstrap incident and non-reuse authority, the worker's temporary frozen
-source bootstrap before repository masking, namespace/Landlock/seccomp/audit isolation, launcher
-v10 and its private Codex runtime, the frozen model smoke, cross-team and predecessor denial,
-phase-state cleanup (including SQLite companions), lane-marker recovery, lifecycle-journal
-substitution resistance, progress/holdout boundaries, source capture, and the previously approved
-compact causal source gate. It did not activate R6, launch a competitive model phase, evaluate a
-candidate, or inspect predecessor score/summary contents.
+This review inspected the exact R7 fresh-successor code, broker, runtime, team kit, frozen
+authorities, tests, and physical preactivation filesystem. It specifically re-attempted the known
+clean-room seams: predecessor/provenance reuse, direct-library and CLI admission bypass, forged or
+replayed batch capabilities, partial-batch score opening, receipt substitution and ambiguous JSON,
+malformed-batch termination, archive link/content substitution, progress disclosure, private model
+state, installed skills, worker bootstrap order, and holdout/network/peer boundaries. It did not
+activate R7, launch a competitive model phase, evaluate a candidate, or open predecessor score or
+summary contents.
 
-Release evidence supplied with the exact target was **135 passed** for the R2 suite and **24
-passed** for the intended R1 suite. I independently reran 18 focused current-byte regressions for
-the namespaced worker, sanitized source bootstrap, Python-only executable mount, marker recovery,
-private-runtime cleanup, frozen smoke/authority, preactivation journal immutability, runtime
-hardlink/path-substitution rejection, and missing-journal non-recreation; all 18 passed. Ruff over
-the security/runtime scope and `git diff --check` passed.
+I independently ran the exact current R7 suite with one CPU and temporary pytest state: **165
+passed**. The intended R1 compatibility and source-archive suites produced **29 passed**. Ruff
+passed over the current V4 security/runtime, broker, and R7 test scope, and `git diff --check`
+passed. The fresh-authority, completed-recovery, and frozen-smoke semantic validators passed.
+Before this report edit, `_implementation_commit` resolved the clean integration HEAD
+`fcee2c7aaf5376715732418e41e229086cb309b4`; the implementation under review is its parent
+`e4b87be0e49362e321fb3e2781d8c10812918d31`, while the intervening commit contains only the
+final lifecycle review.
 
-The exact fresh authority SHA-256 is
-`f71896a9cd2da6071441bd65f5eeb42f2c2b0c953de016998019d082bc234e68`.
-The frozen v10 smoke SHA-256 is
-`596bdbe528f3648f250c471feb591b40af2d3c84d195015d8b3a775e6786a6f8`, with canonical
-self-hash `55d83cfa8c277a07b9f31db4341ba641f788139e91cba1fc16e2576929390660`.
-Both exact semantic validators passed, and `_implementation_commit` returned the reviewed commit.
+The exact `FRESH-RESTART-AUTHORITY.json` SHA-256 is
+`7610daae55d4f9cec3e242162cf100d4236e5f5a3d330f07349715f94dd47910`.
+The frozen v11 smoke SHA-256 is
+`7896fadce3923654b790014d6e6429287e4be44290116b17ac58b4d33a7ce5a1`, with canonical
+self-hash `3fe6257ef1df37ecf03879a4875ec835be155e30e232d98432dffaa44a327873`.
 
-## LC-01 — worker bootstrap and pre-mask exposure: closed
+## LC-01 — fresh R7 provenance and predecessor isolation: closed
 
-The trusted parent constructs, rather than inherits, the worker environment. `PYTHONPATH` contains
-only this frozen checkout's `src` long enough for Python to resolve
-`crypto_trade.tournament._strategy_worker_v4`; `HOME` and XDG paths are `/nonexistent`, user site
-loading is disabled, credentials/proxies/loader controls are absent, and the candidate bundle is
-neither the child working directory nor an initial import path. The active venv has only the
-standard virtualenv hook and the editable source path; no `sitecustomize.py`, `usercustomize.py`,
-or candidate-controlled `.pth` startup hook exists.
+The schema-4 restart authority binds every stopped private incident, including R6's 37-record
+batch-admission incident, six accepted-and-terminal Team-02 trials, the two exact rejected candidate
+bundle/receipt identities, no discovery feedback disclosure, and no outbox archive. The two rejected
+candidates were neither accepted nor evaluated. The authority separately declares
+`research_provenance_reused` and `results_reused` false at both the R6-incident and successor levels.
+It is organizer-only, outside every team profile, and is evidence for genesis admission rather than
+input to a team or evaluator.
 
-Before candidate import, the worker creates user/mount/network/PID namespaces, mounts the frozen
-repository and staged runtime read-only, masks the entire common repository parent, removes every
-repository/bundle-parent/site-packages entry from `sys.path`, remaps loaded dependency paths to the
-staged read-only runtime, changes into the copied bundle, applies resource limits, and installs
-Landlock, seccomp, and the audit hook. Only then does it execute archived `strategy.py`. The
-candidate therefore has no pre-mask execution opportunity and no post-mask path to R6, R5, any
-other worktree, Git metadata, organizer data, `/proc` host state, or the network. The real
-namespaced-worker regression started successfully and confirmed the Python-only executable mount.
+The physical R7 surface independently confirms that assertion. All 15 lanes are trial-zero and
+contain only their tracked brief/policy, candidate README, and three one-byte-LF `.keep` markers;
+all 45 markers are regular single-link files. There is no R7 lifecycle journal, activation freeze,
+candidate, outbox, feedback, work product, research receipt, source archive, result, certificate,
+nomination, selection, release, or private model runtime. The only report data are the two frozen
+common BTC regime/return files. No R6 candidate, receipt, feedback, journal record, model state,
+research context, or result is copied into R7.
 
-## LC-02 — R5 incident authority and zero reuse: closed
+Activation's fresh-start gate exact-enumerates the frozen tournament/report surface, permits only
+the narrowly defined empty lock/bootstrap nodes, rejects residue and links, and binds the 15-lane
+count, empty-journal hash, file count, and chained seed head. The predecessor worktrees, their Git
+metadata, and the authority itself are denied by the team permission profile and worker repository
+mask.
 
-The canonical schema-3 `FRESH-RESTART-AUTHORITY.json` exactly binds the stopped R5 worker incident:
-16 journal records, eight accepted/failed discovery trials, zero successful trials, disclosed
-Team-01 discovery feedback, no holdout-row disclosure, no result artifact, no nomination, and an
-interrupted refinement with no outbox. It separately binds all listed candidate/source/receipt
-identities and the declared 75-file incident surface. Most importantly,
-`research_provenance_reused` and `results_reused` are both false.
+## LC-02 — sole whole-batch admission authority: closed
 
-The R6 physical lane surface is trial-zero: all 15 lanes contain only their committed team kit and
-the three one-byte-LF `.keep` markers; there are no candidate implementations, outboxes, feedback,
-research-session receipts, source archives, results, nominations, certificates, selection, or
-activation freeze. No private model runtime exists and the lifecycle journal is absent before the
-canonical bootstrap. The predecessor identities retained in the organizer-only authority are
-evidence, not input to any lane or evaluator. The profile and repository mask deny both predecessor
-worktrees and the authority itself.
+Only the canonical `consume_batch` frame in `scripts/top40_v4_r2_team_broker.py` can obtain a batch
+capability. The check binds the exact broker pathname, module `__file__`, original function code,
+live `FrameType` identity, root, team, and phase. A copied frame identifier, reconstructed dataclass,
+replayed capability, direct library call, or disabled `is-run` CLI path cannot satisfy it. Those
+attempts fail before result-lock mutation, journal append, receipt recovery, or evaluator access.
 
-The authorized raw market archive is data authority, not team research provenance. It contains
-94,816 regular single-link files and no symlinks; it was admitted only after manifest size/hash
-validation. The full raw replay reproduced manifest SHA-256
-`c21fdcefc39961cd4408277e6cbb4833c31178cf86fa5d166499a3df6a8e7af7` and the exclusive
-hard end `2026-08-01T00:00:00Z`, preserving the complete July 2026 holdout without importing any
-predecessor result or feedback.
+Before request one is accepted, preflight stably captures the exact live outbox and every candidate
+source bundle; validates the full request, metadata, attestation, compact stateless source subset,
+phase uniqueness, and simulated mechanism history; recovers and validates all private candidate
+receipts; and durably appends one ordered `batch_preflighted` record. The journal and live capability
+bind the outbox hash plus ordered candidate IDs, source-bundle hashes, and canonical receipt hashes.
+Replay rejects an accepted trial whose candidate, source, phase position, or receipt hash differs.
+Each final `run_is` reopens the exact receipt with the expected phase and requires its SHA-256 to
+match that ordered batch authority before mechanism validation, the accepted record, or evaluator
+output. The post-preflight wrong-phase/receipt-substitution regression leaves the journal byte-exact
+and creates no evaluator directory.
 
-## LC-03 — launcher v10, installed skills, and private state: closed
+The immutable receipt reader uses no-follow stable reads and requires a current-owner, mode-0600,
+regular, single-link file. Parsing rejects duplicate keys at every object level, nonfinite values,
+invalid UTF-8/JSON, extra or missing fields, wrong phase/runtime/source/profile/launch bindings, and
+any byte representation other than the canonical sorted ASCII form. This closes ambiguous semantic
+residue and same-owner replacement after whole-batch preflight.
 
-There is one live model launcher; callers cannot supply an alternate model or prompt. Its exact
-authority binds Codex CLI `0.148.0`, `gpt-5.6-sol`, high reasoning effort, command ordering,
-sanitized environment, custom no-network permission profile, disabled web/browser/plugin/app/skill
-and multi-agent features, team kit, phase, per-team runtime, and empty system-skill marker.
-`--ignore-user-config` precedes every security override and disabled flag, with no legacy sandbox
-flag. Launch and candidate receipts bind those identities to the exact captured candidate bytes.
+## LC-03 — score-blind failure classification and resume safety: closed
 
-Each team has a distinct organizer-private `HOME`, `CODEX_HOME`, and `TMPDIR`. The model profile
-cannot read its authentication, another team's private runtime, host skill/plugin roots, organizer
-files, predecessors, peers, holdout, or process state; writes are restricted to its own lane and
-network is denied. The frozen organizer-observed v10 smoke binds custom permissions, the empty
-catalog, denied host skills/private auth/peer-private access, isolated TMPDIR, exact sentinel and
-reply, verified cleanup, zero durable lane delta, and removal of the disposable private runtime.
-The previously executed physical profile evidence passed all 11 controls; this review did not
-recreate a private runtime merely to repeat a frozen preactivation mutation.
+Deterministic request, metadata, attestation, source, mechanism, and immutable-receipt semantic
+conflicts are classified before score data opens. They can produce only a sealed rejection
+capability tied to the live broker frame, exact root/team/phase/outbox, candidate prefix, and current
+journal head. Terminal rejection revalidates all of that state and, for refinement, revalidates the
+exact discovery feedback/archive before appending. It records one fixed bounded reason rather than
+candidate-controlled diagnostics, consumes no trial, declares `score_data_opened: false`, and
+cannot occur after a durable preflight or pending accepted request.
 
-Cleanup exact-enumerates and validates owner, mode, type, link count, link target, per-node and
-aggregate bounds before deleting admitted volatile state. The v10 allowlist includes all named
-database companions (`-wal` and `-shm`) for goals, logs, memories, queue, and state. Cleanup runs
-before prompt admission and in subprocess/phase `finally` paths, and restart-idempotent partial
-wrapper/TMP states remain narrowly validated. Unknown names or unsafe topology reject unchanged.
-Only authentication and the empty skill marker may persist between phases.
+Filesystem I/O, unsafe topology, locks, isolation probes, runtime faults, and other infrastructure
+failures propagate without retirement and remain resumable. A malformed published outbox can be
+archived as exact rejection evidence, but no partial candidate is evaluated. Crash recovery accepts
+only the event-bound outbox bytes and content-addressed archive. Archive directories and files must
+be current-owner, private, regular, and single-link; stable no-follow reads and the filename digest
+bind content. Multiple archives, wrong names, hard links, symlinks, substitutions, or changed bytes
+fail without journal mutation. Completed refinement also revalidates exact prior feedback and
+archive, preventing a malformed new batch from masking lost prior-phase authority.
 
-## LC-04 — marker, journal, concurrency, and progress boundaries: closed
+The shared broker lease serializes model and result-bearing work. Model processes exit before the
+organizer consumes an outbox, and accepted trials become durable before the evaluator opens the
+snapshot. Interrupted accepted trials are closed only by their journal-bound terminal path; the
+broker neither fabricates evidence nor repeats a completed trial. Team-visible feedback is written
+only after the whole phase completes and is immutably tied to journal records and the archived
+outbox.
 
-The shared broker lease keeps teams strictly serial and the model exits before evaluation. Direct
-and broker launch paths repeat activation, recovery, smoke, phase, and lane admission under the
-same lifecycle authority. Marker recovery is limited to an absent `outbox/.keep` or `work/.keep`:
-it pins the parent with `O_NOFOLLOW`, creates exact LF bytes descriptor-relatively, fsyncs, and
-revalidates owner, regular type, single link, mode, inode, size, time, and lexical parent identity.
-All existing markers are validated before any missing marker is created, so a conflicting marker
-causes no partial normalization.
+## LC-04 — private model runtime, installed skills, and worker bootstrap: closed
 
-The preactivation journal bootstrap either creates the one exact private empty journal or verifies
-an already empty owner-regular-single-link file; status, validate, and `run_team` never invoke tail
-recovery before activation. After activation, reads and appends pin both parent and existing journal
-with no-follow descriptors, require exact owner/mode/single-link topology, validate lexical inode
-identity while locked, and revalidate around recovery/append. R2 never recreates a missing live
-journal. Hardlink and path-substitution regressions reject without mutating the substituted lexical
-file.
+Launcher v11 derives the sole model command internally and binds Codex CLI `0.148.0`, model,
+prompt, team/phase, team kit, sanitized environment, custom no-network profile, disabled web,
+browser, plugin, app, skill and multi-agent features, and per-team runtime. `--ignore-user-config`
+precedes every security override and disabled flag, and no legacy `--sandbox` flag can supersede the
+profile.
 
-Shared pre-selection status projects the fixed genesis head and sealed state, not trial counts,
-dispositions, order, timing, journal growth, or predecessor progress. A team sees only its own
-journal-bound normalized phase feedback. All research processes exit before the single silent
-July-2026-inclusive holdout observation, and no interim historical feedback is released.
+Every team receives distinct organizer-private `HOME`, `CODEX_HOME`, and `TMPDIR`. Only private
+authentication plus the empty system-skill marker may persist; volatile databases and SQLite
+companions, logs, queues, shell snapshots, wrappers, and sandbox scratch are exact-enumerated,
+owner/mode/link checked, bounded, and removed after each subprocess. Cleanup is crash-idempotent
+only for strict known prefixes; unknown names or unsafe topology fail closed. Neither a host skill
+catalog nor cross-team client state can survive into a later phase.
 
-## LC-05 — exact source and executable-surface leakage: closed
+The exact frozen organizer-observed smoke records `sandbox: custom permissions`, network disabled,
+an empty skill catalog/system marker, isolated TMPDIR, host-skill and private-auth denial, peer
+private-runtime read/write denial, a single requested own-lane sentinel, no durable lane delta after
+verified cleanup, and removal of the disposable private runtime. Its semantic validator passed.
+This review did not recreate a real private runtime or model session because R7 was required to
+remain unstarted; the frozen physical evidence and current regressions bind the unchanged profile,
+argv, runtime, cleanup, and 11-control boundary.
 
-Descriptor-relative capture and archive validation reject symlinks, hard links, FIFOs/devices,
-path substitution, hidden executables, unexpected files, and excessive aggregate data. The exact
-captured bytes are the source archive, review subject, worker staging input, evaluation input, and
-nomination identity. Only `strategy.py` is executable.
+The strategy worker has no candidate-controlled pre-mask execution path. Its trusted parent builds
+the child environment and supplies only the exact frozen R7 `src` bootstrap needed to resolve the
+organizer worker. The candidate bundle is neither the initial working directory nor an initial
+import path. Before candidate import, the worker establishes namespaces, masks the repository and
+common parent, rebuilds `sys.path` around staged Python-only source/runtime, changes into the staged
+bundle, and applies Landlock, seccomp, audit, resource, process, credential, network, and write
+restrictions. The real namespaced startup and Python-only mount regressions passed.
 
-The sole module-level class/factory shape remains restricted to one stateless `target_weights`
-method with the exact signature. The positive semantic AST subset rejects imports and calls outside
-its allowlists, alternate functions/classes, module or candidate-class state, `self` state,
-decision-time branches, iterators, while/bit/modulo/power/packing tricks, ordinal/character and
-encoding channels, executable docstrings, opaque/high-capacity literals, RNG/operator substitutes,
-and dynamic loading. Exact archived-source append and corrupt-future invariance is bound across all
-three scenarios before nomination. Candidate failures remain distinct from infrastructure faults.
+## LC-05 — source, holdout, peer, and progress boundaries: closed
+
+Descriptor-relative capture rejects symlinks, hard links, FIFOs/devices, hidden executables,
+unexpected files, path substitution, and excessive aggregate content. The captured bytes are the
+archive, static-review subject, worker input, evaluation input, and nomination identity. Only
+`strategy.py` is executable. Its sole module-level class/factory shape and exact stateless
+`target_weights` signature remain enforced; forbidden state, decision-time branching, helper code,
+imports, RNG, dynamic loading, comprehensions, executable docstrings, ordinal/encoding channels,
+opaque literals, and packing/arithmetic substitutes are rejected. Exact captured-source
+append/corrupt-future invariance remains required before nomination.
+
+The team kit discloses every enforced batch invariant without mentioning a predecessor strategy or
+result: full-batch score-blind admission, the exact neighborhood-coordinate/material-parameter
+equality, `{}` for non-neighborhood controls, mechanism family/pivot semantics, receipt/static
+source rejection, and deterministic retirement behavior. It also states that earlier editions,
+other lanes, organizer state, raw data, skills/plugins, web/network, and status are unavailable.
+
+The OS profile and worker deny peer lanes, predecessors, repository history, organizer-private
+state, host skills/auth, `/proc` host state, and network. Shared pre-selection status projects a
+fixed genesis view rather than journal growth, counts, order, timing, or dispositions. Teams receive
+only lane-local normalized phase feedback. The holdout retains the full July 2026 window behind the
+exclusive `2026-08-01T00:00:00Z` boundary, is evaluated only after research processes exit, and has
+no interim or cross-team disclosure path.
 
 ## Gate decision
 
-**PASSED — zero unresolved leakage or clean-room findings.** The worker has no candidate-controlled
-pre-mask execution surface, the R5 incident contributes no research provenance/result/feedback to
-R6, launcher v10 and private client state are exact and phase-fresh, predecessor/peer/network/
-holdout/progress channels remain sealed, marker and journal recovery fail closed under substitution,
-and exact captured source retains the stateless causal and future-invariance gates. No activation,
-competitive team phase, candidate evaluation, or predecessor score inspection occurred during this
-review.
+**PASSED — zero unresolved leakage or clean-room findings.** R7 is a physically clean, trial-zero
+successor; predecessor competitive provenance is evidence-only and inaccessible; whole-batch
+authority is canonical, durable, and bound through exact receipt bytes at final acceptance; failure
+classification is score-blind and resumable; private model/skill and worker-bootstrap boundaries
+remain sealed; and source, peer, progress, network, and July-2026 holdout controls remain intact.
+No activation, competitive model/team phase, candidate evaluation, or predecessor score inspection
+occurred during this review.
