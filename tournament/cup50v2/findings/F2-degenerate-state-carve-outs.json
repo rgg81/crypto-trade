@@ -1,0 +1,40 @@
+{
+  "also_noted_not_a_defect": "team-03's side_tilt_cap = 0.15 bounds each leg's share to [0.35, 0.65], which permits dollar net exposure up to +/-0.30 of gross. The declaration's phrasing is correct under the parameter's own semantics, but a reader could take it to mean half the implemented allowance. Recorded so the number is on the record unambiguously, not as a finding against the lane.",
+  "coverage": "With F1 and F2 all twelve declarations have now been read against their nominated source, control by control, with every numeric threshold checked against the comparison operator rather than the surrounding prose.",
+  "distinguished_from_F1": "F1 is a declared threshold that is wrong in normal operation -- team-09 held at half weight, every day, names its declaration says were excluded outright. These three are declared controls that behave as stated whenever the cross-section is its usual size, and step aside only in a degenerate state the declaration does not mention. Different kind of defect, and the record should not blur them.",
+  "finding_id": "F2",
+  "finding_sha256": "53748931a63677d9f206b64b26503813cba946efd2457706b552cc734762da6b",
+  "forward_fix": "The next edition's declaration template asks explicitly what each control does when the cross-section is too thin for it to apply, which is the question all three lanes answered in code and none answered in prose.",
+  "found_by": "organizer cross-check of every risk declaration against its nominated source",
+  "items": [
+    {
+      "assessment": "A guard against the guard emptying a thin cross-section. In a top-50 universe the surviving section is normally ~45, so the carve-out is a warm-up and degenerate-state path rather than an operative loosening.",
+      "candidate_id": "carry-spread-price-guarded",
+      "control": "stop_loss",
+      "declared": "the three names at each end of the pressure ranking are not held",
+      "implemented": "_stand_aside returns the section untrimmed when trim <= 0 or len(clean) <= 2*trim + MINIMUM_BREADTH -- with trim=3 and MINIMUM_BREADTH=12, whenever 18 or fewer names survive. Verified at teams/team-05/strategy.py:252.",
+      "team_id": "team-05"
+    },
+    {
+      "assessment": "The floor keeps the side from being unable to fill its own book. With a top-50 cross-section split by trend sign the 0.60 term normally binds.",
+      "candidate_id": "t10-quiet-trend",
+      "control": "stop_loss",
+      "declared": "a name leaves when it falls out of the better 60% of its own side",
+      "implemented": "band = max(top_k, int(round(len(order) * RETAIN))) with RETAIN = 0.60 and top_k = 10, so on a side of fewer than ~17 candidates the retention band is wider than 60% and the exit is later than declared. Verified at teams/team-10/strategy.py:165.",
+      "team_id": "team-10"
+    },
+    {
+      "assessment": "The claim is true of the mechanism it names and too absolute as written.",
+      "candidate_id": "team-03-residual-blend-001",
+      "control": "exposure_conditioning",
+      "declared": "the distress filter can never stand the book down, because the count is taken first",
+      "implemented": "true of the declared 20-name floor, which is tested before distress; but a residual 'if int(usable.sum()) < 4: return self._stand_down(...)' survives after it, so the book can still stand down by that path.",
+      "team_id": "team-03"
+    }
+  ],
+  "namespace": "cup50v2",
+  "ruling": "Disclosed, no disposition change, no lane penalised. All three describe behaviour in states the declaration did not contemplate rather than a misstatement of the operative rule, and there is no allowlisted code for an incomplete declaration. Two of the three are guards that keep a thin cross-section tradeable, which is reasonable engineering that went unmentioned.",
+  "scoring_impact": "None, for the same reason as F1: the frozen source is what the evaluator ran, and a declaration is a disclosure artifact rather than an input to any score.",
+  "severity": "disclosed, sub-threshold",
+  "title": "three declared controls carry undeclared degenerate-state carve-outs"
+}
