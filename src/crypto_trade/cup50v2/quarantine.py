@@ -9,6 +9,15 @@ import tempfile
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
+# Roots the organizer is meant to write into while the tournament runs, and whose invariant is
+# therefore append-only rather than frozen. "private" collects transcript audits, adjudications,
+# falsifier evidence, dispositions and -- during observation -- one evidence file per point.
+# Freezing it made a receipt that must fail as soon as the process it protects actually runs, which
+# is worse than useless: it trains the operator to expect the failure and wave it through. What
+# genuinely must never happen there is an existing record changing or disappearing, and that is
+# what is checked instead.
+APPEND_ONLY_ROOTS = frozenset({"private", "reports"})
+
 
 def _canonical(payload: object) -> bytes:
     return (
@@ -85,6 +94,18 @@ def verify_receipt(path: str | Path) -> Mapping[str, object]:
     if digest != hashlib.sha256(_canonical(receipt)).hexdigest():
         raise ValueError("quarantine receipt digest mismatch")
     for name, raw in receipt["roots"].items():
-        if _inventory(Path(raw)) != receipt["inventories"][name]:
-            raise ValueError(f"quarantined root drifted: {name}")
+        current = _inventory(Path(raw))
+        recorded = receipt["inventories"][name]
+        if name not in APPEND_ONLY_ROOTS:
+            if current != recorded:
+                raise ValueError(f"quarantined root drifted: {name}")
+            continue
+        now = {entry["path"]: entry["sha256"] for entry in current}
+        was = {entry["path"]: entry["sha256"] for entry in recorded}
+        removed = sorted(set(was) - set(now))
+        if removed:
+            raise ValueError(f"append-only root lost records: {name}: {removed[:5]}")
+        changed = sorted(path for path in was if path in now and was[path] != now[path])
+        if changed:
+            raise ValueError(f"append-only root rewrote records: {name}: {changed[:5]}")
     return {**receipt, "receipt_sha256": digest}

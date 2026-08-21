@@ -1,0 +1,14 @@
+{
+  "amendment_id": "A11",
+  "amendment_sha256": "66cd0208cff4c79392bf92e2231e148130bbe48f26b429e44b6f58fe8d095f80",
+  "defect": "create_receipt covers five roots and verify_receipt required every one to be bit-identical. Two of them are working directories. 'private' collects transcript audits, adjudications, falsifier evidence, dispositions and -- during observation -- one evidence file per point; 'reports' is written at release. The receipt was therefore guaranteed to fail the moment the tournament did anything, and would have failed again after every one of the 208 sealed points.",
+  "family": "A different failure from A4 through A10. Those were gates that did not run, or ran without looking. This one ran, looked, and was asking a question whose only correct answer was the one it rejected.",
+  "fix": "APPEND_ONLY_ROOTS = {private, reports}. Those two may gain records; losing or rewriting one raises. acquisition, caches and sealed stay bit-frozen and admit nothing at all. The relaxed invariant is strictly more informative than the old one, because it can now be violated by something that matters instead of by ordinary work.",
+  "found_at_phase": "re-activation before field close, before the first sealed read",
+  "found_by": "organizer, re-activating: verify_receipt refused with 'quarantined root drifted: private'",
+  "namespace": "cup50v2",
+  "tests": "Four: the exact shape the field produced (add, never touch) passes; rewriting a record raises; deleting one raises; and a frozen root still refuses a single added file, so the relaxation cannot have leaked into the roots it was never meant to touch.",
+  "title": "the quarantine receipt froze the directory the organizer has to write into",
+  "what_the_drift_actually_was": "Measured before ruling. private: 39 files added, 0 modified, 0 removed -- precisely the organizer artifacts this edition produced. acquisition, caches, sealed and reports: intact, byte for byte. The sealed data the quarantine exists to protect was untouched, which is what the receipt was actually asked to prove.",
+  "why_freezing_was_worse_than_useless": "A check that must fail when the process it protects runs correctly teaches the operator to expect the failure and wave it through. That is how a real drift in the sealed root would have been missed: it would have looked like the same nuisance as every previous run."
+}
