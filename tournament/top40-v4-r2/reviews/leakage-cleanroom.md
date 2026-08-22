@@ -1,171 +1,195 @@
-# Top-40 V4-R2 sixth-restart leakage and clean-room review
+# Top-40 V4-R2 seventh-restart leakage and clean-room review
 
-Review date: 2026-08-21
+Review date: 2026-08-22
 Reviewer: independent leakage/clean-room adversarial agent
-Reviewed exact HEAD: `8335719049ddce0fb5b928a3905017b388b1fccd`
-Branch: `quant-portfolio-blind-top40-v4-r1-v2-restart6`
+Reviewed exact implementation HEAD: `d5fc45d1c7ee9efe493b5304af9a30ae9cbdf84b`
+Branch: `quant-portfolio-blind-top40-v4-r1-v2-restart7`
 Gate status: **PASSED**
 Unresolved findings: **0**
 
 ## Scope and method
 
-This review inspected the exact R8 source, canonical broker, research runtime, journal and
-orchestrator, team kit, frozen restart/smoke authorities, tests, and physical preactivation
-filesystem. It concentrated on score-blind whole-batch repair, repeated model processes, durable
-attempt/issue/feedback chains, direct-call and capability bypass, receipt/archive substitution,
-crash idempotency, terminal-evidence recovery, private Codex state, predecessor isolation,
-candidate/source identity ordering, and the established source, worker, network, peer, progress,
-and holdout boundaries. No activation, competitive model/team phase, candidate evaluation,
-historical release, or predecessor score/summary inspection occurred.
+This review inspected the exact R9 code, canonical broker, research runtime, journal,
+orchestrator, automatic representative/certificate path, team kit, frozen authorities, tests, and
+physical preactivation surface. It adversarially checked removal of the decision model, score and
+progress disclosure, robust representative ranking, truncated-refinement handling,
+pre-acceptance causal review, ordered receipt binding, certificate capture/fallback semantics,
+decision/outbox residue, crash and substitution handling, predecessor reuse, private Codex state,
+serial execution, and the established source, worker, peer, network, and holdout boundaries. I did
+not activate R9, launch a team/model phase, evaluate a candidate, run historical release, or inspect
+predecessor score or summary contents.
 
-The complete R8 suite was independently run on the immediately preceding implementation bytes:
-**176 passed**; the sole final change was inspected and its new historical-release regression
-independently passed on this exact HEAD. The intended R1 suite independently produced **24 passed**.
-The release owner reports the exact-current totals as **177 R8 and 24 R1 passed**, with scoped Ruff
-and diff checks clean. The exact restart-authority SHA-256 is
-`20df6a9f7e325e8fa999ebe8482153bd4c006bd884dfd9c1987c08f97752f896`. The frozen v12 smoke
-SHA-256 is `8ce7c6adab43167b54dffdffce8a42b01717762b4d7f821e8d46c996ee5ce5b5`, with canonical
-self-hash `4194ba3f54e6986877024eac0b0a12d673cdcdba00dbe4547fe09b8eda05c62b`.
+I independently ran the exact R9 suite with single-thread environment controls: **198 passed**.
+The release owner reports **29 compatibility/archive tests passed** and scoped Ruff/diff checks
+clean. The exact fresh-restart authority, frozen model-smoke receipt, read-only preactivation
+status, and 15-lane isolation audit passed. Preactivation reports the GENESIS head, zero journal
+records, and no activation identity; the canonical activation path alone creates the pinned empty
+journal under the result lock. The restart-authority SHA-256 is
+`c8dbc0b55a465b785b6cfe7ca960a894617d3c86882fcf45af9d9f5eb2e8a60b`; the frozen v13 smoke
+SHA-256 is `a11bc30bfbb59e5aa328d7e44eea9257a6d1dfb66d0e838a1abd9cc41ed2fbe9`, with canonical
+self-hash `b04c37204929ed15e0c12c711876e84dfebdeef0237c6a406bad3490d5b3de0c`.
 
-I also ran the canonical bounded Team-01 permission-profile probe on this exact HEAD. All eleven
-controls returned true: allowed reads, denied organizer/repository reads, own-lane write,
-cross-lane write denial, network denial, host-process hiding, host skill-root denial, empty skill
-catalog, private-auth denial, and peer-private read/write denial. Afterward, the only private state
-was the expected 18-node Team-01/02 auth-plus-empty-marker tree: owner-only 0700 directories and
-0600 regular single-link files, with no links or volatile session data. It was removed using exact
-nonrecursive unlink/rmdir targets. No probe file or lane delta remains.
+Earlier in this exact R9 clean-restart review I ran the canonical bounded Team-01 physical
+permission-profile probe. All eleven controls returned true: intended reads and own-lane writes
+work; organizer/repository reads, cross-lane writes, network, host process visibility, host skill
+roots, private auth, and peer-private reads/writes are denied; the skill catalog is empty. The
+post-probe owner-only private runtime was exactly inspected and removed. The later changes through
+the reviewed HEAD affect only organizer-private source-review publication, automatic promotion,
+selection accounting, documentation, and their tests; the frozen v13 profile, command ordering,
+probe implementation, model-smoke authority, and OS permission boundary are unchanged. No private
+runtime, probe artifact, or lane delta remains.
 
-## LC-01 — fresh R8 provenance and predecessor isolation: closed
+## LC-01 — fresh R9 provenance and predecessor isolation: closed
 
-The schema-5 restart authority is organizer-only and exact-binds the stopped predecessor
-incidents. In particular, the R7 incident completed with no admissible candidate: zero IS result
-files, zero source archives, zero selected finalists, no winner, and no feedback disclosure. Both
-the top-level successor and each incident explicitly bind `results_reused: false` and
-`research_provenance_reused: false`. Incident hashes and counts are genesis evidence, not team or
-evaluator inputs.
+The schema-6 authority exactly records the stopped R8 minimum-finalist incident as private
+evidence. It binds 38 accepted trials, 37 terminal trials, one pending trial, no nominations or
+selection, and explicitly declares both result and research-provenance reuse false. The top-level
+successor authority repeats `results_reused: false`, `research_provenance_reused: false`, and no
+feedback disclosure. These hashes and counts are activation evidence only; they are not imported
+into a lane, candidate, ranking, or evaluator.
 
-The physical R8 surface is trial-zero. All 15 lanes contain only their tracked brief/policy,
-candidate README, and one-byte-LF `.keep` markers in candidate/feedback/outbox/work seed
-directories. There is no lifecycle journal, activation, candidate, outbox, feedback, research
-session, source archive, result, nomination, selection, release, or private model runtime. No R7
-competitive file was copied into R8.
+The R9 filesystem is trial-zero across all 15 lanes. It contains no activation freeze, competitive
+journal record, candidate, feedback, outbox, work product, research session, source review/archive,
+result, certificate, nomination, selection, release, or private model runtime. Only the tracked
+brief/policy, candidate README, and one-byte-LF seed markers occupy a lane. No R8 candidate,
+feedback packet, source/receipt, result, model state, certificate, or decision is present.
 
-The team profile grants reads only to the current sanitized kit and the team's current lane; the
-R7 sibling worktree, its authority, artifacts, and Git metadata are outside that allowlist. The
-real OS profile demonstrated the corresponding default-deny boundary, including organizer and Git
-denial. The worker masks the repository/common parent before candidate import. Teams cannot read
-the R8 restart authority either.
+The permission profile grants a team only the current sanitized kit and its own current lane. The
+R8 worktree, authorities, results, Git metadata, and the R9 restart authority are outside that
+allowlist. The physical profile reproduced the default-deny boundary, and the strategy worker masks
+the repository/common parent before candidate import.
 
-## LC-02 — fixed score-blind repair sessions and disclosures: closed
+## LC-02 — no decision model or team-controlled selection path: closed
 
-Only the canonical broker's live `consume_batch` frame can start or finish admission. Direct
-library calls, result CLI paths, forged/replayed capabilities, copied frame metadata, wrong
-root/team/phase, and broker exception composition fail before trial acceptance or evaluator access.
-The shared reentrant broker lease remains held across the initial model process, all repair
-processes, outbox consumption, and result-bearing work, so lanes, evaluators, and repair sessions
-cannot overlap.
+The canonical broker launches only discovery and refinement. Its CLI has no decision launch or
+consume command; the exported runtime rejects phase `decision` before any process; the broker
+launch path rejects it again; and retained legacy `consume_decision` rejects unconditionally before
+reading, retiring, nominating, or archiving a team decision. No model, manual repair context, host
+skill, or team-authored certificate participates in representative selection.
 
-Every initial or repair process uses the same internally derived phase prompt, exact Codex command,
-model, environment, team kit, and profile authority. The prompt tells the model only to inspect its
-newest lane-local `feedback/admission-*.json`, the exact checker, and the supplied template. The
-kit discloses the complete enforced static call/name subset, machine-readable allowlist,
-neighborhood/material-parameter identity, whole-batch semantics, and the uniform maximum of three
-score-blind repairs. It discloses no predecessor identity, result, field state, score, trial
-outcome, or holdout row.
+Unexpected outbox names—including legacy `decision.json`—are detected through a stable pinned
+directory capture during score-blind inspection, both preflight passes, every trial acceptance,
+automatic finalization, and terminal resume. Before preflight they are deterministic lane-local
+repair findings; after durable authority they are integrity failures. They can neither be silently
+archived nor converted into a nomination or retirement.
 
-Before each process, an organizer-private canonical session-issue receipt is durably written. The
-initial issue plus at most three repair issues form an exact `phase-00..03` chain. Each completed
-check writes an organizer-private canonical attempt receipt `phase-01..04`, binding the launch,
-input attempt, outbox bytes, ordered candidate IDs/source hashes, and deterministic findings. These
-directories, filenames, schemas, byte encodings, modes, owners, and single-link topology are
-pinned; teams cannot read them. Unexpected names, links, modes, owners, duplicates, noncanonical
-JSON, oversized content, or chain discontinuity fail closed.
+The shared broker lease covers research, evaluation, automatic representative compilation,
+nomination, close, and release. The broker immediately promotes a successful discovery lane when
+score-blind refinement admission terminates. A crash before that promotion is restart-safe:
+`run_team` repeats the exact retired-evidence validation and promotion, while `close_is` detects the
+pending promotion immediately after evidence validation and fails before registry, freeze, or
+journal mutation. The journal also refuses a selection that discards such a success.
 
-The lane-readable admission report is a deterministic projection of that private attempt: source,
-metadata, request, static-AST, mechanism, and batch-consistency findings only. It is created or
-reconstructed and revalidated before another issue or model process. Thus a crash after the
-private attempt but before feedback cannot skip or change disclosure, while a crash after an issue
-cannot create an extra repair allowance. Unchanged model output still consumes its issued attempt;
-the process-local history cannot reset the durable four-process bound.
+## LC-03 — pre-acceptance causal source receipt and batch authority: closed
 
-## LC-03 — whole-batch admission, terminal evidence, and resume safety: closed
+Every candidate receives synthetic causal review before its first accepted record and before any
+score data opens. The review revalidates the exact phase-bound candidate receipt, recaptures the
+source bundle, repeats the compact stateless static gate, and executes the three-scenario
+past-only/future-appended/future-corrupted invariance check. Candidate execution or invalid target
+responses and invariance mismatches are deterministic score-blind findings. Worker launch,
+namespace, protocol, storage, timeout, or unsafe-topology failures propagate as infrastructure
+errors and remain resumable rather than retiring the lane.
 
-No score data opens until the complete batch passes deterministic admission. Preflight stably
-captures the exact live outbox and every candidate bundle; validates requests, metadata,
-attestations, source, phase uniqueness, neighborhood coordinates, and mechanism history; and
-recovers exact private candidate receipts. One durable `batch_preflighted` event and its live
-capability bind the ordered candidate IDs, source-bundle hashes, canonical candidate-receipt
-hashes, phase, and outbox hash. Each final `run_is` repeats the expected-phase and exact-receipt-SHA
-checks before acceptance or evaluator output.
+The organizer-private source-review receipt is canonical duplicate/nonfinite-rejecting JSON in an
+owner-only regular single-link file. It binds team, candidate, exact source-bundle SHA-256,
+executable set, frozen static-check list, timestamp, six decision rows, and identical
+past/appended/corrupt target hashes. Publication pins every organizer-private directory component,
+uses a fixed owner-only staging name, fsyncs the staging inode and directory, and creates the final
+name by a no-replace hard link. A retry removes a staging-only scratch inode, normalizes only the
+exact same-inode two-link crash prefix, rejects unrelated hardlinks or unsafe topology without
+mutation, and refuses a disappeared final rather than publishing empty or newly timestamped bytes.
+The caller then validates the exact canonical final authority as regular, owner-only, stable, and
+single-link.
 
-Candidate receipts and repair receipts use strict duplicate/nonfinite-rejecting JSON, canonical
-bytes, no-follow stable reads, and owner/mode/regular/single-link checks. Source and outbox archives
-likewise bind exact content and reject symlink, hardlink, FIFO/device, changed-path, changed-byte,
-or ambiguous filename substitution. An accepted candidate's archived bytes are the static-review,
-worker, evaluation, and nomination identity.
+The durable `batch_preflighted` event and live sealed capability bind ordered candidate IDs,
+source-bundle hashes, phase-bound candidate-receipt hashes, source-review hashes, and exact outbox
+hash. Each `run_is` revalidates the outbox directory, exact live source capture, candidate receipt
+with expected phase, and current source-review SHA before appending acceptance or invoking the
+evaluator. Final automatic selection locates the candidate's phase/index in that journal event and
+revalidates the same review SHA. A changed, replayed, reordered, wrong-phase, or substituted
+receipt therefore fails before score or journal mutation.
 
-If no outbox exists after all four authorized processes, exact attempt 04 becomes durable
-`batch_abandoned` evidence; no outbox or candidate is fabricated. A persistently malformed batch
-becomes `batch_rejected` only through the canonical broker, with its exact organizer-private outbox
-archive. Neither disposition opens score data or consumes a trial. Infrastructure and topology
-failures remain errors rather than deterministic team retirements.
+## LC-04 — automatic ranking and score confidentiality: closed
 
-`close_is` revalidates every rejected archive and every abandoned missing-outbox attempt before
-registry or selection mutation. The final `historical_release` path now independently repeats the
-same terminal-evidence validation before opening selection, recovering a release, appending a
-historical request, or touching the sealed snapshot. This closes post-selection deletion,
-substitution, and recovery seams. Refinement also revalidates its exact discovery feedback/archive
-before terminal mutation.
+The organizer considers successful terminal observations only. The frozen lexicographic order is
+higher worst-fold double-cost Sharpe, higher median-fold double-cost Sharpe, higher trial-adjusted
+confidence, higher gross edge per turnover, lower annualized turnover, then candidate ID. Missing
+edge density ranks last. The broker computes the candidate once, and `nominate` independently
+recomputes and requires the same identity before mutation.
 
-## LC-04 — private model runtime and real OS boundary: closed
+A successful discovery lane whose score-blind refinement batch terminates retains the truthful
+accepted count of eight but is charged `selection_trial_count: 12`. That full charge is used when
+ranking every successful candidate in the lane, computing the nomination selection, computing
+field-wide adjusted confidence, freezing an advancing representative, and scoring its historical
+run. Valid refinement can only add candidates and certificate evidence; it cannot worsen the
+already-successful discovery representative under the same twelve-trial rank. Intentionally
+withholding a valid refinement batch after seeing discovery feedback therefore provides no
+selection advantage. The team kit, shared policy, runtime prompt, and all 15 lane briefs disclose
+the actual-eight/full-twelve rule and its purpose.
 
-Launcher v12 pins Codex CLI `0.148.0`, `gpt-5.6-sol`, prompt and environment hashes, the custom
-permission profile, approval `never`, network off, and disabled web/browser/app/plugin/skill and
-multi-agent features. `--ignore-user-config` precedes all profile overrides and disabled flags;
-there is no legacy sandbox override. Each team has a distinct organizer-private `HOME`,
-`CODEX_HOME`, and `TMPDIR`.
+No ranking result is written into a lane and there is no later team process to observe it.
+Candidate summaries used for ranking are journal-bound organizer results; the only score-bearing
+lane files remain that lane's already-authorized normalized phase feedback. Organizer-private
+source reviews, certificates, nominations, registry, selection freeze, CLI return values, and field
+ranking are outside every team profile. Pre-selection status remains a fixed genesis projection, so
+order, timing, success counts, fallback use, and promotion state do not become cross-lane oracles.
 
-Only private authentication and the empty system-skill marker may persist between subprocesses.
-All admitted volatile databases and SQLite companions, logs, queues, caches, snapshots, wrappers,
-installation marker, and sandbox scratch are exact-enumerated, owner/mode/link checked, bounded,
-and removed in `finally`. Crash cleanup admits only strict known partial prefixes and fails closed
-on an unexpected name or target. The frozen v12 smoke independently binds custom permissions,
-network disabled, empty prompt/skill catalog, original-home exclusion, host-skill/private-auth and
-peer-private denials, isolated TMPDIR, one intended own-lane sentinel, zero durable lane delta, and
-full disposable-runtime removal. The exact-current real probe reproduced the boundary without
-launching a model session or tournament phase.
+At field close, fully qualified representatives rank first. If fewer than five qualify, only the
+shortfall is filled with the strongest remaining successful representatives and each is explicitly
+labeled `robust-ranked-representative`; failed gates remain failed. Fewer than five successful teams
+fails closed. A zero-volatility but successful finalist stays represented with zero risky weight
+and unused capacity in cash, avoiding a score-dependent abort or post-selection rewrite.
 
-The strategy worker receives only a frozen R8-source bootstrap long enough to resolve the trusted
-worker. Candidate code is not in its initial working directory or import path. Before candidate
-import, the worker establishes namespaces, masks the repository and common parent, rebuilds
-`sys.path` around the staged Python-only source/runtime, changes to the staged bundle, then applies
-Landlock, seccomp, audit, resource, credential, process, network, and write restrictions. There is
-no candidate-controlled pre-mask execution surface.
+## LC-05 — single-capture certificate and truthful fallback: closed
 
-## LC-05 — source, holdout, peer, and progress boundaries: closed
+The automatic certificate is compiled only from immutable journal request hashes and their
+accepted metadata tags, in trial order, under the team-specific organizer-private certificate
+namespace. The broker first revalidates the selected candidate's exact preflight source-review
+authority. The immutable write is idempotent: a crash before nomination can resume only with the
+same compiled bytes; conflicting residue fails.
 
-Descriptor-relative capture rejects links, FIFOs/devices, hidden executables, unexpected files,
-path swaps, and aggregate-content excess. Only `strategy.py` is executable. The exact stateless
-semantic AST subset continues to reject imports, candidate/module/class state, decision-time
-branching, helper delegation, iterators/comprehensions, RNG, dynamic loads, executable docstrings,
-ordinal/encoding channels, opaque/high-capacity literals, and packing/arithmetic substitutes.
-Exact archived-source future append/corruption invariance remains nomination-bound.
+`_certificate` performs one stable no-follow byte capture and passes that same captured payload to
+both strict qualification and fallback validation. There is no second path reopen between a
+qualification failure and representative preservation. The parser rejects duplicate/nonfinite or
+noncanonical objects, wrong identity/schema, invalid hashes, duplicate citations, and citations
+whose immutable request lacks the named tag.
 
-The live profile and worker deny peer lanes, predecessor worktrees, repository history,
-organizer-private state, host auth/skills, host `/proc`, raw data, and network. The only permitted
-write roots are the team's own candidates/outbox/work directories. Pre-selection status remains a
-fixed genesis projection, not a journal/count/order/timing oracle. Admission reports are self-only
-deterministic diagnostics and never expose a score or peer state.
+Empty cells, incomplete coverage, insufficient breadth/neighborhood, or a failed sign-inversion
+trial are qualification shortfalls, not false integrity claims: diagnostics set `qualified: false`,
+the neighborhood gate fails, and the nomination records the exact failed gates and
+`fallback_does_not_change_gate_results: true`. Successful sign-inversion evidence still requires
+both terminal successes, matching parent/mechanism/horizon/control/risk authority, and exact
+negative archived targets. Corrupt or missing underlying artifacts remain hard integrity errors.
 
-The holdout still includes all of July 2026 behind the exclusive
-`2026-08-01T00:00:00Z` boundary. Research and repair model processes exit before deterministic
-batch consumption; evaluation and historical release are serialized afterward, with no interim
-or cross-team disclosure path.
+## LC-06 — repair, runtime, source, and holdout boundaries: closed
+
+The fixed initial process plus at most three score-blind repairs remain bound by durable private
+issue/attempt chains. Lane-visible admission feedback is reconstructed from the exact private
+attempt before another process and contains deterministic self-only findings, never scores, trial
+outcomes, peer state, or holdout data. Whole-batch admission still precedes every trial; malformed
+or absent batches terminate only through exact broker capabilities and archived/missing evidence.
+
+Launcher v13 pins Codex CLI `0.148.0`, model and prompt/environment hashes, approval `never`, custom
+permission profile, network off, and disabled web/browser/app/plugin/skill and multi-agent
+capabilities. Per-team private `HOME`, `CODEX_HOME`, and `TMPDIR` preserve only auth plus an empty
+system-skill marker; volatile databases and SQLite companions, logs, snapshots, wrappers, and
+sandbox scratch are exact-enumerated and cleaned after every subprocess. The frozen v13 smoke and
+the physical probe bind the same boundary.
+
+Descriptor-relative source capture, the restricted executable/AST subset, worker repository mask,
+Python-only staged runtime, Landlock, seccomp, audit/resource/process controls, network denial,
+exact archived bytes, and nomination-time review binding remain intact. The holdout still contains
+all of July 2026 behind the exclusive `2026-08-01T00:00:00Z` boundary. Model processes exit before
+batch evaluation, and the broker lease serializes teams, evaluation, automatic representative
+compilation, selection, and historical access with no interim disclosure path.
 
 ## Gate decision
 
-**PASSED — zero unresolved leakage or clean-room findings.** R8 is a physically clean trial-zero
-successor with no reused competitive provenance. Its fixed, bounded repair loop is score-blind,
-durably attempt/issue/feedback bound, substitution-resistant, and crash-idempotent. Whole-batch
-source/receipt authority remains exact through acceptance and terminal recovery; private model,
-skill, predecessor, peer, progress, network, and July-2026 holdout boundaries remain sealed.
+**PASSED — zero unresolved leakage or clean-room findings.** R9 remains a clean trial-zero
+successor with no competitive R8 reuse. Automatic representative selection eliminates the
+decision-model and host-skill surface; exact pre-acceptance causal-review receipts are atomically
+published and ordered into batch/candidate authority; truncated successful lanes retain their
+truthful accepted count without gaining a lighter selection penalty; score-derived ranking and
+certificates remain organizer-private; truthful fallback never changes failed gates; and the
+repair, source, peer, network, progress, private runtime, serial lease, and July-2026 holdout
+boundaries remain sealed.
