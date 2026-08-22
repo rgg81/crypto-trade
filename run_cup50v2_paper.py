@@ -36,6 +36,11 @@ from crypto_trade.cup50v2_desk.live_data import PublicMarketDataClient, refresh_
 from crypto_trade.cup50v2_desk.snapshot_forward import derive_forward_membership
 from crypto_trade.cup50v2_desk.tick import INTERVAL, LATEST, persist_tick
 
+# Set before any bundle is loaded. A frozen bundle's digest is hashed file by file and
+# the desk re-verifies it on every tick, so a stray .pyc written into a bundle stops a
+# desk days later and looks like tampering. Nothing here needs bytecode caching.
+sys.dont_write_bytecode = True
+
 ATTEMPT = "attempt.json"
 DESKS = ("winner", "runner-up-1", "runner-up-2", "ensemble-eq3")
 

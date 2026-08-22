@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -32,6 +33,11 @@ from crypto_trade.cup50v2.replay import (
 from crypto_trade.cup50v2.scoring import _daily_frame, round_half_even, score_point
 from crypto_trade.cup50v2.snapshot import load_snapshot, stitch_snapshots
 from crypto_trade.cup50v2_desk.authority import load_desk, repository_root
+
+# Set before any bundle is loaded. A frozen bundle's digest is hashed file by file and
+# the desk re-verifies it on every tick, so a stray .pyc written into a bundle stops a
+# desk days later and looks like tampering. Nothing here needs bytecode caching.
+sys.dont_write_bytecode = True
 
 DESKS = ("winner", "runner-up-1", "runner-up-2", "ensemble-eq3")
 
