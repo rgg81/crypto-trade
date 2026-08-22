@@ -118,7 +118,14 @@ class EqualRiskEnsemble:
             books.append(scaled)
         if not emitted:
             return None
-        names = sorted({name for book in books for name in book})
+        # Only names that are eligible right now. A member that holds contributes the book it last
+        # emitted, and the Top-50 universe rotates weekly, so a stale book can still name a symbol
+        # that has since left the cross-section. A lane strategy never meets this because it
+        # rebuilds from the current section every decision; an ensemble that reuses books must
+        # prune them. Emitting a departed symbol is a candidate failure, and correctly so: the
+        # evaluator force-settles a name on its way out and will not let a strategy re-enter it.
+        eligible = set(context.eligible_symbols)
+        names = sorted({name for book in books for name in book if name in eligible})
         if not names:
             return {}
         count = float(len(self._members))

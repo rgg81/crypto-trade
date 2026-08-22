@@ -1,0 +1,14 @@
+{
+  "amendment_id": "A16",
+  "amendment_sha256": "ee9d0c823c549b8a7a79a8a78c38f1b640e267c838f159884732ecee066c0077",
+  "consequence": "The ensemble bundle's digest changed, so it no longer matches the activation made before the release. A re-activation is required before the desks launch, so the running field binds the code it actually runs -- the same discipline A13 records failing to observe.",
+  "defect": "The equal-risk ensemble lets a member that holds contribute the book it last emitted, so that a hold means 'no change to my book' rather than 'I have no book'. The Top-50 universe rotates weekly, so a stale book can still name a symbol that has since left the eligible cross-section, and the ensemble averaged and emitted it. A lane strategy never meets this because it rebuilds from the current section at every decision; an ensemble that reuses books has to prune them.",
+  "design_note": "The hold-carries-its-last-book rule is still right: treating a hold as flat would quietly de-risk the ensemble every time a member went quiet. The bug was in what that carried book may contain, not in carrying it.",
+  "fix": "The ensemble intersects the averaged book with context.eligible_symbols before emitting. Verified live by mutation: reverting the filter fails exactly the new test.",
+  "found_at_phase": "after release, before the paper desks launched",
+  "found_by": "the evaluator's own eligibility guard, during the ensemble's launch-state reconstruction: 'strategy targeted ineligible symbol FLMUSDT'",
+  "namespace": "cup50v2",
+  "no_tournament_result_is_affected": "The ensemble is a forward-stage desk, not a competitor. It has no leaderboard entry, no nomination and no score; it was never observed on the sealed window and could not have been. The release and every rank in it stand untouched.",
+  "title": "the ensemble emitted a symbol that had left the universe",
+  "why_the_guard_is_right": "Emitting a departed symbol is a candidate failure and correctly so. The evaluator force-settles a name on its way out of the universe and will not let a strategy re-enter it, because a book that keeps trading a delisted or demoted contract is not a book that could have been traded."
+}

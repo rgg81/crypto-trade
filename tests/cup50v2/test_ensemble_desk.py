@@ -158,3 +158,28 @@ def test_exactly_three_finalists_are_required(tmp_path: Path) -> None:
     two = [("team-aa", _member_source("a", {"AAAUSDT": 0.5}))] * 2
     with pytest.raises(ValueError, match="exactly three finalists"):
         _build(tmp_path, two)
+
+
+def test_a_departed_symbol_is_dropped_from_a_held_book(tmp_path: Path) -> None:
+    """The failure the real reconstruction hit, reproduced.
+
+    A member that holds contributes the book it last emitted, and the Top-50 universe rotates
+    weekly, so a stale book can name a symbol that has since left the cross-section. Emitting it is
+    a candidate failure -- the evaluator force-settles a departing name and refuses re-entry -- and
+    the first version of this strategy did exactly that on FLMUSDT.
+    """
+    steady = _member_source("a", {"AAAUSDT": 0.5})
+    quitter = _member_source("b", {"ZZZUSDT": 0.5}, holds_after=1)
+    third = _member_source("c", {"AAAUSDT": 0.25})
+    ensemble = _build(tmp_path, [("team-aa", steady), ("team-bb", quitter), ("team-cc", third)])
+
+    wide = _context(["AAAUSDT", "ZZZUSDT"])
+    first = ensemble.target_weights(wide, seed=1)
+    assert "ZZZUSDT" in first
+
+    # ZZZUSDT leaves the eligible cross-section; team-bb is now holding its stale book.
+    narrowed = _context(["AAAUSDT", "ZZZUSDT"])
+    narrowed.eligible_symbols = ("AAAUSDT",)
+    second = ensemble.target_weights(narrowed, seed=1)
+    assert "ZZZUSDT" not in second, "a departed symbol must not survive in a held book"
+    assert "AAAUSDT" in second, "the rest of the book must still be emitted"
