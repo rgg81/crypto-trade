@@ -82,7 +82,8 @@ stateless causal AST subset. It rejects self/counter state, decision-time ordina
 while loops, bit/modulo/power packing, literal indexing, ordinal/character conversion, executable
 docstrings, opaque numerics, and aggregate executable/literal surfaces above the frozen bounds.
 This review is bound to the source hash and is followed by exact-source append/corrupt-future
-invariance before a nomination can become eligible.
+invariance before the batch preflight can authorize any acceptance or score access. The journal
+binds each exact causal-review receipt hash, and final representative selection revalidates it.
 
 Each language-model process exits before the organizer evaluates its outbox. A later fresh process
 receives only lane-local normalized feedback. Organizer commands silently queue, lane validation

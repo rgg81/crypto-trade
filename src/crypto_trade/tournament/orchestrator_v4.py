@@ -111,6 +111,7 @@ class _BatchCandidate:
     purpose: str
     source_bundle_sha256: str
     receipt_sha256: str = ""
+    source_review_sha256: str = ""
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -1042,6 +1043,17 @@ def preflight_is_batch(
                 broker_frame=broker_frame,
             )
 
+        unexpected_outbox = research_runtime_v4._unexpected_outbox_entries(  # noqa: SLF001
+            root_path, team_id, allowed={outbox_name}
+        )
+        if unexpected_outbox:
+            if existing is not None:
+                raise OrchestratorError("preflighted batch gained unexpected outbox residue")
+            raise CandidateBatchRejectedError(
+                "batch outbox contains unexpected score-blind residue",
+                capability=rejection_capability(),
+            )
+
         try:
             request_object = _strict_object_bytes(outbox_payload, outbox_relative)
             candidate_ids = research_runtime_v4._validate_phase_request(  # noqa: SLF001
@@ -1166,7 +1178,7 @@ def preflight_is_batch(
                 phase,
                 _path(root_path, outbox_relative),
             )
-            validated_candidates: list[_BatchCandidate] = []
+            receipt_candidates: list[_BatchCandidate] = []
             for candidate in candidates:
                 receipt = research_runtime_v4.validate_candidate_receipt(
                     root_path,
@@ -1175,13 +1187,13 @@ def preflight_is_batch(
                     candidate.source_bundle_sha256,
                     expected_phase=phase,
                 )
-                validated_candidates.append(
+                receipt_candidates.append(
                     dataclasses.replace(
                         candidate,
                         receipt_sha256=str(receipt["sha256"]),
                     )
                 )
-            candidates = validated_candidates
+            candidates = receipt_candidates
         except research_runtime_v4.CandidateReceiptRejectedError as exc:
             if existing is not None:
                 raise OrchestratorError(
@@ -1205,6 +1217,31 @@ def preflight_is_batch(
                 f"batch receipt source failed deterministic score-blind admission: {exc}",
                 capability=rejection_capability(candidate_ids),
             ) from exc
+        try:
+            reviewed_candidates: list[_BatchCandidate] = []
+            for candidate in candidates:
+                source_review = research_runtime_v4.review_candidate_source(
+                    root_path,
+                    team_id,
+                    candidate.candidate_id,
+                    candidate.source_bundle_sha256,
+                )
+                reviewed_candidates.append(
+                    dataclasses.replace(
+                        candidate,
+                        source_review_sha256=str(source_review["sha256"]),
+                    )
+                )
+            candidates = reviewed_candidates
+        except research_runtime_v4.CandidateSourceRejectedError as exc:
+            if existing is not None:
+                raise OrchestratorError(
+                    "preflighted batch causal source authority changed"
+                ) from exc
+            raise CandidateBatchRejectedError(
+                f"batch source failed deterministic causal admission: {exc}",
+                capability=rejection_capability(candidate_ids),
+            ) from exc
         event = {
             "team_id": team_id,
             "phase": phase,
@@ -1214,6 +1251,9 @@ def preflight_is_batch(
                 candidate.source_bundle_sha256 for candidate in candidates
             ],
             "receipt_sha256s": [candidate.receipt_sha256 for candidate in candidates],
+            "source_review_sha256s": [
+                candidate.source_review_sha256 for candidate in candidates
+            ],
         }
         if existing is None:
             record = journal_v4.append(
@@ -1416,6 +1456,9 @@ def _validated_batch_capability(
         "receipt_sha256s": [
             candidate.receipt_sha256 for candidate in capability.candidates
         ],
+        "source_review_sha256s": [
+            candidate.source_review_sha256 for candidate in capability.candidates
+        ],
     }
     accepted = sorted(
         (
@@ -1461,11 +1504,23 @@ def _validated_batch_capability(
         root,
         f"{TOP40_V4_LAYOUT.team_root(team_id)}/outbox/{outbox_name}",
     )
+    if research_runtime_v4._unexpected_outbox_entries(  # noqa: SLF001
+        root, team_id, allowed={outbox_name}
+    ):
+        raise OrchestratorError("whole-batch authority gained unexpected outbox residue")
     if _sha256(_stable_authority_bytes(outbox)) != capability.outbox_sha256:
         raise OrchestratorError("live batch outbox differs from whole-batch authority")
     capture = runner_v4.capture_source_bundle(root, team_id, entrypoint)
     if capture.sha256 != candidate.source_bundle_sha256:
         raise OrchestratorError("candidate source differs from whole-batch authority")
+    source_review = research_runtime_v4.validate_source_review(
+        root,
+        team_id,
+        candidate.candidate_id,
+        candidate.source_bundle_sha256,
+    )
+    if source_review.get("sha256") != candidate.source_review_sha256:
+        raise OrchestratorError("candidate source review differs from whole-batch authority")
     return candidate
 
 
@@ -1666,6 +1721,44 @@ def _strongest_successful_candidate(
     return ranked[0][1]
 
 
+def _validated_preflight_source_review(
+    root: Path,
+    state: journal_v4.JournalState,
+    *,
+    team_id: str,
+    candidate_id: str,
+    source_bundle_sha256: str,
+    trial_number: int,
+) -> Mapping[str, str]:
+    """Bind a representative to the causal review completed before its IS acceptance."""
+
+    phase = "discovery" if trial_number <= 8 else "refinement"
+    index = trial_number - (1 if phase == "discovery" else 9)
+    preflight = state.batch_preflights.get((team_id, phase))
+    payload = preflight["payload"] if preflight is not None else None
+    if (
+        payload is None
+        or index < 0
+        or index >= len(payload["candidate_ids"])
+        or payload["candidate_ids"][index] != candidate_id
+        or payload["source_bundle_sha256s"][index] != source_bundle_sha256
+    ):
+        raise OrchestratorError(
+            "representative lacks its exact pre-acceptance causal review authority"
+        )
+    review = research_runtime_v4.validate_source_review(
+        root,
+        team_id,
+        candidate_id,
+        source_bundle_sha256,
+    )
+    if review.get("sha256") != payload["source_review_sha256s"][index]:
+        raise OrchestratorError(
+            "representative causal review differs from batch preflight authority"
+        )
+    return review
+
+
 def _verified_request_targets(
     root: Path, state: journal_v4.JournalState, request_hash: str
 ) -> pd.DataFrame:
@@ -1758,6 +1851,14 @@ def _validate_exact_sign_inversions(
         ):
             raise CertificateQualificationError(
                 "sign-inversion risk policy differs from its baseline"
+            )
+        if any(
+            state.is_terminals.get(request_hash) is None
+            or state.is_terminals[request_hash]["event_type"] != "is_succeeded"
+            for request_hash in (baseline_hash, inversion_hash)
+        ):
+            raise CertificateQualificationError(
+                "exact sign-inversion evidence must have succeeded"
             )
         baseline_targets = _verified_request_targets(root, state, baseline_hash)
         inversion_targets = _verified_request_targets(root, state, inversion_hash)
@@ -2106,11 +2207,13 @@ def nominate(
         )
         authority = _validate_authority_current(root_path, loaded, request["payload"]["authority"])
         source_review = (
-            research_runtime_v4.validate_source_review(
+            _validated_preflight_source_review(
                 root_path,
-                team_id,
-                candidate_id,
-                authority.source_bundle_sha256,
+                state,
+                team_id=team_id,
+                candidate_id=candidate_id,
+                source_bundle_sha256=authority.source_bundle_sha256,
+                trial_number=int(request["payload"]["trial_number"]),
             )
             if TOP40_V4_LAYOUT.name.endswith("-r2")
             else {}
@@ -2290,16 +2393,19 @@ def _capped_inverse_vol_weights(
     if not nominees:
         return {}, 1.0
     inverse: dict[str, float] = {}
+    weights = {str(nomination["team_id"]): 0.0 for nomination in nominees}
     for nomination in nominees:
         daily = _daily_from_nomination(root, nomination)
         volatility = float(daily.std(ddof=1) * np.sqrt(365.0))
         if not math.isfinite(volatility) or volatility <= 1e-15:
-            raise OrchestratorError("nominee has zero or invalid IS volatility")
+            # A truthful successful representative can be an economically inactive sleeve.
+            # Preserve its finalist status but allocate no risky capital; unused capacity remains
+            # cash rather than aborting or redistributing after selection.
+            continue
         inverse[str(nomination["team_id"])] = 1.0 / volatility
     capacity = min(1.0, cap * len(inverse))
     remaining = capacity
     active = set(inverse)
-    weights = {team_id: 0.0 for team_id in inverse}
     while active and remaining > 1e-15:
         denominator = sum(inverse[team_id] for team_id in active)
         provisional = {team_id: remaining * inverse[team_id] / denominator for team_id in active}
@@ -2463,6 +2569,7 @@ def close_is(root: str | Path) -> Mapping[str, Any]:
                 finalists,
                 float(loaded.raw["ensemble"]["maximum_constituent_weight"]),
             )
+        weightable_constituents = sum(weight > 0.0 for weight in weights.values())
         freeze = {
             "schema_version": f"{_SCHEMA_PREFIX}-selection-freeze-v2"
             if field_adjustment
@@ -2523,7 +2630,8 @@ def close_is(root: str | Path) -> Mapping[str, Any]:
                 **(
                     {
                         "minimum_constituents": minimum_constituents,
-                        "available": len(finalists) >= minimum_constituents,
+                        "available": weightable_constituents >= minimum_constituents,
+                        "weightable_constituents": weightable_constituents,
                     }
                     if field_adjustment
                     else {}

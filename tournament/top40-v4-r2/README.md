@@ -18,7 +18,7 @@ Numerical policy is [`config.toml`](config.toml), clean-room semantics are
   -> up to 12 preregistered IS trials per lane
   -> strongest successful representative, or retirement only after zero successes
   -> fully-qualified teams first; robust rank fills a minimum-5, maximum-6 bracket
-  -> identities + reporting ensemble frozen
+  -> identities + reporting ensemble frozen; zero-volatility sleeves remain zero-weight cash
   -> one serial, silent historical observation per finalist
   -> one atomic cohort release
   -> September 2026 live-forward paper observation
@@ -93,7 +93,9 @@ commands serialize under one kernel lock. During the historical phase, `status` 
 frozen finalist count and a constant sealed state.
 
 Before candidate receipts or any score-bearing journal record exist, the launcher applies the
-same deterministic whole-batch source/metadata checks used by admission. An invalid batch receives
+same deterministic whole-batch source/metadata checks used by admission, including exact-source
+synthetic append/corrupt-future invariance. The durable batch authority binds every source,
+research-session receipt, and causal-review receipt hash. An invalid batch receives
 up to three serial score-blind repair sessions through immutable lane-local admission feedback.
 The fixed prompt, permissions, launch authority, private-runtime cleanup, and one-team lease remain
 unchanged across those retries. A private session-issue receipt is durable before process start,

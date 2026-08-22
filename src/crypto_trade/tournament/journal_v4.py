@@ -172,6 +172,7 @@ if TOP40_V4_LAYOUT.name.endswith("-r2"):
             "candidate_ids",
             "source_bundle_sha256s",
             "receipt_sha256s",
+            "source_review_sha256s",
         }
     )
 
@@ -349,17 +350,24 @@ def _validate_payload(event_type: str, payload: object) -> Mapping[str, Any]:
         if event_type == "batch_preflighted":
             source_hashes = payload["source_bundle_sha256s"]
             receipt_hashes = payload["receipt_sha256s"]
+            source_review_hashes = payload["source_review_sha256s"]
             if (
                 not isinstance(source_hashes, list)
                 or len(source_hashes) != expected_count
                 or not isinstance(receipt_hashes, list)
                 or len(receipt_hashes) != expected_count
+                or not isinstance(source_review_hashes, list)
+                or len(source_review_hashes) != expected_count
             ):
-                raise JournalError("batch source or receipt authority list is invalid")
+                raise JournalError(
+                    "batch source, receipt, or review authority list is invalid"
+                )
             for source_hash in source_hashes:
                 _hash(source_hash, "source_bundle_sha256")
             for receipt_hash in receipt_hashes:
                 _hash(receipt_hash, "receipt_sha256")
+            for source_review_hash in source_review_hashes:
+                _hash(source_review_hash, "source_review_sha256")
     for key in (
         "output_path",
         "summary_path",

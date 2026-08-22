@@ -33,7 +33,7 @@ from crypto_trade.tournament.layout_v4 import TOP40_V4_LAYOUT
 PROFILE_NAME = "top40-v4-r2-offline-team"
 RECEIPT_SCHEMA_VERSION = 2
 LAUNCH_SCHEMA_VERSION = 2
-SOURCE_REVIEW_SCHEMA_VERSION = 7
+SOURCE_REVIEW_SCHEMA_VERSION = 8
 LAUNCHER_VERSION = "top40-v4-r2-research-runtime-v13"
 MODEL_RUNTIME_SCHEMA_VERSION = 1
 _EXPECTED_CODEX_VERSION = "codex-cli 0.148.0"
@@ -2678,13 +2678,37 @@ def validate_source_review(
 
     root_path = Path(root).resolve()
     relative = _source_review_relative(team_id, source_bundle_sha256)
-    payload = _stable_bytes(root_path / relative)
+    payload = _stable_bytes(root_path / relative, require_private=True)
+
+    def unique(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        value: dict[str, object] = {}
+        for key, item in pairs:
+            if key in value:
+                raise ResearchRuntimeError(f"source review contains duplicate key {key}")
+            value[key] = item
+        return value
+
     try:
-        review = json.loads(payload)
-    except (UnicodeError, json.JSONDecodeError) as exc:
+        review = json.loads(
+            payload.decode("ascii"),
+            object_pairs_hook=unique,
+            parse_constant=lambda value: (_ for _ in ()).throw(
+                ValueError(f"nonfinite source-review value: {value}")
+            ),
+        )
+    except (UnicodeError, ValueError, json.JSONDecodeError) as exc:
         raise ResearchRuntimeError("source review is invalid JSON") from exc
     if not isinstance(review, Mapping) or set(review) != _SOURCE_REVIEW_KEYS:
         raise ResearchRuntimeError("source review schema differs")
+    canonical = json.dumps(
+        review,
+        allow_nan=False,
+        ensure_ascii=True,
+        indent=2,
+        sort_keys=True,
+    ).encode("ascii") + b"\n"
+    if payload != canonical:
+        raise ResearchRuntimeError("source review is not canonical JSON")
     expected = {
         "candidate_id": candidate_id,
         "findings": [],
@@ -2697,6 +2721,14 @@ def validate_source_review(
     for key, value in expected.items():
         if review.get(key) != value:
             raise ResearchRuntimeError(f"source review differs in {key}")
+    try:
+        recorded = dt.datetime.strptime(
+            str(review.get("recorded_at_utc")), "%Y-%m-%dT%H:%M:%SZ"
+        ).replace(tzinfo=dt.UTC)
+    except ValueError as exc:
+        raise ResearchRuntimeError("source review timestamp is invalid") from exc
+    if recorded.strftime("%Y-%m-%dT%H:%M:%SZ") != review.get("recorded_at_utc"):
+        raise ResearchRuntimeError("source review timestamp is noncanonical")
     executable = review.get("executable_paths")
     checks = review.get("static_checks")
     invariance = review.get("future_invariance")
@@ -2835,7 +2867,7 @@ def _score_blind_batch_inspection(
     phase: str,
     outbox: Path,
 ) -> Mapping[str, object]:
-    """Inspect every unaccepted candidate without issuing receipts or opening market data."""
+    """Inspect every unaccepted candidate using only metadata and synthetic causal inputs."""
 
     if phase not in {"discovery", "refinement"}:
         raise ResearchRuntimeError("only research batches can be admission-inspected")
@@ -2851,6 +2883,19 @@ def _score_blind_batch_inspection(
             "source_bundle_sha256s": [],
         }
     outbox_sha256 = hashlib.sha256(payload).hexdigest()
+    unexpected_outbox = _unexpected_outbox_entries(
+        root, team_id, allowed={outbox.name}
+    )
+    if unexpected_outbox:
+        return {
+            "candidate_ids": [],
+            "findings": [
+                "outbox: unexpected entries must be removed: "
+                + ", ".join(unexpected_outbox)
+            ],
+            "outbox_sha256": outbox_sha256,
+            "source_bundle_sha256s": [],
+        }
     findings: list[str] = []
     candidate_ids: list[str] = []
     source_bundle_sha256s: list[str] = []
@@ -2895,6 +2940,7 @@ def _score_blind_batch_inspection(
         entrypoint = f"{TOP40_V4_LAYOUT.team_root(team_id)}/{row['entrypoint']}"
         metadata: Mapping[str, object] | None = None
         source_bundle_sha256 = ""
+        finding_count = len(findings)
         try:
             capture = runner_v4.capture_source_bundle(root, team_id, entrypoint)
             source_bundle_sha256 = capture.sha256
@@ -2937,6 +2983,11 @@ def _score_blind_batch_inspection(
                 raise
             findings.append(f"{candidate_id}: {exc}")
         source_bundle_sha256s.append(source_bundle_sha256)
+        if metadata is not None and len(findings) == finding_count:
+            try:
+                _future_invariance_evidence(root, team_id, entrypoint, capture)
+            except CandidateSourceRejectedError as exc:
+                findings.append(f"{candidate_id}: {exc}")
         if metadata is not None:
             try:
                 orchestrator_v4._validate_open_lane_mechanism_history(  # noqa: SLF001
@@ -2966,6 +3017,51 @@ def _score_blind_batch_inspection(
         "outbox_sha256": outbox_sha256,
         "source_bundle_sha256s": source_bundle_sha256s,
     }
+
+
+def _unexpected_outbox_entries(
+    root: Path,
+    team_id: str,
+    *,
+    allowed: set[str],
+) -> tuple[str, ...]:
+    """List unapproved lane outbox names from one pinned no-follow directory capture."""
+
+    TOP40_V4_LAYOUT.require_team(team_id)
+    outbox = root / TOP40_V4_LAYOUT.team_root(team_id) / "outbox"
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+    )
+    try:
+        descriptor = os.open(outbox, flags)
+        before = os.fstat(descriptor)
+        names = tuple(sorted(os.listdir(descriptor)))
+        after = os.fstat(descriptor)
+        lexical = outbox.lstat()
+    except OSError as exc:
+        with contextlib.suppress(UnboundLocalError, OSError):
+            os.close(descriptor)
+        raise ResearchRuntimeError("team outbox is not a stable directory") from exc
+    os.close(descriptor)
+    identities = {
+        (before.st_dev, before.st_ino),
+        (after.st_dev, after.st_ino),
+        (lexical.st_dev, lexical.st_ino),
+    }
+    if (
+        len(identities) != 1
+        or not stat.S_ISDIR(before.st_mode)
+        or not stat.S_ISDIR(after.st_mode)
+        or not stat.S_ISDIR(lexical.st_mode)
+        or before.st_uid != os.geteuid()
+        or after.st_uid != os.geteuid()
+    ):
+        raise ResearchRuntimeError("team outbox directory authority changed")
+    approved = {".keep", *allowed}
+    return tuple(name for name in names if name not in approved)
 
 
 def _admission_attempt_directory(root: Path, team_id: str) -> Path:

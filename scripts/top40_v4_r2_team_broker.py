@@ -35,17 +35,6 @@ class BrokerError(RuntimeError):
     """A team-to-organizer message or sequential broker transition is invalid."""
 
 
-def _wraps_os_error(error: BaseException) -> bool:
-    seen: set[int] = set()
-    current: BaseException | None = error
-    while current is not None and id(current) not in seen:
-        if isinstance(current, OSError):
-            return True
-        seen.add(id(current))
-        current = current.__cause__ or current.__context__
-    return False
-
-
 def _pretty(value: object) -> bytes:
     return json.dumps(
         value,
@@ -388,19 +377,6 @@ def _validate_consume_transition(
         raise BrokerError("archived research batch lacks completed feedback authority")
 
 
-def _validate_decision_transition(root: Path, team_id: str) -> None:
-    state = journal_v4.read(root / TOP40_V4_LAYOUT.journal_path)
-    if state.selection is not None:
-        raise BrokerError("research decision is forbidden after IS selection is sealed")
-    if team_id in state.nominations or team_id in state.retired:
-        raise BrokerError("research decision is forbidden after the lane is terminal")
-    if state.trials_by_team.get(team_id, 0) != 12:
-        raise BrokerError("research decision requires exactly twelve completed trials")
-    _validate_completed_phase(root, team_id, "discovery")
-    _validate_completed_phase(root, team_id, "refinement")
-    research_runtime_v4.validate_launch_authority(root, team_id, "decision")
-
-
 def _restore_lane_markers_before_authority(root: Path, team_id: str) -> tuple[str, ...]:
     """Normalize only crash-missing writable markers while the broker lease is held."""
 
@@ -486,18 +462,6 @@ def consume_batch(root: Path, team_id: str, phase: str) -> Mapping[str, Any]:
     }
 
 
-def _copy_certificate(root: Path, team_id: str, candidate_id: str, relative: object) -> str:
-    if relative != "work/research-certificate.json":
-        raise BrokerError("decision certificate must be work/research-certificate.json")
-    source = root / TOP40_V4_LAYOUT.team_root(team_id) / str(relative)
-    payload = research_runtime_v4._stable_bytes(source)  # noqa: SLF001
-    destination_relative = (
-        f"tournament/top40-v4-r2/certificates/{team_id}/{candidate_id}.json"
-    )
-    _write_exclusive(root / destination_relative, payload)
-    return destination_relative
-
-
 def _team_has_success(root: Path, team_id: str) -> bool:
     state = journal_v4.read(root / TOP40_V4_LAYOUT.journal_path)
     return any(
@@ -509,6 +473,11 @@ def _team_has_success(root: Path, team_id: str) -> bool:
 def _finalize_team_representative(root: Path, team_id: str) -> Mapping[str, Any]:
     """Compile the frozen certificate and disposition without a fallible decision session."""
 
+    unexpected_outbox = research_runtime_v4._unexpected_outbox_entries(  # noqa: SLF001
+        root, team_id, allowed=set()
+    )
+    if unexpected_outbox:
+        raise BrokerError("automatic finalization found unexpected team outbox residue")
     state = journal_v4.read(root / TOP40_V4_LAYOUT.journal_path)
     if state.trials_by_team.get(team_id, 0) != TOP40_V4_LAYOUT.maximum_trials:
         raise BrokerError("automatic representative selection requires all twelve trials")
@@ -530,8 +499,13 @@ def _finalize_team_representative(root: Path, team_id: str) -> Mapping[str, Any]
     if terminal is None or terminal["event_type"] != "is_succeeded":
         raise BrokerError("automatic representative lacks a successful terminal authority")
     source_sha256 = str(accepted["payload"]["authority"]["source_bundle_sha256"])
-    research_runtime_v4.review_candidate_source(
-        root, team_id, candidate_id, source_sha256
+    orchestrator_v4._validated_preflight_source_review(  # noqa: SLF001
+        root,
+        state,
+        team_id=team_id,
+        candidate_id=candidate_id,
+        source_bundle_sha256=source_sha256,
+        trial_number=int(accepted["payload"]["trial_number"]),
     )
     required_tags = tuple(loaded.raw["research"]["required_certificate_tags"])
     evidence: dict[str, list[str]] = {tag: [] for tag in required_tags}
@@ -574,85 +548,7 @@ def consume_decision(root: Path, team_id: str) -> Mapping[str, Any]:
     _restore_lane_markers_before_authority(root, team_id)
     activation_v4.validate(root)
     TOP40_V4_LAYOUT.require_team(team_id)
-    request, path, payload = _read_request(root, team_id, "decision")
-    _validate_decision_transition(root, team_id)
-    if request.get("schema_version") != 1:
-        raise BrokerError("decision schema_version must be 1")
-    operation = request.get("operation")
-    if operation == "retire":
-        if set(request) != {"schema_version", "operation", "reason"}:
-            raise BrokerError("retirement decision schema differs")
-        reason = request.get("reason")
-        if (
-            not research_runtime_v4._is_bounded_single_line(reason)  # noqa: SLF001
-        ):
-            raise BrokerError("retirement reason must be bounded nonempty text")
-        result = orchestrator_v4.retire(root, team_id, reason=reason)
-    elif operation == "nominate":
-        if set(request) != {
-            "schema_version",
-            "operation",
-            "candidate_id",
-            "certificate_path",
-        }:
-            raise BrokerError("nomination decision schema differs")
-        candidate_value = request.get("candidate_id")
-        certificate_value = request.get("certificate_path")
-        if (
-            not isinstance(candidate_value, str)
-            or _SAFE_ID.fullmatch(candidate_value) is None
-            or certificate_value != "work/research-certificate.json"
-        ):
-            raise BrokerError("nomination decision values are invalid")
-        request_hash: str | None = None
-        try:
-            candidate_id = candidate_value
-            request_hash, accepted, terminal = _accepted_record(root, team_id, candidate_id)
-            if terminal is None or terminal["event_type"] != "is_succeeded":
-                raise BrokerError("nominee does not have one successful accepted trial")
-            authority = accepted["payload"]["authority"]
-            research_runtime_v4.review_candidate_source(
-                root,
-                team_id,
-                candidate_id,
-                str(authority["source_bundle_sha256"]),
-            )
-            certificate = _copy_certificate(
-                root,
-                team_id,
-                candidate_id,
-                certificate_value,
-            )
-            result = orchestrator_v4.nominate(root, team_id, candidate_id, certificate)
-        except (
-            BrokerError,
-            research_runtime_v4.CandidateSourceRejectedError,
-        ) as exc:
-            if _team_has_success(root, team_id):
-                raise
-            result = orchestrator_v4.retire(
-                root,
-                team_id,
-                reason=f"nomination rejected by frozen gate: {type(exc).__name__}",
-            )
-            result = {**result, "nomination_rejected": True}
-            if request_hash is not None:
-                result["request_record_sha256"] = request_hash
-        except orchestrator_v4.OrchestratorError as exc:
-            if _wraps_os_error(exc) or _team_has_success(root, team_id):
-                raise
-            result = orchestrator_v4.retire(
-                root,
-                team_id,
-                reason=f"nomination rejected by frozen gate: {type(exc).__name__}",
-            )
-            result = {**result, "nomination_rejected": True}
-            if request_hash is not None:
-                result["request_record_sha256"] = request_hash
-    else:
-        raise BrokerError("decision operation must be nominate or retire")
-    archive = _archive_outbox(root, team_id, "decision", path, payload)
-    return {**dict(result), "outbox_archive_path": archive}
+    raise BrokerError("R2 decision consumption is disabled; selection is automatic")
 
 
 def _prompt(team_id: str, phase: str) -> str:
@@ -708,10 +604,11 @@ def run_team(root: Path, team_id: str) -> Mapping[str, Any]:
                 or evidence["sha256"] != event["admission_attempt_sha256"]
             ):
                 raise BrokerError("abandoned batch evidence differs from journal authority")
-        decision = root / TOP40_V4_LAYOUT.team_root(team_id) / "outbox/decision.json"
-        if decision.exists():
-            _request, path, payload = _read_request(root, team_id, "decision")
-            _archive_outbox(root, team_id, "decision", path, payload)
+        unexpected_outbox = research_runtime_v4._unexpected_outbox_entries(  # noqa: SLF001
+            root, team_id, allowed=set()
+        )
+        if unexpected_outbox:
+            raise BrokerError("terminal lane contains unexpected team outbox residue")
         return {"ok": True, "team_id": team_id, "already_terminal": True, "steps": []}
     for phase in ("discovery", "refinement"):
         team = root / TOP40_V4_LAYOUT.team_root(team_id)

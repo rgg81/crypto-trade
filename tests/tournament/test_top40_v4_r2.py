@@ -636,10 +636,14 @@ def request(candidate_id, parent):
 
 requests = {'b': request('baseline', None), 'i': request('inversion', 'baseline')}
 evidence = {'baseline': ['b'], 'sign-inversion': ['i']}
-orchestrator_v4._validate_exact_sign_inversions(None, None, requests, evidence)
+state = type('State', (), {'is_terminals': {
+    'b': {'event_type': 'is_succeeded'},
+    'i': {'event_type': 'is_succeeded'},
+}})()
+orchestrator_v4._validate_exact_sign_inversions(None, state, requests, evidence)
 frames['i'] = baseline_targets
 try:
-    orchestrator_v4._validate_exact_sign_inversions(None, None, requests, evidence)
+    orchestrator_v4._validate_exact_sign_inversions(None, state, requests, evidence)
 except orchestrator_v4.OrchestratorError:
     pass
 else:
@@ -3233,6 +3237,11 @@ def test_score_blind_refinement_inspection_includes_discovery_mechanism_history(
         "_static_source_findings",
         lambda _files: (["strategy.py"], []),
     )
+    monkeypatch.setattr(
+        research_runtime_v4,
+        "_future_invariance_evidence",
+        lambda *_args, **_kwargs: {"status": "passed"},
+    )
 
     inspection = research_runtime_v4._score_blind_batch_inspection(
         tmp_path, "team-01", "refinement", outbox
@@ -3601,18 +3610,7 @@ def test_retirement_reason_control_characters_fail_at_launch_and_consume(
 
     broker = _broker_module()
     monkeypatch.setattr(broker.activation_v4, "validate", lambda *_args, **_kwargs: {})
-    monkeypatch.setattr(
-        broker.orchestrator_v4,
-        "preflight_is_batch",
-        lambda *_args, **_kwargs: None,
-    )
-    monkeypatch.setattr(broker, "_validate_decision_transition", lambda *_: None)
-    monkeypatch.setattr(
-        broker,
-        "_read_request",
-        lambda *_: (request, tmp_path / "decision.json", json.dumps(request).encode()),
-    )
-    with pytest.raises(broker.BrokerError, match="retirement reason"):
+    with pytest.raises(broker.BrokerError, match="disabled|automatic"):
         broker.consume_decision(tmp_path, "team-01")
 
 
@@ -3621,130 +3619,28 @@ def test_broker_decision_rejects_wrong_schema_version(
 ) -> None:
     broker = _broker_module()
     monkeypatch.setattr(broker.activation_v4, "validate", lambda _root: {})
-    monkeypatch.setattr(broker, "_validate_decision_transition", lambda *_: None)
     request = {"schema_version": 999, "operation": "retire", "reason": "done"}
     monkeypatch.setattr(
         broker,
         "_read_request",
         lambda *_: (request, tmp_path / "decision.json", json.dumps(request).encode()),
     )
-    with pytest.raises(broker.BrokerError, match="schema_version"):
+    with pytest.raises(broker.BrokerError, match="disabled|automatic"):
         broker.consume_decision(tmp_path, "team-01")
 
 
-def test_broker_source_review_rejection_terminally_retires_lane(
+def test_legacy_broker_decision_consume_is_unconditionally_disabled(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     broker = _broker_module()
     monkeypatch.setattr(broker.activation_v4, "validate", lambda _root: {})
-    monkeypatch.setattr(broker, "_validate_decision_transition", lambda *_: None)
-    request = {
-        "schema_version": 1,
-        "operation": "nominate",
-        "candidate_id": "candidate",
-        "certificate_path": "work/research-certificate.json",
-    }
-    monkeypatch.setattr(
-        broker,
-        "_read_request",
-        lambda *_: (request, tmp_path / "decision.json", json.dumps(request).encode()),
-    )
-    monkeypatch.setattr(
-        broker,
-        "_accepted_record",
-        lambda *_: (
-            "a" * 64,
-            {"payload": {"authority": {"source_bundle_sha256": "b" * 64}}},
-            {"event_type": "is_succeeded"},
-        ),
-    )
-    monkeypatch.setattr(
-        broker.research_runtime_v4,
-        "review_candidate_source",
-        lambda *_: (_ for _ in ()).throw(
-            broker.research_runtime_v4.CandidateSourceRejectedError(
-                "causal gate rejected"
-            )
-        ),
-    )
-    monkeypatch.setattr(broker, "_team_has_success", lambda *_: False)
-    retired: list[str] = []
-
-    def retire(_root: Path, _team_id: str, *, reason: str) -> dict[str, object]:
-        retired.append(reason)
-        return {"ok": True, "team_id": "team-01"}
-
-    monkeypatch.setattr(broker.orchestrator_v4, "retire", retire)
-    monkeypatch.setattr(broker, "_archive_outbox", lambda *_: "archive.json")
-    result = broker.consume_decision(tmp_path, "team-01")
-    assert result["nomination_rejected"] is True
-    assert len(retired) == 1
-
-
-def test_broker_decision_types_and_transient_failures_are_resumable(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    broker = _broker_module()
-    monkeypatch.setattr(broker.activation_v4, "validate", lambda _root: {})
-    monkeypatch.setattr(broker, "_validate_decision_transition", lambda *_: None)
-    malformed = {"schema_version": 1, "operation": "retire", "reason": 123}
-    monkeypatch.setattr(
-        broker,
-        "_read_request",
-        lambda *_: (malformed, tmp_path / "decision.json", json.dumps(malformed).encode()),
-    )
-    with pytest.raises(broker.BrokerError, match="reason"):
-        broker.consume_decision(tmp_path, "team-01")
-
-    request = {
-        "schema_version": 1,
-        "operation": "nominate",
-        "candidate_id": "candidate",
-        "certificate_path": "work/research-certificate.json",
-    }
-    monkeypatch.setattr(
-        broker,
-        "_read_request",
-        lambda *_: (request, tmp_path / "decision.json", json.dumps(request).encode()),
-    )
-    monkeypatch.setattr(
-        broker,
-        "_accepted_record",
-        lambda *_: (
-            "a" * 64,
-            {"payload": {"authority": {"source_bundle_sha256": "b" * 64}}},
-            {"event_type": "is_succeeded"},
-        ),
-    )
-    monkeypatch.setattr(
-        broker.research_runtime_v4,
-        "review_candidate_source",
-        lambda *_: (_ for _ in ()).throw(OSError("temporary storage interruption")),
-    )
     retired: list[str] = []
     monkeypatch.setattr(
         broker.orchestrator_v4,
         "retire",
         lambda *_args, **_kwargs: retired.append("retired"),
     )
-    with pytest.raises(OSError, match="temporary"):
-        broker.consume_decision(tmp_path, "team-01")
-    assert retired == []
-
-    def wrapped_storage_failure(*_args: object) -> None:
-        try:
-            raise OSError("wrapped temporary storage interruption")
-        except OSError as exc:
-            raise broker.research_runtime_v4.ResearchRuntimeError(
-                "cannot read research authority safely"
-            ) from exc
-
-    monkeypatch.setattr(
-        broker.research_runtime_v4,
-        "review_candidate_source",
-        wrapped_storage_failure,
-    )
-    with pytest.raises(broker.research_runtime_v4.ResearchRuntimeError, match="authority"):
+    with pytest.raises(broker.BrokerError, match="disabled|automatic"):
         broker.consume_decision(tmp_path, "team-01")
     assert retired == []
 
@@ -4180,6 +4076,7 @@ def test_r2_journal_requires_durable_whole_batch_authority_before_acceptance(
             "candidate_ids": [f"candidate-{number}" for number in range(1, 9)],
             "source_bundle_sha256s": [source_sha256, *["6" * 64] * 7],
             "receipt_sha256s": ["4" * 64, *["7" * 64] * 7],
+            "source_review_sha256s": ["8" * 64] * 8,
         },
     )
     wrong_receipt = deepcopy(accepted)
@@ -4317,6 +4214,7 @@ def test_unauthorized_direct_and_cli_is_run_leave_pending_journal_byte_exact(
             "candidate_ids": [f"candidate-{number}" for number in range(1, 9)],
             "source_bundle_sha256s": [source_sha256, *["9" * 64] * 7],
             "receipt_sha256s": ["a" * 64, *["b" * 64] * 7],
+            "source_review_sha256s": ["c" * 64] * 8,
         },
     )
     journal_v4.append(
@@ -4631,6 +4529,44 @@ def test_preflight_receipt_failure_is_resumable_then_durably_authorizes_batch(
         "validate_candidate_receipt",
         lambda *_args, **_kwargs: {"sha256": "8" * 64},
     )
+    monkeypatch.setattr(
+        orchestrator_v4.research_runtime_v4,
+        "review_candidate_source",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            research_runtime_v4.CandidateSourceRejectedError(
+                "synthetic future-invariance rejection"
+            )
+        ),
+    )
+    with pytest.raises(
+        orchestrator_v4.CandidateBatchRejectedError,
+        match="future-invariance rejection",
+    ):
+        orchestrator_v4.preflight_is_batch.__wrapped__(
+            tmp_path, "team-01", "discovery"
+        )
+    assert journal_v4.read(journal).record_count == 0
+
+    monkeypatch.setattr(
+        orchestrator_v4.research_runtime_v4,
+        "review_candidate_source",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            research_runtime_v4.ResearchRuntimeError("source-review worker unavailable")
+        ),
+    )
+    with pytest.raises(
+        research_runtime_v4.ResearchRuntimeError, match="worker unavailable"
+    ):
+        orchestrator_v4.preflight_is_batch.__wrapped__(
+            tmp_path, "team-01", "discovery"
+        )
+    assert journal_v4.read(journal).record_count == 0
+
+    monkeypatch.setattr(
+        orchestrator_v4.research_runtime_v4,
+        "review_candidate_source",
+        lambda *_args, **_kwargs: {"sha256": "9" * 64},
+    )
     capability = orchestrator_v4.preflight_is_batch.__wrapped__(
         tmp_path, "team-01", "discovery"
     )
@@ -4877,6 +4813,7 @@ def test_refinement_preflight_rejects_candidate_reuse_from_discovery(
             "candidate_ids": discovery_ids,
             "source_bundle_sha256s": discovery_hashes,
             "receipt_sha256s": ["c" * 64] * 8,
+            "source_review_sha256s": ["d" * 64] * 8,
         },
     )
     for number, (candidate_id, source_sha256) in enumerate(
@@ -5098,6 +5035,7 @@ def test_preflighted_batch_rejects_changed_accepted_prefix_purpose_without_mutat
             "candidate_ids": candidate_ids,
             "source_bundle_sha256s": source_hashes,
             "receipt_sha256s": ["e" * 64, *["f" * 64] * 7],
+            "source_review_sha256s": ["a" * 64] * 8,
         },
     )
     accepted = journal_v4.append(
@@ -5487,6 +5425,23 @@ def test_canonical_broker_refuses_a_decision_model_launch(
     assert launched == []
 
 
+def test_score_blind_batch_inspection_rejects_legacy_decision_outbox_residue(
+    tmp_path: Path,
+) -> None:
+    outbox = tmp_path / TOP40_V4_R2_LAYOUT.team_root("team-01") / "outbox"
+    outbox.mkdir(parents=True)
+    batch = outbox / "batch-1.json"
+    batch.write_text("{}\n", encoding="utf-8")
+    (outbox / "decision.json").write_text("{}\n", encoding="utf-8")
+    inspection = research_runtime_v4._score_blind_batch_inspection(
+        tmp_path, "team-01", "discovery", batch
+    )
+    assert inspection["candidate_ids"] == []
+    assert inspection["findings"] == [
+        "outbox: unexpected entries must be removed: decision.json"
+    ]
+
+
 def test_broker_lease_rejects_symlink_node(tmp_path: Path) -> None:
     broker = _broker_module()
     lock = tmp_path / "tournament/top40-v4-r2/broker.lock"
@@ -5580,6 +5535,27 @@ def test_r2_robust_order_ranks_missing_edge_density_last() -> None:
     assert scoring_v4.is_ranking_key(measured) < scoring_v4.is_ranking_key(missing)
 
 
+def test_r2_zero_volatility_representative_remains_a_zero_weight_cash_sleeve(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    returns = {
+        "team-01": pd.Series([0.0, 0.0, 0.0]),
+        "team-02": pd.Series([0.0, 0.01, -0.01]),
+    }
+    monkeypatch.setattr(
+        orchestrator_v4,
+        "_daily_from_nomination",
+        lambda _root, nomination: returns[str(nomination["team_id"])],
+    )
+    weights, cash = orchestrator_v4._capped_inverse_vol_weights(
+        tmp_path,
+        [{"team_id": "team-01"}, {"team_id": "team-02"}],
+        0.25,
+    )
+    assert weights == {"team-01": 0.0, "team-02": 0.25}
+    assert cash == 0.75
+
+
 def test_r2_incomplete_truthful_certificate_preserves_fallback_representative(
     tmp_path: Path,
 ) -> None:
@@ -5633,6 +5609,74 @@ def test_r2_incomplete_truthful_certificate_preserves_fallback_representative(
     assert diagnostics["qualified"] is False
     assert diagnostics["accepted_trials_cited"] == 1
     assert diagnostics["accepted_trials_total"] == 1
+
+
+def test_r2_failed_sign_inversion_is_a_truthful_qualification_shortfall(
+    tmp_path: Path,
+) -> None:
+    baseline_hash = "a" * 64
+    inversion_hash = "b" * 64
+    tags = ["baseline", "sign-inversion"]
+
+    def request(candidate_id: str, parent: str | None, request_tags: list[str]):
+        return {
+            "payload": {
+                "team_id": "team-01",
+                "candidate_id": candidate_id,
+                "metadata": {
+                    "parent_candidate_id": parent,
+                    "mechanism": "one mechanism",
+                    "formation_horizon": "30-bars",
+                    "rebalance_horizon": "weekly",
+                    "control_profile": "controls-off",
+                    "tags": request_tags,
+                },
+                "authority": {"risk_policy_sha256": "c" * 64},
+            }
+        }
+
+    state = SimpleNamespace(
+        is_requests={
+            baseline_hash: request("baseline", None, ["baseline"]),
+            inversion_hash: request(
+                "inversion", "baseline", ["sign-inversion"]
+            ),
+        },
+        is_terminals={
+            baseline_hash: {"event_type": "is_succeeded"},
+            inversion_hash: {"event_type": "is_failed"},
+        },
+    )
+    relative = "tournament/top40-v4-r2/certificates/team-01/candidate.json"
+    path = tmp_path / relative
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "team_id": "team-01",
+                "candidate_id": "candidate",
+                "evidence": {
+                    "baseline": [baseline_hash],
+                    "sign-inversion": [inversion_hash],
+                },
+            },
+            sort_keys=True,
+        )
+        + "\n"
+    )
+    _certificate, _digest, diagnostics = orchestrator_v4._certificate(
+        tmp_path,
+        relative,
+        state=state,
+        config={"research": {"required_certificate_tags": tags}},
+        team_id="team-01",
+        candidate_id="candidate",
+        nominated_request_hash=baseline_hash,
+        allow_unqualified=True,
+    )
+    assert diagnostics["qualified"] is False
+    assert "must have succeeded" in diagnostics["finding"]
 
 
 def test_r2_retirement_is_forbidden_when_any_candidate_succeeded(
@@ -5755,8 +5799,11 @@ def test_r2_close_fills_five_with_honestly_labeled_ranked_representatives(
         orchestrator_v4,
         "_capped_inverse_vol_weights",
         lambda _root, rows, _cap: (
-            {str(row["team_id"]): 0.2 for row in rows},
-            0.0,
+            {
+                str(row["team_id"]): 0.25 if index == 0 else 0.0
+                for index, row in enumerate(rows)
+            },
+            0.75,
         ),
     )
     monkeypatch.setattr(
@@ -5786,6 +5833,9 @@ def test_r2_close_fills_five_with_honestly_labeled_ranked_representatives(
         row["field_selection"]["eligible"] is row["fully_qualified"]
         for row in freeze["population"]
     )
+    assert freeze["ensemble"]["available"] is False
+    assert freeze["ensemble"]["weightable_constituents"] == 1
+    assert freeze["ensemble"]["cash_weight"] == 0.75
 
 
 def test_r2_close_refuses_to_fabricate_five_when_only_four_teams_succeeded(
@@ -5868,49 +5918,18 @@ def test_r2_close_refuses_to_fabricate_five_when_only_four_teams_succeeded(
     assert not (tmp_path / TOP40_V4_R2_LAYOUT.journal_path).exists()
 
 
-def test_broker_nomination_failure_cannot_retire_a_successful_team(
+def test_disabled_decision_path_cannot_retire_a_successful_team(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     broker = _broker_module()
-    request = {
-        "schema_version": 1,
-        "operation": "nominate",
-        "candidate_id": "candidate",
-        "certificate_path": "work/research-certificate.json",
-    }
     monkeypatch.setattr(broker.activation_v4, "validate", lambda *_: {})
-    monkeypatch.setattr(broker, "_validate_decision_transition", lambda *_: None)
-    monkeypatch.setattr(
-        broker,
-        "_read_request",
-        lambda *_: (request, tmp_path / "decision.json", json.dumps(request).encode()),
-    )
-    monkeypatch.setattr(
-        broker,
-        "_accepted_record",
-        lambda *_: (
-            "a" * 64,
-            {"payload": {"authority": {"source_bundle_sha256": "b" * 64}}},
-            {"event_type": "is_succeeded"},
-        ),
-    )
-    monkeypatch.setattr(
-        broker.research_runtime_v4,
-        "review_candidate_source",
-        lambda *_: (_ for _ in ()).throw(
-            broker.research_runtime_v4.CandidateSourceRejectedError("rejected")
-        ),
-    )
-    monkeypatch.setattr(broker, "_team_has_success", lambda *_: True)
     retired: list[str] = []
     monkeypatch.setattr(
         broker.orchestrator_v4,
         "retire",
         lambda *_args, **_kwargs: retired.append("retired"),
     )
-    with pytest.raises(
-        broker.research_runtime_v4.CandidateSourceRejectedError, match="rejected"
-    ):
+    with pytest.raises(broker.BrokerError, match="disabled|automatic"):
         broker.consume_decision(tmp_path, "team-01")
     assert retired == []
 
@@ -5919,6 +5938,9 @@ def test_broker_automatically_compiles_the_strongest_team_representative(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     broker = _broker_module()
+    outbox = tmp_path / TOP40_V4_R2_LAYOUT.team_root("team-01") / "outbox"
+    outbox.mkdir(parents=True)
+    (outbox / ".keep").write_text("\n", encoding="utf-8")
     state = SimpleNamespace(
         trials_by_team={"team-01": 12},
         is_requests={
@@ -5959,15 +5981,20 @@ def test_broker_automatically_compiles_the_strongest_team_representative(
         "_accepted_record",
         lambda *_: (
             "a" * 64,
-            {"payload": {"authority": {"source_bundle_sha256": "c" * 64}}},
+            {
+                "payload": {
+                    "authority": {"source_bundle_sha256": "c" * 64},
+                    "trial_number": 1,
+                }
+            },
             {"event_type": "is_succeeded"},
         ),
     )
     reviewed: list[str] = []
     monkeypatch.setattr(
-        broker.research_runtime_v4,
-        "review_candidate_source",
-        lambda _root, _team, candidate, _source: reviewed.append(candidate),
+        broker.orchestrator_v4,
+        "_validated_preflight_source_review",
+        lambda _root, _state, **values: reviewed.append(str(values["candidate_id"])),
     )
     nominations: list[tuple[str, str]] = []
 
