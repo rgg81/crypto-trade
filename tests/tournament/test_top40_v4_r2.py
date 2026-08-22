@@ -3051,6 +3051,116 @@ def test_close_is_revalidates_abandoned_batch_evidence_before_registry_write(
         orchestrator_v4.close_is.__wrapped__(tmp_path)
 
 
+def test_close_is_rejects_pending_successful_truncation_before_any_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    disposition = {
+        "event_type": "batch_rejected",
+        "payload": {
+            "team_id": "team-01",
+            "phase": "refinement",
+            "reason": "score-blind refinement failure",
+            "outbox_sha256": "1" * 64,
+            "candidate_ids": [f"candidate-{number}" for number in range(9, 13)],
+        },
+    }
+    state = SimpleNamespace(
+        selection=None,
+        retired={"team-01": disposition},
+        nominations={},
+        records=(disposition,),
+        trials_by_team={"team-01": 8},
+        is_successes={
+            "2" * 64: {
+                "payload": {"team_id": "team-01", "candidate_id": "candidate-1"}
+            }
+        },
+    )
+    monkeypatch.setattr(orchestrator_v4.isolation_v4, "audit_surface", lambda *_: {})
+    monkeypatch.setattr(
+        orchestrator_v4.activation_v4,
+        "validate",
+        lambda *_args, **_kwargs: {"record_sha256": "3" * 64},
+    )
+    monkeypatch.setattr(orchestrator_v4.top40_v4, "load_config", lambda **_: {})
+    monkeypatch.setattr(
+        orchestrator_v4, "_close_interrupted_is_requests", lambda *_: state
+    )
+    monkeypatch.setattr(
+        orchestrator_v4, "_validate_retired_research_authorities", lambda *_: None
+    )
+    monkeypatch.setattr(
+        orchestrator_v4,
+        "_write_nomination_registry",
+        lambda *_: pytest.fail("pending promotion mutated nomination registry"),
+    )
+    with pytest.raises(orchestrator_v4.OrchestratorError, match="broker promotes"):
+        orchestrator_v4.close_is.__wrapped__(tmp_path)
+    assert not (
+        tmp_path / orchestrator_v4.TOP40_V4_LAYOUT.selection_freeze_path
+    ).exists()
+    assert not (
+        tmp_path / orchestrator_v4.TOP40_V4_LAYOUT.nomination_registry_path
+    ).exists()
+    assert not (tmp_path / orchestrator_v4.TOP40_V4_LAYOUT.journal_path).exists()
+
+
+def test_truncated_representative_ranking_charges_all_twelve_trials(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    disposition = {
+        "event_type": "batch_abandoned",
+        "payload": {"phase": "refinement"},
+    }
+    state = SimpleNamespace(
+        retired={"team-01": disposition},
+        trials_by_team={"team-01": 8},
+        is_successes={
+            "1" * 64: {
+                "payload": {"team_id": "team-01", "candidate_id": "candidate-a"}
+            },
+            "2" * 64: {
+                "payload": {"team_id": "team-01", "candidate_id": "candidate-b"}
+            },
+        },
+    )
+    monkeypatch.setattr(
+        orchestrator_v4,
+        "_verified_summary",
+        lambda _root, terminal: {
+            "rank": 0
+            if terminal["payload"]["candidate_id"] == "candidate-a"
+            else 1
+        },
+    )
+    observed_trials: list[int] = []
+
+    def assess(
+        summary: dict[str, int],
+        _config: object,
+        *,
+        trial_count: int,
+        neighborhood_passed: bool,
+    ) -> dict[str, int]:
+        assert neighborhood_passed is False
+        observed_trials.append(trial_count)
+        return {"rank": summary["rank"]}
+
+    monkeypatch.setattr(orchestrator_v4.scoring_v4, "assess_is", assess)
+    monkeypatch.setattr(
+        orchestrator_v4.scoring_v4,
+        "is_ranking_key",
+        lambda selection: (selection["rank"],),
+    )
+    assert (
+        orchestrator_v4._strongest_successful_candidate(  # noqa: SLF001
+            tmp_path, state, {}, "team-01"
+        )
+        == "candidate-a"
+    )
+    assert observed_trials == [12, 12]
+
+
 def test_historical_release_revalidates_terminal_batch_evidence_before_selection(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -5736,7 +5846,11 @@ def test_r2_strongest_successful_candidate_uses_frozen_robust_order(
             "rank": 0.9,
         },
     }
-    state = SimpleNamespace(is_successes=terminals, trials_by_team={"team-01": 12})
+    state = SimpleNamespace(
+        is_successes=terminals,
+        trials_by_team={"team-01": 12},
+        retired={},
+    )
     monkeypatch.setattr(
         orchestrator_v4, "_verified_summary", lambda _root, terminal: terminal
     )

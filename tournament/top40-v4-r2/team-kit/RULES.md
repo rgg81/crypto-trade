@@ -27,9 +27,10 @@ five-point local neighborhood around any prospective nominee. Every accepted req
 of twelve slots, including failures. After all twelve trials, the organizer deterministically
 submits the strongest successful candidate under the frozen ordering below. If a score-blind
 refinement batch terminates after discovery produced a success, the organizer preserves the
-strongest discovery success and ranks it with the actual eight-trial count. Retirement is
-permitted only when the lane has no successful trial. There is no separate team decision model or
-outbox.
+strongest discovery success, records the actual eight accepted trials, and charges the full
+twelve-trial selection penalty. This removes any benefit from choosing not to publish a valid
+refinement batch after reading discovery feedback. Retirement is permitted only when the lane has
+no successful trial. There is no separate team decision model or outbox.
 
 The representative ordering is higher worst-fold 2x-cost Sharpe, then higher median-fold 2x-cost
 Sharpe, higher trial-adjusted confidence, higher gross edge per turnover, lower annualized
@@ -39,8 +40,8 @@ gate (including the complete research certificate and field-adjusted confidence)
 five earn that badge, the organizer fills the bracket to exactly five with the strongest remaining
 successful representatives without changing, concealing, or claiming that they passed a failed
 gate. If fewer than five teams produce any successful candidate, selection fails closed.
-For the final comparison after twelve trials, the organizer recomputes each successful candidate's
-trial-adjusted confidence as
+For the final comparison, the organizer recomputes each successful candidate's trial-adjusted
+confidence using twelve charged selection trials as
 `max(0, min(1, 1 - 12 * (1 - bootstrap_probability_positive_mean)))`; provisional adjustments
 recorded at different earlier trial counts are never compared.
 

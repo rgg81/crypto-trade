@@ -1701,7 +1701,11 @@ def _strongest_successful_candidate(
     """Return the team's strongest successful candidate under the frozen IS ordering."""
 
     ranked: list[tuple[tuple[Any, ...], str]] = []
-    trial_count = state.trials_by_team.get(team_id, 0)
+    trial_count = (
+        TOP40_V4_LAYOUT.maximum_trials
+        if _successful_truncated_refinement(state, team_id)
+        else state.trials_by_team.get(team_id, 0)
+    )
     for terminal in state.is_successes.values():
         event = terminal["payload"]
         if event["team_id"] != team_id:
@@ -2254,7 +2258,11 @@ def nominate(
         selection = scoring_v4.assess_is(
             summary,
             loaded.raw,
-            trial_count=state.trials_by_team[team_id],
+            trial_count=(
+                TOP40_V4_LAYOUT.maximum_trials
+                if truncated_refinement
+                else state.trials_by_team[team_id]
+            ),
             neighborhood_passed=bool(neighborhood.get("qualified", True)),
         )
         if not selection["eligible"] and not TOP40_V4_LAYOUT.name.endswith("-r2"):
@@ -2265,6 +2273,17 @@ def nominate(
             "team_id": team_id,
             "candidate_id": candidate_id,
             "trial_count": state.trials_by_team[team_id],
+            **(
+                {
+                    "selection_trial_count": (
+                        TOP40_V4_LAYOUT.maximum_trials
+                        if truncated_refinement
+                        else state.trials_by_team[team_id]
+                    )
+                }
+                if TOP40_V4_LAYOUT.name.endswith("-r2")
+                else {}
+            ),
             "request_record_sha256": request_hash,
             "success_record_sha256": success_hash,
             "authority": authority.as_dict(),
@@ -2501,6 +2520,20 @@ def close_is(root: str | Path) -> Mapping[str, Any]:
         loaded = top40_v4.load_config(root=root_path)
         state = _close_interrupted_is_requests(root_path)
         _validate_retired_research_authorities(root_path, state)
+        pending_promotions = (
+            sorted(
+                team_id
+                for team_id in state.retired
+                if _successful_truncated_refinement(state, team_id)
+            )
+            if TOP40_V4_LAYOUT.name.endswith("-r2")
+            else []
+        )
+        if pending_promotions:
+            raise OrchestratorError(
+                "IS cannot close before the serial broker promotes successful truncated "
+                f"refinement lanes: {pending_promotions}"
+            )
         _write_nomination_registry(root_path, state)
         if state.selection is not None:
             freeze = _selection_freeze(root_path, state)
@@ -2517,7 +2550,21 @@ def close_is(root: str | Path) -> Mapping[str, Any]:
             raise OrchestratorError(f"IS cannot close while teams are unresolved: {unresolved}")
         population: list[Mapping[str, Any]] = []
         field_adjustment = TOP40_V4_LAYOUT.name.endswith("-r2")
-        total_field_trials = sum(state.trials_by_team.values()) if field_adjustment else 0
+        accepted_field_trials = (
+            sum(state.trials_by_team.values()) if field_adjustment else 0
+        )
+        total_field_trials = (
+            sum(
+                TOP40_V4_LAYOUT.maximum_trials
+                if team_id in state.nominations
+                and state.trials_by_team.get(team_id, 0)
+                < TOP40_V4_LAYOUT.maximum_trials
+                else state.trials_by_team.get(team_id, 0)
+                for team_id in TOP40_V4_LAYOUT.team_ids
+            )
+            if field_adjustment
+            else 0
+        )
         field_floor = (
             float(
                 loaded.raw["selection"]["floors"][
@@ -2547,7 +2594,8 @@ def close_is(root: str | Path) -> Mapping[str, Any]:
                     "eligible": bool(nomination["selection"]["eligible"])
                     and field_confidence >= field_floor,
                     "adjusted_confidence": field_confidence,
-                    "accepted_trials_across_field": total_field_trials,
+                    "accepted_trials_across_field": accepted_field_trials,
+                    "selection_trials_across_field": total_field_trials,
                     "minimum_inclusive": field_floor,
                 }
             population.append(nomination)
@@ -2640,6 +2688,9 @@ def close_is(root: str | Path) -> Mapping[str, Any]:
                     ],
                     **(
                         {
+                            "selection_trial_count": row.get(
+                                "selection_trial_count", row["trial_count"]
+                            ),
                             "selection_tier": finalist_tier[str(row["team_id"])],
                             "fully_qualified": bool(
                                 row["field_selection"]["eligible"]
@@ -3291,7 +3342,9 @@ def historical_release(root: str | Path) -> Mapping[str, Any]:
                     root_path,
                     result,
                     loaded.raw,
-                    trial_count=int(finalist["trial_count"]),
+                    trial_count=int(
+                        finalist.get("selection_trial_count", finalist["trial_count"])
+                    ),
                 )
                 summary["candidate_id"] = authority.candidate_id
                 summary["run_id"] = run_id

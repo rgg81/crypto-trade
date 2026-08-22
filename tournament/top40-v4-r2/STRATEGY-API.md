@@ -100,8 +100,9 @@ One trial may cover multiple preregistered cells. After all twelve accepted tria
 deterministically submits the strongest successful candidate under the frozen robust ordering and
 compiles its certificate from immutable request metadata; no decision model or team decision
 outbox is used. A score-blind refinement terminal after a successful discovery batch preserves the
-strongest discovery success and applies its actual eight-trial penalty. Retirement is permitted
-only when no trial succeeded. Full qualification additionally requires three distinct formation
+strongest discovery success, records eight accepted trials, and applies the full twelve-trial
+selection penalty. Retirement is permitted only when no trial succeeded. Full qualification
+additionally requires three distinct formation
 horizons, two rebalance horizons, three control profiles, and five successful, distinct local
 neighborhood points that bracket every nominee coordinate. See `config.toml` for the frozen pass
 fraction, median 2x-cost Sharpe, IS floors, and the twelve-trial cap.

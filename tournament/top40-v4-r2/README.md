@@ -16,8 +16,9 @@ Numerical policy is [`config.toml`](config.toml), clean-room semantics are
 ```text
 15 independent clean rooms
   -> up to 12 preregistered IS trials per lane
-  -> strongest successful representative (including a preserved eight-trial discovery success
-     after score-blind refinement truncation), or retirement only after zero successes
+  -> strongest successful representative (including a preserved eight-accepted-trial discovery
+     success charged the full twelve-trial selection penalty after score-blind refinement
+     truncation), or retirement only after zero successes
   -> fully-qualified teams first; robust rank fills a minimum-5, maximum-6 bracket
   -> identities + reporting ensemble frozen; zero-volatility sleeves remain zero-weight cash
   -> one serial, silent historical observation per finalist

@@ -696,6 +696,16 @@ def run_team(root: Path, team_id: str) -> Mapping[str, Any]:
             )
         state = journal_v4.read(root / TOP40_V4_LAYOUT.journal_path)
         if team_id in state.retired:
+            if orchestrator_v4._successful_truncated_refinement(  # noqa: SLF001
+                state, team_id
+            ):
+                representative = _finalize_team_representative(root, team_id)
+                return {
+                    "ok": True,
+                    "team_id": team_id,
+                    "research_truncated": True,
+                    "steps": [*results, representative],
+                }
             return {
                 "ok": True,
                 "team_id": team_id,
