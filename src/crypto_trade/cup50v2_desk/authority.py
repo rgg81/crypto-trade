@@ -26,20 +26,30 @@ DESK_SCHEMA_VERSION = 1
 
 @dataclasses.dataclass(frozen=True)
 class Desk:
-    """Which lane a desk replays, and the exact centre it replays it at."""
+    """Which lane a desk replays, and the exact centre it replays it at.
+
+    ``kind`` distinguishes the two things a desk can be. A ``lane`` desk replays one team's frozen
+    nomination and is verified against it. An ``ensemble`` desk has no nomination and no leaderboard
+    entry of its own -- it is organizer code defined over other lanes -- so it is verified against
+    the finalists it names instead. Making that explicit avoids deciding which checks apply by
+    whether a file happens to exist.
+    """
 
     desk_id: str
     team_id: str
     candidate_id: str
     centre: Mapping[str, float]
     nomination_sha256: str
+    kind: str = "lane"
 
     def __post_init__(self) -> None:
+        if self.kind not in {"lane", "ensemble"}:
+            raise ValueError(f"unknown desk kind: {self.kind!r}")
         if not self.desk_id or "/" in self.desk_id or ".." in self.desk_id:
             raise ValueError(f"unsafe desk id: {self.desk_id!r}")
         if len(self.nomination_sha256) != 64:
             raise ValueError("desk nomination_sha256 must be a SHA-256")
-        if not self.centre:
+        if self.kind == "lane" and not self.centre:
             raise ValueError("a desk must name the centre it replays")
 
 
@@ -57,6 +67,7 @@ def load_desk(desk_id: str, root: str | Path | None = None) -> Desk:
         candidate_id=str(payload["candidate_id"]),
         centre={str(k): float(v) for k, v in dict(payload["centre"]).items()},
         nomination_sha256=str(payload["nomination_sha256"]),
+        kind=str(payload.get("kind", "lane")),
     )
 
 
@@ -114,9 +125,13 @@ def verify_lineage(desk: Desk, root: str | Path | None = None) -> Mapping[str, o
     base = Path(root).resolve() if root is not None else repository_root()
     released = release_path(base)
     release = json.loads(released.read_text(encoding="utf-8"))
-    if desk.team_id not in {str(entry.get("team_id")) for entry in release.get("entries", [])}:
+    if desk.kind == "lane" and desk.team_id not in {
+        str(entry.get("team_id")) for entry in release.get("entries", [])
+    }:
         raise DeploymentChangedError(f"release does not rank {desk.team_id}")
     config = load_config(base / "tournament" / "cup50v2" / "config.toml")
+    if desk.kind == "ensemble":
+        return _verify_ensemble_lineage(desk, base, released, release, config)
     authority = verify_desk_authority(
         paper_root(desk, base) / "authority.json",
         release_path=released,
@@ -227,3 +242,61 @@ def build_deployment_manifest(
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
     return record
+
+
+def _verify_ensemble_lineage(desk: Desk, base: Path, released: Path, release, config):
+    """An ensemble desk is verified against the finalists it is defined over.
+
+    It has no nomination of its own, so the checks a lane desk gets are replaced by stricter ones:
+    the members must be exactly the top eligible lanes of the release, in order, each at the centre
+    and nomination digest its own lane froze. A member that drifts, is re-ordered, or is not
+    eligible stops the desk.
+    """
+    bundle = base / "tournament" / "cup50v2" / "teams" / desk.team_id
+    manifest = json.loads((bundle / "finalists.json").read_text())
+    members = list(manifest["finalists"])
+    if len(members) != 3:
+        raise DeploymentChangedError("the equal-risk ensemble is defined over exactly three lanes")
+
+    eligible = [
+        str(entry["team_id"])
+        for entry in release.get("entries", [])
+        if entry.get("eligible") and entry.get("valid")
+    ]
+    named = [str(member["team_id"]) for member in members]
+    if named != eligible[:3]:
+        raise DeploymentChangedError(
+            f"ensemble members {named} are not the release's top three eligible {eligible[:3]}"
+        )
+
+    for member in members:
+        team_id = str(member["team_id"])
+        nomination = json.loads(
+            (base / "tournament" / "cup50v2" / "nominations" / f"{team_id}.json").read_text()
+        )
+        if nomination["freeze_sha256"] != str(member["nomination_sha256"]):
+            raise DeploymentChangedError(f"ensemble member {team_id} binds another nomination")
+        frozen = {str(k): float(v) for k, v in nomination.get("centre", {}).items()}
+        if frozen != {str(k): float(v) for k, v in dict(member["centre"]).items()}:
+            raise DeploymentChangedError(f"ensemble member {team_id} centre parameters drifted")
+
+    authority = verify_desk_authority(
+        paper_root(desk, base) / "authority.json",
+        release_path=released,
+        winner_bundle=bundle,
+    )
+    if authority.get("public_data_only") is not True:
+        raise DeploymentChangedError("paper authority is not public-data-only")
+    reconstruction = json.loads((paper_root(desk, base) / "reconstruction.json").read_text())
+    if (
+        reconstruction.get("parity") is not True
+        or reconstruction.get("team_id") != desk.team_id
+        or reconstruction.get("lineage_sha256") != authority.get("lineage_sha256")
+    ):
+        raise DeploymentChangedError("historical reconstruction is not this desk's frozen lane")
+    return {
+        "authority": authority,
+        "config_sha256": config.sha256,
+        "nomination": {"freeze_sha256": desk.nomination_sha256, "members": named},
+        "reconstruction": reconstruction,
+    }

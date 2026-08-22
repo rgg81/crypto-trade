@@ -52,27 +52,57 @@ def main() -> int:
     parser.add_argument("--team-id", required=True, help="the lane this desk replays")
     parser.add_argument("--candidate-id", required=True)
     parser.add_argument("--launch", required=True, help="first boundary, ISO-8601 UTC, 8h grid")
+    parser.add_argument(
+        "--kind",
+        choices=("lane", "ensemble"),
+        default="lane",
+        help="ensemble desks have no nomination and are verified against their finalists",
+    )
     arguments = parser.parse_args()
 
     root = Path(arguments.root).resolve() if arguments.root else repository_root()
     launch = _utc(arguments.launch)
     released = root / "reports-cup50v2" / "leaderboard.json"
     release = json.loads(released.read_text())
-    ranked = {str(entry.get("team_id")) for entry in release.get("entries", [])}
-    if arguments.team_id not in ranked:
-        raise SystemExit(
-            f"release does not rank {arguments.team_id}; refusing to bind a desk to it"
-        )
-
-    nomination_path = root / "tournament" / "cup50v2" / "nominations" / f"{arguments.team_id}.json"
-    nomination = json.loads(nomination_path.read_text())
     bundle = root / "tournament" / "cup50v2" / "teams" / arguments.team_id
     bundle_digest = source_bundle_digest(bundle)
-    if bundle_digest != nomination["source_bundle_sha256"]:
-        raise SystemExit(
-            "the repository copy of this lane's bundle is not the one it nominated; "
-            f"{bundle_digest} != {nomination['source_bundle_sha256']}"
+
+    if arguments.kind == "lane":
+        ranked = {str(entry.get("team_id")) for entry in release.get("entries", [])}
+        if arguments.team_id not in ranked:
+            raise SystemExit(
+                f"release does not rank {arguments.team_id}; refusing to bind a desk to it"
+            )
+        nomination_path = (
+            root / "tournament" / "cup50v2" / "nominations" / f"{arguments.team_id}.json"
         )
+        nomination = json.loads(nomination_path.read_text())
+        if bundle_digest != nomination["source_bundle_sha256"]:
+            raise SystemExit(
+                "the repository copy of this lane's bundle is not the one it nominated; "
+                f"{bundle_digest} != {nomination['source_bundle_sha256']}"
+            )
+        centre = {str(k): float(v) for k, v in nomination["centre"].items()}
+        nomination_digest = nomination["freeze_sha256"]
+    else:
+        # An ensemble has no nomination. Its identity is the manifest of finalists it is defined
+        # over, and verify_lineage checks those against the release on every tick.
+        manifest = json.loads((bundle / "finalists.json").read_text())
+        members = [str(m["team_id"]) for m in manifest["finalists"]]
+        eligible = [
+            str(e["team_id"])
+            for e in release.get("entries", [])
+            if e.get("eligible") and e.get("valid")
+        ]
+        if members != eligible[:3]:
+            raise SystemExit(
+                f"ensemble members {members} are not the release's "
+                f"top three eligible {eligible[:3]}"
+            )
+        centre = {}
+        nomination_digest = hashlib.sha256(
+            (bundle / "finalists.json").read_bytes()
+        ).hexdigest()
 
     paper = root / "paper-cup50v2" / arguments.desk_id
     paper.mkdir(parents=True, exist_ok=True)
@@ -85,8 +115,9 @@ def main() -> int:
         "desk_id": arguments.desk_id,
         "team_id": arguments.team_id,
         "candidate_id": arguments.candidate_id,
-        "centre": {str(k): float(v) for k, v in nomination["centre"].items()},
-        "nomination_sha256": nomination["freeze_sha256"],
+        "centre": centre,
+        "nomination_sha256": nomination_digest,
+        "kind": arguments.kind,
     }
     Desk(**{k: v for k, v in desk_record.items() if k != "schema_version"})  # validate before write
     (paper / "desk.json").write_text(json.dumps(desk_record, indent=2, sort_keys=True) + "\n")
@@ -99,7 +130,7 @@ def main() -> int:
         "candidate_id": arguments.candidate_id,
         "release_sha256": hashlib.sha256(released.read_bytes()).hexdigest(),
         "winner_bundle_sha256": bundle_digest,
-        "nomination_sha256": nomination["freeze_sha256"],
+        "nomination_sha256": nomination_digest,
         "launch_time": launch.isoformat(),
         "public_data_only": True,
         "exact_replay": True,

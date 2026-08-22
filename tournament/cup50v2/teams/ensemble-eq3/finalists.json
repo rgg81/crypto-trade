@@ -1,0 +1,58 @@
+{
+  "finalists": [
+    {
+      "bundle": "tournament/cup50v2/teams/team-06",
+      "candidate_id": "team-06-flow-quality-001",
+      "centre": {
+        "band": 0.08,
+        "crash_days": 20.0,
+        "crash_drop": 0.35,
+        "persistence_weight": 0.5,
+        "window_days": 48.0
+      },
+      "nomination_sha256": "2bc8048b7c2146d300e31d2f0e013b900ea521c0d3f596e1ca7c8808631715bb",
+      "team_id": "team-06"
+    },
+    {
+      "bundle": "tournament/cup50v2/teams/team-07",
+      "candidate_id": "flow-neutral-001",
+      "centre": {
+        "adv_days": 24.0,
+        "blend_decay": 0.09,
+        "fast_days": 13.0,
+        "slow_days": 40.0,
+        "trade_band": 0.12
+      },
+      "nomination_sha256": "ff15a85daead55309795cc5811786086feb4206bdfe8e601a42cb586d18564f5",
+      "team_id": "team-07"
+    },
+    {
+      "bundle": "tournament/cup50v2/teams/team-01",
+      "candidate_id": "team-01-mht-bounded-common",
+      "centre": {
+        "clip_limit": 2.0,
+        "h_centre_days": 21.0,
+        "h_spread": 3.0,
+        "n_rungs": 5.0,
+        "net_scale": 0.18,
+        "sigma_bars": 90.0,
+        "smooth_band": 0.05,
+        "smooth_decay": 0.25,
+        "symbol_cap": 0.15
+      },
+      "nomination_sha256": "1985a9ed95d86b515d5decab3bcfe564f7b8936591d36785766ff48e02b42a77",
+      "team_id": "team-01"
+    }
+  ],
+  "namespace": "cup50v2-ensemble-eq3",
+  "note": "The three eligible finalists of release 485f39de, at the centres their lanes froze. Each is sized to the common volatility target before averaging, so the ensemble is equal-risk rather than equal-weight.",
+  "risk_policy": {
+    "risk_halflife_bars": 90.0,
+    "risk_maximum_scale": 3.0,
+    "risk_minimum_scale": 0.1,
+    "risk_minimum_symbol_bars": 30,
+    "risk_target": 0.1,
+    "risk_window_bars": 270
+  },
+  "schema_version": 1
+}
