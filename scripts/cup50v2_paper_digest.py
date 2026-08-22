@@ -27,14 +27,22 @@ def _utc(value: object) -> pd.Timestamp:
 
 
 def desk_record(paper_root: Path, desk_id: str) -> dict[str, object] | None:
+    """Forward returns only. The historical series sits beside this one and is not the record.
+
+    ledger/forward_returns.parquet is what the desk has produced since launch. The reconstruction
+    also wrote ledger/historical_daily_returns.parquet, which is the pre-launch replay used for
+    the tearsheets -- mixing the two would report the tournament's own window as forward
+    performance, which is the single most misleading thing this script could do.
+    """
     ledger = paper_root / desk_id / "ledger" / "forward_returns.parquet"
     if not ledger.is_file():
         return None
     frame = pd.read_parquet(ledger)
     if frame.empty:
         return None
-    column = "net_return" if "net_return" in frame.columns else frame.columns[-1]
-    returns = pd.Series(frame[column].to_numpy(dtype=float))
+    if "net_return" not in frame.columns:
+        raise ValueError(f"{desk_id}: forward ledger has no net_return column")
+    returns = pd.Series(frame["net_return"].to_numpy(dtype=float))
     equity = (1.0 + returns).cumprod()
     peak = equity.cummax()
     drawdown = float((equity / peak - 1.0).min())

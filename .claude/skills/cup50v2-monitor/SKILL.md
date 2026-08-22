@@ -1,6 +1,6 @@
 ---
 name: cup50v2-monitor
-description: Monitor the four CUP-50 v2 forward paper desks (winner, both runners-up, equal-risk ensemble), diagnose integrity failures, and report forward observation without intervening. Use when asked to check the CUP-50 v2 desks, cup50v2 paper PnL, ensemble-eq3, the capital rule's standing, live/backtest parity, deployment-authority or pin drift, stale boundaries, append-invariance aborts, shared market-cache drift, or safe engine recovery.
+description: Monitor the four CUP-50 v2 forward paper desks (winner, both runners-up, equal-risk ensemble), report every desk's performance on every tick, diagnose integrity failures, and observe without intervening. Use when asked to check the CUP-50 v2 desks, cup50v2 paper PnL, ensemble-eq3, the capital rule's standing, live/backtest parity, deployment-authority or pin drift, stale boundaries, append-invariance aborts, shared market-cache drift, or safe engine recovery.
 ---
 
 # CUP-50 v2 Monitor
@@ -60,6 +60,36 @@ those exact bytes. Two consequences:
   If two desks disagree about a price, that is a real integrity failure, not a data race.
 
 The engine lock is held once at `paper-cup50v2/engine.lock` for the whole field.
+
+## Every check reports every desk's performance
+
+**Report a performance line for all four desks on every tick, without being asked.** Not only on a
+status change, not only when something is wrong, and not only in the 24-hour digest.
+
+```
+uv run python scripts/cup50v2_paper_healthcheck.py
+uv run python scripts/cup50v2_paper_digest.py
+```
+
+The digest reads `ledger/forward_returns.parquet` — the record produced **since launch**. It
+deliberately never reads `historical_daily_returns.parquet`, which sits beside it and holds the
+pre-launch replay used for the tearsheets. Reporting that as forward performance would be the most
+misleading thing this monitor could do.
+
+A tick report is two blocks: the integrity line per desk (from the healthcheck), then the
+performance line per desk (from the digest) — days, total return, annualised growth, volatility,
+max drawdown. Four desks, four lines. If a desk has no forward returns yet, say so for that desk
+rather than omitting it; a missing row reads as a desk that is fine.
+
+**This is reporting, not ranking, and the distinction is load-bearing.** Print the numbers for all
+four every time and let them be compared by the person reading. Do not sort the desks by
+performance, do not name a leader, do not describe one desk as ahead of another, and do not compute
+a provisional capital winner. The capital rule is read **once**, after 183 official days, and the
+four-desk design exists precisely because in-sample rank did not predict forward rank. Turning a
+weekly report into a weekly verdict is that same error arriving by a different route.
+
+Losses are reported the same way as gains: as data, in the same format, with no commentary about
+what should be done. There is nothing to do about a losing month.
 
 ## Run the standard check
 
@@ -139,8 +169,11 @@ Report in the session. Do not send push notifications and do not open external c
 
 ## Report concisely
 
-One line per desk plus the capital standing. When everything is fine, say so briefly and stop.
-When something is wrong, name the class, the desk, the boundary, and what you did or did not do.
+Every tick: the integrity line and the performance line for **all four desks**, plus the capital
+standing. That is the whole report when nothing is wrong — brief, complete, and the same shape
+every time so a change is visible at a glance.
+
+When something is wrong, add the class, the desk, the boundary, and what you did or did not do.
 
 ## Provenance
 
