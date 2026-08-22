@@ -71,10 +71,20 @@ uv run python scripts/cup50v2_paper_healthcheck.py
 uv run python scripts/cup50v2_paper_digest.py
 ```
 
-The digest reads `ledger/forward_returns.parquet` — the record produced **since launch**. It
-deliberately never reads `historical_daily_returns.parquet`, which sits beside it and holds the
-pre-launch replay used for the tearsheets. Reporting that as forward performance would be the most
-misleading thing this monitor could do.
+The digest reads `ledger/forward_returns.parquet`. Two distinctions in it are load-bearing, and
+both were wrong in the first version of the script:
+
+- **Bars are not days.** One row per 8h decision, three per day. The digest compounds to UTC days
+  before computing anything, so its numbers mean what the tournament's cells mean.
+- **Bridge is not official.** The ledger begins when the *sealed window* ends, not when the desk
+  launched, so its early rows are real out-of-sample data that existed before the desk went live.
+  Only the `official` phase is the forward record and only official days count toward the capital
+  rule. Report them apart, always. Adding them would credit a desk with performance it never
+  traded — and the bridge is 22 days of it, sitting right there, labelled in a column that is easy
+  to ignore.
+
+The digest also never reads `historical_daily_returns.parquet`, which sits beside it and holds the
+pre-launch replay used for the tearsheets.
 
 A tick report is two blocks: the integrity line per desk (from the healthcheck), then the
 performance line per desk (from the digest) — days, total return, annualised growth, volatility,

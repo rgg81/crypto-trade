@@ -1,12 +1,22 @@
 #!/usr/bin/env python
 """Forward observation across the four CUP-50 v2 desks.
 
-Reports the record, and only the record. There is no ranking in the output and no "leader": the
-capital rule is pre-registered, read once after 183 official days, and naming a leader every week
-is how a six-month experiment quietly turns into a series of one-week decisions.
+Reports the record and only the record. There is no ranking and no "leader": the capital rule is
+pre-registered, read once after 183 official days, and naming a leader every week is how a
+six-month experiment quietly becomes a series of one-week decisions.
 
-Each desk's numbers are computed the same way the tournament computes a cell, so a forward number
-and an in-sample number mean the same thing when they are eventually compared.
+Two things this script is careful about, because getting either wrong misreports performance in a
+direction nobody would question:
+
+*Bars are not days.* The ledger holds one row per 8h decision, three per day. Counting rows as days
+reported "64 days" for desks that had been live for hours, and then annualised by 365 on top of it.
+Everything here compounds to UTC days first, so a number means what it means in the tournament's
+own cells.
+
+*Bridge is not official.* forward_returns.parquet begins when the sealed window ends, not when the
+desk launched, so its early rows are real out-of-sample data that existed before the desk went
+live. Only the official phase is the forward record, and only official days count toward the
+capital rule. Adding the two together would credit a desk with performance it never traded.
 """
 
 from __future__ import annotations
@@ -26,79 +36,103 @@ def _utc(value: object) -> pd.Timestamp:
     return stamp.tz_localize("UTC") if stamp.tzinfo is None else stamp.tz_convert("UTC")
 
 
-def desk_record(paper_root: Path, desk_id: str) -> dict[str, object] | None:
-    """Forward returns only. The historical series sits beside this one and is not the record.
+def _daily(frame: pd.DataFrame) -> pd.Series:
+    series = pd.Series(
+        frame["net_return"].to_numpy(dtype=float),
+        index=pd.DatetimeIndex(frame["decision_time"]),
+    )
+    return (1.0 + series).groupby(series.index.normalize()).prod() - 1.0
 
-    ledger/forward_returns.parquet is what the desk has produced since launch. The reconstruction
-    also wrote ledger/historical_daily_returns.parquet, which is the pre-launch replay used for
-    the tearsheets -- mixing the two would report the tournament's own window as forward
-    performance, which is the single most misleading thing this script could do.
-    """
+
+def _statistics(series: pd.Series) -> dict[str, object]:
+    if series.empty:
+        return {"days": 0}
+    equity = (1.0 + series).cumprod()
+    peak = equity.cummax()
+    ruined = float(equity.iloc[-1]) <= 0.0
+    return {
+        "days": int(len(series)),
+        "total_return": round(float(equity.iloc[-1] - 1.0), 6),
+        "annualised_growth": None
+        if ruined
+        else round(float((365.0 / len(series)) * np.log1p(series.to_numpy()).sum()), 6),
+        "annualised_volatility": round(float(series.std(ddof=0) * (365.0**0.5)), 6),
+        "max_drawdown": round(float((equity / peak - 1.0).min()), 6),
+    }
+
+
+def desk_record(paper_root: Path, desk_id: str) -> dict[str, object] | None:
     ledger = paper_root / desk_id / "ledger" / "forward_returns.parquet"
     if not ledger.is_file():
         return None
     frame = pd.read_parquet(ledger)
-    if frame.empty:
+    if frame.empty or "net_return" not in frame.columns:
         return None
-    if "net_return" not in frame.columns:
-        raise ValueError(f"{desk_id}: forward ledger has no net_return column")
-    returns = pd.Series(frame["net_return"].to_numpy(dtype=float))
-    equity = (1.0 + returns).cumprod()
-    peak = equity.cummax()
-    drawdown = float((equity / peak - 1.0).min())
-    days = len(returns)
-    total = float(equity.iloc[-1] - 1.0)
-    # Annualised log growth, the tournament's own definition. A day that loses everything makes
-    # the log undefined, and an equity path that reaches zero is a failed candidate rather than a
-    # number to report, so it is surfaced instead of being quietly dropped.
-    if float(equity.iloc[-1]) <= 0.0:
-        growth = float("-inf")
-    else:
-        growth = float((365.0 / max(days, 1)) * float(np.log1p(returns.to_numpy()).sum()))
-    volatility = float(returns.std(ddof=0) * (365.0 ** 0.5))
+    phases: dict[str, dict[str, object]] = {}
+    for name in ("official", "bridge"):
+        piece = frame[frame["phase"] == name] if "phase" in frame.columns else frame
+        phases[name] = _statistics(_daily(piece)) if len(piece) else {"days": 0}
+    return {"desk": desk_id, "official": phases["official"], "bridge": phases["bridge"]}
+
+
+def capital_rule(paper_root: Path, now: pd.Timestamp, minimum_days: int) -> dict[str, object]:
+    launch_file = paper_root / "launch.json"
+    if not launch_file.is_file():
+        return {"status": "NOT-LAUNCHED"}
+    launch = _utc(json.loads(launch_file.read_text())["launch"])
+    days = (now - launch).total_seconds() / 86400.0
     return {
-        "desk": desk_id,
-        "days": days,
-        "total_return": round(total, 6),
-        "annualised_growth": None if growth == float("-inf") else round(growth, 6),
-        "annualised_volatility": round(volatility, 6),
-        "max_drawdown": round(drawdown, 6),
+        "status": "ACCRUING" if days < minimum_days else "DECIDABLE",
+        "official_days": round(days, 1),
+        "minimum_days": minimum_days,
     }
+
+
+def _line(desk: str, stats: dict[str, object]) -> str:
+    growth = stats["annualised_growth"]
+    rendered = "RUINED" if growth is None else format(float(growth), "+.4f")
+    return (
+        f"{stats['days']:>4}d  total {float(stats['total_return']):+.4f}  "
+        f"growth {rendered}  vol {float(stats['annualised_volatility']):.4f}  "
+        f"maxDD {float(stats['max_drawdown']):+.4f}"
+    )
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", default=None)
+    parser.add_argument("--minimum-days", type=int, default=183)
     parser.add_argument("--json", action="store_true")
     arguments = parser.parse_args()
     root = Path(arguments.root).resolve() if arguments.root else Path(__file__).resolve().parents[1]
     paper_root = root / "paper-cup50v2"
+    now = pd.Timestamp.now(tz="UTC")
 
-    launch_file = paper_root / "launch.json"
-    launch = _utc(json.loads(launch_file.read_text())["launch"]) if launch_file.is_file() else None
     rows = [record for desk in DESKS if (record := desk_record(paper_root, desk)) is not None]
-
+    capital = capital_rule(paper_root, now, arguments.minimum_days)
     if arguments.json:
-        print(json.dumps({"launch": launch.isoformat() if launch else None, "desks": rows},
-                         sort_keys=True))
+        print(json.dumps({"capital": capital, "desks": rows}, sort_keys=True))
         return 0
-    if launch is None:
+    if capital["status"] == "NOT-LAUNCHED":
         print("desks not launched")
         return 0
-    print(f"CUP-50 v2 forward observation since {launch.date()}")
+    print(f"CUP-50 v2 forward observation ({capital['official_days']:.1f} days since launch)")
     if not rows:
         print("  no desk has published a forward return yet")
         return 0
     for row in rows:
-        growth = row["annualised_growth"]
-        rendered = "RUINED" if growth is None else format(growth, "+.4f")
-        print(
-            f"  {row['desk']:<14} {row['days']:>4}d  "
-            f"total {row['total_return']:+.4f}  "
-            f"growth {rendered}  "
-            f"vol {row['annualised_volatility']:.4f}  "
-            f"maxDD {row['max_drawdown']:+.4f}"
-        )
+        official, bridge = row["official"], row["bridge"]
+        if official["days"]:
+            print(f"  {row['desk']:<14} official {_line(row['desk'], official)}")
+        else:
+            extra = (
+                f"  (bridge {bridge['days']}d total {float(bridge['total_return']):+.4f})"
+                if bridge["days"]
+                else ""
+            )
+            print(f"  {row['desk']:<14} official    0d  no settled boundary yet{extra}")
+    print("  bridge = between the sealed window ending and launch; NOT the forward record and")
+    print("  not counted by the capital rule, which reads official days only")
     print("  (no ranking by design -- the capital rule is read once, after 183 official days)")
     return 0
 
