@@ -115,10 +115,11 @@ One blocking process-wide broker lease encloses every model session and evaluati
 pre-activation bootstrap runs under the distinct result lock so its committed-scope test child can
 acquire the broker lease; no model or evaluation is authorized before that bootstrap atomically
 freezes. The organizer records a deterministic launch authority before a model starts; after a
-crash, the broker can validate that authority, rerun the physical isolation probes, bind final candidate
-bytes, and resume without repeating accepted trials. Feedback, outbox archives, certificates, and
-terminal decisions are immutable/idempotent. A rejected nomination gate retires the completed
-lane without exposing details to another team.
+crash, the broker can validate that authority, rerun the physical isolation probes, bind final
+candidate bytes, and resume without repeating accepted trials. Feedback, outbox archives,
+certificates, and terminal decisions are immutable/idempotent. A team with any successful IS trial
+cannot be retired by a nomination-gate error: it must preserve a successful representative or
+fail closed for organizer recovery, without exposing details to another team.
 
 Every result-bearing command performs a read-only activation precheck before acquiring the broker
 lease, then repeats activation validation inside its result lock. This fixed lock order makes an

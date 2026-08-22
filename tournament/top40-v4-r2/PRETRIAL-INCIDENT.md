@@ -1,5 +1,32 @@
 # Pretrial executor incident
 
+## Minimum-finalist contract incident and fresh successor
+
+The reviewed predecessor admitted valid candidates and completed 36 successful IS observations
+across the four lanes it reached. Its frozen all-or-nothing nomination rule nevertheless allowed
+the first three successful teams to retire when no candidate passed every gate, leaving no
+representative from those teams. Team 04 then had one successful terminal observation and one
+accepted pending observation when the organizer stopped the serial broker. The predecessor has 85
+immutable journal records, no nomination, no selection, and no historical release. It remains
+private and stopped; the pending request is neither fabricated into a failure nor resumed.
+
+That behavior was mechanically faithful to the predecessor rules but incompatible with the
+explicit requirement for at least five strong IS teams. This successor therefore starts every one
+of the 15 lanes at trial zero and reuses no candidate, source, receipt, feedback, journal, result,
+private model state, nomination, or research provenance. The same manifest-authorized market
+snapshot is copied as neutral infrastructure only after exact hash/size and no-link validation.
+
+The successor freezes a different selection contract before any trial. Every team that produces a
+successful IS candidate must submit its strongest successful representative under one exact robust
+ordering; retirement after completed trials is permitted only when no candidate succeeded. Passing
+all original gates, certificate checks, and field confidence remains the `fully-qualified` badge.
+If fewer than five representatives earn it, selection fills only the shortfall to five with the
+strongest remaining successful representatives and labels them `robust-ranked-representative`,
+without changing or hiding any failed gate. If fewer than five teams produce any successful
+candidate, selection fails closed rather than fabricating strength. `FRESH-RESTART-AUTHORITY.json`
+schema 6 binds the stopped predecessor activation, tests, journal file/head, lifecycle counts, and
+no-selection facts alongside every earlier private incident authority.
+
 ## Whole-batch admission incident and fifth clean restart
 
 The fourth clean restart activated successfully. Team 01 reached a terminal retirement, and Team
@@ -18,7 +45,7 @@ output or fabricating a trial would violate provenance. The fourth-restart workt
 preserved privately and stopped. No candidate, receipt, feedback, journal record, result, work,
 private model state, or research provenance from it is reused.
 
-`FRESH-RESTART-AUTHORITY.json` schema 4 binds the exact fourth-restart activation, test, journal,
+`FRESH-RESTART-AUTHORITY.json` binds the exact fourth-restart activation, test, journal,
 launch, outbox, rejected candidate bundle/receipt hashes, trial counts, and no-feedback facts. The
 successor starts all 15 lanes at trial zero. Team rules now state the exact coordinate semantics and
 permit `{}` for non-neighborhood controls. The broker captures and score-blind preflights every

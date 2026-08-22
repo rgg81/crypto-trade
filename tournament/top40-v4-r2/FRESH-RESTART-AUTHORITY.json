@@ -37,6 +37,34 @@
     "team_02_trials_accepted": 6
   },
   "feedback_disclosed": false,
+  "minimum_finalist_incident": {
+    "accepted_trials": 38,
+    "activation_file_sha256": "49b8af37cc650dc9fcc80395f379a2c6704505b1bd2faebf57b1e83adb128e1d",
+    "activation_record_sha256": "df4a9e4be14da63757d3ce6287613baa8e28019569573e5052ccaa4f698bc8da",
+    "activation_tests_sha256": "c61208a39d6518bd6a233257f1968eb6926781affaf985a023d127a10ceba0d4",
+    "branch": "quant-portfolio-blind-top40-v4-r1-v2-restart6",
+    "feedback_files_disclosed": 8,
+    "implementation_commit": "27b66a2d039447788ba2d1a66bf73cd3d6fc5fd0",
+    "journal_file_sha256": "8be8b3dff8344ee98130428e7529ed80bb61f0ba603e9c2ce5cbaa349fb5fa71",
+    "journal_head_sha256": "cde4a71fe23979b1e323319957c776883c216b99a3f687af1af1479edd4db03f",
+    "journal_records": 85,
+    "launch_count": 10,
+    "nominations_created": 0,
+    "outbox_archive_count": 9,
+    "pending_trials": 1,
+    "preservation": "exact-stopped-runtime-artifacts-preserved-in-private-r8-worktree",
+    "reason": "all-or-nothing-qualification-allowed-successful-teams-to-retire-and-did-not-guarantee-five-is-representatives",
+    "research_provenance_reused": false,
+    "results_reused": false,
+    "selection_created": false,
+    "successful_trials": 36,
+    "team_01_retired": true,
+    "team_02_retired": true,
+    "team_03_retired": true,
+    "team_04_pending": true,
+    "teams_started": 4,
+    "terminal_trials": 37
+  },
   "predecessor": {
     "activation_file_sha256": "b80cd016b9572fe75c63abd485990b345901bfe671937f3e1e0b60044e792f17",
     "branch": "quant-portfolio-blind-top40-v4-r1-v2",
@@ -87,7 +115,7 @@
     "trials_accepted": 0,
     "trials_evaluated": 0
   },
-  "schema_version": 5,
+  "schema_version": 6,
   "skill_boundary_incident": {
     "activation_file_sha256": "839a849904db69769e0ea79e0215ea670bbd72f8f595b1ba52eafafca55d39e9",
     "activation_record_sha256": "302528e9f29b1dea57cd524f14aa12c0fd0bc40767e66cdc297a36cfd79600bb",
@@ -180,7 +208,7 @@
     "trials_failed": 8,
     "trials_succeeded": 0
   },
-  "status": "fresh-restart-after-private-aborted-and-zero-candidate-incidents",
+  "status": "fresh-restart-with-mandatory-successful-team-representatives",
   "successful_prefix": [
     {
       "candidate_id": "pressure-reversal-f24-r1-baseline",

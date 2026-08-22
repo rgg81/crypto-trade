@@ -189,7 +189,9 @@ maximum_fold_positive_pnl_share_inclusive = 0.60
 
 [selection.ranking]
 advance_count = 6
-eligible_population = "one-qualified-nominee-per-team"
+minimum_finalist_count = 5
+eligible_population = "one-successful-representative-per-team"
+qualification_policy = "fully-qualified-first-then-robust-ranked-representatives"
 sort = [
   "higher-worst-fold-double-cost-sharpe",
   "higher-median-fold-double-cost-sharpe",
@@ -200,6 +202,7 @@ sort = [
 ]
 advance_all_when_fewer = true
 lower_floors_to_fill_bracket = false
+fallback_changes_frozen_gate_results = false
 
 [historical_oos]
 maximum_observations_per_finalist = 1

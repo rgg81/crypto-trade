@@ -92,10 +92,15 @@ CRYPTO_TRADE_TOP40_V4_EDITION=r2 PYTHONPATH=src \
 Keep each returned `request_record_sha256`. At acceptance, the organizer also writes a score-free
 receipt under `reports-top40-v4-r2/is/team-NN/receipts/`; this preserves the request hash even when
 execution fails or is interrupted. The research certificate has exactly the seven keys shown in
-`templates/research-certificate.json`; each value is a nonempty list of unique request hashes whose
-candidate tags include that key, and their union must cover every accepted trial.
-One trial may cover multiple preregistered cells. Nomination or evidence-backed retirement requires
-at least eight accepted trials. Nomination additionally requires three distinct formation
+`templates/research-certificate.json`; each value lists unique request hashes whose candidate tags
+include that key. Empty or incomplete cells are accepted only for an honestly labeled fallback
+representative. Full qualification requires every list to be nonempty and their union to cover
+every accepted trial.
+One trial may cover multiple preregistered cells. After all twelve accepted trials, the organizer
+deterministically submits the strongest successful candidate under the frozen robust ordering and
+compiles its certificate from immutable request metadata; no decision model or team decision
+outbox is used. Retirement is permitted only when all twelve trials failed. Full qualification
+additionally requires three distinct formation
 horizons, two rebalance horizons, three control profiles, and five successful, distinct local
 neighborhood points that bracket every nominee coordinate. See `config.toml` for the frozen pass
 fraction, median 2x-cost Sharpe, IS floors, and the twelve-trial cap.
@@ -106,10 +111,9 @@ negative of every baseline target while preserving its explicit-rebalance/hold d
 organizer verifies this equality directly from the two immutable target artifacts at nomination;
 a label alone is not evidence.
 
-The team writes its completed certificate only to `work/research-certificate.json` and references
-it from `outbox/decision.json`. The broker validates and copies exact bytes into the organizer-only
-certificate namespace before nomination. No lane is obliged to nominate a candidate that fails the
-frozen gates.
+The broker writes the deterministic certificate only in the organizer namespace. A representative
+that fails a frozen gate keeps that failure in its public selection record and is never described
+as fully qualified.
 
 An individual IS summary is intentionally provisional: its `neighborhood_stability` gate remains
 false because the organizer can validate the multi-trial certificate only at nomination. Assess

@@ -1,8 +1,9 @@
 # Top-40 V4-R2
 
 This directory is the public authority for a fresh 15-lane tournament. Teams choose their own
-mechanisms inside deny-by-default clean rooms. Six or fewer robust IS nominees enter a single
-sealed historical championship ending after the final July 2026 bar.
+mechanisms inside deny-by-default clean rooms. At least five and at most six robust IS team
+representatives enter a single sealed historical championship ending after the final July 2026
+bar, provided at least five teams produce a successful IS candidate.
 
 The charter is [`../../TOURNAMENT-CHARTER-TOP40-V4-R2.md`](../../TOURNAMENT-CHARTER-TOP40-V4-R2.md).
 Numerical policy is [`config.toml`](config.toml), clean-room semantics are
@@ -15,8 +16,8 @@ Numerical policy is [`config.toml`](config.toml), clean-room semantics are
 ```text
 15 independent clean rooms
   -> up to 12 preregistered IS trials per lane
-  -> one eligible nominee or evidence-backed retirement per lane
-  -> exact robust rank; at most 6 finalists
+  -> strongest successful representative, or retirement only after zero successes
+  -> fully-qualified teams first; robust rank fills a minimum-5, maximum-6 bracket
   -> identities + reporting ensemble frozen
   -> one serial, silent historical observation per finalist
   -> one atomic cohort release
@@ -38,7 +39,7 @@ Activation performs the expensive full raw-source replay once. Each later result
 the bound pure-crypto classification audit and canonical-file hashes before and after execution,
 without re-reading tens of thousands of immutable source archives.
 
-This worktree is the fifth clean restart after private predecessor incidents. No predecessor is
+This worktree is a clean successor after private predecessor incidents. No predecessor is
 continued: no candidate, feedback, result, source archive, research receipt, or decision is reused,
 and all 15 lanes begin at trial zero. The exact score-blind incident facts and predecessor hashes
 are frozen in `FRESH-RESTART-AUTHORITY.json`; teams cannot read that organizer authority or any

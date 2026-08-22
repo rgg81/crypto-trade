@@ -93,6 +93,10 @@ class CandidateBatchRejectedError(OrchestratorError):
         self._capability = capability
 
 
+class CertificateQualificationError(OrchestratorError):
+    """A truthful representative missed a stricter frozen qualification requirement."""
+
+
 class ResultCommandBusyError(OrchestratorError):
     """Another result-bearing V4 command owns the kernel lock."""
 
@@ -1633,6 +1637,35 @@ def _candidate_success(
     return matches[0]
 
 
+def _strongest_successful_candidate(
+    root: Path,
+    state: journal_v4.JournalState,
+    config: Mapping[str, Any],
+    team_id: str,
+) -> str:
+    """Return the team's strongest successful candidate under the frozen IS ordering."""
+
+    ranked: list[tuple[tuple[Any, ...], str]] = []
+    trial_count = state.trials_by_team.get(team_id, 0)
+    for terminal in state.is_successes.values():
+        event = terminal["payload"]
+        if event["team_id"] != team_id:
+            continue
+        candidate_id = str(event["candidate_id"])
+        summary = _verified_summary(root, terminal)
+        selection = scoring_v4.assess_is(
+            summary,
+            config,
+            trial_count=trial_count,
+            neighborhood_passed=False,
+        )
+        ranked.append(((*scoring_v4.is_ranking_key(selection), candidate_id), candidate_id))
+    if not ranked:
+        raise OrchestratorError("team has no successful IS candidate to represent it")
+    ranked.sort(key=lambda row: row[0])
+    return ranked[0][1]
+
+
 def _verified_request_targets(
     root: Path, state: journal_v4.JournalState, request_hash: str
 ) -> pd.DataFrame:
@@ -1709,21 +1742,23 @@ def _validate_exact_sign_inversions(
         parent_id = inversion.get("parent_candidate_id")
         baseline_hash = baselines.get(str(parent_id)) if parent_id is not None else None
         if baseline_hash is None:
-            raise OrchestratorError(
+            raise CertificateQualificationError(
                 "sign-inversion evidence must name a cited baseline as parent_candidate_id"
             )
         baseline_request = team_requests[baseline_hash]
         baseline = baseline_request["payload"]["metadata"]
         for key in ("mechanism", "formation_horizon", "rebalance_horizon", "control_profile"):
             if inversion[key] != baseline[key]:
-                raise OrchestratorError(
+                raise CertificateQualificationError(
                     f"sign-inversion differs from its baseline in {key}"
                 )
         if (
             inversion_request["payload"]["authority"]["risk_policy_sha256"]
             != baseline_request["payload"]["authority"]["risk_policy_sha256"]
         ):
-            raise OrchestratorError("sign-inversion risk policy differs from its baseline")
+            raise CertificateQualificationError(
+                "sign-inversion risk policy differs from its baseline"
+            )
         baseline_targets = _verified_request_targets(root, state, baseline_hash)
         inversion_targets = _verified_request_targets(root, state, inversion_hash)
         if (
@@ -1741,21 +1776,18 @@ def _validate_exact_sign_inversions(
                 ),
             )
         ):
-            raise OrchestratorError(
+            raise CertificateQualificationError(
                 "sign-inversion targets are not the exact negative of their cited baseline"
             )
 
 
-def _certificate(
+def _captured_certificate(
     root: Path,
     relative: str,
     *,
-    state: journal_v4.JournalState,
-    config: Mapping[str, Any],
     team_id: str,
     candidate_id: str,
-    nominated_request_hash: str,
-) -> tuple[Mapping[str, Any], str, dict[str, Any]]:
+) -> tuple[bytes, Mapping[str, Any]]:
     required_prefix = f"{TOP40_V4_LAYOUT.tournament_root}/certificates/{team_id}/"
     if not relative.startswith(required_prefix):
         raise OrchestratorError("research certificate must remain inside its team namespace")
@@ -1769,6 +1801,23 @@ def _certificate(
         or certificate["candidate_id"] != candidate_id
     ):
         raise OrchestratorError("research certificate identity is wrong")
+    return certificate_payload, certificate
+
+
+def _qualified_certificate(
+    root: Path,
+    relative: str,
+    *,
+    state: journal_v4.JournalState,
+    config: Mapping[str, Any],
+    team_id: str,
+    candidate_id: str,
+    nominated_request_hash: str,
+    captured: tuple[bytes, Mapping[str, Any]] | None = None,
+) -> tuple[Mapping[str, Any], str, dict[str, Any]]:
+    certificate_payload, certificate = captured or _captured_certificate(
+        root, relative, team_id=team_id, candidate_id=candidate_id
+    )
     evidence = certificate["evidence"]
     required_tags = tuple(config["research"]["required_certificate_tags"])
     if not isinstance(evidence, Mapping) or set(evidence) != set(required_tags):
@@ -1782,7 +1831,9 @@ def _certificate(
     for tag in required_tags:
         digests = evidence[tag]
         if not isinstance(digests, list) or not digests or len(set(digests)) != len(digests):
-            raise OrchestratorError(f"certificate cell {tag} must list unique trial records")
+            raise CertificateQualificationError(
+                f"certificate cell {tag} must list unique trial records"
+            )
         for digest in digests:
             if not isinstance(digest, str) or _SHA256.fullmatch(digest) is None:
                 raise OrchestratorError(f"certificate cell {tag} contains an invalid hash")
@@ -1791,7 +1842,9 @@ def _certificate(
                 raise OrchestratorError(f"certificate cell {tag} cites incompatible evidence")
             cited_requests.add(digest)
     if cited_requests != set(team_requests):
-        raise OrchestratorError("research certificate must cover every accepted team trial")
+        raise CertificateQualificationError(
+            "research certificate must cover every accepted team trial"
+        )
     _validate_exact_sign_inversions(root, state, team_requests, evidence)
 
     records = [record["payload"]["metadata"] for record in team_requests.values()]
@@ -1799,28 +1852,38 @@ def _certificate(
     if len({row["formation_horizon"] for row in records}) < int(
         research["minimum_distinct_formation_horizons"]
     ):
-        raise OrchestratorError("research certificate lacks formation-horizon breadth")
+        raise CertificateQualificationError(
+            "research certificate lacks formation-horizon breadth"
+        )
     if len({row["rebalance_horizon"] for row in records}) < int(
         research["minimum_distinct_rebalance_horizons"]
     ):
-        raise OrchestratorError("research certificate lacks rebalance-horizon breadth")
+        raise CertificateQualificationError(
+            "research certificate lacks rebalance-horizon breadth"
+        )
     if len({row["control_profile"] for row in records}) < int(
         research["minimum_distinct_control_profiles"]
     ):
-        raise OrchestratorError("research certificate lacks control-profile breadth")
+        raise CertificateQualificationError(
+            "research certificate lacks control-profile breadth"
+        )
     if sum("mechanism-pivot" in row["tags"] for row in records) > int(
         research["maximum_mechanism_pivots_per_team"]
     ):
-        raise OrchestratorError("team exceeded its mechanism-pivot allowance")
+        raise CertificateQualificationError("team exceeded its mechanism-pivot allowance")
 
     finalist_metadata = team_requests[nominated_request_hash]["payload"]["metadata"]
     neighborhood_id = finalist_metadata["neighborhood_id"]
     finalist_coordinates = finalist_metadata["neighborhood_coordinates"]
     if neighborhood_id is None or not finalist_coordinates:
-        raise OrchestratorError("finalist must declare a numeric local neighborhood")
+        raise CertificateQualificationError(
+            "finalist must declare a numeric local neighborhood"
+        )
     neighborhood_hashes = evidence["local-neighborhood"]
     if len(neighborhood_hashes) < int(research["minimum_neighborhood_points"]):
-        raise OrchestratorError("research certificate has too few neighborhood points")
+        raise CertificateQualificationError(
+            "research certificate has too few neighborhood points"
+        )
     neighborhood_summaries: list[Mapping[str, Any]] = []
     coordinates: list[Mapping[str, Any]] = []
     passes = 0
@@ -1829,12 +1892,18 @@ def _certificate(
         request = team_requests[request_hash]
         metadata = request["payload"]["metadata"]
         if metadata["neighborhood_id"] != neighborhood_id:
-            raise OrchestratorError("certificate mixes different local neighborhoods")
+            raise CertificateQualificationError(
+                "certificate mixes different local neighborhoods"
+            )
         if set(metadata["neighborhood_coordinates"]) != set(finalist_coordinates):
-            raise OrchestratorError("neighborhood coordinate schema is inconsistent")
+            raise CertificateQualificationError(
+                "neighborhood coordinate schema is inconsistent"
+            )
         terminal = state.is_terminals.get(request_hash)
         if terminal is None or terminal["event_type"] != "is_succeeded":
-            raise OrchestratorError("every local-neighborhood point must have succeeded")
+            raise CertificateQualificationError(
+                "every local-neighborhood point must have succeeded"
+            )
         summary = _verified_summary(root, terminal)
         annual_return = float(summary["scored_window"]["base_metrics"]["annualized_return"])
         double_sharpe = float(summary["scored_window"]["double_cost_metrics"]["net_sharpe"])
@@ -1844,17 +1913,23 @@ def _certificate(
         coordinates.append(metadata["neighborhood_coordinates"])
     coordinate_vectors = {_coordinate_vector_key(row) for row in coordinates}
     if len(coordinate_vectors) != len(coordinates):
-        raise OrchestratorError("local-neighborhood coordinate vectors must be distinct")
+        raise CertificateQualificationError(
+            "local-neighborhood coordinate vectors must be distinct"
+        )
     pass_fraction = passes / len(neighborhood_summaries)
     median_double = float(np.median(double_sharpes))
     if pass_fraction < float(research["minimum_neighborhood_pass_fraction"]):
-        raise OrchestratorError("local-neighborhood pass fraction is below policy")
+        raise CertificateQualificationError(
+            "local-neighborhood pass fraction is below policy"
+        )
     if median_double < float(research["minimum_neighborhood_median_double_cost_sharpe"]):
-        raise OrchestratorError("local-neighborhood median 2x Sharpe is below policy")
+        raise CertificateQualificationError(
+            "local-neighborhood median 2x Sharpe is below policy"
+        )
     for key, finalist_value in finalist_coordinates.items():
         values = [float(row[key]) for row in coordinates]
         if not min(values) < float(finalist_value) < max(values):
-            raise OrchestratorError(
+            raise CertificateQualificationError(
                 f"local neighborhood does not bracket finalist coordinate {key}"
             )
     diagnostics = {
@@ -1865,6 +1940,100 @@ def _certificate(
         "bracketed_coordinates": sorted(finalist_coordinates),
     }
     return certificate, _sha256(certificate_payload), diagnostics
+
+
+def _representative_certificate(
+    root: Path,
+    relative: str,
+    *,
+    state: journal_v4.JournalState,
+    config: Mapping[str, Any],
+    team_id: str,
+    candidate_id: str,
+    captured: tuple[bytes, Mapping[str, Any]] | None = None,
+) -> tuple[Mapping[str, Any], str, dict[str, Any]]:
+    """Validate a complete score-bound research record without claiming qualification.
+
+    Every cited trial must have truthful tag evidence. Missing cells or incomplete coverage remain
+    part of the stricter fully-qualified badge; failure of one of those checks must not erase a
+    successful team from the comparative bracket because the journal already binds all trials.
+    """
+
+    certificate_payload, certificate = captured or _captured_certificate(
+        root, relative, team_id=team_id, candidate_id=candidate_id
+    )
+    evidence = certificate["evidence"]
+    required_tags = tuple(config["research"]["required_certificate_tags"])
+    if not isinstance(evidence, Mapping) or set(evidence) != set(required_tags):
+        raise OrchestratorError("research certificate evidence cells differ from policy")
+    team_requests = {
+        digest: record
+        for digest, record in state.is_requests.items()
+        if record["payload"]["team_id"] == team_id
+    }
+    cited_requests: set[str] = set()
+    for tag in required_tags:
+        digests = evidence[tag]
+        if not isinstance(digests, list) or len(set(digests)) != len(digests):
+            raise OrchestratorError(f"certificate cell {tag} must list unique trial records")
+        for digest in digests:
+            if not isinstance(digest, str) or _SHA256.fullmatch(digest) is None:
+                raise OrchestratorError(f"certificate cell {tag} contains an invalid hash")
+            request = team_requests.get(digest)
+            if request is None or tag not in request["payload"]["metadata"]["tags"]:
+                raise OrchestratorError(f"certificate cell {tag} cites incompatible evidence")
+            cited_requests.add(digest)
+    diagnostics = {
+        "qualified": False,
+        "finding": "representative did not satisfy the complete frozen research certificate",
+        "accepted_trials_cited": len(cited_requests),
+        "accepted_trials_total": len(team_requests),
+    }
+    return certificate, _sha256(certificate_payload), diagnostics
+
+
+def _certificate(
+    root: Path,
+    relative: str,
+    *,
+    state: journal_v4.JournalState,
+    config: Mapping[str, Any],
+    team_id: str,
+    candidate_id: str,
+    nominated_request_hash: str,
+    allow_unqualified: bool = False,
+) -> tuple[Mapping[str, Any], str, dict[str, Any]]:
+    captured = _captured_certificate(
+        root, relative, team_id=team_id, candidate_id=candidate_id
+    )
+    try:
+        certificate, digest, diagnostics = _qualified_certificate(
+            root,
+            relative,
+            state=state,
+            config=config,
+            team_id=team_id,
+            candidate_id=candidate_id,
+            nominated_request_hash=nominated_request_hash,
+            captured=captured,
+        )
+    except CertificateQualificationError as exc:
+        if not allow_unqualified:
+            raise
+        certificate, digest, diagnostics = _representative_certificate(
+            root,
+            relative,
+            state=state,
+            config=config,
+            team_id=team_id,
+            candidate_id=candidate_id,
+            captured=captured,
+        )
+        diagnostics = {**diagnostics, "finding": str(exc)}
+        return certificate, digest, diagnostics
+    if not allow_unqualified:
+        return certificate, digest, diagnostics
+    return certificate, digest, {**diagnostics, "qualified": True, "finding": None}
 
 
 def _write_nomination_registry(root: Path, state: journal_v4.JournalState) -> None:
@@ -1918,6 +2087,20 @@ def nominate(
         minimum = int(loaded.raw["research"]["minimum_accepted_trials_before_nomination"])
         if state.trials_by_team.get(team_id, 0) < minimum:
             raise OrchestratorError("team must consume at least eight structured trials")
+        if (
+            TOP40_V4_LAYOUT.name.endswith("-r2")
+            and state.trials_by_team.get(team_id, 0) != TOP40_V4_LAYOUT.maximum_trials
+        ):
+            raise OrchestratorError("representative nomination requires all twelve trials")
+        if TOP40_V4_LAYOUT.name.endswith("-r2"):
+            strongest = _strongest_successful_candidate(
+                root_path, state, loaded.raw, team_id
+            )
+            if candidate_id != strongest:
+                raise OrchestratorError(
+                    "team must nominate its strongest successful candidate under the frozen "
+                    "robust IS ranking"
+                )
         success_hash, terminal, request_hash, request = _candidate_success(
             state, team_id, candidate_id
         )
@@ -1941,14 +2124,15 @@ def nominate(
             team_id=team_id,
             candidate_id=candidate_id,
             nominated_request_hash=request_hash,
+            allow_unqualified=TOP40_V4_LAYOUT.name.endswith("-r2"),
         )
         selection = scoring_v4.assess_is(
             summary,
             loaded.raw,
             trial_count=state.trials_by_team[team_id],
-            neighborhood_passed=True,
+            neighborhood_passed=bool(neighborhood.get("qualified", True)),
         )
-        if not selection["eligible"]:
+        if not selection["eligible"] and not TOP40_V4_LAYOUT.name.endswith("-r2"):
             failed = sorted(key for key, passed in selection["gates"].items() if not passed)
             raise OrchestratorError(f"candidate fails frozen IS gates: {', '.join(failed)}")
         nomination = {
@@ -1967,6 +2151,21 @@ def nominate(
             "certificate": certificate,
             "neighborhood": neighborhood,
             "selection": selection,
+            **(
+                {
+                    "qualification": {
+                        "fully_qualified": bool(selection["eligible"]),
+                        "failed_gates": sorted(
+                            key
+                            for key, passed in selection["gates"].items()
+                            if not passed
+                        ),
+                        "fallback_does_not_change_gate_results": True,
+                    }
+                }
+                if TOP40_V4_LAYOUT.name.endswith("-r2")
+                else {}
+            ),
         }
         nomination_path = (
             f"{TOP40_V4_LAYOUT.tournament_root}/nominations/{team_id}-{candidate_id}.json"
@@ -1993,7 +2192,8 @@ def nominate(
             "ok": True,
             "team_id": team_id,
             "candidate_id": candidate_id,
-            "eligible": True,
+            "eligible": bool(selection["eligible"]),
+            "representative": True,
             "selection": selection,
             "journal_record_sha256": record["record_sha256"],
         }
@@ -2023,6 +2223,16 @@ def retire(root: str | Path, team_id: str, *, reason: str) -> Mapping[str, Any]:
         minimum = int(loaded.raw["research"]["minimum_accepted_trials_before_nomination"])
         if state.trials_by_team[team_id] < minimum:
             raise OrchestratorError("retirement requires at least eight accepted research trials")
+        if TOP40_V4_LAYOUT.name.endswith("-r2"):
+            if state.trials_by_team[team_id] != TOP40_V4_LAYOUT.maximum_trials:
+                raise OrchestratorError("retirement requires all twelve accepted research trials")
+            if any(
+                terminal["payload"]["team_id"] == team_id
+                for terminal in state.is_successes.values()
+            ):
+                raise OrchestratorError(
+                    "a team with a successful IS candidate must submit its representative"
+                )
         _validate_text(reason, "reason")
         record = journal_v4.append(
             _journal_path(root_path), "retired", {"team_id": team_id, "reason": reason}
@@ -2187,7 +2397,10 @@ def close_is(root: str | Path) -> Mapping[str, Any]:
         )
         for team_id, record in sorted(state.nominations.items()):
             nomination = dict(_verified_nomination(root_path, record))
-            if not nomination["selection"]["eligible"]:
+            if (
+                not field_adjustment
+                and not nomination["selection"]["eligible"]
+            ):
                 raise OrchestratorError("nomination registry contains an ineligible candidate")
             if field_adjustment:
                 summary_relative = str(nomination["summary_path"])
@@ -2199,7 +2412,8 @@ def close_is(root: str | Path) -> Mapping[str, Any]:
                     float(summary["bootstrap_probability_positive_mean"]), total_field_trials
                 )
                 nomination["field_selection"] = {
-                    "eligible": field_confidence >= field_floor,
+                    "eligible": bool(nomination["selection"]["eligible"])
+                    and field_confidence >= field_floor,
                     "adjusted_confidence": field_confidence,
                     "accepted_trials_across_field": total_field_trials,
                     "minimum_inclusive": field_floor,
@@ -2207,12 +2421,34 @@ def close_is(root: str | Path) -> Mapping[str, Any]:
             population.append(nomination)
         population.sort(key=lambda row: scoring_v4.is_ranking_key(row["selection"]))
         advance_count = int(loaded.raw["selection"]["ranking"]["advance_count"])
-        eligible_population = (
-            [row for row in population if row["field_selection"]["eligible"]]
-            if field_adjustment
-            else population
-        )
-        finalists = eligible_population[:advance_count]
+        if field_adjustment:
+            minimum_finalists = int(
+                loaded.raw["selection"]["ranking"]["minimum_finalist_count"]
+            )
+            if len(population) < minimum_finalists:
+                raise OrchestratorError(
+                    "IS produced fewer than five successful team representatives"
+                )
+            qualified = [row for row in population if row["field_selection"]["eligible"]]
+            fallback = [row for row in population if not row["field_selection"]["eligible"]]
+            if len(qualified) >= minimum_finalists:
+                finalists = qualified[:advance_count]
+            else:
+                finalists = [
+                    *qualified,
+                    *fallback[: minimum_finalists - len(qualified)],
+                ]
+            finalist_tier = {
+                str(row["team_id"]): (
+                    "fully-qualified"
+                    if row["field_selection"]["eligible"]
+                    else "robust-ranked-representative"
+                )
+                for row in finalists
+            }
+        else:
+            finalists = population[:advance_count]
+            finalist_tier = {str(row["team_id"]): "fully-qualified" for row in finalists}
         advancing = [str(row["team_id"]) for row in finalists]
         minimum_constituents = (
             int(loaded.raw["ensemble"]["minimum_constituents"])
@@ -2228,7 +2464,9 @@ def close_is(root: str | Path) -> Mapping[str, Any]:
                 float(loaded.raw["ensemble"]["maximum_constituent_weight"]),
             )
         freeze = {
-            "schema_version": f"{_SCHEMA_PREFIX}-selection-freeze-v1",
+            "schema_version": f"{_SCHEMA_PREFIX}-selection-freeze-v2"
+            if field_adjustment
+            else f"{_SCHEMA_PREFIX}-selection-freeze-v1",
             "tournament": TOP40_V4_LAYOUT.name,
             "input_journal_head_sha256": state.head_sha256,
             "config_sha256": loaded.sha256,
@@ -2243,7 +2481,10 @@ def close_is(root: str | Path) -> Mapping[str, Any]:
                     ],
                     "selection": row["selection"],
                     **(
-                        {"field_selection": row["field_selection"]}
+                        {
+                            "field_selection": row["field_selection"],
+                            "fully_qualified": bool(row["field_selection"]["eligible"]),
+                        }
                         if field_adjustment
                         else {}
                     ),
@@ -2264,6 +2505,16 @@ def close_is(root: str | Path) -> Mapping[str, Any]:
                     "nomination_sha256": state.nominations[row["team_id"]]["payload"][
                         "nomination_sha256"
                     ],
+                    **(
+                        {
+                            "selection_tier": finalist_tier[str(row["team_id"])],
+                            "fully_qualified": bool(
+                                row["field_selection"]["eligible"]
+                            ),
+                        }
+                        if field_adjustment
+                        else {}
+                    ),
                 }
                 for rank, row in enumerate(finalists, start=1)
             ],
@@ -2642,6 +2893,14 @@ def _release_bundle(
                     "team_id": row["team_id"],
                     "candidate_id": row["candidate_id"],
                     "status": "succeeded" if packets[row["team_id"]] is not None else "DNF",
+                    **(
+                        {
+                            "selection_tier": row["selection_tier"],
+                            "fully_qualified": row["fully_qualified"],
+                        }
+                        if "selection_tier" in row
+                        else {}
+                    ),
                     "championship": packets[row["team_id"]]["championship"]
                     if packets[row["team_id"]] is not None
                     else None,

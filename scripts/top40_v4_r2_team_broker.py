@@ -23,6 +23,7 @@ from crypto_trade.tournament import (  # noqa: E402
     journal_v4,
     orchestrator_v4,
     research_runtime_v4,
+    top40_v4,
 )
 from crypto_trade.tournament.layout_v4 import TOP40_V4_LAYOUT  # noqa: E402
 
@@ -497,6 +498,77 @@ def _copy_certificate(root: Path, team_id: str, candidate_id: str, relative: obj
     return destination_relative
 
 
+def _team_has_success(root: Path, team_id: str) -> bool:
+    state = journal_v4.read(root / TOP40_V4_LAYOUT.journal_path)
+    return any(
+        terminal["payload"]["team_id"] == team_id
+        for terminal in state.is_successes.values()
+    )
+
+
+def _finalize_team_representative(root: Path, team_id: str) -> Mapping[str, Any]:
+    """Compile the frozen certificate and disposition without a fallible decision session."""
+
+    state = journal_v4.read(root / TOP40_V4_LAYOUT.journal_path)
+    if state.trials_by_team.get(team_id, 0) != TOP40_V4_LAYOUT.maximum_trials:
+        raise BrokerError("automatic representative selection requires all twelve trials")
+    _validate_completed_phase(root, team_id, "discovery")
+    _validate_completed_phase(root, team_id, "refinement")
+    if not _team_has_success(root, team_id):
+        result = orchestrator_v4.retire(
+            root,
+            team_id,
+            reason="all twelve accepted candidates failed before representative selection",
+        )
+        return {**dict(result), "automatic_disposition": True}
+
+    loaded = top40_v4.load_config(root=root)
+    candidate_id = orchestrator_v4._strongest_successful_candidate(  # noqa: SLF001
+        root, state, loaded.raw, team_id
+    )
+    _request_hash, accepted, terminal = _accepted_record(root, team_id, candidate_id)
+    if terminal is None or terminal["event_type"] != "is_succeeded":
+        raise BrokerError("automatic representative lacks a successful terminal authority")
+    source_sha256 = str(accepted["payload"]["authority"]["source_bundle_sha256"])
+    research_runtime_v4.review_candidate_source(
+        root, team_id, candidate_id, source_sha256
+    )
+    required_tags = tuple(loaded.raw["research"]["required_certificate_tags"])
+    evidence: dict[str, list[str]] = {tag: [] for tag in required_tags}
+    requests = sorted(
+        (
+            (digest, record["payload"])
+            for digest, record in state.is_requests.items()
+            if record["payload"]["team_id"] == team_id
+        ),
+        key=lambda row: int(row[1]["trial_number"]),
+    )
+    for digest, request in requests:
+        for tag in required_tags:
+            if tag in request["metadata"]["tags"]:
+                evidence[tag].append(digest)
+    certificate = {
+        "schema_version": 1,
+        "team_id": team_id,
+        "candidate_id": candidate_id,
+        "evidence": evidence,
+    }
+    certificate_relative = (
+        f"{TOP40_V4_LAYOUT.tournament_root}/certificates/{team_id}/{candidate_id}.json"
+    )
+    orchestrator_v4._write_atomic(  # noqa: SLF001
+        root, certificate_relative, _pretty(certificate), replace=False
+    )
+    result = orchestrator_v4.nominate(
+        root, team_id, candidate_id, certificate_relative
+    )
+    return {
+        **dict(result),
+        "automatic_disposition": True,
+        "selection_basis": "frozen-robust-is-ranking",
+    }
+
+
 @research_runtime_v4.serialized_r2_command
 def consume_decision(root: Path, team_id: str) -> Mapping[str, Any]:
     _restore_lane_markers_before_authority(root, team_id)
@@ -556,6 +628,8 @@ def consume_decision(root: Path, team_id: str) -> Mapping[str, Any]:
             BrokerError,
             research_runtime_v4.CandidateSourceRejectedError,
         ) as exc:
+            if _team_has_success(root, team_id):
+                raise
             result = orchestrator_v4.retire(
                 root,
                 team_id,
@@ -565,7 +639,7 @@ def consume_decision(root: Path, team_id: str) -> Mapping[str, Any]:
             if request_hash is not None:
                 result["request_record_sha256"] = request_hash
         except orchestrator_v4.OrchestratorError as exc:
-            if _wraps_os_error(exc):
+            if _wraps_os_error(exc) or _team_has_success(root, team_id):
                 raise
             result = orchestrator_v4.retire(
                 root,
@@ -590,6 +664,8 @@ def launch_phase(root: Path, team_id: str, phase: str) -> Mapping[str, Any]:
     _restore_lane_markers_before_authority(root, team_id)
     activation_v4.validate(root)
     TOP40_V4_LAYOUT.require_team(team_id)
+    if phase == "decision":
+        raise BrokerError("R2 representative selection is automatic after refinement")
     _validate_launch_transition(root, team_id, phase)
     return research_runtime_v4.launch_team_phase(root, team_id, phase)
 
@@ -688,10 +764,7 @@ def run_team(root: Path, team_id: str) -> Mapping[str, Any]:
             }
     state = journal_v4.read(root / TOP40_V4_LAYOUT.journal_path)
     if team_id not in state.nominations and team_id not in state.retired:
-        decision = root / TOP40_V4_LAYOUT.team_root(team_id) / "outbox/decision.json"
-        if not decision.exists():
-            results.append(launch_phase(root, team_id, "decision"))
-        results.append(consume_decision(root, team_id))
+        results.append(_finalize_team_representative(root, team_id))
     return {"ok": True, "team_id": team_id, "steps": results}
 
 
@@ -703,12 +776,10 @@ def _parser() -> argparse.ArgumentParser:
     probe.add_argument("team_id")
     launch = commands.add_parser("launch")
     launch.add_argument("team_id")
-    launch.add_argument("phase", choices=("discovery", "refinement", "decision"))
+    launch.add_argument("phase", choices=("discovery", "refinement"))
     consume = commands.add_parser("consume")
     consume.add_argument("team_id")
     consume.add_argument("phase", choices=("discovery", "refinement"))
-    decision = commands.add_parser("consume-decision")
-    decision.add_argument("team_id")
     run = commands.add_parser("run-team")
     run.add_argument("team_id")
     commands.add_parser("run-all")
@@ -726,8 +797,6 @@ def main(argv: list[str] | None = None) -> int:
                 result = launch_phase(root, arguments.team_id, arguments.phase)
             elif arguments.command == "consume":
                 result = consume_batch(root, arguments.team_id, arguments.phase)
-            elif arguments.command == "consume-decision":
-                result = consume_decision(root, arguments.team_id)
             elif arguments.command == "run-team":
                 result = run_team(root, arguments.team_id)
             elif arguments.command == "run-all":

@@ -24,7 +24,22 @@ Create eight preregistered candidates in the first batch and at most four additi
 after lane-local feedback. Cover a transparent baseline, its exact sign inversion, three formation
 horizons, two rebalance horizons, three risk/control profiles, long/short role checks, and a
 five-point local neighborhood around any prospective nominee. Every accepted request consumes one
-of twelve slots, including failures. A team may retire honestly; nomination is never required.
+of twelve slots, including failures. After all twelve trials, the organizer deterministically
+submits the strongest successful candidate under the frozen ordering below. Retirement is
+permitted only when all twelve trials failed. There is no separate team decision model or outbox.
+
+The representative ordering is higher worst-fold 2x-cost Sharpe, then higher median-fold 2x-cost
+Sharpe, higher trial-adjusted confidence, higher gross edge per turnover, lower annualized
+turnover, and finally the lexicographically smaller candidate identifier. Passing every frozen
+gate (including the complete research certificate and field-adjusted confidence) earns the
+`fully-qualified` badge. At selection, fully qualified representatives rank first. If fewer than
+five earn that badge, the organizer fills the bracket to exactly five with the strongest remaining
+successful representatives without changing, concealing, or claiming that they passed a failed
+gate. If fewer than five teams produce any successful candidate, selection fails closed.
+For the final comparison after twelve trials, the organizer recomputes each successful candidate's
+trial-adjusted confidence as
+`max(0, min(1, 1 - 12 * (1 - bootstrap_probability_positive_mean)))`; provisional adjustments
+recorded at different earlier trial counts are never compared.
 
 The organizer performs one score-blind admission preflight over the entire batch before accepting
 its first request. Before terminal rejection, every lane receives up to three uniform repair

@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import importlib.util
+import inspect
 import json
 import os
 import stat
@@ -212,7 +213,7 @@ def test_r2_layout_has_fifteen_fresh_lanes_and_six_finalists() -> None:
         f"team-{number:02d}" for number in range(1, 16)
     )
     assert TOP40_V4_R2_LAYOUT.advance_count == 6
-    assert TOP40_V4_R2_LAYOUT.branch == "quant-portfolio-blind-top40-v4-r1-v2-restart6"
+    assert TOP40_V4_R2_LAYOUT.branch == "quant-portfolio-blind-top40-v4-r1-v2-restart7"
     assert TOP40_V4_R2_LAYOUT.tournament_root == "tournament/top40-v4-r2"
     assert TOP40_V4_R2_LAYOUT.reports_root == "reports-top40-v4-r2"
 
@@ -222,6 +223,11 @@ def test_r2_config_uses_open_lanes_and_july_inclusive_holdout() -> None:
     assert config["teams"] == list(TOP40_V4_R2_LAYOUT.team_ids)
     assert set(config["mandates"].values()) == {"open-independent-mechanism"}
     assert config["selection"]["ranking"]["advance_count"] == 6
+    assert config["selection"]["ranking"]["minimum_finalist_count"] == 5
+    assert (
+        config["selection"]["ranking"]["eligible_population"]
+        == "one-successful-representative-per-team"
+    )
     assert config["data"]["hard_end_exclusive"] == "2026-08-01T00:00:00Z"
     assert config["splits"]["historical_oos"] == {
         "start": "2024-07-01T00:00:00Z",
@@ -882,6 +888,12 @@ assert orchestrator_v4._SCHEMA_PREFIX == 'top40-v4-r1'
         (("splits", "historical_oos", "raw_data_visible_to_teams"), True),
         (("splits", "historical_oos", "feedback"), "per-finalist-immediate"),
         (("selection", "ranking", "eligible_population"), "any-nominee"),
+        (("selection", "ranking", "minimum_finalist_count"), 4),
+        (
+            ("selection", "ranking", "qualification_policy"),
+            "strict-gates-only",
+        ),
+        (("selection", "ranking", "fallback_changes_frozen_gate_results"), True),
         (("ensemble", "role"), "winner-eligible"),
         (("isolation", "research_network_enabled"), True),
     ),
@@ -1641,6 +1653,15 @@ def test_fresh_restart_authority_is_an_explicit_alternative_to_incident_recovery
     assert zero_candidate["results_reused"] is False
     assert zero_candidate["research_provenance_reused"] is False
     assert zero_candidate["holdout_end_exclusive"] == "2026-08-01T00:00:00Z"
+    minimum_finalist = authority["minimum_finalist_incident"]
+    assert minimum_finalist["journal_records"] == 85
+    assert minimum_finalist["accepted_trials"] == 38
+    assert minimum_finalist["successful_trials"] == 36
+    assert minimum_finalist["pending_trials"] == 1
+    assert minimum_finalist["nominations_created"] == 0
+    assert minimum_finalist["selection_created"] is False
+    assert minimum_finalist["results_reused"] is False
+    assert minimum_finalist["research_provenance_reused"] is False
 
     old_launch = tmp_path / activation_v4._PRETRIAL_OLD_LAUNCH_PATH
     old_launch.parent.mkdir(parents=True)
@@ -3646,6 +3667,7 @@ def test_broker_source_review_rejection_terminally_retires_lane(
             )
         ),
     )
+    monkeypatch.setattr(broker, "_team_has_success", lambda *_: False)
     retired: list[str] = []
 
     def retire(_root: Path, _team_id: str, *, reason: str) -> dict[str, object]:
@@ -4073,13 +4095,45 @@ def test_journal_records_preacceptance_batch_rejection_without_weakening_retirem
 
     second = tmp_path / "ordinary-retirement.jsonl"
     journal_v4.initialize(second)
-    with pytest.raises(journal_v4.JournalError, match="retired before eight"):
+    with pytest.raises(journal_v4.JournalError, match="retired before all twelve"):
         journal_v4.append(
             second,
             "retired",
             {"team_id": "team-01", "reason": "must remain forbidden"},
         )
     assert journal_v4.read(second).record_count == 0
+
+
+def test_r2_journal_refuses_a_selection_with_fewer_than_five_representatives(
+    tmp_path: Path,
+) -> None:
+    journal = tmp_path / "research-journal.jsonl"
+    journal_v4.initialize(journal)
+    for team_id in TOP40_V4_R2_LAYOUT.team_ids:
+        journal_v4.append(
+            journal,
+            "batch_rejected",
+            {
+                "team_id": team_id,
+                "phase": "discovery",
+                "reason": "deterministic score-blind admission failure",
+                "outbox_sha256": hashlib.sha256(team_id.encode()).hexdigest(),
+                "candidate_ids": [f"candidate-{number}" for number in range(1, 9)],
+            },
+        )
+    state = journal_v4.read(journal)
+    with pytest.raises(journal_v4.JournalError, match="five or six"):
+        journal_v4.append(
+            journal,
+            "selection_frozen",
+            {
+                "input_head_sha256": state.head_sha256,
+                "advancing": [],
+                "selection_freeze_path": "tournament/top40-v4-r2/selection-freeze.json",
+                "selection_freeze_sha256": "f" * 64,
+            },
+        )
+    assert journal_v4.read(journal).record_count == 15
 
 
 def test_r2_journal_requires_durable_whole_batch_authority_before_acceptance(
@@ -5391,7 +5445,7 @@ def test_consume_batch_preflight_infrastructure_failure_is_resumable(
     assert retired == []
 
 
-def test_runtime_decision_schema_and_terminal_launch_fail_closed(
+def test_runtime_decision_schema_and_automatic_selection_launch_gate(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with pytest.raises(research_runtime_v4.ResearchRuntimeError, match="nomination.*values"):
@@ -5411,10 +5465,26 @@ def test_runtime_decision_schema_and_terminal_launch_fail_closed(
         trials_by_team={"team-01": 12},
     )
     monkeypatch.setattr(research_runtime_v4.journal_v4, "read", lambda _path: state)
-    with pytest.raises(research_runtime_v4.ResearchRuntimeError, match="terminal"):
+    with pytest.raises(research_runtime_v4.ResearchRuntimeError, match="automatic"):
         research_runtime_v4._validate_runtime_launch_lifecycle(
             tmp_path, "team-01", "decision"
         )
+
+
+def test_canonical_broker_refuses_a_decision_model_launch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    broker = _broker_module()
+    monkeypatch.setattr(broker.activation_v4, "validate", lambda *_: {})
+    launched: list[str] = []
+    monkeypatch.setattr(
+        broker.research_runtime_v4,
+        "launch_team_phase",
+        lambda _root, _team, phase: launched.append(phase),
+    )
+    with pytest.raises(broker.BrokerError, match="automatic"):
+        inspect.unwrap(broker.launch_phase)(tmp_path, "team-01", "decision")
+    assert launched == []
 
 
 def test_broker_lease_rejects_symlink_node(tmp_path: Path) -> None:
@@ -5455,3 +5525,478 @@ with module.research_runtime_v4.broker_lease(Path(sys.argv[1])):
     stdout, stderr = child.communicate(timeout=5)
     assert child.returncode == 0, stderr
     assert stdout.strip() == "acquired"
+
+
+def test_r2_strongest_successful_candidate_uses_frozen_robust_order(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    terminals = {
+        "1" * 64: {
+            "payload": {"team_id": "team-01", "candidate_id": "weaker"},
+            "rank": 0.4,
+        },
+        "2" * 64: {
+            "payload": {"team_id": "team-01", "candidate_id": "stronger"},
+            "rank": 0.9,
+        },
+    }
+    state = SimpleNamespace(is_successes=terminals, trials_by_team={"team-01": 12})
+    monkeypatch.setattr(
+        orchestrator_v4, "_verified_summary", lambda _root, terminal: terminal
+    )
+
+    def assess(summary: dict[str, object], *_args: object, **_kwargs: object):
+        rank = float(summary["rank"])
+        return {
+            "ranking_vector": {
+                "worst_fold_double_cost_sharpe": rank,
+                "median_fold_double_cost_sharpe": rank,
+                "trial_adjusted_confidence": rank,
+                "gross_edge_per_turnover_bps": rank,
+                "annualized_turnover": 1.0,
+                "team_id": "team-01",
+            }
+        }
+
+    monkeypatch.setattr(scoring_v4, "assess_is", assess)
+    assert (
+        orchestrator_v4._strongest_successful_candidate(
+            tmp_path, state, {}, "team-01"
+        )
+        == "stronger"
+    )
+
+
+def test_r2_robust_order_ranks_missing_edge_density_last() -> None:
+    common = {
+        "worst_fold_double_cost_sharpe": 0.5,
+        "median_fold_double_cost_sharpe": 0.5,
+        "trial_adjusted_confidence": 0.9,
+        "annualized_turnover": 1.0,
+        "team_id": "team-01",
+    }
+    measured = {"ranking_vector": {**common, "gross_edge_per_turnover_bps": 10.0}}
+    missing = {"ranking_vector": {**common, "gross_edge_per_turnover_bps": None}}
+    assert scoring_v4.is_ranking_key(measured) < scoring_v4.is_ranking_key(missing)
+
+
+def test_r2_incomplete_truthful_certificate_preserves_fallback_representative(
+    tmp_path: Path,
+) -> None:
+    tags = [
+        "baseline",
+        "sign-inversion",
+        "formation-grid",
+        "rebalance-grid",
+        "control-ablation",
+        "role-check",
+        "local-neighborhood",
+    ]
+    request_hash = "a" * 64
+    state = SimpleNamespace(
+        is_requests={
+            request_hash: {
+                "payload": {
+                    "team_id": "team-01",
+                    "metadata": {"tags": ["baseline"]},
+                }
+            }
+        }
+    )
+    relative = "tournament/top40-v4-r2/certificates/team-01/candidate.json"
+    path = tmp_path / relative
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "team_id": "team-01",
+                "candidate_id": "candidate",
+                "evidence": {
+                    tag: [request_hash] if tag == "baseline" else [] for tag in tags
+                },
+            },
+            sort_keys=True,
+        )
+        + "\n"
+    )
+    _certificate, _digest, diagnostics = orchestrator_v4._certificate(
+        tmp_path,
+        relative,
+        state=state,
+        config={"research": {"required_certificate_tags": tags}},
+        team_id="team-01",
+        candidate_id="candidate",
+        nominated_request_hash=request_hash,
+        allow_unqualified=True,
+    )
+    assert diagnostics["qualified"] is False
+    assert diagnostics["accepted_trials_cited"] == 1
+    assert diagnostics["accepted_trials_total"] == 1
+
+
+def test_r2_retirement_is_forbidden_when_any_candidate_succeeded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "tournament/top40-v4-r2").mkdir(parents=True)
+    state = SimpleNamespace(
+        selection=None,
+        retired={},
+        nominations={},
+        trials_by_team={"team-01": 12},
+        is_successes={"a" * 64: {"payload": {"team_id": "team-01"}}},
+    )
+    monkeypatch.setattr(orchestrator_v4.isolation_v4, "audit_team_surface", lambda *_: {})
+    monkeypatch.setattr(orchestrator_v4.activation_v4, "validate", lambda *_: {})
+    monkeypatch.setattr(
+        orchestrator_v4.top40_v4,
+        "load_config",
+        lambda **_kwargs: SimpleNamespace(
+            raw={"research": {"minimum_accepted_trials_before_nomination": 8}}
+        ),
+    )
+    monkeypatch.setattr(orchestrator_v4, "_close_interrupted_is_requests", lambda *_: state)
+    with pytest.raises(orchestrator_v4.OrchestratorError, match="must submit"):
+        inspect.unwrap(orchestrator_v4.retire)(tmp_path, "team-01", reason="done")
+
+
+def test_r2_close_fills_five_with_honestly_labeled_ranked_representatives(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "tournament/top40-v4-r2").mkdir(parents=True)
+    scores = {
+        "team-01": 0.80,
+        "team-02": 0.70,
+        "team-03": 0.95,
+        "team-04": 0.90,
+        "team-05": 0.85,
+        "team-06": 0.60,
+        "team-07": 0.50,
+    }
+    nominations: dict[str, dict[str, object]] = {}
+    summary_payload = b'{"bootstrap_probability_positive_mean":0.99}'
+    summary_sha256 = hashlib.sha256(summary_payload).hexdigest()
+    for team_id, score in scores.items():
+        qualified = team_id in {"team-01", "team-02"}
+        nomination = {
+            "team_id": team_id,
+            "candidate_id": f"{team_id}-representative",
+            "trial_count": 12,
+            "authority": {"candidate_id": f"{team_id}-representative"},
+            "summary_path": f"summaries/{team_id}.json",
+            "summary_sha256": summary_sha256,
+            "selection": {
+                "eligible": qualified,
+                "ranking_vector": {
+                    "worst_fold_double_cost_sharpe": score,
+                    "median_fold_double_cost_sharpe": score,
+                    "trial_adjusted_confidence": 0.95,
+                    "gross_edge_per_turnover_bps": 100.0,
+                    "annualized_turnover": 8.0,
+                    "team_id": team_id,
+                },
+            },
+        }
+        nominations[team_id] = {
+            "payload": {
+                "nomination_path": f"nominations/{team_id}.json",
+                "nomination_sha256": hashlib.sha256(team_id.encode()).hexdigest(),
+            },
+            "nomination": nomination,
+        }
+    state = SimpleNamespace(
+        selection=None,
+        nominations=nominations,
+        retired={
+            team_id: {"event_type": "retired"}
+            for team_id in TOP40_V4_R2_LAYOUT.team_ids
+            if team_id not in nominations
+        },
+        trials_by_team={team_id: 12 for team_id in TOP40_V4_R2_LAYOUT.team_ids},
+        head_sha256="a" * 64,
+    )
+    loaded = SimpleNamespace(
+        sha256="b" * 64,
+        raw={
+            "selection": {
+                "floors": {"minimum_field_adjusted_confidence_inclusive": 0.90},
+                "ranking": {"advance_count": 6, "minimum_finalist_count": 5},
+            },
+            "ensemble": {
+                "weight_method": "capped-inverse-is-daily-volatility",
+                "minimum_constituents": 2,
+                "maximum_constituent_weight": 0.25,
+            },
+        },
+    )
+    monkeypatch.setattr(orchestrator_v4.isolation_v4, "audit_surface", lambda *_: {})
+    monkeypatch.setattr(
+        orchestrator_v4.activation_v4,
+        "validate",
+        lambda *_: {"record_sha256": "c" * 64},
+    )
+    monkeypatch.setattr(orchestrator_v4.top40_v4, "load_config", lambda **_: loaded)
+    monkeypatch.setattr(orchestrator_v4, "_close_interrupted_is_requests", lambda *_: state)
+    monkeypatch.setattr(orchestrator_v4, "_validate_retired_research_authorities", lambda *_: None)
+    monkeypatch.setattr(orchestrator_v4, "_write_nomination_registry", lambda *_: None)
+    monkeypatch.setattr(
+        orchestrator_v4,
+        "_verified_nomination",
+        lambda _root, record: record["nomination"],
+    )
+    monkeypatch.setattr(orchestrator_v4, "_stable_authority_bytes", lambda *_: summary_payload)
+    monkeypatch.setattr(
+        orchestrator_v4,
+        "_strict_object_bytes",
+        lambda *_: {"bootstrap_probability_positive_mean": 0.99},
+    )
+    monkeypatch.setattr(scoring_v4, "trial_adjusted_confidence", lambda *_: 0.95)
+    monkeypatch.setattr(
+        orchestrator_v4,
+        "_capped_inverse_vol_weights",
+        lambda _root, rows, _cap: (
+            {str(row["team_id"]): 0.2 for row in rows},
+            0.0,
+        ),
+    )
+    monkeypatch.setattr(
+        orchestrator_v4.journal_v4,
+        "append",
+        lambda *_args, **_kwargs: {"record_sha256": "d" * 64},
+    )
+    result = inspect.unwrap(orchestrator_v4.close_is)(tmp_path)
+    assert result["advancing"] == [
+        "team-01",
+        "team-02",
+        "team-03",
+        "team-04",
+        "team-05",
+    ]
+    freeze = json.loads(
+        (tmp_path / TOP40_V4_R2_LAYOUT.selection_freeze_path).read_text()
+    )
+    assert [row["selection_tier"] for row in freeze["advancing"]] == [
+        "fully-qualified",
+        "fully-qualified",
+        "robust-ranked-representative",
+        "robust-ranked-representative",
+        "robust-ranked-representative",
+    ]
+    assert all(
+        row["field_selection"]["eligible"] is row["fully_qualified"]
+        for row in freeze["population"]
+    )
+
+
+def test_r2_close_refuses_to_fabricate_five_when_only_four_teams_succeeded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "tournament/top40-v4-r2").mkdir(parents=True)
+    nominations = {
+        team_id: {
+            "payload": {
+                "nomination_path": f"nominations/{team_id}.json",
+                "nomination_sha256": hashlib.sha256(team_id.encode()).hexdigest(),
+            },
+            "nomination": {
+                "team_id": team_id,
+                "candidate_id": f"{team_id}-representative",
+                "selection": {
+                    "eligible": False,
+                    "ranking_vector": {
+                        "worst_fold_double_cost_sharpe": 0.5,
+                        "median_fold_double_cost_sharpe": 0.5,
+                        "trial_adjusted_confidence": 0.5,
+                        "gross_edge_per_turnover_bps": 50.0,
+                        "annualized_turnover": 10.0,
+                        "team_id": team_id,
+                    },
+                },
+                "summary_path": f"summaries/{team_id}.json",
+                "summary_sha256": hashlib.sha256(b"summary").hexdigest(),
+            },
+        }
+        for team_id in TOP40_V4_R2_LAYOUT.team_ids[:4]
+    }
+    state = SimpleNamespace(
+        selection=None,
+        nominations=nominations,
+        retired={
+            team_id: {"event_type": "retired"}
+            for team_id in TOP40_V4_R2_LAYOUT.team_ids[4:]
+        },
+        trials_by_team={team_id: 12 for team_id in TOP40_V4_R2_LAYOUT.team_ids},
+        head_sha256="a" * 64,
+    )
+    monkeypatch.setattr(orchestrator_v4.isolation_v4, "audit_surface", lambda *_: {})
+    monkeypatch.setattr(
+        orchestrator_v4.activation_v4,
+        "validate",
+        lambda *_: {"record_sha256": "b" * 64},
+    )
+    monkeypatch.setattr(
+        orchestrator_v4.top40_v4,
+        "load_config",
+        lambda **_: SimpleNamespace(
+            sha256="c" * 64,
+            raw={
+                "selection": {
+                    "floors": {"minimum_field_adjusted_confidence_inclusive": 0.90},
+                    "ranking": {"advance_count": 6, "minimum_finalist_count": 5},
+                }
+            },
+        ),
+    )
+    monkeypatch.setattr(orchestrator_v4, "_close_interrupted_is_requests", lambda *_: state)
+    monkeypatch.setattr(orchestrator_v4, "_validate_retired_research_authorities", lambda *_: None)
+    monkeypatch.setattr(orchestrator_v4, "_write_nomination_registry", lambda *_: None)
+    monkeypatch.setattr(
+        orchestrator_v4,
+        "_verified_nomination",
+        lambda _root, record: record["nomination"],
+    )
+    monkeypatch.setattr(orchestrator_v4, "_stable_authority_bytes", lambda *_: b"summary")
+    monkeypatch.setattr(
+        orchestrator_v4,
+        "_strict_object_bytes",
+        lambda *_: {"bootstrap_probability_positive_mean": 0.5},
+    )
+    monkeypatch.setattr(scoring_v4, "trial_adjusted_confidence", lambda *_: 0.5)
+    with pytest.raises(orchestrator_v4.OrchestratorError, match="fewer than five"):
+        inspect.unwrap(orchestrator_v4.close_is)(tmp_path)
+    assert not (tmp_path / TOP40_V4_R2_LAYOUT.selection_freeze_path).exists()
+    assert not (tmp_path / TOP40_V4_R2_LAYOUT.journal_path).exists()
+
+
+def test_broker_nomination_failure_cannot_retire_a_successful_team(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    broker = _broker_module()
+    request = {
+        "schema_version": 1,
+        "operation": "nominate",
+        "candidate_id": "candidate",
+        "certificate_path": "work/research-certificate.json",
+    }
+    monkeypatch.setattr(broker.activation_v4, "validate", lambda *_: {})
+    monkeypatch.setattr(broker, "_validate_decision_transition", lambda *_: None)
+    monkeypatch.setattr(
+        broker,
+        "_read_request",
+        lambda *_: (request, tmp_path / "decision.json", json.dumps(request).encode()),
+    )
+    monkeypatch.setattr(
+        broker,
+        "_accepted_record",
+        lambda *_: (
+            "a" * 64,
+            {"payload": {"authority": {"source_bundle_sha256": "b" * 64}}},
+            {"event_type": "is_succeeded"},
+        ),
+    )
+    monkeypatch.setattr(
+        broker.research_runtime_v4,
+        "review_candidate_source",
+        lambda *_: (_ for _ in ()).throw(
+            broker.research_runtime_v4.CandidateSourceRejectedError("rejected")
+        ),
+    )
+    monkeypatch.setattr(broker, "_team_has_success", lambda *_: True)
+    retired: list[str] = []
+    monkeypatch.setattr(
+        broker.orchestrator_v4,
+        "retire",
+        lambda *_args, **_kwargs: retired.append("retired"),
+    )
+    with pytest.raises(
+        broker.research_runtime_v4.CandidateSourceRejectedError, match="rejected"
+    ):
+        broker.consume_decision(tmp_path, "team-01")
+    assert retired == []
+
+
+def test_broker_automatically_compiles_the_strongest_team_representative(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    broker = _broker_module()
+    state = SimpleNamespace(
+        trials_by_team={"team-01": 12},
+        is_requests={
+            "a" * 64: {
+                "payload": {
+                    "team_id": "team-01",
+                    "trial_number": 1,
+                    "metadata": {"tags": ["baseline", "formation-grid"]},
+                }
+            },
+            "b" * 64: {
+                "payload": {
+                    "team_id": "team-01",
+                    "trial_number": 2,
+                    "metadata": {"tags": ["local-neighborhood"]},
+                }
+            },
+        },
+    )
+    tags = ["baseline", "formation-grid", "local-neighborhood"]
+    monkeypatch.setattr(broker.journal_v4, "read", lambda *_: state)
+    monkeypatch.setattr(broker, "_validate_completed_phase", lambda *_: {})
+    monkeypatch.setattr(broker, "_team_has_success", lambda *_: True)
+    monkeypatch.setattr(
+        broker.top40_v4,
+        "load_config",
+        lambda **_: SimpleNamespace(
+            raw={"research": {"required_certificate_tags": tags}}
+        ),
+    )
+    monkeypatch.setattr(
+        broker.orchestrator_v4,
+        "_strongest_successful_candidate",
+        lambda *_: "candidate-best",
+    )
+    monkeypatch.setattr(
+        broker,
+        "_accepted_record",
+        lambda *_: (
+            "a" * 64,
+            {"payload": {"authority": {"source_bundle_sha256": "c" * 64}}},
+            {"event_type": "is_succeeded"},
+        ),
+    )
+    reviewed: list[str] = []
+    monkeypatch.setattr(
+        broker.research_runtime_v4,
+        "review_candidate_source",
+        lambda _root, _team, candidate, _source: reviewed.append(candidate),
+    )
+    nominations: list[tuple[str, str]] = []
+
+    def nominate(
+        _root: Path, _team: str, candidate: str, certificate: str
+    ) -> dict[str, object]:
+        nominations.append((candidate, certificate))
+        return {"ok": True, "team_id": "team-01", "candidate_id": candidate}
+
+    monkeypatch.setattr(broker.orchestrator_v4, "nominate", nominate)
+    result = broker._finalize_team_representative(tmp_path, "team-01")
+    assert result["automatic_disposition"] is True
+    assert result["selection_basis"] == "frozen-robust-is-ranking"
+    assert reviewed == ["candidate-best"]
+    assert nominations == [
+        (
+            "candidate-best",
+            "tournament/top40-v4-r2/certificates/team-01/candidate-best.json",
+        )
+    ]
+    certificate = json.loads(
+        (
+            tmp_path
+            / "tournament/top40-v4-r2/certificates/team-01/candidate-best.json"
+        ).read_text()
+    )
+    assert certificate["candidate_id"] == "candidate-best"
+    assert certificate["evidence"] == {
+        "baseline": ["a" * 64],
+        "formation-grid": ["a" * 64],
+        "local-neighborhood": ["b" * 64],
+    }

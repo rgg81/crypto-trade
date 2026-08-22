@@ -41,7 +41,9 @@ def _parser() -> argparse.ArgumentParser:
     run_is.add_argument("entrypoint")
     run_is.add_argument("--purpose", required=True)
 
-    nominate = commands.add_parser("nominate", help="freeze one eligible nominee for a team")
+    nominate = commands.add_parser(
+        "nominate", help="freeze one strongest successful representative for a team"
+    )
     nominate.add_argument("team_id")
     nominate.add_argument("candidate_id")
     nominate.add_argument("certificate_path")
@@ -50,7 +52,9 @@ def _parser() -> argparse.ArgumentParser:
     retire.add_argument("team_id")
     retire.add_argument("--reason", required=True)
 
-    commands.add_parser("close-is", help="rank nominees and freeze at most six finalists")
+    commands.add_parser(
+        "close-is", help="rank representatives and freeze a minimum-five finalist bracket"
+    )
     commands.add_parser(
         "historical-release",
         help="consume finalist observations and atomically publish the championship",

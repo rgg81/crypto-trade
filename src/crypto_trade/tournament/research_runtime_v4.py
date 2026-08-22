@@ -34,7 +34,7 @@ PROFILE_NAME = "top40-v4-r2-offline-team"
 RECEIPT_SCHEMA_VERSION = 2
 LAUNCH_SCHEMA_VERSION = 2
 SOURCE_REVIEW_SCHEMA_VERSION = 7
-LAUNCHER_VERSION = "top40-v4-r2-research-runtime-v12"
+LAUNCHER_VERSION = "top40-v4-r2-research-runtime-v13"
 MODEL_RUNTIME_SCHEMA_VERSION = 1
 _EXPECTED_CODEX_VERSION = "codex-cli 0.148.0"
 _MODEL_NAME = "gpt-5.6-sol"
@@ -73,8 +73,8 @@ _SMOKE_PROMPT = (
     "generations, append invariance, unusual returns, exposure, turnover, and safe engine "
     "recovery. If any installed skill or SKILL.md is present in your context, do not read it and "
     "report a boundary breach. Otherwise, without reading tournament data or feedback, create "
-    "exactly work/.r2-v12-model-write-smoke with exact UTF-8 bytes "
-    "r8-private-skill-boundary-ok followed by one newline. Do not create candidates or outbox "
+    "exactly work/.r2-v13-model-write-smoke with exact UTF-8 bytes "
+    "r9-private-skill-boundary-ok followed by one newline. Do not create candidates or outbox "
     "files. Then reply only smoke-complete."
 )
 _SHA256 = re.compile(r"[0-9a-f]{64}")
@@ -1318,9 +1318,13 @@ post-hoc labels."""
 
 Read both lane-local feedback packets. Do not edit candidates. Build
 work/research-certificate.json whose seven arrays use official request hashes, whose union covers
-all twelve trials, and whose tags truthfully support every cell. If one successful candidate
-appears capable of the frozen gates and has a bracketed stable neighborhood, write a nominate
-decision to outbox/decision.json. Otherwise retire honestly with a concise evidence-based reason.
+all twelve trials when truthful evidence exists, and whose tags truthfully support every cited
+cell. Leave a cell empty rather than cite incompatible evidence; incomplete cells or coverage
+prevent the fully-qualified badge but cannot erase a successful representative. If at least one
+trial succeeded,
+you MUST nominate the strongest successful candidate using the frozen ordering in RULES.md,
+whether or not it passed every qualification gate. The organizer preserves every failed gate and
+labels a fallback representative honestly. Retire only when none of the twelve trials succeeded.
 Do not claim or guess sealed performance."""
 
 
@@ -3629,6 +3633,10 @@ def _validate_prior_phase_evidence(root: Path, team_id: str, phase: str) -> None
 
 
 def _validate_runtime_launch_lifecycle(root: Path, team_id: str, phase: str) -> None:
+    if phase == "decision":
+        raise ResearchRuntimeError(
+            "R2 representative selection is automatic after refinement"
+        )
     state = journal_v4.read(root / TOP40_V4_LAYOUT.journal_path)
     if state.selection is not None:
         raise ResearchRuntimeError("research launch is forbidden after IS selection")
@@ -3787,7 +3795,7 @@ def validate_frozen_model_smoke(root: str | Path) -> Mapping[str, object]:
         "model_reply": "smoke-complete",
         "model_runtime_sha256": model_runtime_sha256(root_path, "team-01"),
         "network_enabled": False,
-        "observed_on_date": "2026-08-21",
+            "observed_on_date": "2026-08-22",
         "organizer_observed": True,
         "original_home_excluded": True,
         "peer_private_runtime_read_denied": True,
@@ -3796,14 +3804,14 @@ def validate_frozen_model_smoke(root: str | Path) -> Mapping[str, object]:
         "private_runtime_removed_before_activation": True,
         "process_returncode": 0,
         "profile_sha256": profile_sha256(root_path, "team-01"),
-        "prompt_catalog_bytes": 8853,
+            "prompt_catalog_bytes": 8852,
         "prompt_catalog_empty": True,
         "prompt_sha256": hashlib.sha256(_SMOKE_PROMPT.encode("utf-8")).hexdigest(),
         "purpose": "pretrial-private-home-skill-boundary-smoke",
-        "requested_sentinel": "work/.r2-v12-model-write-smoke",
+        "requested_sentinel": "work/.r2-v13-model-write-smoke",
         "sandbox": "custom permissions",
         "schema_version": 2,
-        "sentinel_sha256": hashlib.sha256(b"r8-private-skill-boundary-ok\n").hexdigest(),
+        "sentinel_sha256": hashlib.sha256(b"r9-private-skill-boundary-ok\n").hexdigest(),
         "skill_catalog": "empty-system-marker",
         "system_skill_marker_sha256": hashlib.sha256(_SYSTEM_SKILL_MARKER).hexdigest(),
         "team_id": "team-01",

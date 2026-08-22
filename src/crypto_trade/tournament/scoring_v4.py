@@ -396,11 +396,12 @@ def assess_is(
 
 def is_ranking_key(selection: Mapping[str, Any]) -> tuple[Any, ...]:
     vector = selection["ranking_vector"]
+    edge = vector["gross_edge_per_turnover_bps"]
     return (
         -float(vector["worst_fold_double_cost_sharpe"]),
         -float(vector["median_fold_double_cost_sharpe"]),
         -float(vector["trial_adjusted_confidence"]),
-        -float(vector["gross_edge_per_turnover_bps"]),
+        -float(edge) if edge is not None else float("inf"),
         float(vector["annualized_turnover"]),
         str(vector["team_id"]),
     )

@@ -115,8 +115,10 @@ deterministic findings; repair the complete unaccepted batch in place before fin
 
 The team process exits before the organizer evaluates a batch. A later clean-room session receives
 only this lane's normalized feedback. Never infer sealed performance from timing, errors,
-progress, or another lane. A negative result is valid evidence. There is no requirement to
-nominate and no guaranteed winner.
+progress, or another lane. A negative result is valid evidence. After all twelve trials, the
+organizer deterministically submits the lane's strongest successful representative under the
+frozen robust ranking; retirement is allowed only if all twelve failed. There is no guaranteed
+winner and no separate team decision session.
 """
 
 

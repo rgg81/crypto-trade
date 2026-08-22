@@ -41,14 +41,14 @@ _PRETRIAL_INCIDENT_STAGE = f"{_PRETRIAL_INCIDENT_ROOT}/.{_PRETRIAL_INCIDENT_ID}.
 _PRETRIAL_INCIDENT_FINAL = f"{_PRETRIAL_INCIDENT_ROOT}/{_PRETRIAL_INCIDENT_ID}"
 _PRETRIAL_SMOKE_RECEIPT_PATH = "tournament/top40-v4-r2/PRETRIAL-MODEL-SMOKE.json"
 _PRETRIAL_SMOKE_RECEIPT_SHA256 = (
-    "8ce7c6adab43167b54dffdffce8a42b01717762b4d7f821e8d46c996ee5ce5b5"
+    "a11bc30bfbb59e5aa328d7e44eea9257a6d1dfb66d0e838a1abd9cc41ed2fbe9"
 )
 _PRETRIAL_SMOKE_RECORD_SHA256 = (
-    "4194ba3f54e6986877024eac0b0a12d673cdcdba00dbe4547fe09b8eda05c62b"
+    "b04c37204929ed15e0c12c711876e84dfebdeef0237c6a406bad3490d5b3de0c"
 )
 _FRESH_RESTART_AUTHORITY_PATH = "tournament/top40-v4-r2/FRESH-RESTART-AUTHORITY.json"
 _FRESH_RESTART_AUTHORITY_SHA256 = (
-    "20df6a9f7e325e8fa999ebe8482153bd4c006bd884dfd9c1987c08f97752f896"
+    "c8dbc0b55a465b785b6cfe7ca960a894617d3c86882fcf45af9d9f5eb2e8a60b"
 )
 _FRESH_LANE_MARKER_PAYLOAD = b"\n"
 _PRETRIAL_OLD_ACTIVATION_FILE_SHA256 = (
@@ -724,6 +724,7 @@ def _fresh_restart_authority(root: Path) -> Mapping[str, Any]:
     expected_keys = {
         "batch_admission_incident",
         "feedback_disclosed",
+        "minimum_finalist_incident",
         "predecessor",
         "reason",
         "rejected_preacceptance_residue",
@@ -740,10 +741,10 @@ def _fresh_restart_authority(root: Path) -> Mapping[str, Any]:
     }
     if (
         set(authority) != expected_keys
-        or authority.get("schema_version") != 5
+        or authority.get("schema_version") != 6
         or authority.get("tournament") != TOP40_V4_LAYOUT.name
         or authority.get("status")
-        != "fresh-restart-after-private-aborted-and-zero-candidate-incidents"
+        != "fresh-restart-with-mandatory-successful-team-representatives"
         or authority.get("feedback_disclosed") is not False
         or authority.get("research_provenance_reused") is not False
         or authority.get("results_reused") is not False
@@ -756,6 +757,7 @@ def _fresh_restart_authority(root: Path) -> Mapping[str, Any]:
     skill_incident = authority.get("skill_boundary_incident")
     worker_incident = authority.get("worker_bootstrap_incident")
     zero_candidate_incident = authority.get("zero_candidate_incident")
+    minimum_finalist_incident = authority.get("minimum_finalist_incident")
     prefix = authority.get("successful_prefix")
     expected_batch_keys = {
         "activation_file_sha256",
@@ -1143,6 +1145,49 @@ def _fresh_restart_authority(root: Path) -> Mapping[str, Any]:
         or _SHA256.fullmatch(str(zero_surface.get("sha256"))) is None
     ):
         raise ActivationError("fresh restart zero-candidate incident changed")
+    expected_minimum_finalist_incident = {
+        "accepted_trials": 38,
+        "activation_file_sha256": (
+            "49b8af37cc650dc9fcc80395f379a2c6704505b1bd2faebf57b1e83adb128e1d"
+        ),
+        "activation_record_sha256": (
+            "df4a9e4be14da63757d3ce6287613baa8e28019569573e5052ccaa4f698bc8da"
+        ),
+        "activation_tests_sha256": (
+            "c61208a39d6518bd6a233257f1968eb6926781affaf985a023d127a10ceba0d4"
+        ),
+        "branch": "quant-portfolio-blind-top40-v4-r1-v2-restart6",
+        "feedback_files_disclosed": 8,
+        "implementation_commit": "27b66a2d039447788ba2d1a66bf73cd3d6fc5fd0",
+        "journal_file_sha256": (
+            "8be8b3dff8344ee98130428e7529ed80bb61f0ba603e9c2ce5cbaa349fb5fa71"
+        ),
+        "journal_head_sha256": (
+            "cde4a71fe23979b1e323319957c776883c216b99a3f687af1af1479edd4db03f"
+        ),
+        "journal_records": 85,
+        "launch_count": 10,
+        "nominations_created": 0,
+        "outbox_archive_count": 9,
+        "pending_trials": 1,
+        "preservation": "exact-stopped-runtime-artifacts-preserved-in-private-r8-worktree",
+        "reason": (
+            "all-or-nothing-qualification-allowed-successful-teams-to-retire-and-did-not-"
+            "guarantee-five-is-representatives"
+        ),
+        "research_provenance_reused": False,
+        "results_reused": False,
+        "selection_created": False,
+        "successful_trials": 36,
+        "team_01_retired": True,
+        "team_02_retired": True,
+        "team_03_retired": True,
+        "team_04_pending": True,
+        "teams_started": 4,
+        "terminal_trials": 37,
+    }
+    if minimum_finalist_incident != expected_minimum_finalist_incident:
+        raise ActivationError("fresh restart minimum-finalist incident changed")
     return authority
 
 

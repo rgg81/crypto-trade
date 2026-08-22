@@ -579,11 +579,24 @@ def replay_bytes(payload: bytes) -> JournalState:
                     )
                 retired[team_id] = record
             elif event_type == "retired":
-                if trials[team_id] < 8:
+                if TOP40_V4_LAYOUT.name.endswith("-r2"):
+                    if trials[team_id] != TOP40_V4_LAYOUT.maximum_trials:
+                        raise JournalError("team retired before all twelve accepted trials")
+                    if any(
+                        terminal["payload"]["team_id"] == team_id
+                        for terminal in is_successes.values()
+                    ):
+                        raise JournalError("successful team retired without a representative")
+                elif trials[team_id] < 8:
                     raise JournalError("team retired before eight accepted trials")
                 retired[team_id] = record
             else:
-                if trials[team_id] < 8:
+                if (
+                    TOP40_V4_LAYOUT.name.endswith("-r2")
+                    and trials[team_id] != TOP40_V4_LAYOUT.maximum_trials
+                ):
+                    raise JournalError("team nominated before all twelve accepted trials")
+                if not TOP40_V4_LAYOUT.name.endswith("-r2") and trials[team_id] < 8:
                     raise JournalError("team nominated before eight accepted trials")
                 success = is_successes.get(str(event["success_record_sha256"]))
                 if success is None or success["payload"]["team_id"] != team_id:
@@ -600,6 +613,10 @@ def replay_bytes(payload: bytes) -> JournalState:
                 raise JournalError("selection does not bind its exact input journal head")
             if any(team_id not in nominations for team_id in event["advancing"]):
                 raise JournalError("selection advances a non-nominated team")
+            if TOP40_V4_LAYOUT.name.endswith("-r2") and not (
+                5 <= len(event["advancing"]) <= TOP40_V4_LAYOUT.advance_count
+            ):
+                raise JournalError("selection must freeze five or six team representatives")
             selection = event
             selection_record_sha256 = digest
         elif event_type == "historical_accepted":

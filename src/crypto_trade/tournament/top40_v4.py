@@ -275,7 +275,15 @@ def validate_config(raw: Mapping[str, Any]) -> None:
         ): 0.35,
         ("selection", "floors", "maximum_fold_positive_pnl_share_inclusive"): 0.60,
         ("selection", "ranking", "advance_count"): TOP40_V4_LAYOUT.advance_count,
-        ("selection", "ranking", "eligible_population"): "one-qualified-nominee-per-team",
+        (
+            "selection",
+            "ranking",
+            "eligible_population",
+        ): (
+            "one-successful-representative-per-team"
+            if _IS_R2
+            else "one-qualified-nominee-per-team"
+        ),
         ("selection", "ranking", "advance_all_when_fewer"): True,
         ("selection", "ranking", "lower_floors_to_fill_bracket"): False,
         ("historical_oos", "maximum_observations_per_finalist"): 1,
@@ -318,6 +326,11 @@ def validate_config(raw: Mapping[str, Any]) -> None:
     }
     if _IS_R2:
         critical[("selection", "floors", "minimum_field_adjusted_confidence_inclusive")] = 0.90
+        critical[("selection", "ranking", "minimum_finalist_count")] = 5
+        critical[("selection", "ranking", "qualification_policy")] = (
+            "fully-qualified-first-then-robust-ranked-representatives"
+        )
+        critical[("selection", "ranking", "fallback_changes_frozen_gate_results")] = False
     for path, expected in critical.items():
         _expect(raw, path, expected)
     manifest_sha256 = _mapping(raw.get("data"), "data").get("manifest_sha256")

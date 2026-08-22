@@ -11,8 +11,7 @@ organizer will not suggest a mechanism.
 
 Cover a transparent baseline, exact sign inversion, three formation horizons, two rebalance or
 holding horizons, risk-control ablations, role checks, and a five-point local neighborhood. One run
-may cover several preregistered cells. Failures count. At least eight trials are required before
-nomination or retirement.
+may cover several preregistered cells. Failures count. A decision follows all twelve trials.
 
 Before trial one of each batch, validate every candidate against the frozen schema and source
 subset using the accepted strategy template and exact machine-readable call allowlist. Each
@@ -29,11 +28,14 @@ signals, fills, positions, PnL, or scores. The central engine owns execution, fu
 membership exits, participation, and risk state. `STRATEGY-API.md` is the complete neutral
 implementation and organizer-command reference.
 
-## Nominate once or retire honestly
+## Submit the strongest successful representative
 
-A nominee must exactly match a successful source archive and pass every frozen IS floor plus its
-research certificate. Nomination is terminal. A falsified mechanism is useful evidence; it is not
-a reason to force a candidate through the gate.
+After all twelve trials, the organizer deterministically submits the strongest successful
+candidate using the frozen robust order in `RULES.md`; only a team with zero successful trials may
+retire. No separate decision model is launched. The organizer keeps all frozen gate results: full
+qualification is a distinct badge, and a fallback representative is labeled honestly rather than
+being treated as if it passed. It recomputes final confidence at twelve trials rather than
+comparing provisional per-trial adjustments.
 
 ## Treat the holdout as nonexistent
 
