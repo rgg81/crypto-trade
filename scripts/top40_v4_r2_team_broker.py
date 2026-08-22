@@ -160,11 +160,20 @@ def _reject_failed_preflight(
     payload = research_runtime_v4._stable_bytes(path)  # noqa: SLF001
     rejected = orchestrator_v4.reject_batch_before_evaluation(root, error)
     archive = _archive_outbox(root, team_id, phase, path, payload)
-    return {
+    result: Mapping[str, Any] = {
         **rejected,
         "outbox_sha256": hashlib.sha256(payload).hexdigest(),
         "outbox_archive_path": archive,
     }
+    if phase == "refinement" and _team_has_success(root, team_id):
+        representative = _finalize_team_representative(root, team_id)
+        result = {
+            **result,
+            "retired": False,
+            "research_truncated": True,
+            "representative": representative,
+        }
+    return result
 
 
 def _accepted_record(
@@ -399,9 +408,18 @@ def consume_batch(root: Path, team_id: str, phase: str) -> Mapping[str, Any]:
             root, team_id, phase
         )
     ):
-        return orchestrator_v4.abandon_missing_batch_before_evaluation(
+        result = orchestrator_v4.abandon_missing_batch_before_evaluation(
             root, team_id, phase
         )
+        if phase == "refinement" and _team_has_success(root, team_id):
+            representative = _finalize_team_representative(root, team_id)
+            return {
+                **dict(result),
+                "retired": False,
+                "research_truncated": True,
+                "representative": representative,
+            }
+        return result
     try:
         orchestrator_v4.preflight_is_batch(
             root, team_id, phase, require_receipts=False
@@ -479,10 +497,22 @@ def _finalize_team_representative(root: Path, team_id: str) -> Mapping[str, Any]
     if unexpected_outbox:
         raise BrokerError("automatic finalization found unexpected team outbox residue")
     state = journal_v4.read(root / TOP40_V4_LAYOUT.journal_path)
-    if state.trials_by_team.get(team_id, 0) != TOP40_V4_LAYOUT.maximum_trials:
-        raise BrokerError("automatic representative selection requires all twelve trials")
+    trial_count = state.trials_by_team.get(team_id, 0)
+    truncated_refinement = orchestrator_v4._successful_truncated_refinement(  # noqa: SLF001
+        state, team_id
+    )
+    if trial_count != TOP40_V4_LAYOUT.maximum_trials and not truncated_refinement:
+        raise BrokerError(
+            "automatic representative selection requires twelve trials or a bound "
+            "score-blind refinement truncation"
+        )
     _validate_completed_phase(root, team_id, "discovery")
-    _validate_completed_phase(root, team_id, "refinement")
+    if truncated_refinement:
+        orchestrator_v4._validate_retired_research_authorities(  # noqa: SLF001
+            root, state
+        )
+    else:
+        _validate_completed_phase(root, team_id, "refinement")
     if not _team_has_success(root, team_id):
         result = orchestrator_v4.retire(
             root,
@@ -604,6 +634,19 @@ def run_team(root: Path, team_id: str) -> Mapping[str, Any]:
                 or evidence["sha256"] != event["admission_attempt_sha256"]
             ):
                 raise BrokerError("abandoned batch evidence differs from journal authority")
+        if (
+            retired is not None
+            and retired["event_type"] in {"batch_rejected", "batch_abandoned"}
+            and retired["payload"]["phase"] == "refinement"
+            and _team_has_success(root, team_id)
+        ):
+            representative = _finalize_team_representative(root, team_id)
+            return {
+                "ok": True,
+                "team_id": team_id,
+                "research_truncated": True,
+                "steps": [representative],
+            }
         unexpected_outbox = research_runtime_v4._unexpected_outbox_entries(  # noqa: SLF001
             root, team_id, allowed=set()
         )

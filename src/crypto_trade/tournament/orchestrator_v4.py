@@ -1721,6 +1721,24 @@ def _strongest_successful_candidate(
     return ranked[0][1]
 
 
+def _successful_truncated_refinement(
+    state: journal_v4.JournalState, team_id: str
+) -> bool:
+    """Return whether a score-blind refinement terminal must preserve an IS success."""
+
+    disposition = state.retired.get(team_id)
+    return bool(
+        disposition is not None
+        and disposition["event_type"] in {"batch_rejected", "batch_abandoned"}
+        and disposition["payload"]["phase"] == "refinement"
+        and state.trials_by_team.get(team_id, 0) == 8
+        and any(
+            terminal["payload"]["team_id"] == team_id
+            for terminal in state.is_successes.values()
+        )
+    )
+
+
 def _validated_preflight_source_review(
     root: Path,
     state: journal_v4.JournalState,
@@ -2183,16 +2201,20 @@ def nominate(
                 "candidate_id": candidate_id,
                 "journal_record_sha256": state.nominations[team_id]["record_sha256"],
             }
-        if team_id in state.retired:
+        truncated_refinement = _successful_truncated_refinement(state, team_id)
+        if team_id in state.retired and not truncated_refinement:
             raise OrchestratorError("team already has a terminal IS disposition")
         minimum = int(loaded.raw["research"]["minimum_accepted_trials_before_nomination"])
         if state.trials_by_team.get(team_id, 0) < minimum:
             raise OrchestratorError("team must consume at least eight structured trials")
-        if (
-            TOP40_V4_LAYOUT.name.endswith("-r2")
-            and state.trials_by_team.get(team_id, 0) != TOP40_V4_LAYOUT.maximum_trials
+        if TOP40_V4_LAYOUT.name.endswith("-r2") and (
+            state.trials_by_team.get(team_id, 0) != TOP40_V4_LAYOUT.maximum_trials
+            and not truncated_refinement
         ):
-            raise OrchestratorError("representative nomination requires all twelve trials")
+            raise OrchestratorError(
+                "representative nomination requires twelve trials or a bound "
+                "score-blind refinement truncation"
+            )
         if TOP40_V4_LAYOUT.name.endswith("-r2"):
             strongest = _strongest_successful_candidate(
                 root_path, state, loaded.raw, team_id
@@ -2431,10 +2453,14 @@ def _validate_retired_research_authorities(
 
     if not TOP40_V4_LAYOUT.name.endswith("-r2"):
         return
-    for team_id, record in sorted(state.retired.items()):
+    records = (
+        record
+        for record in state.records
+        if record["event_type"] in {"batch_rejected", "batch_abandoned"}
+    )
+    for record in records:
+        team_id = str(record["payload"]["team_id"])
         event_type = str(record["event_type"])
-        if event_type not in {"batch_rejected", "batch_abandoned"}:
-            continue
         event = record["payload"]
         phase = str(event["phase"])
         outbox_name = "batch-1.json" if phase == "discovery" else "batch-2.json"

@@ -25,8 +25,11 @@ after lane-local feedback. Cover a transparent baseline, its exact sign inversio
 horizons, two rebalance horizons, three risk/control profiles, long/short role checks, and a
 five-point local neighborhood around any prospective nominee. Every accepted request consumes one
 of twelve slots, including failures. After all twelve trials, the organizer deterministically
-submits the strongest successful candidate under the frozen ordering below. Retirement is
-permitted only when all twelve trials failed. There is no separate team decision model or outbox.
+submits the strongest successful candidate under the frozen ordering below. If a score-blind
+refinement batch terminates after discovery produced a success, the organizer preserves the
+strongest discovery success and ranks it with the actual eight-trial count. Retirement is
+permitted only when the lane has no successful trial. There is no separate team decision model or
+outbox.
 
 The representative ordering is higher worst-fold 2x-cost Sharpe, then higher median-fold 2x-cost
 Sharpe, higher trial-adjusted confidence, higher gross edge per turnover, lower annualized

@@ -24,5 +24,7 @@ The team process exits before the organizer evaluates a batch. A later clean-roo
 only this lane's normalized feedback. Never infer sealed performance from timing, errors,
 progress, or another lane. A negative result is valid evidence. After all twelve trials, the
 organizer deterministically submits the lane's strongest successful representative under the
-frozen robust ranking; retirement is allowed only if all twelve failed. There is no guaranteed
+frozen robust ranking. If a score-blind refinement batch terminates after a successful discovery
+trial, the organizer instead preserves the strongest discovery success with the honest eight-trial
+penalty. Retirement is allowed only when the lane has no successful trial. There is no guaranteed
 winner and no separate team decision session.

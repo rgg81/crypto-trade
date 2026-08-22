@@ -89,11 +89,13 @@ status, and successful standardized IS summary. Do not place claimed metrics in 
 
 After all twelve accepted trials, the organizer deterministically chooses the strongest successful
 candidate under the frozen ordering in `RULES.md`, compiles the seven certificate cells directly
-from the immutable request metadata, and submits the representative. There is no decision model,
-`outbox/decision.json`, or team-authored certificate. Empty or incomplete certificate cells make
-the strict certificate fail but do not erase the representative; every cited hash must still have
-the matching tag. Full qualification requires nonempty cells whose union covers every accepted
-trial. An exact sign inversion names the baseline as `parent_candidate_id`, uses identical
+from the immutable request metadata, and submits the representative. A score-blind refinement
+terminal after a successful discovery batch preserves that batch's strongest success with its
+actual eight-trial count. There is no decision model, `outbox/decision.json`, or team-authored
+certificate. Empty or incomplete certificate cells make the strict certificate fail but do not
+erase the representative; every cited hash must still have the matching tag. Full qualification
+requires nonempty cells whose union covers every accepted trial. An exact sign inversion names the
+baseline as `parent_candidate_id`, uses identical
 mechanism/horizon/control/risk metadata, and returns the negative of every baseline target while
 preserving explicit-rebalance versus hold decisions. The organizer verifies the archived target
 artifacts, not the tag.

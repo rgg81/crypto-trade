@@ -3005,22 +3005,22 @@ def test_admission_attempt_feedback_publish_crash_recovers_exact_guidance(
 def test_close_is_revalidates_abandoned_batch_evidence_before_registry_write(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    disposition = {
+        "event_type": "batch_abandoned",
+        "payload": {
+            "team_id": "team-01",
+            "phase": "discovery",
+            "reason": "model batch remained absent",
+            "admission_attempt_path": (
+                "tournament/top40-v4-r2/research-sessions/"
+                "admission-attempts/team-01/discovery-04.json"
+            ),
+            "admission_attempt_sha256": "1" * 64,
+        },
+    }
     state = SimpleNamespace(
-        retired={
-            "team-01": {
-                "event_type": "batch_abandoned",
-                "payload": {
-                    "team_id": "team-01",
-                    "phase": "discovery",
-                    "reason": "model batch remained absent",
-                    "admission_attempt_path": (
-                        "tournament/top40-v4-r2/research-sessions/"
-                        "admission-attempts/team-01/discovery-04.json"
-                    ),
-                    "admission_attempt_sha256": "1" * 64,
-                },
-            }
-        }
+        retired={"team-01": disposition},
+        records=(disposition,),
     )
     monkeypatch.setattr(orchestrator_v4.isolation_v4, "audit_surface", lambda *_args: {})
     monkeypatch.setattr(orchestrator_v4.activation_v4, "validate", lambda *_args: {})
@@ -4000,6 +4000,181 @@ def test_journal_records_preacceptance_batch_rejection_without_weakening_retirem
     assert journal_v4.read(second).record_count == 0
 
 
+def test_refinement_rejection_promotes_a_successful_discovery_representative(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    broker = _broker_module()
+    outbox = (
+        tmp_path
+        / broker.TOP40_V4_LAYOUT.team_root("team-01")
+        / "outbox/batch-2.json"
+    )
+    outbox.parent.mkdir(parents=True)
+    outbox.write_bytes(b'{"score_blind":"invalid-refinement"}\n')
+    monkeypatch.setattr(
+        broker.orchestrator_v4,
+        "reject_batch_before_evaluation",
+        lambda *_args: {"ok": True, "retired": True},
+    )
+    monkeypatch.setattr(
+        broker,
+        "_archive_outbox",
+        lambda *_args: "research-sessions/outboxes/team-01/refinement.json",
+    )
+    monkeypatch.setattr(broker, "_team_has_success", lambda *_args: True)
+    monkeypatch.setattr(
+        broker,
+        "_finalize_team_representative",
+        lambda *_args: {"candidate_id": "candidate-best"},
+    )
+    result = broker._reject_failed_preflight(
+        tmp_path,
+        "team-01",
+        "refinement",
+        orchestrator_v4.CandidateBatchRejectedError("score-blind finding"),
+    )
+    assert result["retired"] is False
+    assert result["research_truncated"] is True
+    assert result["representative"] == {"candidate_id": "candidate-best"}
+
+
+def test_successful_discovery_survives_score_blind_refinement_truncation(
+    tmp_path: Path,
+) -> None:
+    journal = tmp_path / "research-journal.jsonl"
+    journal_v4.initialize(journal)
+    candidate_ids = [f"candidate-{number}" for number in range(1, 9)]
+    source_hashes = [f"{number:064x}" for number in range(1, 9)]
+    receipt_hashes = [f"{number + 20:064x}" for number in range(1, 9)]
+    journal_v4.append(
+        journal,
+        "batch_preflighted",
+        {
+            "team_id": "team-01",
+            "phase": "discovery",
+            "outbox_sha256": "a" * 64,
+            "candidate_ids": candidate_ids,
+            "source_bundle_sha256s": source_hashes,
+            "receipt_sha256s": receipt_hashes,
+            "source_review_sha256s": ["b" * 64] * 8,
+        },
+    )
+    success_record = None
+    for trial_number, (candidate_id, source_sha256, receipt_sha256) in enumerate(
+        zip(candidate_ids, source_hashes, receipt_hashes, strict=True), start=1
+    ):
+        accepted = journal_v4.append(
+            journal,
+            "is_accepted",
+            {
+                "team_id": "team-01",
+                "run_id": f"team01-is-{trial_number:02d}",
+                "trial_number": trial_number,
+                "candidate_id": candidate_id,
+                "purpose": f"discovery trial {trial_number}",
+                "metadata": {},
+                "authority": {
+                    "entrypoint": (
+                        "tournament/top40-v4-r2/teams/team-01/candidates/"
+                        f"{candidate_id}/strategy.py"
+                    ),
+                    "source_bundle_sha256": source_sha256,
+                },
+                "research_session": {
+                    "path": (
+                        "tournament/top40-v4-r2/research-sessions/team-01/"
+                        f"{source_sha256}.json"
+                    ),
+                    "sha256": receipt_sha256,
+                    "source_bundle_sha256": source_sha256,
+                },
+                "output_path": f"reports-top40-v4-r2/is/team-01/trial-{trial_number}",
+            },
+        )
+        terminal_payload = {
+            "team_id": "team-01",
+            "run_id": f"team01-is-{trial_number:02d}",
+            "candidate_id": candidate_id,
+            "request_sha256": accepted["record_sha256"],
+        }
+        if trial_number == 1:
+            success_record = journal_v4.append(
+                journal,
+                "is_succeeded",
+                {
+                    **terminal_payload,
+                    "summary_path": "reports-top40-v4-r2/is/team-01/trial-1/summary.json",
+                    "summary_sha256": "c" * 64,
+                },
+            )
+        else:
+            journal_v4.append(
+                journal,
+                "is_failed",
+                {**terminal_payload, "failure": "bounded candidate failure"},
+            )
+    journal_v4.append(
+        journal,
+        "batch_rejected",
+        {
+            "team_id": "team-01",
+            "phase": "refinement",
+            "reason": "deterministic score-blind refinement failure",
+            "outbox_sha256": "d" * 64,
+            "candidate_ids": [f"candidate-{number}" for number in range(9, 13)],
+        },
+    )
+    for team_id in TOP40_V4_R2_LAYOUT.team_ids[1:]:
+        journal_v4.append(
+            journal,
+            "batch_rejected",
+            {
+                "team_id": team_id,
+                "phase": "discovery",
+                "reason": "deterministic score-blind discovery failure",
+                "outbox_sha256": hashlib.sha256(team_id.encode()).hexdigest(),
+                "candidate_ids": [f"candidate-{number}" for number in range(1, 9)],
+            },
+        )
+    state = journal_v4.read(journal)
+    assert state.retired["team-01"]["payload"]["phase"] == "refinement"
+    before = journal.read_bytes()
+    with pytest.raises(journal_v4.JournalError, match="discarded a successful"):
+        journal_v4.append(
+            journal,
+            "selection_frozen",
+            {
+                "input_head_sha256": state.head_sha256,
+                "advancing": [],
+                "selection_freeze_path": "tournament/top40-v4-r2/selection-freeze.json",
+                "selection_freeze_sha256": "e" * 64,
+            },
+        )
+    assert journal.read_bytes() == before
+    assert success_record is not None
+    journal_v4.append(
+        journal,
+        "nominated",
+        {
+            "team_id": "team-01",
+            "candidate_id": "candidate-1",
+            "success_record_sha256": success_record["record_sha256"],
+            "certificate_path": (
+                "tournament/top40-v4-r2/certificates/team-01/candidate-1.json"
+            ),
+            "certificate_sha256": "f" * 64,
+            "nomination_path": (
+                "tournament/top40-v4-r2/nominations/team-01/candidate-1.json"
+            ),
+            "nomination_sha256": "1" * 64,
+        },
+    )
+    promoted = journal_v4.read(journal)
+    assert promoted.trials_by_team["team-01"] == 8
+    assert "team-01" not in promoted.retired
+    assert promoted.nominations["team-01"]["payload"]["candidate_id"] == "candidate-1"
+
+
 def test_r2_journal_refuses_a_selection_with_fewer_than_five_representatives(
     tmp_path: Path,
 ) -> None:
@@ -4792,6 +4967,72 @@ def test_candidate_receipt_hash_mismatch_and_immutable_conflict_are_deterministi
             b"second\n",
             conflict_error=research_runtime_v4.CandidateReceiptRejectedError,
         )
+
+
+def test_source_review_atomic_publish_recovers_every_private_staging_prefix(
+    tmp_path: Path,
+) -> None:
+    source_sha256 = "d" * 64
+    relative = research_runtime_v4._source_review_relative(  # noqa: SLF001
+        "team-01", source_sha256
+    )
+    final = tmp_path / relative
+    final.parent.mkdir(parents=True, mode=0o700)
+    final.parent.chmod(0o700)
+    final.parent.parent.chmod(0o700)
+    staging = final.parent / f".{final.name}.staging"
+    payload = b'{"complete":"source-review"}\n'
+
+    # Crash after creating only a partial, unpublished staging inode.
+    staging.write_bytes(payload[:7])
+    staging.chmod(0o600)
+    research_runtime_v4._publish_source_review_atomic(  # noqa: SLF001
+        tmp_path, "team-01", source_sha256, payload
+    )
+    assert final.read_bytes() == payload
+    assert final.stat().st_nlink == 1
+    assert not staging.exists()
+
+    # Crash after the durable no-replace link but before removing the staging name.
+    final.unlink()
+    staging.write_bytes(payload)
+    staging.chmod(0o600)
+    os.link(staging, final)
+    assert final.stat().st_nlink == 2
+    research_runtime_v4._publish_source_review_atomic(  # noqa: SLF001
+        tmp_path, "team-01", source_sha256, b"new timestamp would differ\n"
+    )
+    assert final.read_bytes() == payload
+    assert final.stat().st_nlink == 1
+    assert not staging.exists()
+
+
+def test_source_review_atomic_publish_rejects_unrelated_staging_hardlink(
+    tmp_path: Path,
+) -> None:
+    source_sha256 = "e" * 64
+    relative = research_runtime_v4._source_review_relative(  # noqa: SLF001
+        "team-01", source_sha256
+    )
+    final = tmp_path / relative
+    final.parent.mkdir(parents=True, mode=0o700)
+    final.parent.chmod(0o700)
+    final.parent.parent.chmod(0o700)
+    staging = final.parent / f".{final.name}.staging"
+    outside = tmp_path / "unrelated-private-file"
+    outside.write_bytes(b"do not mutate\n")
+    outside.chmod(0o600)
+    os.link(outside, staging)
+    before = outside.read_bytes()
+    with pytest.raises(
+        research_runtime_v4.ResearchRuntimeError, match="link topology is unsafe"
+    ):
+        research_runtime_v4._publish_source_review_atomic(  # noqa: SLF001
+            tmp_path, "team-01", source_sha256, b"review\n"
+        )
+    assert outside.read_bytes() == before
+    assert outside.stat().st_nlink == 2
+    assert not final.exists()
 
 
 def test_refinement_preflight_rejects_candidate_reuse_from_discovery(
@@ -5943,6 +6184,7 @@ def test_broker_automatically_compiles_the_strongest_team_representative(
     (outbox / ".keep").write_text("\n", encoding="utf-8")
     state = SimpleNamespace(
         trials_by_team={"team-01": 12},
+        retired={},
         is_requests={
             "a" * 64: {
                 "payload": {

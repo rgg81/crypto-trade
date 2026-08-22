@@ -2625,6 +2625,14 @@ def review_candidate_source(
         candidate_id,
         source_bundle_sha256,
     )
+    relative = _source_review_relative(team_id, source_bundle_sha256)
+    if os.path.lexists(root_path / relative):
+        return validate_source_review(
+            root_path,
+            team_id,
+            candidate_id,
+            source_bundle_sha256,
+        )
     entrypoint = f"{TOP40_V4_LAYOUT.team_root(team_id)}/candidates/{candidate_id}/strategy.py"
     capture = runner_v4.capture_source_bundle(root_path, team_id, entrypoint)
     if capture.sha256 != source_bundle_sha256:
@@ -2657,9 +2665,12 @@ def review_candidate_source(
     payload = json.dumps(
         review, allow_nan=False, ensure_ascii=True, indent=2, sort_keys=True
     ).encode("ascii") + b"\n"
-    relative = _source_review_relative(team_id, source_bundle_sha256)
-    if not os.path.lexists(root_path / relative):
-        _write_immutable(root_path / relative, payload)
+    _publish_source_review_atomic(
+        root_path,
+        team_id,
+        source_bundle_sha256,
+        payload,
+    )
     return validate_source_review(
         root_path,
         team_id,
@@ -3078,7 +3089,11 @@ def _pinned_admission_directory(
     """Pin one organizer-private authority directory through every path component."""
 
     TOP40_V4_LAYOUT.require_team(team_id)
-    if category not in {"admission-attempts", "admission-sessions"}:
+    if category not in {
+        "admission-attempts",
+        "admission-sessions",
+        "source-reviews",
+    }:
         raise ResearchRuntimeError("admission authority category is invalid")
     parts = (*Path(isolation_v4.RESEARCH_SESSION_ROOT).parts, category, team_id)
     flags = (
@@ -3157,6 +3172,105 @@ def _pinned_admission_directory(
         for descriptor in reversed(descriptors):
             with contextlib.suppress(OSError):
                 os.close(descriptor)
+
+
+def _publish_source_review_atomic(
+    root: Path,
+    team_id: str,
+    source_bundle_sha256: str,
+    payload: bytes,
+) -> None:
+    """Publish a causal review without ever exposing a partial final authority.
+
+    The fixed private staging name makes every host-crash prefix recognizable.  A staging-only
+    inode is unbound scratch and can be discarded; a two-name inode is accepted only when the
+    staging and final names are the same inode, after which removing the staging name restores
+    the immutable single-link final authority.  Unsafe or unrelated link topology fails closed.
+    """
+
+    TOP40_V4_LAYOUT.require_team(team_id)
+    if _SHA256.fullmatch(source_bundle_sha256) is None:
+        raise ResearchRuntimeError("source review identity is not a SHA-256")
+    name = f"{source_bundle_sha256}.json"
+    staging = f".{name}.staging"
+    with _pinned_admission_directory(root, team_id, "source-reviews") as directory:
+        try:
+            final_details = os.stat(name, dir_fd=directory, follow_symlinks=False)
+        except FileNotFoundError:
+            final_details = None
+        except OSError as exc:
+            raise ResearchRuntimeError("cannot inspect source review authority") from exc
+        try:
+            staging_details = os.stat(staging, dir_fd=directory, follow_symlinks=False)
+        except FileNotFoundError:
+            staging_details = None
+        except OSError as exc:
+            raise ResearchRuntimeError("cannot inspect source review staging authority") from exc
+
+        if staging_details is not None:
+            if (
+                not stat.S_ISREG(staging_details.st_mode)
+                or staging_details.st_uid != os.geteuid()
+                or stat.S_IMODE(staging_details.st_mode) != 0o600
+                or staging_details.st_size > 2 * 1024 * 1024
+                or staging_details.st_nlink not in {1, 2}
+            ):
+                raise ResearchRuntimeError("source review staging authority is unsafe")
+            if staging_details.st_nlink == 2 and (
+                final_details is None
+                or final_details.st_nlink != 2
+                or (staging_details.st_dev, staging_details.st_ino)
+                != (final_details.st_dev, final_details.st_ino)
+            ):
+                raise ResearchRuntimeError("source review staging link topology is unsafe")
+            try:
+                os.unlink(staging, dir_fd=directory)
+                os.fsync(directory)
+            except OSError as exc:
+                raise ResearchRuntimeError(
+                    "cannot normalize source review staging authority"
+                ) from exc
+
+        if final_details is not None:
+            return
+
+        flags = (
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+        )
+        try:
+            descriptor = os.open(staging, flags, 0o600, dir_fd=directory)
+        except OSError as exc:
+            raise ResearchRuntimeError("cannot create source review staging authority") from exc
+        try:
+            with os.fdopen(descriptor, "wb") as handle:
+                os.fchmod(handle.fileno(), 0o600)
+                if handle.write(payload) != len(payload):
+                    raise ResearchRuntimeError("short source review staging write")
+                handle.flush()
+                os.fsync(handle.fileno())
+            try:
+                os.link(
+                    staging,
+                    name,
+                    src_dir_fd=directory,
+                    dst_dir_fd=directory,
+                    follow_symlinks=False,
+                )
+            except FileExistsError:
+                # A serialized retry may encounter a final authority published immediately
+                # before a process interruption.  The caller validates its exact content.
+                pass
+            os.fsync(directory)
+        except Exception:
+            raise
+        finally:
+            with contextlib.suppress(FileNotFoundError):
+                os.unlink(staging, dir_fd=directory)
+                os.fsync(directory)
 
 
 def _pinned_admission_bytes(directory: int, name: str) -> bytes:

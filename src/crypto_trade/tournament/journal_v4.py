@@ -566,7 +566,22 @@ def replay_bytes(payload: bytes) -> JournalState:
             if selection is not None:
                 raise JournalError("team disposition changed after selection freeze")
             team_id = str(event["team_id"])
-            if team_id in nominations or team_id in retired:
+            prior_disposition = retired.get(team_id)
+            promoting_truncated_success = bool(
+                event_type == "nominated"
+                and prior_disposition is not None
+                and prior_disposition["event_type"]
+                in {"batch_rejected", "batch_abandoned"}
+                and prior_disposition["payload"]["phase"] == "refinement"
+                and trials[team_id] == 8
+                and any(
+                    terminal["payload"]["team_id"] == team_id
+                    for terminal in is_successes.values()
+                )
+            )
+            if team_id in nominations or (
+                team_id in retired and not promoting_truncated_success
+            ):
                 raise JournalError("team has more than one terminal IS disposition")
             if event_type in {"batch_rejected", "batch_abandoned"}:
                 expected_trials = 0 if event["phase"] == "discovery" else 8
@@ -599,11 +614,13 @@ def replay_bytes(payload: bytes) -> JournalState:
                     raise JournalError("team retired before eight accepted trials")
                 retired[team_id] = record
             else:
-                if (
-                    TOP40_V4_LAYOUT.name.endswith("-r2")
-                    and trials[team_id] != TOP40_V4_LAYOUT.maximum_trials
+                if TOP40_V4_LAYOUT.name.endswith("-r2") and (
+                    trials[team_id] != TOP40_V4_LAYOUT.maximum_trials
+                    and not promoting_truncated_success
                 ):
-                    raise JournalError("team nominated before all twelve accepted trials")
+                    raise JournalError(
+                        "team nominated before twelve trials or a refinement truncation"
+                    )
                 if not TOP40_V4_LAYOUT.name.endswith("-r2") and trials[team_id] < 8:
                     raise JournalError("team nominated before eight accepted trials")
                 success = is_successes.get(str(event["success_record_sha256"]))
@@ -611,12 +628,26 @@ def replay_bytes(payload: bytes) -> JournalState:
                     raise JournalError("nomination does not reference a team success")
                 if success["payload"]["candidate_id"] != event["candidate_id"]:
                     raise JournalError("nomination candidate differs from its success")
+                if promoting_truncated_success:
+                    retired.pop(team_id)
                 nominations[team_id] = record
         elif event_type == "selection_frozen":
             if selection is not None or release is not None:
                 raise JournalError("selection was frozen more than once")
             if set(nominations) | set(retired) != set(TOP40_V4_LAYOUT.team_ids):
                 raise JournalError("selection frozen before all teams were resolved")
+            if any(
+                disposition["event_type"] in {"batch_rejected", "batch_abandoned"}
+                and disposition["payload"]["phase"] == "refinement"
+                and any(
+                    terminal["payload"]["team_id"] == team_id
+                    for terminal in is_successes.values()
+                )
+                for team_id, disposition in retired.items()
+            ):
+                raise JournalError(
+                    "selection discarded a successful truncated refinement lane"
+                )
             if event["input_head_sha256"] != head:
                 raise JournalError("selection does not bind its exact input journal head")
             if any(team_id not in nominations for team_id in event["advancing"]):

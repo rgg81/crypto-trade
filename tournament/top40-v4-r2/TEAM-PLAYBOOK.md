@@ -32,10 +32,12 @@ implementation and organizer-command reference.
 
 After all twelve trials, the organizer deterministically submits the strongest successful
 candidate using the frozen robust order in `RULES.md`; only a team with zero successful trials may
-retire. No separate decision model is launched. The organizer keeps all frozen gate results: full
+retire. If score-blind refinement admission terminates after discovery produced a success, the
+organizer preserves the strongest discovery success and ranks it with the actual eight-trial
+count. No separate decision model is launched. The organizer keeps all frozen gate results: full
 qualification is a distinct badge, and a fallback representative is labeled honestly rather than
-being treated as if it passed. It recomputes final confidence at twelve trials rather than
-comparing provisional per-trial adjustments.
+being treated as if it passed. It recomputes final confidence at the lane's actual accepted trial
+count rather than comparing provisional per-trial adjustments.
 
 ## Treat the holdout as nonexistent
 

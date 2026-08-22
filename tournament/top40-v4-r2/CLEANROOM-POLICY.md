@@ -100,9 +100,12 @@ deterministic findings and explicitly binds that no score data was opened; every
 the same offline profile, fixed prompt/command, cleaned private runtime, launch authority, and
 global serial lease. A durable private attempt is the source of truth for recreating or validating
 the exact lane-visible repair feedback before another session is issued. Deterministic batch
-defects—or a batch that remains absent—after all repairs retire the lane at that score-blind
-boundary without fabricating an outbox. Before selection, the organizer revalidates each terminal
-batch's journal-bound archive or exhausted-attempt evidence. This includes a
+defects—or a batch that remains absent—after all repairs retire a zero-success lane at that
+score-blind boundary without fabricating an outbox. When discovery already produced a success, a
+terminal refinement batch instead preserves and nominates the strongest discovery success with
+its actual eight-trial penalty. Before selection, the organizer revalidates each terminal batch's
+journal-bound archive or exhausted-attempt evidence, including dispositions later promoted to a
+representative. This includes a
 deterministic immutable receipt schema, phase, hash, or
 binding conflict. Filesystem I/O, isolation-probe, lock, or other infrastructure failures before
 session issuance do not retire the lane and remain safely resumable. After issuance, an ambiguous
