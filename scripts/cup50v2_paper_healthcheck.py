@@ -15,6 +15,11 @@ from pathlib import Path
 
 import pandas as pd
 
+# Imported, never restated. The first version hardcoded "latest.json" while the desk writes
+# "latest-boundary.json", so the healthcheck reported NO-TICK for desks that had published
+# perfectly good boundaries -- a monitor lying in the safe-looking direction is still lying.
+from crypto_trade.cup50v2_desk.tick import LATEST  # noqa: E402
+
 INTERVAL = pd.Timedelta(hours=8)
 DESKS = ("winner", "runner-up-1", "runner-up-2", "ensemble-eq3")
 # A desk is late once it has missed a whole boundary plus a grace period for a slow fetch.
@@ -30,7 +35,7 @@ def desk_status(
     paper_root: Path, desk_id: str, now: pd.Timestamp, *, launched: bool
 ) -> dict[str, object]:
     paper = paper_root / desk_id
-    latest = paper / "latest.json"
+    latest = paper / LATEST
     attempt = paper / "attempt.json"
     if not latest.is_file():
         # Before launch a desk with no boundary is expected. After launch it is a desk that has
