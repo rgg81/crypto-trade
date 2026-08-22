@@ -151,7 +151,13 @@ def main() -> int:
             "published_centre_score": expected,
             "cost_multiplier": 1,
             "decision_time": OOS_END.isoformat(),
-            "equity": float(realistic.final_state.equity),
+            # The SEAM, not the final state. The tick compares the equity column at the last
+            # historical row against this field; final_state.equity is the state after the whole
+            # replay including its end-of-window settlement, and the two differ. Recording the
+            # wrong one made every desk fail its own parity check on the first tick.
+            "equity": float(
+                realistic.returns.loc[realistic.returns.index < OOS_END].iloc[-1]["equity"]
+            ),
             "quantities": {
                 str(k): float(v) for k, v in dict(realistic.final_state.quantities).items()
             },
