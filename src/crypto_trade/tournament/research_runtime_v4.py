@@ -2627,6 +2627,12 @@ def review_candidate_source(
     )
     relative = _source_review_relative(team_id, source_bundle_sha256)
     if os.path.lexists(root_path / relative):
+        _publish_source_review_atomic(
+            root_path,
+            team_id,
+            source_bundle_sha256,
+            None,
+        )
         return validate_source_review(
             root_path,
             team_id,
@@ -3178,7 +3184,7 @@ def _publish_source_review_atomic(
     root: Path,
     team_id: str,
     source_bundle_sha256: str,
-    payload: bytes,
+    payload: bytes | None,
 ) -> None:
     """Publish a causal review without ever exposing a partial final authority.
 
@@ -3233,6 +3239,10 @@ def _publish_source_review_atomic(
 
         if final_details is not None:
             return
+        if payload is None:
+            raise ResearchRuntimeError(
+                "source review final authority disappeared during crash recovery"
+            )
 
         flags = (
             os.O_WRONLY

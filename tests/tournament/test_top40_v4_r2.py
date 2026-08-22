@@ -5110,7 +5110,7 @@ def test_source_review_atomic_publish_recovers_every_private_staging_prefix(
     os.link(staging, final)
     assert final.stat().st_nlink == 2
     research_runtime_v4._publish_source_review_atomic(  # noqa: SLF001
-        tmp_path, "team-01", source_sha256, b"new timestamp would differ\n"
+        tmp_path, "team-01", source_sha256, None
     )
     assert final.read_bytes() == payload
     assert final.stat().st_nlink == 1
