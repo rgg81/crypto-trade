@@ -47,7 +47,7 @@ def _utc(value: object) -> pd.Timestamp:
 
 def _historical_classifications(root: Path) -> dict[str, str]:
     payload = json.loads(
-        (root / "tournament" / "cup50" / "historical-asset-classification.json").read_text()
+        (root / "tournament" / "cup50v2" / "historical-asset-classification.json").read_text()
     )
     entries = payload.get("entries")
     if not isinstance(entries, dict):
@@ -60,7 +60,7 @@ def _historical_classifications(root: Path) -> dict[str, str]:
 
 
 def _verified_acquisition_frame(root: Path, name: str) -> pd.DataFrame:
-    acquisition = root / "data" / "cup50" / "acquisition-remediated-20260817"
+    acquisition = root / "data" / "cup50v2" / "acquisition"
     manifest = json.loads((acquisition / "manifest.json").read_text())
     matches = [entry for entry in manifest["files"] if entry.get("name") == name]
     if len(matches) != 1:
@@ -95,8 +95,8 @@ def derive_forward_membership(
     """Resolver passed to the acquisition layer after the wide bar panel is refreshed."""
     base = Path(root).resolve() if root is not None else repository_root()
     decision = _utc(boundary)
-    research = load_snapshot(base / "data" / "cup50" / "is")
-    sealed = load_snapshot(base / "data" / "cup50" / "sealed")
+    research = load_snapshot(base / "data" / "cup50v2" / "is")
+    sealed = load_snapshot(base / "data" / "cup50v2" / "sealed")
     recorded = pd.concat([research.membership, sealed.membership], ignore_index=True)
     recorded["reconstitution_time"] = pd.to_datetime(
         recorded["reconstitution_time"], utc=True
@@ -201,8 +201,8 @@ def build_forward_snapshot(
     decision = _utc(boundary)
     right = decision + pd.Timedelta(hours=8)
     historical = stitch_snapshots(
-        load_snapshot(base / "data" / "cup50" / "is"),
-        load_snapshot(base / "data" / "cup50" / "sealed"),
+        load_snapshot(base / "data" / "cup50v2" / "is"),
+        load_snapshot(base / "data" / "cup50v2" / "sealed"),
     )
     live_bars = load_cached_frame(generation, BARS)
     live_funding = load_cached_frame(generation, FUNDING)

@@ -1,0 +1,13 @@
+{
+  "amendment_id": "A17",
+  "amendment_sha256": "996db79480e6671a36944ed58eb8fa5b2d357d3b196991c9f1c6a7db1f574575",
+  "defect": "Forking cup50_desk rewrote every 'from crypto_trade.cup50.' import and left six paths built from string segments untouched: five data paths and one tournament path. A path assembled from literals is invisible to an import-level rewrite, invisible to lint, and invisible to every test that does not actually build a snapshot.",
+  "family": "The same shape as the rest of this edition, one layer down: a mechanism that appeared to have run and had not run everywhere, with nothing checking the property it was meant to establish.",
+  "fix": "All six paths corrected. A test now asserts no desk source names another edition at all -- cup50, cup20 or top40 -- as a quoted segment or a path fragment. It immediately found the second one, which my first grep had missed because that grep looked only at data paths.",
+  "found_at_phase": "first tick after launch, before any boundary was published",
+  "found_by": "the first paper tick, failing to open data/cup50/is/manifest.json",
+  "how_much_worse_it_could_have_been": "The desk would have replayed against CUP-50's universe and sealed extent, producing a forward record that meant nothing. It failed loudly only because this worktree has no data/cup50 directory; in a checkout that had one it would have run, for six months, confidently.",
+  "namespace": "cup50v2",
+  "no_result_is_affected": "No boundary was published. The tick failed before writing anything, which is the fail-closed behaviour working as designed.",
+  "title": "the forked desk still read another edition's data"
+}

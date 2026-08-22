@@ -107,3 +107,19 @@ def test_every_desk_module_imports() -> None:
 
     for info in pkgutil.iter_modules(package.__path__):
         importlib.import_module(f"crypto_trade.cup50v2_desk.{info.name}")
+
+
+@pytest.mark.parametrize("path", _desk_sources(), ids=lambda p: p.name)
+def test_no_desk_source_reaches_into_another_edition_s_data(path: Path) -> None:
+    """Paths built from string segments survive an import-level namespace rewrite.
+
+    Forking cup50_desk rewrote every `from crypto_trade.cup50.` import, and left five
+    `root / "data" / "cup50" / ...` literals untouched. They are invisible to an import rewrite,
+    invisible to lint, and invisible to every test that does not actually build a snapshot -- the
+    first paper tick found them by trying to open another edition's manifest. This asserts the
+    property directly instead of relying on a rewrite having been thorough.
+    """
+    source = path.read_text()
+    for edition in ("cup50", "cup20", "top40"):
+        for segment in (f'"{edition}"', f"'{edition}'", f"/{edition}/"):
+            assert segment not in source, f"{path.name} names another edition: {segment}"
