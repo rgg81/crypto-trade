@@ -1,0 +1,14 @@
+{
+  "amendment_id": "A15",
+  "amendment_sha256": "6c540bd1f51de20b2d9ace1bc78cce95a5cf073ff38cae65e6f77e4ce0007881",
+  "defect": "compile_leaderboard reads each lane's source_bundle_sha256 from its disposition and compares it with the digest recorded in every point's private evidence. freeze_field never required that key, and the dispositions this edition generated did not carry it, so the comparison ran against the default sentinel 'f'*64 and refused team-01's first point.",
+  "family": "A5, A12 and now A15: a field that exists in a schema, is consumed somewhere downstream, and is never required where it is written. freeze_field validates nomination_sha256 and point_ids and says nothing about source_bundle_sha256, which another module treats as mandatory.",
+  "fix": "The leaderboard now follows the chain instead of expecting a duplicated copy. The field pins each lane's nomination by freeze digest; the nomination pins the bundle. _leaderboard verifies the first link -- the nomination on disk must be the one the field froze -- and then supplies the second. This is stronger than a copy in the disposition would have been, and it avoids a second copy of a digest that would be a second thing to drift (A2).",
+  "found_at_phase": "after the sealed observation, while compiling the leaderboard",
+  "found_by": "compile_leaderboard refusing every lane after the integrity review passed",
+  "namespace": "cup50v2",
+  "no_result_is_affected": "The comparison this restores is between the frozen bundle digest and the digest recorded in each point's evidence at observation time. Every one of the 208 points now passes it, so the evidence was always consistent with the frozen field; the leaderboard simply could not see it.",
+  "title": "the leaderboard wanted a bundle digest the field close never required",
+  "what_was_not_done": "The field was not re-closed. It is one-shot and the sealed window had already been read; re-closing it to add a key would be the retroactive change this edition exists to prevent, and the binding it would have added was never actually missing -- only indirect.",
+  "why_it_surfaced_late": "The sentinel default made the failure loud rather than silent, which is the one good property here: an absent binding could not be mistaken for a matching one. But nothing checked the key was present when the field closed, and the field is one-shot, so the gap could only be found after the sealed window had already been read."
+}

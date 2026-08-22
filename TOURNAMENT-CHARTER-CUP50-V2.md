@@ -255,3 +255,57 @@ deployment. The tournament result never authorises capital; only the forward rec
 6. **A calm book cannot reach the volatility target**, because the caps bind before the risk unit
    does, and a concentrated book is capped harder than a diversified one. Drawdowns across lanes are
    comparable in kind, not in scale.
+
+## What went wrong, and what it cost
+
+Written after the sealed window closed, before the release. Fifteen amendments and two findings are
+in `tournament/cup50v2/amendments/` and `findings/`, each with the digests needed to check its
+claims. This section is the honest summary a reader deserves without reading all seventeen.
+
+**Nothing here changed a score, a rank, an eligibility verdict or the winner rule.** The
+qualification bar (S_is ≥ 35, every in-sample regime ≥ 15) and the frozen score were hash-bound
+before any lane nominated and never moved. Every amendment after the first sealed read touched
+journal mechanics or validation plumbing, and each one says so with the digests to prove it.
+
+Three defects are worth a reader's attention:
+
+1. **A13 — the sealed observation ran one file no activation bound.** A12 edited `cli.py` after
+   re-activation, so the evaluator that read the sealed window differed from the activated one by a
+   validation-only block. Every module that computes a number was verified bit-identical. The run
+   was not stopped, because re-closing a field after sealed reads is precisely CUP-50's incident 3;
+   the chain of custody for this observation is therefore weaker than intended, and that is a real
+   cost, not a technicality.
+2. **A14 — the integrity review assumed sequential observation.** Points were observed six at a
+   time inside each lane, which the observation order permits and the journal's locking makes safe,
+   but the review paired the i-th start with the i-th terminal and refused the completed run. The
+   check was replaced with the relation it stood in for, after independently verifying every
+   property it protected. The change was made after seeing the check fail, on data the organizer
+   produced, and is recorded as such.
+3. **F1 — team-09 declared a control tighter than it ran.** Disclosed, no disposition changed;
+   there is no allowlisted code for an inaccurate declaration and minting one afterwards would be
+   retroactive. team-09 was independently ineligible on the in-sample bar.
+
+**The pattern.** Ten of the fifteen amendments are one shape: a check that existed, passed its own
+unit test, and gated nothing — never invoked, or reading a field nobody compared, or scoped to a
+dimension the failure did not live in. None was caught by a green suite. The general lesson, for
+whoever runs the next edition: **a test of a helper is not a test of the path**, and a binding
+nobody compares is not a binding.
+
+## What the sealed window actually showed
+
+For the first time in this lineage, **in-sample rank carried information about out-of-sample rank**:
+Spearman +0.59 across twelve lanes, +0.47 among the eligible, +0.50 on the top three. CUP-20
+measured −1 on its top three. One edition and twelve lanes is thin evidence and the error bars are
+wide; the forward desks, not this table, are the test that matters.
+
+The likely cause is visible in the same results. **3× drawdown against sealed S has a Spearman of
+−0.916**, and turnover sorts nearly as cleanly: lanes under 45×/yr averaged a sealed S of 39.1,
+lanes over 90×/yr averaged 11.5, and every lane above 90×/yr finished in the bottom four. The cost
+wall is still the binding constraint, as it has been in every edition. What changed is that the
+re-weighted cost cells (0.45/0.35/0.20 rather than 0.20/0.30/0.50) made the in-sample score
+discriminating instead of selecting for a book that never trades — so a lane that would die of costs
+died where its team could see it.
+
+**The qualification bar worked.** team-09, the one lane below the pre-registered bar, finished last
+of twelve on sealed data with 268×/yr turnover and a 61% 3× drawdown. The bar excluded the worst
+forward performer using only in-sample evidence, frozen before anyone read a sealed byte.

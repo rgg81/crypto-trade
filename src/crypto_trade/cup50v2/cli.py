@@ -1010,6 +1010,27 @@ def _review(arguments: argparse.Namespace) -> Mapping[str, object]:
 
 def _leaderboard(arguments: argparse.Namespace) -> Mapping[str, object]:
     field = verify_field(arguments.field, signing_key=_key(arguments.signing_key))
+
+    # Follow the chain rather than expecting a duplicated copy. compile_leaderboard reads each
+    # lane's source_bundle_sha256 from its disposition, and freeze_field never required one, so a
+    # closed field can be missing it entirely (amendment A15). The binding is not lost: the field
+    # pins the nomination by freeze digest, and the nomination pins the bundle. Verify the first
+    # link here, then supply the second. Resolving it this way also avoids a second copy of a
+    # digest that would be a second thing to drift (A2).
+    nominations = Path(arguments.nominations)
+    dispositions = {}
+    for team_id, disposition in field["dispositions"].items():
+        resolved = dict(disposition)
+        if disposition.get("state") == "nominated" and "source_bundle_sha256" not in resolved:
+            nomination = verify_nomination(nominations / f"{team_id}.json")
+            if nomination["freeze_sha256"] != disposition["nomination_sha256"]:
+                raise ValueError(
+                    f"{team_id}: nomination on disk is not the one the field froze"
+                )
+            resolved["source_bundle_sha256"] = nomination["source_bundle_sha256"]
+        dispositions[team_id] = resolved
+    field = {**field, "dispositions": dispositions}
+
     result = compile_leaderboard(
         field=field,
         journal_path=arguments.journal,
@@ -1230,6 +1251,9 @@ def parser() -> argparse.ArgumentParser:
     leaderboard.add_argument("--journal", required=True)
     leaderboard.add_argument("--private-stage", required=True)
     leaderboard.add_argument("--output", required=True)
+    leaderboard.add_argument(
+        "--nominations", default="tournament/cup50v2/nominations"
+    )
     leaderboard.set_defaults(handler=_leaderboard)
 
     release = commands.add_parser("release")

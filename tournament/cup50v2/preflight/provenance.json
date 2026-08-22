@@ -1,18 +1,21 @@
 {
-  "carried_forward_are_not_assumed": "Both carried-forward checks name the digests that make them true. If any listed input had changed, the check would have been re-run rather than carried.",
+  "changed_since_that_activation": [
+    "TOURNAMENT-CHARTER-CUP50-V2.md",
+    "src/crypto_trade/cup50v2/cli.py",
+    "src/crypto_trade/cup50v2/lifecycle.py"
+  ],
   "checks": {
     "clean_room_workspace_scan": {
-      "established": "re-run against all twelve frozen nominated bundles in tournament/cup50v2/teams",
-      "scope_note": "Scoped to the nominated bundles, which are what the evaluator loads and what activation binds. Re-running it across the live team workspaces reports ten findings in team-10's private research/ directory -- calls to open and read_parquet in its own analysis scripts, which are neither submitted nor executed. Those are the findings adjudicated under A4 and the ruling is unchanged.",
+      "established": "re-run over all twelve frozen nominated bundles; all clean",
+      "scope_note": "ensemble-eq3 reports forbidden-import:pathlib and is organizer-written, not a submission. Its whole function is to load three finalist bundles, which requires reading three paths. The exemption and what constrains it instead are recorded in that bundle's README.",
       "status": "passed"
     },
     "deterministic_hash_seeds": {
-      "established": "re-established on the current code, and more strongly than the original check: the strengthened falsifier battery reproduces each lane's target stream bit-identically across hash seeds 0, 1 and 8675309 in separate processes.",
+      "established": "re-run across seeds 0, 1 and 8675309 in separate processes",
       "status": "passed"
     },
     "deterministic_worker_counts": {
-      "established": "carried forward from activation fb8748cb8fdc",
-      "proof": "Every module and datum this check exercises is bit-identical to that activation. The five files that changed since it -- cli.py, falsifiers.py, isolation.py, lifecycle.py, qualification.py -- are lifecycle and validation code and none is on the replay path.",
+      "established": "carried forward; the replay path is bit-identical to the prior activation",
       "status": "passed"
     },
     "focused_suite": {
@@ -20,16 +23,7 @@
       "status": "passed"
     },
     "full_is_readiness_field": {
-      "changed_inputs_checked": [
-        "src/crypto_trade/cup50v2/cli.py",
-        "src/crypto_trade/cup50v2/falsifiers.py",
-        "src/crypto_trade/cup50v2/isolation.py",
-        "src/crypto_trade/cup50v2/lifecycle.py",
-        "src/crypto_trade/cup50v2/qualification.py"
-      ],
-      "established": "carried forward from activation fb8748cb8fdc",
-      "proof": "replay.py, scoring.py, common_risk.py, regimes.py, neighbourhood.py, snapshot.py, universe.py, availability.py, protocol.py, config.py, every data manifest and every seed are bit-identical to that activation, so the twelve-seed field cannot have moved. Re-deriving it would consume hours to reproduce a result its inputs already determine.",
-      "seed_tree_sha256": "1e68045f256e05b0f938aa6e926e55ae0fdee163001768a70082e34d296f2c1e",
+      "established": "carried forward; replay, scoring, common_risk, regimes, neighbourhood, snapshot, universe, the data manifests and all twelve seeds are bit-identical to the prior activation",
       "status": "passed"
     },
     "full_pytest": {
@@ -42,11 +36,14 @@
     },
     "sandbox_isolation_smoke": {
       "established": "re-run against cup50v2-evaluator:2026-08-21: network unreachable, filesystem read-only, uid 1000",
-      "honesty_note": "This proves the container is what it claims. A4 records separately that the evaluation path did not route through it, which is a different question and is not repaired here.",
+      "honesty_note": "A4 stands: the evaluation path did not route through this container.",
       "status": "passed"
     }
   },
   "namespace": "cup50v2",
-  "purpose": "How each activation preflight check was established for the re-activation that follows amendments A4 through A9. The preflight record itself can only say 'passed', so the account of how lives here and is bound as an activation artifact.",
-  "schema_version": 1
+  "observation_evidence_bound_here": "The integrity review, the leaderboard and the private point bundle digest are bound as artifacts of this activation, so the released result is tied to the record that produced it.",
+  "provenance_sha256": "d2ff622c00e142a9919e14beb908d4aab48696544041aba75aa61fbc240724eb",
+  "purpose": "How each preflight check was established for the post-observation re-activation that precedes the release. This is the A13 remedy: the sealed observation ran a cli.py no activation bound, so the released result must bind the evaluator that actually produced it.",
+  "schema_version": 1,
+  "supersedes_activation_sha256": "5adaa59923efa7ecef2d046fe9bfdc07e818838fd2d6dc1267deabe5cade494a"
 }
