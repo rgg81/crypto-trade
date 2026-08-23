@@ -42,6 +42,8 @@ from crypto_trade.cup50v2_desk.tick import INTERVAL, LATEST, persist_tick
 sys.dont_write_bytecode = True
 
 ATTEMPT = "attempt.json"
+# Binance can revise the final trades of a bar for a few seconds after it closes.
+SETTLE_MARGIN = pd.Timedelta(minutes=2)
 DESKS = ("winner", "runner-up-1", "runner-up-2", "ensemble-eq3")
 
 
@@ -204,7 +206,15 @@ def main() -> int:
     with engine_lock(paper_root):
         for _ in range(max(1, arguments.max_boundaries)):
             boundary = next_boundary(paper_root, desk_ids, launch)
-            if boundary > pd.Timestamp.now(tz="UTC"):
+            # A boundary is not ready when it arrives; it is ready when the interval it attributes
+            # has CLOSED. Decision t fills at t's open and earns over [t, t+8h), so the bar with
+            # open_time t must be complete before t can be published. Ticking earlier caches a
+            # still-forming bar, and the next fetch returns the finalised one -- which the
+            # append-invariant cache refuses to overwrite, stopping the whole field until someone
+            # discards the poisoned generation. Binance also revises a just-closed bar for a few
+            # seconds, hence the settle margin.
+            ready_at = boundary + INTERVAL + SETTLE_MARGIN
+            if ready_at > pd.Timestamp.now(tz="UTC"):
                 break
             outcomes = run_boundary(
                 boundary, root=root, paper_root=paper_root, desk_ids=desk_ids
