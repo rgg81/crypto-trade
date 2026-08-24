@@ -21,6 +21,7 @@ row appended by the engine) because scale[H] consumes raw_net[H-1] which needs o
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -44,6 +45,13 @@ TEAM_DIR = tc.team_dir(WINNER_TEAM)
 
 # Live data store (shared main-repo store; the engine refreshes it each tick).
 DATA_DIR = Path(os.environ.get("TOURNAMENT_DESK_DATA_DIR", str(tc.MAIN_DATA_DIR)))
+
+# One JSON line per weekly ranking boundary this desk has ever seen, so a future signal-parity
+# audit (scripts/tournament_paper_signal_parity.py) has ground truth instead of having to infer
+# whether a live-vs-backtest divergence traces to data that changed on disk after the fact (see
+# the 2026-08-24/25 investigation: the shared data/ store's "closed candles are immutable"
+# assumption does not hold in practice). Lives in this worktree, not the shared data store.
+_SNAPSHOT_PATH = _REPO_ROOT / "logs" / "tournament_universe_weekly_snapshots.jsonl"
 
 # Verify the frozen bundle at import — the desk refuses to start on a mutated submission.
 tp.check_submission_shas(TEAM_DIR)
@@ -141,10 +149,46 @@ def _panels(coins: dict) -> tuple[dict, dict, pd.DataFrame]:
     return pn, scoring, elig
 
 
+def _snapshot_weekly_ranking(qv: pd.DataFrame) -> None:
+    """Append the trailing-liquidity ranking used for the LATEST weekly refresh boundary, once
+    per boundary ever seen (idempotent on refresh_ms) — best-effort, never blocks trading.
+    `qv` is DatetimeIndex-ed (pn["quote_volume"] from _panels), NOT raw epoch-ms."""
+    try:
+        liq = qv.rolling(tc.DVOL_WIN, min_periods=tc.DVOL_MIN_PERIODS).mean().shift(1)
+        refresh_rows = qv.index[(qv.index.weekday == tc.REFRESH_WEEKDAY) & (qv.index.hour == 0)]
+        if not len(refresh_rows):
+            return
+        refresh_at = refresh_rows[-1]
+        refresh_ms = int(refresh_at.value // 10**6)
+
+        seen = set()
+        if _SNAPSHOT_PATH.exists():
+            for line in _SNAPSHOT_PATH.read_text().splitlines():
+                if line.strip():
+                    seen.add(json.loads(line)["refresh_ms"])
+        if refresh_ms in seen:
+            return  # this week's boundary is already recorded (first observer wins)
+
+        row = liq.loc[refresh_at]
+        rank = row.rank(ascending=False, method="min")
+        record = {
+            "refresh_ms": refresh_ms,
+            "refresh_at": str(refresh_at),
+            "liq": {s: round(float(v), 2) for s, v in row.items() if pd.notna(v)},
+            "top40": sorted(s for s in row.index if pd.notna(rank[s]) and rank[s] <= tc.TOP_N),
+        }
+        _SNAPSHOT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with _SNAPSHOT_PATH.open("a") as f:
+            f.write(json.dumps(record) + "\n")
+    except Exception:  # noqa: BLE001 — instrumentation must never break a live decision
+        pass
+
+
 def position_weight_book(coins: dict) -> pd.DataFrame:
     """Full per-candle deployed book: row t = tournament weights held during candle t × scale[t]."""
     tp.check_submission_shas(TEAM_DIR)  # SHA-recheck on EVERY recompute
     pn, scoring, elig = _panels(coins)
+    _snapshot_weekly_ranking(pn["quote_volume"])
     mod = tp.load_strategy(TEAM_DIR)
     view = {k: pn[k].copy() for k in ("open", "close", "quote_volume")}
     aux = {"eligibility": elig.copy(), "seed": tc.SEED}
