@@ -35,6 +35,14 @@ RUNNER = "run_portfolio_tournament_paper.py"
 STALE_MIN = 20.0  # log silent this long => not even retrying => hung (vs healthy 60s retries)
 MISS_H = 10.0  # newest rebalance older than this => missed-rebalance territory
 
+# Local caching reverse proxy (~/binance-proxy) for candle fetches ONLY — this desk was
+# tripping Binance's IP-wide 418/429 bans (shared across every desk on this host hitting
+# fapi.binance.com directly). The proxy exposes the identical /fapi/v1/klines signature,
+# byte-for-byte parity confirmed for closed candles 2026-08-24; the still-forming candle is
+# always fetched live (never served stale). Scoped to THIS desk's runner subprocess only —
+# every other worktree/session is untouched.
+PROXY_BASE_URL = "http://127.0.0.1:8000"
+
 
 def _procs() -> tuple[list[int], list[int]]:
     """(all matching pids, python-child pids) for the desk runner."""
@@ -92,7 +100,7 @@ def _relaunch() -> None:
             stdout=f,
             stderr=subprocess.STDOUT,
             start_new_session=True,
-            env={**os.environ, "PYTHONUNBUFFERED": "1"},
+            env={**os.environ, "PYTHONUNBUFFERED": "1", "BINANCE_BASE_URL": PROXY_BASE_URL},
         )
     time.sleep(12)
 
