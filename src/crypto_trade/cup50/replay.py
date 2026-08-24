@@ -904,6 +904,7 @@ class _PreparedExecution:
     marks: np.ndarray
     bar_time_exists: np.ndarray
     eligible: np.ndarray
+    reduction_active: np.ndarray
     suppressed: tuple[frozenset[str], ...]
     unavailable_next: tuple[frozenset[str], ...]
     funding_indices: tuple[np.ndarray, ...]
@@ -933,6 +934,7 @@ def _prepare_execution(
     snapshot: Snapshot,
     config: ExecutionConfig,
     unavailability: Sequence[UnavailabilityWindow],
+    append_invariant_start: pd.Timestamp | None = None,
 ) -> _PreparedExecution:
     decisions = pd.DatetimeIndex(targets.index)
     step = pd.Timedelta(hours=config.interval_hours)
@@ -1008,6 +1010,28 @@ def _prepare_execution(
 
     membership_boundaries, membership_members = _membership_index(snapshot.membership)
     eligible = np.zeros((len(decisions), len(symbols)), dtype=bool)
+    reduction_active = np.ones((len(decisions), len(symbols)), dtype=bool)
+    if append_invariant_start is not None:
+        append_start = pd.Timestamp(append_invariant_start)
+        if append_start.tzinfo is None:
+            raise ValueError("append-invariant start must be timezone-aware UTC")
+        append_start = append_start.tz_convert("UTC")
+        membership_times = snapshot.membership.loc[:, ["reconstitution_time", "symbol"]].copy()
+        membership_times["reconstitution_time"] = pd.to_datetime(
+            membership_times["reconstitution_time"], utc=True, errors="raise"
+        )
+        first_membership = membership_times.groupby("symbol", sort=False)[
+            "reconstitution_time"
+        ].min()
+        for position, symbol in enumerate(symbols):
+            activation = first_membership.get(symbol)
+            # Symbols already in the frozen launch universe (and any execution-only archival
+            # columns) retain their original position in every historical reduction. A symbol
+            # first admitted after launch joins numeric reductions only when that roster becomes
+            # effective. Merely appending its earlier public bars can therefore never perturb
+            # the frozen prefix by changing NumPy's reduction width/order.
+            if activation is not None and pd.Timestamp(activation) >= append_start:
+                reduction_active[:, position] = decisions >= pd.Timestamp(activation)
     suppressed: list[frozenset[str]] = []
     unavailable_next: list[frozenset[str]] = []
     for row, decision in enumerate(decisions):
@@ -1068,6 +1092,7 @@ def _prepare_execution(
         marks=mark_values,
         bar_time_exists=bar_time_exists,
         eligible=eligible,
+        reduction_active=reduction_active,
         suppressed=tuple(suppressed),
         unavailable_next=tuple(unavailable_next),
         funding_indices=tuple(funding_indices),
@@ -1078,11 +1103,17 @@ def _prepare_execution(
     )
 
 
-def _cap_array(values: np.ndarray, config: ExecutionConfig) -> np.ndarray:
-    absolute = np.abs(values)
+def _cap_array(
+    values: np.ndarray,
+    config: ExecutionConfig,
+    *,
+    active: np.ndarray | None = None,
+) -> np.ndarray:
+    selected = values if active is None else values[active]
+    absolute = np.abs(selected)
     gross = float(absolute.sum())
-    net = abs(float(values.sum()))
-    symbol = float(absolute.max()) if len(values) else 0.0
+    net = abs(float(selected.sum()))
+    symbol = float(absolute.max()) if len(selected) else 0.0
     factors = [
         ceiling / magnitude
         for magnitude, ceiling in (
@@ -1116,6 +1147,7 @@ def evaluate_targets(
     initial_state: ReplayState | None = None,
     unavailability: Sequence[UnavailabilityWindow] = (),
     record_events: bool = True,
+    append_invariant_start: pd.Timestamp | None = None,
     _prepared: _PreparedExecution | None = None,
 ) -> EvaluationResultV2:
     """Array-backed execution with the same ordered arithmetic as the reference contract."""
@@ -1152,7 +1184,11 @@ def evaluate_targets(
             rows, pd.DataFrame(), ReplayState(decisions[-1] + step, equity, {})
         )
     prepared = _prepared or _prepare_execution(
-        targets, snapshot=snapshot, config=config, unavailability=unavailability
+        targets,
+        snapshot=snapshot,
+        config=config,
+        unavailability=unavailability,
+        append_invariant_start=append_invariant_start,
     )
     if not prepared.decisions.equals(decisions):
         raise ValueError("prepared execution decisions do not align with targets")
@@ -1183,6 +1219,9 @@ def evaluate_targets(
     for row, decision in enumerate(decisions):
         next_time = decision + step
         eligible = prepared.eligible[row]
+        reduction_active = prepared.reduction_active[row]
+        if (quantities[~reduction_active] != 0.0).any():  # pragma: no cover - invariant guard
+            raise AssertionError("a position exists before its first membership activation")
         carried_suppressed = [
             symbol
             for symbol in prepared.suppressed[row]
@@ -1217,7 +1256,7 @@ def evaluate_targets(
         if explicit[row]:
             weights = target_matrix[row].copy()
             weights[~eligible] = 0.0
-            capped = _cap_array(weights, config)
+            capped = _cap_array(weights, config, active=reduction_active)
             desired = np.divide(
                 capped * equity_start,
                 current_mark,
@@ -1241,7 +1280,7 @@ def evaluate_targets(
             <= _NOTIONAL_DUST_USD
         ] = 0.0
         marked_weights = np.nan_to_num(quantities * current_mark, nan=0.0) / equity_start
-        capped_marked = _cap_array(marked_weights, config)
+        capped_marked = _cap_array(marked_weights, config, active=reduction_active)
         risk_requested = np.divide(
             (capped_marked - marked_weights) * equity_start,
             current_mark,
@@ -1262,7 +1301,7 @@ def evaluate_targets(
             <= _NOTIONAL_DUST_USD
         ] = 0.0
         filled_notional = strategy_filled + risk_filled
-        turnover_usd = float(np.abs(filled_notional).sum())
+        turnover_usd = float(np.abs(filled_notional[reduction_active]).sum())
         costs_usd = turnover_usd * cost_rate
 
         if prepared.bar_time_exists[row + 1]:
@@ -1281,20 +1320,24 @@ def evaluate_targets(
                 f"{[symbols[index] for index in np.flatnonzero(missing_end)]}"
             )
         price_change = np.nan_to_num(end_price - current_open, nan=0.0)
-        price_pnl_usd = float((quantities * price_change).sum())
+        price_pnl_usd = float((quantities * price_change)[reduction_active].sum())
         funding_index = prepared.funding_indices[row]
-        event_quantities = quantities[funding_index]
+        active_funding = reduction_active[funding_index]
+        event_quantities = quantities[funding_index][active_funding]
         funding_pnl_usd = -float(
             (
                 event_quantities
-                * prepared.funding_marks[row]
-                * prepared.funding_rates[row]
+                * prepared.funding_marks[row][active_funding]
+                * prepared.funding_rates[row][active_funding]
             ).sum()
         )
         held_quantities = quantities.copy()
         exposure_marks = np.where(np.isnan(current_mark), current_open, current_mark)
         exposure = float(
-            np.nansum(np.abs(held_quantities) * exposure_marks) / equity_start
+            np.nansum(
+                (np.abs(held_quantities) * exposure_marks)[reduction_active]
+            )
+            / equity_start
         )
         gross_pnl = price_pnl_usd + funding_pnl_usd
         liquidation_cost = 0.0
@@ -1333,7 +1376,7 @@ def evaluate_targets(
                 raise StrategyFailureError(
                     "terminal liquidation exceeds remaining participation capacity"
                 )
-            terminal_notional = float(np.abs(close_notional).sum())
+            terminal_notional = float(np.abs(close_notional[reduction_active]).sum())
             liquidation_notional += terminal_notional
             liquidation_cost += terminal_notional * cost_rate
             if record_events:
@@ -1421,6 +1464,7 @@ def run_candidate(
     terminal: bool = False,
     unavailability: Sequence[UnavailabilityWindow] = (),
     record_events: bool = True,
+    append_invariant_start: pd.Timestamp | None = None,
 ) -> CandidateReplay:
     """One target stream, one causal calibration pass, and independent 1x/2x/3x cost runs."""
     decisions = decision_grid(start, end, interval_hours=config.interval_hours)
@@ -1438,7 +1482,11 @@ def run_candidate(
     nonflat = raw.drop(columns=REBALANCE_COLUMN).fillna(0.0).ne(0.0).any().any()
     prepared = (
         _prepare_execution(
-            raw, snapshot=snapshot, config=config, unavailability=unavailability
+            raw,
+            snapshot=snapshot,
+            config=config,
+            unavailability=unavailability,
+            append_invariant_start=append_invariant_start,
         )
         if nonflat
         else None
@@ -1451,6 +1499,7 @@ def run_candidate(
         terminal=False,
         unavailability=unavailability,
         record_events=False,
+        append_invariant_start=append_invariant_start,
         _prepared=prepared,
     )
     gross = calibration.returns["gross_return"]
@@ -1473,6 +1522,7 @@ def run_candidate(
             terminal=terminal,
             unavailability=unavailability,
             record_events=record_events,
+            append_invariant_start=append_invariant_start,
             _prepared=prepared,
         )
         for multiplier in (1, 2, 3)

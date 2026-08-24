@@ -162,7 +162,9 @@ def verify_historical_prefix(replay: Any, path: Path) -> str:
     return sha256_file(path)
 
 
-def replay_winner(snapshot: Any, *, root: Path) -> Any:
+def replay_winner(
+    snapshot: Any, *, root: Path, append_invariant_start: pd.Timestamp
+) -> Any:
     nomination = json.loads(
         (root / "tournament" / "cup50" / "nominations" / "team-02.json").read_text()
     )
@@ -180,6 +182,7 @@ def replay_winner(snapshot: Any, *, root: Path) -> Any:
         terminal=False,
         unavailability=audit,
         record_events=True,
+        append_invariant_start=append_invariant_start,
     )
 
 
@@ -307,7 +310,7 @@ def persist_tick(
     if decision < launch or decision != decision.floor("8h"):
         raise ValueError(f"paper observation cannot publish boundary {decision}")
     snapshot = build_forward_snapshot(generation, membership, decision, root=base)
-    replay = replay_winner(snapshot, root=base)
+    replay = replay_winner(snapshot, root=base, append_invariant_start=launch)
     prefix_path = paper / HISTORICAL_PREFIX
     prefix_sha = verify_historical_prefix(replay, prefix_path)
     normal = replay.costs[NORMAL_COST]

@@ -9,7 +9,9 @@ import pytest
 from crypto_trade.cup50.availability import UnavailabilityWindow
 from crypto_trade.cup50.replay import (
     REBALANCE_COLUMN,
+    ExecutionConfig,
     _evaluate_targets_reference,
+    _prepare_execution,
     apply_strategy_parameters,
     evaluate_targets,
     generate_targets,
@@ -319,6 +321,67 @@ def test_future_value_corruption_is_inert_at_a_frozen_replay_cutoff() -> None:
         pd.testing.assert_frame_equal(
             expected.costs[cost].returns, observed.costs[cost].returns, check_exact=True
         )
+
+
+def test_post_launch_member_cannot_change_pre_activation_reduction_width() -> None:
+    baseline = _snapshot()
+    first = baseline.window_start
+    activation = first + pd.Timedelta(hours=8)
+    append_start = first + pd.Timedelta(hours=1)
+    new_symbol = "0NEWUSDT"
+    new_bars = baseline.bars.copy()
+    new_bars["symbol"] = new_symbol
+    new_marks = baseline.mark_prices.copy()
+    new_marks["symbol"] = new_symbol
+    appended = dataclasses.replace(
+        baseline,
+        bars=pd.concat([baseline.bars, new_bars], ignore_index=True),
+        mark_prices=pd.concat([baseline.mark_prices, new_marks], ignore_index=True),
+        membership=pd.concat(
+            [
+                baseline.membership,
+                pd.DataFrame(
+                    [[activation, new_symbol, 1, 2000.0]],
+                    columns=baseline.membership.columns,
+                ),
+            ],
+            ignore_index=True,
+        ),
+    )
+    decisions = pd.date_range(first, baseline.window_end, freq="8h", inclusive="left")
+    targets = pd.DataFrame(
+        {
+            new_symbol: [0.0, 0.1],
+            "AUSDT": [0.2, 0.1],
+            REBALANCE_COLUMN: [True, True],
+        },
+        index=decisions,
+    )
+
+    prepared = _prepare_execution(
+        targets,
+        snapshot=appended,
+        config=ExecutionConfig(),
+        unavailability=(),
+        append_invariant_start=append_start,
+    )
+    new_position = prepared.symbol_positions[new_symbol]
+    old_position = prepared.symbol_positions["AUSDT"]
+
+    assert prepared.reduction_active[:, new_position].tolist() == [False, True]
+    assert prepared.reduction_active[:, old_position].tolist() == [True, True]
+    result = evaluate_targets(
+        targets,
+        snapshot=appended,
+        cost_multiplier=1.0,
+        append_invariant_start=append_start,
+    )
+    assert new_symbol not in result.events.loc[
+        result.events["timestamp"] < activation, "symbol"
+    ].tolist()
+    assert new_symbol in result.events.loc[
+        result.events["timestamp"] == activation, "symbol"
+    ].tolist()
 
 
 def test_nonterminal_split_and_stitched_execution_are_bit_exact() -> None:
