@@ -3,8 +3,8 @@
   "files": [
     {
       "path": ".agents/skills/team12-monitor/SKILL.md",
-      "sha256": "0c30d35c566f6a99bfd03652f1cfbe30ef05ea96a4081d396dc49291647cf12b",
-      "size": 5940
+      "sha256": "931e51e144eae57e693450afbde3b2aaa4a449570d2bfb0658f046f4262c0aee",
+      "size": 6624
     },
     {
       "path": ".agents/skills/team12-monitor/agents/openai.yaml",

@@ -32,6 +32,10 @@ uv run python scripts/team12_paper_healthcheck.py
 uv run python scripts/team12_paper_digest.py
 ```
 
+For a basic performance request, run the full parity workflow below after these commands and
+include its result in the same response. A process-status-only or recovery request does not need
+the compute-heavy replay unless the user also asks for performance or parity.
+
 Interpret `STATUS OK` as operationally healthy. The healthcheck binds every paper artifact and
 load-bearing market-cache file by path, size, row count, and SHA-256. It also verifies that every
 Team 12 adapter and monitoring file matches the Git-anchored deployment manifest recorded in the
@@ -83,10 +87,11 @@ it uses the same engine lock and never launches a second desk. A running process
 deployment identity and exits if a new committed Team 12 deployment appears, allowing the
 watchdog to restart it on one internally consistent release.
 
-## Run deep parity only on demand
+## Pair deep parity with performance
 
-Do not run the multi-year parity replay in every monitoring tick. It is compute-heavy.
-When the user asks for deep verification, run it by itself:
+Run the multi-year parity replay whenever the user asks for basic performance statistics or
+explicit parity verification. Do not run it in routine status-only monitoring ticks. Run it by
+itself after the standard healthcheck and digest:
 
 ```bash
 uv run pytest -m parity tests/team12/test_team12_pipeline.py -q
@@ -107,4 +112,8 @@ Lead with one verdict:
 
 Then give latest boundary, official forward bar/day counts and cumulative return, daily-annualized
 Sharpe/max drawdown when meaningful, current gross/net and long/short count, actual funding-event
-count, and any integrity action taken. Never recommend a strategy intervention based on losses.
+count, and any integrity action taken. For performance reports, add a parity section with the
+full-replay test pass count, exact-equality scope (targets, held positions, and evaluator bar
+returns), live decision-history PASS count versus total sealed boundaries, and the sealed live
+return count. Name any mismatch rather than reducing it to a generic failure. Never recommend a
+strategy intervention based on losses.
