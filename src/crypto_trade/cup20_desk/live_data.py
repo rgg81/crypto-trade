@@ -582,6 +582,7 @@ class PublicMarketDataClient:
         self,
         *,
         base_url: str = FAPI_BASE_URL,
+        klines_base_url: str | None = None,
         timeout_seconds: float = 45.0,
         pause_seconds: float = 0.05,
         weight_soft_limit: int = 1_800,
@@ -594,6 +595,9 @@ class PublicMarketDataClient:
         if transport is not None:
             options["transport"] = transport
         self._http = httpx.Client(**options)
+        self._klines_base_url = (
+            klines_base_url.rstrip("/") if klines_base_url is not None else None
+        )
         self.pause_seconds = pause_seconds
         self.weight_soft_limit = weight_soft_limit
         self.weight_window_seconds = weight_window_seconds
@@ -750,7 +754,12 @@ class PublicMarketDataClient:
             if self.pause_seconds and attempt == 0:
                 self._sleep(self.pause_seconds)
             try:
-                response = self._http.get(endpoint, params=params)
+                request_url = (
+                    f"{self._klines_base_url}{endpoint}"
+                    if endpoint == KLINES_ENDPOINT and self._klines_base_url is not None
+                    else endpoint
+                )
+                response = self._http.get(request_url, params=params)
                 response.raise_for_status()
             except httpx.HTTPStatusError as exc:
                 last_error = exc

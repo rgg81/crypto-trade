@@ -86,6 +86,23 @@ def _classified_metadata(root: Path, generation: Path) -> pd.DataFrame:
     )
 
 
+def _causal_reconstitution_times(boundary: object) -> tuple[pd.Timestamp, ...]:
+    """Return only Monday rosters already effective at the decision boundary.
+
+    The half-open weekly helper needs an upper edge just after ``decision`` so a Monday 00:00
+    decision includes its own reconstitution.  Extending that edge by a full day is noncausal:
+    from Sunday 08:00 onward it asks for Monday's roster before Sunday is a complete UTC day.
+    """
+    decision = _utc(boundary)
+    result = weekly_reconstitution_times(
+        OOS_END + pd.Timedelta(seconds=1),
+        decision + pd.Timedelta(nanoseconds=1),
+    )
+    if any(reconstitution > decision for reconstitution in result):  # pragma: no cover
+        raise AssertionError("forward membership includes a future reconstitution")
+    return result
+
+
 def derive_forward_membership(
     generation: Path,
     boundary: object,
@@ -106,9 +123,7 @@ def derive_forward_membership(
     )
     recorded_last = pd.Timestamp(recorded["reconstitution_time"].max())
 
-    boundaries = weekly_reconstitution_times(
-        OOS_END + pd.Timedelta(seconds=1), decision + pd.Timedelta(days=1)
-    )
+    boundaries = _causal_reconstitution_times(decision)
     wide_historical = _verified_acquisition_frame(base, BARS)
     earliest = (boundaries[0] if boundaries else decision) - pd.Timedelta(days=LOOKBACK_DAYS)
     wide_historical["open_time"] = pd.to_datetime(wide_historical["open_time"], utc=True)

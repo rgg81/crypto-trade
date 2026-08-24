@@ -4,11 +4,18 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import httpx
 import pandas as pd
 import pytest
 
 from crypto_trade.cup20_desk.live_data import (
+    EXCHANGE_INFO_ENDPOINT,
+    FUNDING_RATE_ENDPOINT,
+    KLINES_ENDPOINT,
+    MARK_PRICE_KLINES_ENDPOINT,
     AppendInvarianceError,
+    BinancePublicDataError,
+    PublicMarketDataClient,
     append_frame,
     conform_frame,
 )
@@ -21,6 +28,7 @@ from crypto_trade.cup50_desk.live_data import (
     current_generation,
 )
 from crypto_trade.cup50_desk.schedule import ready_boundary
+from crypto_trade.cup50_desk.snapshot_forward import _causal_reconstitution_times
 from crypto_trade.cup50_desk.tick import (
     _event_rows,
     _historical_stream,
@@ -44,6 +52,79 @@ def test_ready_boundary_waits_for_own_bar_and_lag() -> None:
     assert ready_boundary("2026-08-18T08:25:00Z") == pd.Timestamp(
         "2026-08-18T00:00:00Z"
     )
+
+
+def test_forward_reconstitution_times_never_include_tomorrow() -> None:
+    sunday = pd.Timestamp("2026-08-23T08:00:00Z")
+    boundaries = _causal_reconstitution_times(sunday)
+
+    assert boundaries[-1] == pd.Timestamp("2026-08-17T00:00:00Z")
+    assert pd.Timestamp("2026-08-24T00:00:00Z") not in boundaries
+    assert all(boundary <= sunday for boundary in boundaries)
+
+
+def test_monday_reconstitution_first_appears_at_monday_decision() -> None:
+    monday = pd.Timestamp("2026-08-24T00:00:00Z")
+
+    assert _causal_reconstitution_times(monday)[-1] == monday
+
+
+def test_only_transaction_klines_are_routed_through_proxy() -> None:
+    urls: list[httpx.URL] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        urls.append(request.url)
+        return httpx.Response(200, json=[])
+
+    with PublicMarketDataClient(
+        base_url="https://direct.example",
+        klines_base_url="http://proxy.example:8000",
+        pause_seconds=0,
+        transport=httpx.MockTransport(handler),
+        sleep=lambda _seconds: None,
+    ) as client:
+        for endpoint in (
+            KLINES_ENDPOINT,
+            MARK_PRICE_KLINES_ENDPOINT,
+            FUNDING_RATE_ENDPOINT,
+            EXCHANGE_INFO_ENDPOINT,
+        ):
+            assert client.get_json(endpoint) == []
+
+    assert [url.host for url in urls] == [
+        "proxy.example",
+        "direct.example",
+        "direct.example",
+        "direct.example",
+    ]
+    assert [url.path for url in urls] == [
+        KLINES_ENDPOINT,
+        MARK_PRICE_KLINES_ENDPOINT,
+        FUNDING_RATE_ENDPOINT,
+        EXCHANGE_INFO_ENDPOINT,
+    ]
+
+
+def test_proxy_failure_never_falls_back_to_direct_klines() -> None:
+    urls: list[httpx.URL] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        urls.append(request.url)
+        return httpx.Response(503, headers={"Retry-After": "1"}, json={"code": -1003})
+
+    with PublicMarketDataClient(
+        base_url="https://direct.example",
+        klines_base_url="http://proxy.example:8000",
+        pause_seconds=0,
+        max_attempts=1,
+        transport=httpx.MockTransport(handler),
+        sleep=lambda _seconds: None,
+    ) as client:
+        with pytest.raises(BinancePublicDataError, match="exhausted retries"):
+            client.get_json(KLINES_ENDPOINT)
+
+    assert len(urls) == 1
+    assert urls[0].host == "proxy.example"
 
 
 def test_unsafe_cache_pointer_fails_closed(tmp_path: Path) -> None:
@@ -241,6 +322,8 @@ def test_runner_has_no_order_or_credential_path() -> None:
     forbidden = ("create_order", "new_order", "api_secret", "api_key", "/fapi/v1/order")
     assert not any(token in source for token in forbidden)
     assert "publicmarketdataclient" in source
+    assert 'klines_proxy_base_url = "http://127.0.0.1:8000"' in source
+    assert "publicmarketdataclient(klines_base_url=klines_proxy_base_url)" in source
 
 
 def test_monitor_skill_is_installed_and_observe_only() -> None:

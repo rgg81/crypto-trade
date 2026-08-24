@@ -23,6 +23,7 @@ from crypto_trade.cup50_desk.tick import INTERVAL, LATEST, persist_tick
 
 DEFAULT_POLL_SECONDS = 60
 ATTEMPT = "attempt.json"
+KLINES_PROXY_BASE_URL = "http://127.0.0.1:8000"
 
 
 class EngineLockError(RuntimeError):
@@ -84,7 +85,11 @@ def run_boundary(boundary: pd.Timestamp, *, root: Path, paper: Path) -> dict[str
     }
     _atomic_json(paper / ATTEMPT, attempt)
     try:
-        with PublicMarketDataClient() as client:
+        # Klines are a hard dependency on the local coalescing/cache proxy. There is deliberately
+        # no direct-Binance fallback: bypassing the shared limiter would recreate the IP-wide 418
+        # bans this desk has already recorded. The other three allowlisted public endpoints retain
+        # their direct point-in-time semantics.
+        with PublicMarketDataClient(klines_base_url=KLINES_PROXY_BASE_URL) as client:
             generation, membership = refresh_generation(
                 paper / "market-cache",
                 boundary=boundary,
