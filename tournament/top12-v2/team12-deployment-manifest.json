@@ -13,8 +13,8 @@
     },
     {
       "path": "run_team12_paper.py",
-      "sha256": "68701ed9c475bcbb9667af95088333980a769f88a4266628a8aa9cb762d826ad",
-      "size": 17864
+      "sha256": "3c50f54d4faed6236b10fb904584928ddc8aef462c2b3857310478dcceb99004",
+      "size": 17973
     },
     {
       "path": "scripts/team12_backtest.py",
@@ -63,8 +63,8 @@
     },
     {
       "path": "src/crypto_trade/team12/live_data.py",
-      "sha256": "d826a6ec326788a5a40c16867bcd69d079a6047604896ba2fc47f911afef3ccd",
-      "size": 81369
+      "sha256": "026ddd1faad3fb638abe00d85f179ff9d55448cac0bf1b085be480ec0a79d4e7",
+      "size": 82715
     },
     {
       "path": "src/crypto_trade/team12/report.py",

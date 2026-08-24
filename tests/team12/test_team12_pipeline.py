@@ -188,6 +188,87 @@ def test_rest_invalid_symbol_uses_checksum_verified_daily_archive() -> None:
     assert provenance[0]["archive_sha256"] == digest
 
 
+def test_public_client_routes_only_transaction_klines_through_proxy() -> None:
+    direct_urls: list[httpx.URL] = []
+    proxy_urls: list[httpx.URL] = []
+
+    def direct_handler(request: httpx.Request) -> httpx.Response:
+        direct_urls.append(request.url)
+        if request.url.path == "/fapi/v1/exchangeInfo":
+            return httpx.Response(200, json={"serverTime": 1, "symbols": []})
+        if request.url.path in {"/fapi/v1/markPriceKlines", "/fapi/v1/fundingRate"}:
+            return httpx.Response(200, json=[])
+        raise AssertionError(f"unexpected direct request: {request.url}")
+
+    def proxy_handler(request: httpx.Request) -> httpx.Response:
+        proxy_urls.append(request.url)
+        if request.url.path == "/fapi/v1/klines":
+            return httpx.Response(200, json=[])
+        raise AssertionError(f"unexpected proxy request: {request.url}")
+
+    start = pd.Timestamp("2026-08-24T00:00:00Z")
+    end = pd.Timestamp("2026-08-24T07:59:59.999Z")
+    with Team12PublicDataClient(
+        base_url="https://fapi.binance.com",
+        kline_base_url="http://127.0.0.1:8000",
+        transport=httpx.MockTransport(direct_handler),
+        kline_transport=httpx.MockTransport(proxy_handler),
+        pause_seconds=0.0,
+    ) as client:
+        client.exchange_info()
+        client.transaction_bars("BTCUSDT", start=start, end_inclusive=end)
+        client.mark_prices("BTCUSDT", start=start, end_inclusive=end)
+        client.funding("BTCUSDT", start=start, end_inclusive=end)
+
+    assert [url.path for url in proxy_urls] == ["/fapi/v1/klines"]
+    assert {url.path for url in direct_urls} == {
+        "/fapi/v1/exchangeInfo",
+        "/fapi/v1/markPriceKlines",
+        "/fapi/v1/fundingRate",
+    }
+    assert {url.host for url in proxy_urls} == {"127.0.0.1"}
+    assert {url.host for url in direct_urls} == {"fapi.binance.com"}
+
+
+def test_public_client_does_not_bypass_an_unavailable_kline_proxy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    direct_requests = 0
+    proxy_requests = 0
+
+    def direct_handler(request: httpx.Request) -> httpx.Response:
+        nonlocal direct_requests
+        direct_requests += 1
+        raise AssertionError(f"kline request bypassed proxy: {request.url}")
+
+    def proxy_handler(request: httpx.Request) -> httpx.Response:
+        nonlocal proxy_requests
+        proxy_requests += 1
+        return httpx.Response(
+            503,
+            headers={"Retry-After": "0"},
+            json={"code": -1003, "msg": "proxy is backing off"},
+        )
+
+    monkeypatch.setattr("crypto_trade.team12.live_data.time.sleep", lambda _delay: None)
+    start = pd.Timestamp("2026-08-24T00:00:00Z")
+    end = pd.Timestamp("2026-08-24T07:59:59.999Z")
+    with (
+        Team12PublicDataClient(
+            base_url="https://fapi.binance.com",
+            kline_base_url="http://127.0.0.1:8000",
+            transport=httpx.MockTransport(direct_handler),
+            kline_transport=httpx.MockTransport(proxy_handler),
+            pause_seconds=0.0,
+        ) as client,
+        pytest.raises(RuntimeError, match="request failed after retries"),
+    ):
+        client.transaction_bars("BTCUSDT", start=start, end_inclusive=end)
+
+    assert proxy_requests == 5
+    assert direct_requests == 0
+
+
 def test_live_cache_aborts_if_a_sealed_value_changes(tmp_path: Path) -> None:
     path = tmp_path / "bars.parquet"
     original = pd.DataFrame(

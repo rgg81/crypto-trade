@@ -35,6 +35,7 @@ from crypto_trade.team12.live_data import (
 
 DEFAULT_PAPER_DIR = Path("paper-team12")
 DEFAULT_LAG_SECONDS = 25 * 60
+TEAM12_KLINE_PROXY_URL = "http://127.0.0.1:8000"
 
 
 class DeploymentChangedError(RuntimeError):
@@ -100,7 +101,9 @@ def paper_tick(
     cache_root = paper_dir / "market-cache"
     prior_accounting_admissions = _paper_accounting_admissions(paper_dir)
     if refresh:
-        with Team12PublicDataClient() as client:
+        with Team12PublicDataClient(
+            kline_base_url=TEAM12_KLINE_PROXY_URL,
+        ) as client:
             live_data = _refresh_cache_generation(
                 frozen,
                 boundary=boundary,

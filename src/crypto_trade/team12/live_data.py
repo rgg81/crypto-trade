@@ -56,6 +56,8 @@ _KLINE_COLUMNS = (
 _BAR_VALUE_COLUMNS = _KLINE_COLUMNS[1:]
 _MARK_VALUE_COLUMNS = ("mark_price",)
 _FUNDING_VALUE_COLUMNS = ("funding_rate", "mark_price")
+_BINANCE_RETRYABLE_STATUS_CODES = frozenset({418, 429})
+_KLINE_PROXY_RETRYABLE_STATUS_CODES = frozenset({418, 429, 503})
 
 
 @dataclasses.dataclass(frozen=True)
@@ -120,9 +122,11 @@ class Team12PublicDataClient:
         self,
         *,
         base_url: str = FAPI_BASE_URL,
+        kline_base_url: str | None = None,
         timeout_seconds: float = 45.0,
         pause_seconds: float = 0.03,
         transport: httpx.BaseTransport | None = None,
+        kline_transport: httpx.BaseTransport | None = None,
     ) -> None:
         kwargs: dict[str, object] = {
             "base_url": base_url,
@@ -131,11 +135,24 @@ class Team12PublicDataClient:
         if transport is not None:
             kwargs["transport"] = transport
         self._http = httpx.Client(**kwargs)
+        self._kline_http: httpx.Client | None = None
+        if kline_base_url is not None:
+            kline_kwargs: dict[str, object] = {
+                "base_url": kline_base_url,
+                "timeout": timeout_seconds,
+            }
+            if kline_transport is not None:
+                kline_kwargs["transport"] = kline_transport
+            self._kline_http = httpx.Client(**kline_kwargs)
         self.pause_seconds = pause_seconds
         self._archive_provenance: dict[str, dict[str, object]] = {}
 
     def close(self) -> None:
-        self._http.close()
+        try:
+            self._http.close()
+        finally:
+            if self._kline_http is not None:
+                self._kline_http.close()
 
     def __enter__(self) -> Team12PublicDataClient:
         return self
@@ -412,7 +429,17 @@ class Team12PublicDataClient:
         *,
         params: Mapping[str, object] | None = None,
     ) -> object:
-        response = self._request(endpoint, params=params)
+        use_kline_proxy = endpoint == "/fapi/v1/klines" and self._kline_http is not None
+        response = self._request(
+            endpoint,
+            params=params,
+            client=self._kline_http if use_kline_proxy else self._http,
+            retryable_status_codes=(
+                _KLINE_PROXY_RETRYABLE_STATUS_CODES
+                if use_kline_proxy
+                else _BINANCE_RETRYABLE_STATUS_CODES
+            ),
+        )
         try:
             return response.json()
         except ValueError as exc:
@@ -472,17 +499,20 @@ class Team12PublicDataClient:
         endpoint: str,
         *,
         params: Mapping[str, object] | None = None,
+        client: httpx.Client | None = None,
+        retryable_status_codes: frozenset[int] = _BINANCE_RETRYABLE_STATUS_CODES,
     ) -> httpx.Response:
+        request_client = self._http if client is None else client
         last_error: Exception | None = None
         for attempt in range(5):
             try:
-                response = self._http.get(endpoint, params=params)
+                response = request_client.get(endpoint, params=params)
                 response.raise_for_status()
                 return response
             except httpx.HTTPStatusError as exc:
                 last_error = exc
                 retry_after = exc.response.headers.get("Retry-After")
-                if exc.response.status_code not in {418, 429}:
+                if exc.response.status_code not in retryable_status_codes:
                     try:
                         payload = exc.response.json()
                     except ValueError:
