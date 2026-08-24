@@ -28,8 +28,8 @@
     },
     {
       "path": "run_team09_paper.py",
-      "sha256": "0304c94fe5f9c0054e84c9d574cbceea962b4edcf56397468664031dbacbfcda",
-      "size": 17864
+      "sha256": "89acba1c5ca7cef1dda42b858bede8abc1db6314a3364edb340a5fc15b5ef570",
+      "size": 18164
     },
     {
       "path": "scripts/team09_backtest.py",
@@ -78,8 +78,8 @@
     },
     {
       "path": "src/crypto_trade/team09/live_data.py",
-      "sha256": "e9e861116500438dd3dca2811513cf265e1b078709eb8f9ff2324775f7b6ee52",
-      "size": 81367
+      "sha256": "0cb021eea6d3977a2403307828fb7349568ab6a69487aaa4ea7c9080d6cb9138",
+      "size": 82814
     },
     {
       "path": "src/crypto_trade/team09/report.py",

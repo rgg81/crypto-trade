@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from crypto_trade.team09 import backtest
+from crypto_trade.team09 import backtest, live_data
 from crypto_trade.team09.authority import (
     CANDIDATE_ID,
     EVALUATOR_AUTHORITY_SHA256,
@@ -132,9 +132,11 @@ def test_rest_invalid_symbol_uses_checksum_verified_daily_archive() -> None:
     archive_bytes = buffer.getvalue()
     digest = hashlib.sha256(archive_bytes).hexdigest()
     request_counts: dict[str, int] = {}
+    requests: list[tuple[str, str]] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         path = request.url.path
+        requests.append((request.url.host or "", path))
         request_counts[path] = request_counts.get(path, 0) + 1
         if path == "/fapi/v1/klines":
             return httpx.Response(
@@ -159,6 +161,7 @@ def test_rest_invalid_symbol_uses_checksum_verified_daily_archive() -> None:
         raise AssertionError(f"unexpected request: {request.url}")
 
     with Team09PublicDataClient(
+        klines_base_url="http://127.0.0.1:8000",
         transport=httpx.MockTransport(handler),
         pause_seconds=0.0,
     ) as client:
@@ -169,12 +172,105 @@ def test_rest_invalid_symbol_uses_checksum_verified_daily_archive() -> None:
         )
         provenance = client.archive_provenance()
     assert request_counts["/fapi/v1/klines"] == 1
+    assert requests[0] == ("127.0.0.1", "/fapi/v1/klines")
+    assert all(
+        host != "127.0.0.1"
+        for host, path in requests
+        if path != "/fapi/v1/klines"
+    )
     assert frame["open_time"].tolist() == [
         pd.Timestamp("2026-07-22T00:00:00Z")
     ]
     assert frame["open"].tolist() == [319.408]
     assert provenance[0]["archive_path"] == key
     assert provenance[0]["archive_sha256"] == digest
+
+
+def test_only_transaction_klines_use_loopback_proxy() -> None:
+    requests: list[tuple[str, str]] = []
+    kline_params: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append((request.url.path, request.url.host or ""))
+        if request.url.path == "/fapi/v1/klines":
+            kline_params.update(dict(request.url.params))
+        if request.url.path == "/fapi/v1/exchangeInfo":
+            return httpx.Response(200, json={"symbols": []})
+        return httpx.Response(200, json=[])
+
+    start = pd.Timestamp("2026-08-24T00:00:00Z")
+    end = pd.Timestamp("2026-08-24T07:59:59.999Z")
+    with Team09PublicDataClient(
+        base_url="https://direct.invalid",
+        klines_base_url="http://127.0.0.1:8000",
+        transport=httpx.MockTransport(handler),
+        pause_seconds=0.0,
+    ) as client:
+        client.exchange_info()
+        client.transaction_bars("BTCUSDT", start=start, end_inclusive=end)
+        client.mark_prices("BTCUSDT", start=start, end_inclusive=end)
+        client.funding("BTCUSDT", start=start, end_inclusive=end)
+
+    assert requests == [
+        ("/fapi/v1/exchangeInfo", "direct.invalid"),
+        ("/fapi/v1/klines", "127.0.0.1"),
+        ("/fapi/v1/markPriceKlines", "direct.invalid"),
+        ("/fapi/v1/fundingRate", "direct.invalid"),
+    ]
+    assert kline_params == {
+        "symbol": "BTCUSDT",
+        "interval": "8h",
+        "startTime": "1787529600000",
+        "endTime": "1787558399999",
+        "limit": "99",
+    }
+
+
+def test_klines_proxy_failure_never_falls_back_direct(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    hosts: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        hosts.append(request.url.host or "")
+        raise httpx.ConnectError("proxy unavailable", request=request)
+
+    monkeypatch.setattr(live_data.time, "sleep", lambda _seconds: None)
+    with Team09PublicDataClient(
+        base_url="https://direct.invalid",
+        klines_base_url="http://127.0.0.1:8000",
+        transport=httpx.MockTransport(handler),
+        pause_seconds=0.0,
+    ) as client:
+        with pytest.raises(
+            RuntimeError,
+            match="Binance public-data request failed after retries: /fapi/v1/klines",
+        ):
+            client.transaction_bars(
+                "BTCUSDT",
+                start=pd.Timestamp("2026-08-24T00:00:00Z"),
+                end_inclusive=pd.Timestamp("2026-08-24T07:59:59.999Z"),
+            )
+
+    assert hosts == ["127.0.0.1"] * 5
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "https://127.0.0.1:8000",
+        "http://fapi.binance.com:8000",
+        "http://127.0.0.1",
+        "http://127.0.0.1:0",
+        "http://user@127.0.0.1:8000",
+        "http://127.0.0.1:8000/base",
+        "http://127.0.0.1:8000?mode=proxy",
+        "http://127.0.0.1:8000#fragment",
+    ],
+)
+def test_klines_proxy_rejects_non_loopback_origin(value: str) -> None:
+    with pytest.raises(ValueError, match="klines proxy URL"):
+        Team09PublicDataClient(klines_base_url=value)
 
 
 def test_live_cache_aborts_if_a_sealed_value_changes(tmp_path: Path) -> None:

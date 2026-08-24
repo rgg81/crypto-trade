@@ -35,6 +35,8 @@ from crypto_trade.team09.live_data import (
 
 DEFAULT_PAPER_DIR = Path("paper-team09")
 DEFAULT_LAG_SECONDS = 25 * 60
+# This fixed loopback origin is part of Team 09's Git-anchored deployment identity.
+TEAM09_KLINES_PROXY_BASE_URL = "http://127.0.0.1:8000"
 
 
 class DeploymentChangedError(RuntimeError):
@@ -100,7 +102,7 @@ def paper_tick(
     cache_root = paper_dir / "market-cache"
     prior_accounting_admissions = _paper_accounting_admissions(paper_dir)
     if refresh:
-        with Team09PublicDataClient() as client:
+        with _team09_public_data_client() as client:
             live_data = _refresh_cache_generation(
                 frozen,
                 boundary=boundary,
@@ -120,6 +122,12 @@ def paper_tick(
     paths = persist_paper_tick(tick, paper_dir)
     _publish_committed_cache(paper_dir, live_data.cache_dir)
     return paths
+
+
+def _team09_public_data_client() -> Team09PublicDataClient:
+    return Team09PublicDataClient(
+        klines_base_url=TEAM09_KLINES_PROXY_BASE_URL,
+    )
 
 
 def _refresh_cache_generation(

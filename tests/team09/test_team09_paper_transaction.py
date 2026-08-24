@@ -26,6 +26,25 @@ def _load_runner():
 runner = _load_runner()
 
 
+def test_runner_pins_klines_to_local_proxy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeClient:
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+    monkeypatch.setattr(runner, "Team09PublicDataClient", FakeClient)
+    client = runner._team09_public_data_client()
+
+    assert isinstance(client, FakeClient)
+    assert captured == {
+        "klines_base_url": runner.TEAM09_KLINES_PROXY_BASE_URL,
+    }
+    assert runner.TEAM09_KLINES_PROXY_BASE_URL == "http://127.0.0.1:8000"
+
+
 def _bind_cache(paper: Path, generation: Path) -> None:
     manifest = generation / "cache-manifest.json"
     payload = {

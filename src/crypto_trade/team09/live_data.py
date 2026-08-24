@@ -13,6 +13,7 @@ import zipfile
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 from xml.etree import ElementTree
 
 import httpx
@@ -56,6 +57,33 @@ _KLINE_COLUMNS = (
 _BAR_VALUE_COLUMNS = _KLINE_COLUMNS[1:]
 _MARK_VALUE_COLUMNS = ("mark_price",)
 _FUNDING_VALUE_COLUMNS = ("funding_rate", "mark_price")
+
+
+def _validated_klines_proxy_base_url(value: str) -> str:
+    """Return a canonical loopback-only HTTP origin for the klines proxy."""
+
+    parsed = urlsplit(value)
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError("Team 09 klines proxy URL has an invalid port") from exc
+    if (
+        parsed.scheme != "http"
+        or parsed.hostname not in {"127.0.0.1", "::1"}
+        or port is None
+        or port < 1
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path not in {"", "/"}
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError(
+            "Team 09 klines proxy URL must be a credential-free loopback "
+            "HTTP origin with an explicit port"
+        )
+    host = f"[{parsed.hostname}]" if parsed.hostname == "::1" else parsed.hostname
+    return f"http://{host}:{port}"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -120,17 +148,25 @@ class Team09PublicDataClient:
         self,
         *,
         base_url: str = FAPI_BASE_URL,
+        klines_base_url: str | None = None,
         timeout_seconds: float = 45.0,
         pause_seconds: float = 0.03,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
+        validated_klines_base_url = (
+            _validated_klines_proxy_base_url(klines_base_url)
+            if klines_base_url is not None
+            else None
+        )
         kwargs: dict[str, object] = {
             "base_url": base_url,
             "timeout": timeout_seconds,
+            "trust_env": False,
         }
         if transport is not None:
             kwargs["transport"] = transport
         self._http = httpx.Client(**kwargs)
+        self._klines_base_url = validated_klines_base_url
         self.pause_seconds = pause_seconds
         self._archive_provenance: dict[str, dict[str, object]] = {}
 
@@ -474,9 +510,15 @@ class Team09PublicDataClient:
         params: Mapping[str, object] | None = None,
     ) -> httpx.Response:
         last_error: Exception | None = None
+        target = (
+            f"{self._klines_base_url}{endpoint}"
+            if endpoint == "/fapi/v1/klines"
+            and self._klines_base_url is not None
+            else endpoint
+        )
         for attempt in range(5):
             try:
-                response = self._http.get(endpoint, params=params)
+                response = self._http.get(target, params=params)
                 response.raise_for_status()
                 return response
             except httpx.HTTPStatusError as exc:
