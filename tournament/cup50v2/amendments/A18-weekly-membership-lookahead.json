@@ -1,0 +1,15 @@
+{
+  "amendment_id": "A18",
+  "amendment_sha256": "85ce70bcb421710a07a541656288048234f753ac347f32bdf831fbc4b4462890",
+  "consequence": "The field lost roughly 24 hours of official ticks -- the first weekly reconstitution's boundaries. Nothing official had settled beyond what was already published before the stall, so no result is corrected or discarded; the desks resume from where they left off.",
+  "defect": "derive_forward_membership computed reconstitution boundaries via weekly_reconstitution_times(OOS_END+1s, decision + 1 DAY) -- one full day past the current decision. episode_eligibility is past-only: an episode's end is the last CACHED bar's close time, which cannot reach a boundary that has not occurred yet. From decision=2026-08-23T08:00 onward, the boundary list included Monday 2026-08-24T00:00, for which no symbol could satisfy eligibility -- zero symbols eligible, require_exact_membership raised, and the crash happened before any of the four desks was ticked, so every subsequent 15-minute cron restart hit the same wall.",
+  "fix": "end bound changed from decision + 1 day to decision + 1 second. This excludes any Monday strictly after decision and includes decision itself exactly when decision IS that Monday -- satisfiable because that tick's own generation fetch reaches decision + 8h, past the eligibility cutoff for that boundary.",
+  "found_at_phase": "forward paper stage, first live weekly universe crossing",
+  "found_by": "the field, stalled 24h straight: every engine attempt raised ForwardUniverseError('weekly membership is not exact Top-50: {2026-08-24T00:00:00+00:00: 0})') from the first decision inside the 24h before the first live Monday reconstitution since launch",
+  "namespace": "cup50v2",
+  "root_cause": "This line is unchanged from the CUP-50 v1 desk it was forked from -- inherited, not introduced. Checked before ruling: nothing downstream needs the lookahead. Both places that read the combined membership table filter reconstitution_time <= decision, so the extra future boundary bought nothing and forced a structural impossibility -- observing data from a time that has not happened.",
+  "scope_note": "Fixed only in cup50v2_desk/snapshot_forward.py, forked desk code, not in crypto_trade/cup50v2/universe.py, which is activation-bound tournament core the sealed observation already ran against. The tournament result is untouched.",
+  "tests": "Two: no boundary strictly after decision is ever requested across a grid spanning three weekly crossings; and the exact failure reproduced directly -- the 24h before a Monday must exclude it, decision on the Monday itself must include it. Verified live by mutation: reverting to +1 day fails both.",
+  "title": "derive_forward_membership asked for a weekly boundary before it could exist",
+  "why_it_never_surfaced_before": "This is the first time either edition's desk has ticked continuously, in near-real-time, across a live weekly universe crossing. A day-ahead lookahead is invisible in a backtest or a burst catch-up where the data already exists by the time it is asked for."
+}

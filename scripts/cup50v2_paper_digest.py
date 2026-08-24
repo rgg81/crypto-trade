@@ -30,6 +30,12 @@ import pandas as pd
 
 DESKS = ("winner", "runner-up-1", "runner-up-2", "ensemble-eq3")
 
+# Below this many official days an annualised figure is extrapolation, not measurement: one day of
+# +1.2% annualises to +442%. Total return and drawdown are honest from the first day; growth,
+# volatility and anything derived from them are withheld until there is enough sample to mean
+# something. A number that looks like a result is worse than no number.
+MINIMUM_DAYS_FOR_ANNUALISED = 20
+
 
 def _utc(value: object) -> pd.Timestamp:
     stamp = pd.Timestamp(value)
@@ -89,13 +95,15 @@ def capital_rule(paper_root: Path, now: pd.Timestamp, minimum_days: int) -> dict
 
 
 def _line(desk: str, stats: dict[str, object]) -> str:
-    growth = stats["annualised_growth"]
-    rendered = "RUINED" if growth is None else format(float(growth), "+.4f")
-    return (
+    head = (
         f"{stats['days']:>4}d  total {float(stats['total_return']):+.4f}  "
-        f"growth {rendered}  vol {float(stats['annualised_volatility']):.4f}  "
         f"maxDD {float(stats['max_drawdown']):+.4f}"
     )
+    if int(stats["days"]) < MINIMUM_DAYS_FOR_ANNUALISED:
+        return f"{head}  (annualised figures withheld until {MINIMUM_DAYS_FOR_ANNUALISED}d)"
+    growth = stats["annualised_growth"]
+    rendered = "RUINED" if growth is None else format(float(growth), "+.4f")
+    return f"{head}  growth {rendered}  vol {float(stats['annualised_volatility']):.4f}"
 
 
 def main() -> int:

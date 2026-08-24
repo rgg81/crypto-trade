@@ -106,8 +106,20 @@ def derive_forward_membership(
     )
     recorded_last = pd.Timestamp(recorded["reconstitution_time"].max())
 
+    # Past-only, matching episode_eligibility's own contract: eligibility requires a listing
+    # episode extending up to the boundary being checked, and no boundary strictly after `decision`
+    # can be satisfied by data that has not happened yet. This inherited its predecessor's
+    # `decision + 1 day` lookahead, which pre-computed the NEXT Monday's row a day early -- nothing
+    # downstream reads a boundary beyond `decision` (both `active_rows` filters below use
+    # `<= decision`), so the lookahead bought nothing and forced a structural crash on any decision
+    # inside the 24h immediately before a live weekly reconstitution: `derive_listing_episodes`
+    # closes every symbol's episode at its last CACHED bar, which cannot yet reach a boundary that
+    # has not occurred, so `episode_eligibility` finds zero eligible names and
+    # `require_exact_membership` fails hard. `decision + 1 second` includes decision itself exactly
+    # when decision IS the Monday being reconstituted -- satisfiable because that tick's own
+    # generation fetch reaches `decision + 8h`, past the eligibility cutoff for that boundary.
     boundaries = weekly_reconstitution_times(
-        OOS_END + pd.Timedelta(seconds=1), decision + pd.Timedelta(days=1)
+        OOS_END + pd.Timedelta(seconds=1), decision + pd.Timedelta(seconds=1)
     )
     wide_historical = _verified_acquisition_frame(base, BARS)
     earliest = (boundaries[0] if boundaries else decision) - pd.Timedelta(days=LOOKBACK_DAYS)
