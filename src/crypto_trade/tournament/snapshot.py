@@ -2668,6 +2668,39 @@ def _contract_metadata(
     return metadata
 
 
+LEGACY_MEMBERSHIP_RULE = "top-n-median-quote-volume"
+SEASONED_MEMBERSHIP_RULE = "seasoned-top-n"
+
+
+def _seasoned_membership(
+    bars: pd.DataFrame,
+    metadata: pd.DataFrame,
+    reconstitutions: pd.DatetimeIndex,
+    universe_config: dict[str, Any],
+) -> pd.DataFrame:
+    """Dispatch to the V5 seasoned rule.
+
+    Imported here rather than at module scope so the legacy path keeps no dependency on the V5
+    package and its behaviour stays byte-identical.
+    """
+
+    from crypto_trade.tournament.v5.universe import seasoned_membership
+
+    return seasoned_membership(
+        bars,
+        metadata,
+        reconstitutions,
+        size=int(universe_config["size"]),
+        trailing_days=int(universe_config["trailing_days"]),
+        minimum_history_days=int(universe_config["minimum_history_days"]),
+        persistence_rank=int(universe_config["persistence_rank"]),
+        persistence_window_weeks=int(universe_config["persistence_window_weeks"]),
+        persistence_minimum_weeks=int(universe_config["persistence_minimum_weeks"]),
+        minimum_completeness=float(universe_config["minimum_completeness"]),
+        bars_per_day=3,
+    )
+
+
 def _build_membership(
     bars: pd.DataFrame,
     metadata: pd.DataFrame,
@@ -2676,19 +2709,36 @@ def _build_membership(
     hard_end: pd.Timestamp,
     universe_config: dict[str, Any],
 ) -> pd.DataFrame:
+    """Build point-in-time membership under the rule the snapshot config declares.
+
+    The rule chosen here decides far more than which symbols are tradable. ``build_snapshot``
+    derives the funding and mark months it must acquire from this membership and raises if a
+    month cannot be covered, so funding coverage in the finished snapshot is exactly
+    membership-shaped. That is a good property while the rule is fixed and a trap when it
+    changes: a snapshot built under one rule cannot be reused under another, because whatever
+    the new rule newly admits was never downloaded, and absent funding rows do not crash — they
+    silently pay a carried position nothing.
+    """
+
     first = evaluation_start.floor("D") - pd.Timedelta(days=evaluation_start.weekday())
     last_day = (hard_end - pd.Timedelta(nanoseconds=1)).floor("D")
     last = last_day - pd.Timedelta(days=last_day.weekday())
     reconstitutions = pd.date_range(first, last, freq="7D", tz="UTC")
-    membership = point_in_time_top40(
-        bars,
-        metadata,
-        reconstitutions,
-        top_n=int(universe_config["size"]),
-        trailing_days=int(universe_config["trailing_days"]),
-        min_history_days=int(universe_config["minimum_history_days"]),
-        bars_per_day=3,
-    )
+    rule = str(universe_config.get("rule", LEGACY_MEMBERSHIP_RULE))
+    if rule == LEGACY_MEMBERSHIP_RULE:
+        membership = point_in_time_top40(
+            bars,
+            metadata,
+            reconstitutions,
+            top_n=int(universe_config["size"]),
+            trailing_days=int(universe_config["trailing_days"]),
+            min_history_days=int(universe_config["minimum_history_days"]),
+            bars_per_day=3,
+        )
+    elif rule == SEASONED_MEMBERSHIP_RULE:
+        membership = _seasoned_membership(bars, metadata, reconstitutions, universe_config)
+    else:
+        raise ValueError(f"unknown universe membership rule: {rule}")
     present = set(pd.to_datetime(membership["reconstitution_time"], utc=True))
     missing = [timestamp for timestamp in reconstitutions if timestamp not in present]
     if missing:

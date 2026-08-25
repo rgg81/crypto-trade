@@ -92,6 +92,36 @@ tournament/top40-v4-r2/teams/*/outbox/*.json
 tournament/top40-v4-r2/teams/*/work/*
 !tournament/top40-v4-r2/teams/*/work/.keep
 
+# Top-40 V5 organizer and lane runtime artifacts. Same split as V4-R2: the common benchmark,
+# frozen policy and the preflight/calibration reports stay tracked because they are the evidence
+# an auditor reads; candidate, result and session material is content-addressed by the journal.
+# The sealed-block and scouting roots are ignored for a stronger reason than size — a sealed
+# statistic that reaches version control has stopped being sealed.
+reports-top40-v5/is/
+reports-top40-v5/source-archives/
+reports-top40-v5/historical/
+tournament/top40-v5/broker.lock
+tournament/top40-v5/result.lock
+tournament/top40-v5/.result-command.lock
+tournament/top40-v5/research-journal.jsonl
+tournament/top40-v5/research-sessions/
+tournament/top40-v5/private/
+tournament/top40-v5/nominations/
+tournament/top40-v5/certificates/
+tournament/top40-v5/lifecycle.jsonl
+tournament/top40-v5/activation-freeze.json
+tournament/top40-v5/activation-tests.out
+tournament/top40-v5/selection-freeze.json
+tournament/top40-v5/nomination-registry.json
+tournament/top40-v5/teams/*/candidates/*
+!tournament/top40-v5/teams/*/candidates/README.md
+tournament/top40-v5/teams/*/feedback/*.json
+tournament/top40-v5/teams/*/outbox/*.json
+tournament/top40-v5/teams/*/scouting/*
+!tournament/top40-v5/teams/*/scouting/.keep
+tournament/top40-v5/teams/*/work/*
+!tournament/top40-v5/teams/*/work/.keep
+
 # Notebook outputs and checkpoints
 notebooks/output/
 notebooks/.ipynb_checkpoints/
