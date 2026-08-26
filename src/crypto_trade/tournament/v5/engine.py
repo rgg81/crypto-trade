@@ -72,6 +72,9 @@ class EvaluatorConfig:
     # incidental -- the scaled book can transiently exceed the gross cap.
     risk_unit_maximum_scale: float = 8.0
     risk_unit_warmup_bars: int = 90
+    # Pure performance: the working cross-section is restricted to symbols that can matter in the
+    # evaluated window. Output-identical by construction, and asserted so by the parity suite.
+    narrow_to_relevant_symbols: bool = True
 
     def validate(self) -> None:
         if self.interval_hours < 1 or self.initial_equity <= 0:
@@ -132,6 +135,8 @@ RETURN_ROW_FIELDS: tuple[str, ...] = (
     "conservative_settlement_loss",
     "terminal_unresolved_notional",
     "risk_reduction_turnover",
+    "submitted_effective_breadth",
+    "submitted_gross_exposure",
     "risk_unit_scale",
     "risk_unit_ex_ante_vol",
     "risk_unit_attained_vol",
@@ -159,6 +164,52 @@ class RiskUnitDecision:
 
 _RISK_UNIT_NONE = "none"
 _RISK_UNIT_WARMUP = "warmup"
+
+
+def _working_symbols(
+    frame: pd.DataFrame,
+    target_frame: pd.DataFrame,
+    membership: pd.DataFrame,
+    cfg: EvaluatorConfig,
+) -> list[str]:
+    """Symbols that can affect this evaluation, or every symbol when narrowing is disabled."""
+
+    targeted = set(target_frame.columns)
+    universe = set(frame["symbol"].unique()) | targeted
+    if not cfg.narrow_to_relevant_symbols or membership.empty or len(target_frame.index) == 0:
+        return sorted(universe)
+    # Work on numpy rather than a pandas column: the membership timestamps are Arrow-backed, and
+    # converting them elementwise costs more than the narrowing saves.
+    stamps = pd.DatetimeIndex(membership["reconstitution_time"]).tz_convert("UTC").asi8
+    first = pd.Timestamp(target_frame.index.min()).value
+    last = pd.Timestamp(target_frame.index.max()).value
+    # Include the reconstitution in force at the first decision, not merely those inside the
+    # window: membership is a step function and the active step usually began earlier.
+    started_before = stamps[stamps <= first]
+    lower = started_before.max() if started_before.size else stamps.min()
+    selected = membership["symbol"].to_numpy()[(stamps >= lower) & (stamps <= last)]
+    return sorted(universe & (set(selected.tolist()) | targeted))
+
+
+def effective_breadth(weights: pd.Series) -> float:
+    """Inverse Herfindahl of absolute weights: the number of equally sized positions this book
+    is worth. Equals n for n equal weights, and 1 for a single name however large.
+
+    Measured on the *submitted* book, before the organizer's unit scales it, so that the
+    organizer's own sizing cannot flatter or damage a team's concentration.
+
+    Four of V4-R9's five finalists held one or two names at +/-0.10, and the field's effective
+    breadth ranged from 1.00 to 14.74. That is the gap the floor is placed in.
+    """
+
+    absolute = weights.abs()
+    total = float(absolute.sum())
+    if total <= 0.0:
+        return 0.0
+    squared = float((absolute**2).sum())
+    if squared <= 0.0:
+        return 0.0
+    return (total * total) / squared
 
 
 def _annualisation(interval_hours: int) -> float:
@@ -315,6 +366,8 @@ def _ruin_row(fill_time: pd.Timestamp) -> dict[str, object]:
     row["timestamp"] = fill_time
     row["net_return"] = -1.0
     row["price_pnl"] = -1.0
+    row["submitted_effective_breadth"] = float("nan")
+    row["submitted_gross_exposure"] = float("nan")
     row["risk_unit_scale"] = 1.0
     row["risk_unit_ex_ante_vol"] = 0.0
     row["risk_unit_attained_vol"] = 0.0
@@ -495,7 +548,12 @@ def evaluate_targets(
         raise ValueError("target frame contains non-finite target weights")
     if frame["symbol"].astype(str).eq(REBALANCE_INSTRUCTION_COLUMN).any():
         raise ValueError("market data contains the reserved rebalance instruction symbol")
-    symbols = sorted(set(frame["symbol"]) | set(target_frame.columns))
+    # Restrict the working cross-section to symbols that can possibly matter in this window. The
+    # parent built every per-bar series over all 670 snapshot contracts while at most ~150 can ever
+    # be eligible, ~30 times per bar across three cost passes. A symbol outside this union can
+    # never be a member here, can never be targeted, and carries no opening position, so narrowing
+    # changes no output -- which the parity suite asserts frame-for-frame.
+    symbols = _working_symbols(frame, target_frame, membership, cfg)
     opens = frame.pivot(index="open_time", columns="symbol", values="open").sort_index()
     closes = frame.pivot(index="open_time", columns="symbol", values="close").sort_index()
     quote_volume = frame.pivot(
@@ -706,6 +764,10 @@ def evaluate_targets(
         risk_unit = RiskUnitDecision(
             pd.Series(0.0, index=symbols), 1.0, float("nan"), float("nan"), _RISK_UNIT_NONE
         )
+        # A bar with no explicit rebalance holds quantities; it expresses no new opinion about
+        # concentration, so it is reported as NaN rather than counted as a breadth of zero.
+        submitted_breadth = float("nan")
+        submitted_gross = float("nan")
         if fill_time in target_frame.index and bool(rebalance_instructions.loc[fill_time]):
             desired = pd.Series(0.0, index=symbols)
             supplied = target_frame.loc[fill_time].reindex(symbols).fillna(0.0).astype(float)
@@ -723,6 +785,8 @@ def evaluate_targets(
             _validate_weight_limits(desired, cfg, fill_time)
             # Organizer-owned sizing comes next, and it may scale up, which is why the projection
             # back into the caps is part of the unit rather than an afterthought.
+            submitted_breadth = effective_breadth(desired)
+            submitted_gross = float(desired.abs().sum())
             risk_unit = _ex_ante_risk_unit(desired, closes, quantities, fill_time, cfg)
             if risk_unit.acted:
                 before = float(desired.abs().sum()) * equity_after_boundary_funding
@@ -1173,6 +1237,8 @@ def evaluate_targets(
             "conservative_settlement_loss": conservative_settlement_notional / equity_at_start,
             "terminal_unresolved_notional": terminal_unresolved_notional,
             "risk_reduction_turnover": float(risk_reduction_notional.abs().sum()) / equity_at_start,
+            "submitted_effective_breadth": submitted_breadth,
+            "submitted_gross_exposure": submitted_gross,
             "risk_unit_scale": risk_unit.scale,
             "risk_unit_ex_ante_vol": risk_unit.ex_ante_vol,
             "risk_unit_attained_vol": risk_unit.attained_vol,

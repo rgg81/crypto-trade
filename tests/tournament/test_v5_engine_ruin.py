@@ -216,5 +216,11 @@ def test_the_ruined_frame_is_not_ragged() -> None:
     assert list(result.returns.reset_index().columns) == list(engine.RETURN_ROW_FIELDS)
     # The risk-unit volatility diagnostics are deliberately NaN when no estimate exists -- "not
     # computed" and "zero volatility" are different claims and must not be conflated.
-    economic = result.returns.drop(columns=["risk_unit_ex_ante_vol", "risk_unit_attained_vol"])
+    diagnostics = [
+        "risk_unit_ex_ante_vol",
+        "risk_unit_attained_vol",
+        "submitted_effective_breadth",
+        "submitted_gross_exposure",
+    ]
+    economic = result.returns.drop(columns=diagnostics)
     assert not economic.isna().any().any()

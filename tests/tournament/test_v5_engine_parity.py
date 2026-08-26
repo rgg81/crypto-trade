@@ -23,6 +23,10 @@ PARENT_EQUIVALENT = {
     "risk_unit_enabled": False,
 }
 
+# Flags that claim to change no output. They are deliberately left ON during parity, which makes
+# this suite the proof of that claim rather than somewhere it is exempted from scrutiny.
+OUTPUT_NEUTRAL = {"narrow_to_relevant_symbols"}
+
 INTERVAL_HOURS = 8
 START = pd.Timestamp("2021-01-04", tz="UTC")
 SYMBOLS = ("AAAUSDT", "BBBUSDT", "CCCUSDT", "DDDUSDT")
@@ -213,6 +217,8 @@ def test_v5_adds_only_the_declared_diagnostic_columns(fixtures: dict[str, pd.Dat
     forked = _evaluate(engine_v5, fixtures, **PARENT_EQUIVALENT)
     extra = [name for name in forked.returns.columns if name not in set(parent.returns.columns)]
     assert extra == [
+        "submitted_effective_breadth",
+        "submitted_gross_exposure",
         "risk_unit_scale",
         "risk_unit_ex_ante_vol",
         "risk_unit_attained_vol",
@@ -226,11 +232,15 @@ def test_every_v5_flag_is_listed_in_the_parity_set() -> None:
     parent_fields = {f.name for f in engine_v2.EvaluatorConfig.__dataclass_fields__.values()}
     v5_fields = {f.name for f in engine_v5.EvaluatorConfig.__dataclass_fields__.values()}
     added = v5_fields - parent_fields
-    behavioural = {name for name in added if not name.startswith("risk_unit_")} | {
-        "risk_unit_enabled"
-    }
+    behavioural = (
+        {name for name in added if not name.startswith("risk_unit_")} | {"risk_unit_enabled"}
+    ) - OUTPUT_NEUTRAL
     assert behavioural == set(PARENT_EQUIVALENT), (
-        "every V5 behavioural flag must appear in PARENT_EQUIVALENT"
+        "every V5 behavioural flag must appear in PARENT_EQUIVALENT, or be declared "
+        "output-neutral and left enabled so parity proves the claim"
+    )
+    assert not (OUTPUT_NEUTRAL & set(PARENT_EQUIVALENT)), (
+        "an output-neutral flag switched off during parity is never actually tested"
     )
 
 
@@ -246,3 +256,34 @@ def test_v5_config_defaults_match_the_parent() -> None:
     shared = {field.name for field in parent.__dataclass_fields__.values()}
     for name in sorted(shared):
         assert getattr(parent, name) == getattr(forked, name), name
+
+
+def test_narrowing_ignores_symbols_that_cannot_matter(fixtures: dict[str, pd.DataFrame]) -> None:
+    """Narrowing must be output-identical even when the snapshot carries irrelevant contracts.
+
+    The parent built every per-bar series over all 670 snapshot contracts while at most ~150 can
+    ever be eligible. Dropping the rest is only safe if a dropped symbol could never have been a
+    member, targeted, or held -- so this adds contracts that are none of those and asserts the
+    frames do not move.
+    """
+
+    bars = fixtures["bars"].copy()
+    spectators = []
+    for name in ("ZZZUSDT", "YYYUSDT"):
+        extra = fixtures["bars"][fixtures["bars"]["symbol"] == "AAAUSDT"].copy()
+        extra["symbol"] = name
+        spectators.append(extra)
+    wide = pd.concat([bars, *spectators], ignore_index=True)
+
+    payload = {**fixtures, "bars": wide, "marks": _marks(wide), "funding": _funding(wide)}
+    narrowed = _evaluate(engine_v5, payload)
+    everything = _evaluate(engine_v5, payload, narrow_to_relevant_symbols=False)
+
+    pd.testing.assert_frame_equal(narrowed.returns, everything.returns, check_exact=True)
+    pd.testing.assert_frame_equal(narrowed.events, everything.events, check_exact=True)
+    shared = list(narrowed.positions.columns)
+    pd.testing.assert_frame_equal(
+        narrowed.positions, everything.positions[shared], check_exact=True
+    )
+    assert "ZZZUSDT" not in narrowed.positions.columns
+    assert "ZZZUSDT" in everything.positions.columns, "the fixture must actually exercise the drop"
