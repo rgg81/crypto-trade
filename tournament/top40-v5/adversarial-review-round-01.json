@@ -1,0 +1,180 @@
+{
+  "compared": 19,
+  "disagreements": 9,
+  "rows": [
+    {
+      "activated": 10.0,
+      "agreed": true,
+      "key": "sealed.embargo_days",
+      "organizer": 10.0,
+      "relative_difference": 0.0,
+      "reviewer": 10.0,
+      "reviewer_reasoning": "Same structural arithmetic fixes it at 10, and raising it to 31 to chase the absolute-return autocorrelation settle would cost 257 days of margin instead of 110 while buying nothing, since that channel leaks volatility regime rather than sign \u2014 which is why the charter discloses the limit instead of purging it away."
+    },
+    {
+      "activated": 5.0,
+      "agreed": true,
+      "key": "sealed.purge_days",
+      "organizer": 5.0,
+      "relative_difference": 0.0,
+      "reviewer": 5.0,
+      "reviewer_reasoning": "This is a structural constant the window arithmetic already pins rather than a calibration choice: 808 visible + 360 sealed + 110 withheld = 1278 days holds only if purge is 5 and embargo is 10 (8 x 5 + 7 x 10 = 110, the terminal block's embargo falling outside the scored window), and five days is a fivefold margin over the lag-1 settle of signed autocorrelation, which is the only channel that carries sign."
+    },
+    {
+      "activated": 278.6,
+      "agreed": false,
+      "key": "selection.floors.maximum_annualised_turnover",
+      "organizer": 66.7,
+      "relative_difference": 0.7606,
+      "reviewer": 278.6,
+      "reviewer_reasoning": "This is the midpoint of the widest gap in the upper seed distribution (248.91 volume_shock to 308.30 timeseries_momentum), and it coincides with the point where base costs of 7.47 bps per side consume 20.8% a year against the field's ~10.9% realized volatility, so a book above it must earn a gross Sharpe near 1.9 merely to break even; it excludes exactly the five cost-annihilated seeds, all of which have net Sharpe <= 0.15 and double-cost Sharpe <= -1.83."
+    },
+    {
+      "activated": 0.252,
+      "agreed": false,
+      "key": "selection.floors.maximum_realized_annual_volatility",
+      "organizer": 0.15,
+      "relative_difference": 0.4048,
+      "reviewer": 0.252,
+      "reviewer_reasoning": "Twice the highest realized volatility the seeds imply (12.61%, cointegration) requires a candidate to stay within a factor of two of the organizer's common risk unit, and it brackets the 0.25 x 0.927 = 0.232 systematic ceiling a book at the |net| cap would inherit from the index's 92.7% volatility, so exceeding it means the ex-ante scaling failed rather than that the strategy is merely aggressive."
+    },
+    {
+      "activated": 0.219,
+      "agreed": false,
+      "key": "selection.floors.maximum_risk_unit_capped_fraction",
+      "organizer": 0.5,
+      "relative_difference": 0.562,
+      "reviewer": 0.219,
+      "reviewer_reasoning": "Missing slots are held as cash and never backfilled, and the universe is short of full slots in 40 of 183 reconstitutions, so a book may be pushed against the risk unit's re-applied caps through no fault of its own about 21.9% of the time; capping more often than the universe is itself incomplete means the caps, not the strategy, are setting the risk profile."
+    },
+    {
+      "activated": 0.4,
+      "agreed": true,
+      "key": "selection.floors.maximum_top_symbol_gross_pnl_share",
+      "organizer": 0.4,
+      "relative_difference": 0.1675,
+      "reviewer": 0.333,
+      "reviewer_reasoning": "There is no seed field for concentration, so the bar comes from the breadth floor: a book with six effective names contributing evenly gives each about 16.7% of gross P&L, and twice that leaves room for one genuine standout while rejecting a result carried by a single idiosyncratic event of the kind the charter documents at 25x for LUNA and 989x for SXP."
+    },
+    {
+      "activated": 3.2,
+      "agreed": false,
+      "key": "selection.floors.maximum_vol_normalised_drawdown",
+      "organizer": 0.4676,
+      "relative_difference": 0.8539,
+      "reviewer": 3.2,
+      "reviewer_reasoning": "Dividing each seed's max drawdown by its implied realized volatility gives a ratio distribution whose widest interior gap runs from 2.87 (timeseries_momentum) to 3.53 (volume_shock), and the midpoint of that gap sits just above the ~2.9 a zero-drift book naturally produces over a 2.21-year window, so the cap rejects the five seeds whose drawdown is worse than drift-free noise without becoming a performance gate on the ten that are not."
+    },
+    {
+      "activated": 0.8,
+      "agreed": true,
+      "key": "selection.floors.minimum_active_bar_fraction",
+      "organizer": 0.8,
+      "relative_difference": 0.125,
+      "reviewer": 0.7,
+      "reviewer_reasoning": "Absolute-return autocorrelation persists to lag 21-30, so volatility regimes are month-scale and a legitimate regime filter can stand a book down for whole months at a time; 0.70 permits standing down roughly one month in three while still excluding the near-flat book the charter names as V4-R9's first-place failure."
+    },
+    {
+      "activated": 5.57,
+      "agreed": false,
+      "key": "selection.floors.minimum_annualised_turnover",
+      "organizer": 4.0,
+      "relative_difference": 0.2819,
+      "reviewer": 5.57,
+      "reviewer_reasoning": "Nothing in the seed field lies below 11.14, so there is no observed gap at the bottom and the floor is set at half that value, which cannot exclude inclusion_attention (the best-scoring baseline, net Sharpe 0.94) yet still rejects a book rotating less than six times a year on a universe that reconstitutes weekly and churns through 123 distinct symbols in 183 reconstitutions."
+    },
+    {
+      "activated": 0.8,
+      "agreed": true,
+      "key": "selection.floors.minimum_breadth_pass_fraction",
+      "organizer": 0.8,
+      "relative_difference": 0.0,
+      "reviewer": 0.8,
+      "reviewer_reasoning": "The universe never falls below 24 members and its p10 is 32.2, four to five times any breadth floor, so the universe can never be what fails a candidate; the residual excuse is unfilled slots held as cash, which occur in 40 of 183 reconstitutions, so 0.80 sits just above the 143/183 = 0.781 full-slot rate and charges the strategy for breadth failures it chose."
+    },
+    {
+      "activated": 0.334,
+      "agreed": false,
+      "key": "selection.floors.minimum_deflated_sharpe_probability",
+      "organizer": 0.6,
+      "relative_difference": 0.4433,
+      "reviewer": 0.334,
+      "reviewer_reasoning": "Against a twelve-trial expected-maximum benchmark of about 1.12 at the 808-day window (SE of an annualised Sharpe = 0.673), this is the deflated probability of a development Sharpe of 0.83, the midpoint of the observed seed gap between breadth_state (0.757) and funding_carry (0.907); it admits the two best naive baselines, which is the point, since a development bar that no baseline clears would be enforcing performance on precisely the data the charter says a Sharpe is a statement about a search."
+    },
+    {
+      "activated": 11.25,
+      "agreed": false,
+      "key": "selection.floors.minimum_gross_edge_bps_per_turnover",
+      "organizer": 45.0,
+      "relative_difference": 0.75,
+      "reviewer": 11.25,
+      "reviewer_reasoning": "One and a half times the 7.5 bps per-side base cost demands the book earn half again what it pays to trade, and it lands inside the observed gap between taker_flow (9.59) and breadth_state (12.92), admitting four of the fifteen naive seeds so the bar is demonstrably clearable while rejecting the eight whose gross edge does not even cover their own costs."
+    },
+    {
+      "activated": 0.149,
+      "agreed": false,
+      "key": "selection.floors.minimum_mean_gross_exposure",
+      "organizer": 0.3,
+      "relative_difference": 0.5033,
+      "reviewer": 0.149,
+      "reviewer_reasoning": "The seed field is a point mass at 0.60 and so contains no gap to place a bar in, leaving the two named anchors \u2014 the 3.7% mean gross of the V4-R9 book the charter calls the archetypal non-portfolio and the 0.60 every seed runs \u2014 whose log-midpoint is sqrt(0.037 x 0.60) = 0.149, low enough that a naturally volatile book scaled down by the common risk unit is not punished for it."
+    },
+    {
+      "activated": 6.0,
+      "agreed": true,
+      "key": "selection.floors.minimum_median_effective_breadth",
+      "organizer": 6.0,
+      "relative_difference": 0.0,
+      "reviewer": 6.0,
+      "reviewer_reasoning": "Fourteen of fifteen seeds sit at exactly 12.000000000000002, which is a construction artifact of an equal-weight six-by-six book rather than evidence about required breadth, so the bar comes from the caps instead: at the seeds' 0.60 gross the 0.10 per-symbol limit forces at least six names, making 6.0 the tightest book the execution contract itself permits, while placing the floor in the only observed gap (11.38 to 12.00) would fail every candidate less diversified than the naive baseline."
+    },
+    {
+      "activated": 0.6,
+      "agreed": true,
+      "key": "selection.floors.minimum_positive_fold_fraction",
+      "organizer": 0.6,
+      "relative_difference": 0.04,
+      "reviewer": 0.625,
+      "reviewer_reasoning": "Five of the eight sealed blocks reproduces the charter's published operating characteristic almost exactly: at a 45-day block a true annualised Sharpe of 1.0 gives a per-block Sharpe of 0.351 and a 63.7% chance of a positive block, so P(>=5 of 8) = 0.68 (the charter's 'roughly two thirds'), while a null book gives P(>=5 of 8) = 0.36 (the charter's 'roughly a third')."
+    },
+    {
+      "activated": 0.06,
+      "agreed": true,
+      "key": "selection.floors.minimum_realized_annual_volatility",
+      "organizer": 0.06,
+      "relative_difference": 0.1833,
+      "reviewer": 0.049,
+      "reviewer_reasoning": "Solving each seed's net and double-cost Sharpe jointly recovers a per-side cost of about 7.47 bps and pins the field's realized volatility to 9.87%-12.61%, so half the lowest observed value marks a book that is not engaging the common risk unit at all rather than one merely running quieter than the baselines."
+    },
+    {
+      "activated": 0.2,
+      "agreed": true,
+      "key": "selection.floors.minimum_side_exposure_share",
+      "organizer": 0.2,
+      "relative_difference": 0.2,
+      "reviewer": 0.25,
+      "reviewer_reasoning": "The caps themselves fix the tightest legitimate value: a book at the seeds' 0.60 gross running the full |net| <= 0.25 has a smaller-side share of (0.60 - 0.25)/1.20 = 0.292, so 0.25 sits just below what the net cap already permits and binds only on low-gross books, where the net cap in absolute terms stops restraining directionality."
+    },
+    {
+      "activated": 10000.0,
+      "agreed": false,
+      "key": "statistics.bootstrap_samples",
+      "organizer": 20000.0,
+      "relative_difference": 0.5,
+      "reviewer": 10000.0,
+      "reviewer_reasoning": "The measured resolution table gives 1e-4 at 10,000 samples, three orders of magnitude finer than the 0.15-0.30 p-value scale the charter says the sealed stage operates at and finer than the Monte Carlo standard error of about 0.004 at that p, so the 5e-5 and 2e-5 available at 20,000 and 50,000 buy precision no decision in this charter can consume."
+    },
+    {
+      "activated": 30.0,
+      "agreed": true,
+      "key": "statistics.deletion_block_days",
+      "organizer": 30.0,
+      "relative_difference": 0.0323,
+      "reviewer": 31.0,
+      "reviewer_reasoning": "Absolute-return autocorrelation settles at lag 31, so a contiguous deletion block must span at least 31 days for the deleted segment to carry the full dependence structure rather than leaving its correlated neighbours behind, and 31 is still under the 45-day seal length so a deletion block never straddles a sealed-block boundary and its calendar gap."
+    }
+  ],
+  "rule": "within tolerance the organizer value activates; outside it the contamination-free reviewer value activates",
+  "schema_version": "top40-v5-adversarial-review-v1",
+  "tolerance": 0.25
+}

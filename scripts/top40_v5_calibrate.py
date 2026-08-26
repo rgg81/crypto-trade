@@ -60,8 +60,15 @@ MAXIMUM_NULL_PASS_RATE = 0.40
 MINIMUM_POWER = {1.0: 0.55, 1.5: 0.70}
 
 
-# Base cost of one unit of turnover, both sides. From [execution] in the config.
-ROUND_TRIP_COST = 2 * (5.0 + 2.5) / 10_000.0  # 15 bps
+# Base cost of one unit of turnover. The engine defines turnover as executed notional over equity,
+# which is **one-way**, so a unit pays one side: 5.0 taker + 2.5 slippage = 7.5 bps.
+#
+# An earlier revision used the round-trip 15 bps and was wrong by a factor of two. The
+# contamination-free reviewer used 7.5 and was right, and the seed field settles it outright: the
+# implied cost recovered from each seed's 1x-to-2x Sharpe drag is 7.40 to 7.56 bps across all
+# fifteen books. Worth recording as a lesson rather than a fix -- the review caught an arithmetic
+# error in the contaminated party's work, which is exactly the failure it was built to catch.
+COST_PER_TURNOVER = (5.0 + 2.5) / 10_000.0  # 7.5 bps, one-way
 # The volatility every book is scaled to by the organizer's risk unit.
 TARGET_VOLATILITY = 0.10
 
@@ -103,29 +110,32 @@ def cost_derived() -> dict[str, float]:
 
     ``maximum_annualised_turnover``
         The turnover at which base costs consume one entire unit of Sharpe. A book above it must be
-        extraordinary *gross* merely to break even net. 0.10 / 0.0015 = 67 per year.
+        extraordinary *gross* merely to break even net. 0.10 / 0.00075 = 133 per year.
 
     ``minimum_gross_edge_bps_per_turnover``
         A book must earn more per unit of turnover than it pays. Surviving the 3x evaluation needs
-        three round trips' worth: 45 bps.
+        three times the cost: 22.5 bps.
 
     ``minimum_annualised_turnover``
         The anti-inactivity floor. The universe reconstitutes weekly, so a book that responds to
         membership at all turns over several times a year; below 4 it is not trading the universe.
         V4-R9's fallback ranked a book running 1.39 per year into first place.
 
-    The seed field then *checks* these rather than setting them, and it checks out: every seed below
-    the derived turnover ceiling survives 2x costs, and every seed above it does not.
+    The seed field checks these rather than setting them. The recovered cost per unit of turnover is
+    7.40 to 7.56 bps across all fifteen seeds, which is the arithmetic above measured rather than
+    assumed.
     """
 
     return {
-        "maximum_annualised_turnover": round(TARGET_VOLATILITY / ROUND_TRIP_COST, 1),
-        "minimum_gross_edge_bps_per_turnover": round(3 * ROUND_TRIP_COST * 10_000.0, 1),
+        "maximum_annualised_turnover": round(TARGET_VOLATILITY / COST_PER_TURNOVER, 1),
+        "minimum_gross_edge_bps_per_turnover": round(3 * COST_PER_TURNOVER * 10_000.0, 1),
         "minimum_annualised_turnover": 4.0,
     }
 
 
-def resolve(measurements: dict, distribution: dict) -> tuple[dict[str, float], dict[str, str]]:
+def resolve(
+    measurements: dict, distribution: dict, normalised_drawdowns: Sequence[float]
+) -> tuple[dict[str, float], dict[str, str]]:
     """Every placeholder key, resolved to a value and a provenance kind."""
 
     def column(name: str) -> list[float]:
@@ -187,8 +197,12 @@ def resolve(measurements: dict, distribution: dict) -> tuple[dict[str, float], d
     # is meaningless, and these stay structural until a real field measures them.
     record(prefix + "minimum_mean_gross_exposure", 0.30, "calibrated")
     record(prefix + "minimum_median_effective_breadth", 6.0, "derived")
+    # On the **normalised** ratio the gate actually computes (drawdown x 0.10 / realized vol), not
+    # on raw drawdown. An earlier revision gap-placed on the raw column and produced 0.47, which at
+    # the 10% reference is a 4.7% drawdown cap -- tight enough to reject almost any real book. The
+    # quantity a threshold is placed on has to be the quantity the gate compares against.
     record(prefix + "maximum_vol_normalised_drawdown",
-           place_in_gap(column("max_drawdown"), side="cap"), "calibrated")
+           place_in_gap(normalised_drawdowns, side="cap"), "calibrated")
 
     # Structural fractions: a book below these is not a portfolio, whatever it scores.
     record(prefix + "minimum_breadth_pass_fraction", 0.80, "calibrated")
@@ -238,23 +252,48 @@ def thresholds_from(values: dict[str, float]) -> GateThresholds:
     )
 
 
-def apply_to_config(path: Path, kinds: dict[str, str], hashes: dict[str, str]) -> int:
-    """Replace every ``:placeholder`` tag with the artifact that justifies it."""
+def apply_to_config(
+    path: Path, values: dict[str, float], kinds: dict[str, str], hashes: dict[str, str]
+) -> tuple[int, int]:
+    """Write the resolved **value** and the tag that justifies it.
+
+    Both, and the value first. An earlier revision rewrote only the tags, which left the config
+    claiming ``calibrated:<hash>`` provenance for numbers that had never been calibrated -- a
+    turnover ceiling of 90 wearing the tag of one derived at 190. That is V4-R2's defect exactly:
+    a promise the contract validates and the file does not keep. A tag is a claim about a value, so
+    writing one without the other is worse than writing neither.
+    """
 
     body = path.read_text(encoding="utf-8")
-    replaced = 0
+    values_written = 0
+    for key, value in values.items():
+        if key.startswith("_") or key not in kinds:
+            continue
+        leaf = key.rsplit(".", 1)[-1]
+        rendered = repr(int(value)) if float(value).is_integer() else repr(round(value, 6))
+        pattern = re.compile(rf"^({re.escape(leaf)}\s*=\s*)[-0-9.eE+]+$", re.MULTILINE)
+        body, count = pattern.subn(rf"\g<1>{rendered}", body)
+        values_written += min(count, 1)
+
+    tags_written = 0
     for key, kind in kinds.items():
         tag = f"{kind}:{hashes[kind]}"
         pattern = re.compile(rf'("{re.escape(key)}"\s*=\s*)"[a-z]+:placeholder"')
         body, count = pattern.subn(rf'\1"{tag}"', body)
-        replaced += count
+        tags_written += count
+
     path.write_text(body, encoding="utf-8")
-    return replaced
+    return values_written, tags_written
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--apply", action="store_true", help="rewrite config.toml provenance tags")
+    parser.add_argument(
+        "--adversarial",
+        default="tournament/top40-v5/adversarial-review.json",
+        help="apply the preregistered resolution from the contamination-free review",
+    )
     parser.add_argument("--out", default="tournament/top40-v5/calibration-report.json")
     arguments = parser.parse_args()
 
@@ -274,10 +313,33 @@ def main() -> int:
     print(f"measurements  sha256 {hashes['derived']}")
     print(f"seed field    sha256 {hashes['calibrated']}  ({len(distribution)} seeds)")
 
-    values, kinds = resolve(measurements, distribution)
+    packets = sorted(DISTRIBUTION.parent.glob("seed.*.json"))
+    normalised = []
+    for packet in packets:
+        row = json.loads(packet.read_text(encoding="utf-8"))
+        volatility = float(row.get("annualised_volatility") or 0.0)
+        if volatility > 0.0:
+            normalised.append(float(row["max_drawdown"]) * TARGET_VOLATILITY / volatility)
+    print(f"normalised drawdowns recovered from {len(normalised)} seed packets")
+
+    values, kinds = resolve(measurements, distribution, normalised)
     print(f"\nresolved {len(kinds)} numbers:")
     for key in sorted(kinds):
         print(f"  {key:56s} {values[key]!r:>10}  [{kinds[key]}]")
+
+    # The preregistered resolution: where the two proposals disagree beyond tolerance, the
+    # contamination-free value activates. Applied before the bar is measured, because loosening a
+    # threshold raises the null pass rate as well as the power and the bar has to be usable as
+    # actually configured -- not as I proposed it.
+    review_path = Path(arguments.adversarial)
+    if review_path.is_file():
+        review = json.loads(review_path.read_text(encoding="utf-8"))
+        adopted = 0
+        for row in review["rows"]:
+            if not row["agreed"] and row["key"] in values:
+                values[row["key"]] = row["reviewer"]
+                adopted += 1
+        print(f"\nadversarial resolution: adopted {adopted} contamination-free value(s)")
 
     thresholds = thresholds_from(values)
     print("\nmeasuring the bar on development-derived synthetic paths...", flush=True)
@@ -330,9 +392,9 @@ def main() -> int:
         if not usable:
             print("\nrefusing to apply: the bar is not usable")
             return 1
-        replaced = apply_to_config(CONFIG, kinds, hashes)
+        values_written, tags_written = apply_to_config(CONFIG, values, kinds, hashes)
         remaining = CONFIG.read_text(encoding="utf-8").count(":placeholder")
-        print(f"\napplied {replaced} provenance tags to {CONFIG}")
+        print(f"\napplied {values_written} values and {tags_written} tags to {CONFIG}")
         print(f"placeholders remaining: {remaining}")
         return 0 if remaining == 0 else 1
 

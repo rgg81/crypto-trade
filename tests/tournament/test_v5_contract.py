@@ -102,10 +102,32 @@ def test_identity_and_path_sections_are_not_justified() -> None:
 # -- placeholders ------------------------------------------------------------------------
 
 
-def test_the_shipped_config_cannot_be_activated_yet() -> None:
-    """A half-justified contract is a normal intermediate state; reaching activation is not."""
+def test_the_shipped_config_is_now_fully_justified() -> None:
+    """Every number carries a real artifact hash.
+
+    This test asserted the opposite until the calibration run happened, and that was correct then:
+    the config shipped with placeholder provenance precisely so it could not activate before
+    anything had been measured. It now carries thirty-five resolved values, so the honest assertion
+    is the other one. The guard itself is still tested, below, against a config that has not been
+    calibrated -- which is what keeps this from being a test that was simply switched off.
+    """
 
     loaded = contract.load_config(CONFIG)
+    contract.assert_no_placeholder_provenance(loaded)
+    assert set(loaded.counts_by_source()) <= {"structural", "inherited", "calibrated", "derived"}
+    assert sum(loaded.counts_by_source().values()) == len(contract.numeric_keys(loaded.raw))
+
+
+def test_a_config_that_was_never_calibrated_is_still_refused() -> None:
+    """The guard, exercised on an uncalibrated contract rather than trusted."""
+
+    raw = _raw()
+    raw["provenance"] = {  # type: ignore[index]
+        key: "calibrated:placeholder" for key in contract.numeric_keys(raw)
+    }
+    loaded = contract.LoadedConfig(
+        path=CONFIG, raw=raw, provenance=contract.validate_provenance(raw)
+    )
     with pytest.raises(contract.ContractError, match="placeholder provenance"):
         contract.assert_no_placeholder_provenance(loaded)
 

@@ -64,21 +64,29 @@ reproducible from the data rather than chosen.
 Write your proposal to `lane/outbox/proposal.json` as a flat JSON object mapping each key below to
 an object `{"value": <number>, "because": "<one sentence>"}`. Write nothing else to that file.
 
+State every value in the units given below. Where a formula is shown, that is exactly what the
+gate computes, so propose a number on that scale and no other.
+
 Keys:
   selection.floors.minimum_mean_gross_exposure
   selection.floors.minimum_median_effective_breadth
   selection.floors.minimum_breadth_pass_fraction
   selection.floors.minimum_active_bar_fraction
   selection.floors.minimum_side_exposure_share
-  selection.floors.minimum_realized_annual_volatility
-  selection.floors.maximum_realized_annual_volatility
+  selection.floors.minimum_realized_annual_volatility   [a fraction, e.g. 0.06 for 6% a year]
+  selection.floors.maximum_realized_annual_volatility   [a fraction]
   selection.floors.maximum_risk_unit_capped_fraction
   selection.floors.minimum_annualised_turnover
   selection.floors.maximum_annualised_turnover
+      [turnover per year, one-way executed notional over equity]
   selection.floors.minimum_gross_edge_bps_per_turnover
+      [basis points of gross P&L per unit of turnover, where turnover is executed notional over
+       equity and is ONE-WAY, so one unit pays one side of costs]
   selection.floors.minimum_positive_fold_fraction
   selection.floors.minimum_deflated_sharpe_probability
   selection.floors.maximum_vol_normalised_drawdown
+      [computed as: max_drawdown * (0.10 / realized_annual_volatility) — a fraction, so a book
+       drawing down 30% at exactly 10% realized volatility scores 0.30, NOT 3.0]
   selection.floors.maximum_top_symbol_gross_pnl_share
   sealed.purge_days
   sealed.embargo_days

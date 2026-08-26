@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -76,19 +77,30 @@ def _freeze(bench, **overrides):
 # -- the shipped config deliberately cannot activate ---------------------------------------------
 
 
-def test_the_shipped_config_still_carries_placeholder_provenance():
-    """Not an oversight. The config ships unable to activate so that a calibration run has to
-    happen first -- a config that activated on placeholders would be one nobody ever calibrated."""
+def test_the_shipped_config_has_been_calibrated():
+    """The config shipped unable to activate so a calibration run had to happen first. It has.
+
+    A config that activated on placeholders would be one nobody ever calibrated, which is why this
+    test asserted the opposite until the run produced real artifact hashes for all thirty-five.
+    """
 
     loaded = contract.load_config(SHIPPED_CONFIG)
 
-    with pytest.raises(contract.ContractError, match="placeholder"):
-        contract.assert_no_placeholder_provenance(loaded)
+    contract.assert_no_placeholder_provenance(loaded)
+    assert loaded.counts_by_source()["calibrated"] > 0
+    assert loaded.counts_by_source()["derived"] > 0
 
 
 def test_activation_refuses_a_config_with_placeholder_provenance(bench):
+    """The guard, exercised on an uncalibrated config rather than trusted."""
+
     placeholder = bench["tmp"] / "placeholder.toml"
-    placeholder.write_text(SHIPPED_CONFIG.read_text(encoding="utf-8"), encoding="utf-8")
+    body = SHIPPED_CONFIG.read_text(encoding="utf-8")
+    # Put the placeholders back, so this tests the guard rather than the calibrated file.
+    body = re.sub(
+        r'"(structural|inherited|calibrated|derived)[^"]*"', '"calibrated:placeholder"', body
+    )
+    placeholder.write_text(body, encoding="utf-8")
     artifacts = dict(bench["artifacts"], config=placeholder)
 
     with pytest.raises(contract.ContractError, match="placeholder"):

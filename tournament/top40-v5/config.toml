@@ -85,12 +85,12 @@ score_ruin_instead_of_raising = true
 [risk_unit]
 enabled = true
 annualized_target = 0.10
-halflife_bars = 90
-window_bars = 270
-shrinkage = 0.10
-minimum_scale = 0.10
-maximum_scale = 8.0
-warmup_bars = 90
+halflife_bars = 60
+window_bars = 240
+shrinkage = 0.1
+minimum_scale = 0.25
+maximum_scale = 3
+warmup_bars = 270
 
 [research]
 maximum_accepted_trials_per_team = 12
@@ -106,33 +106,33 @@ desk_individual_count = 3
 ensemble_weighting = "equal"
 
 [selection.floors]
-minimum_mean_gross_exposure = 0.30
-minimum_median_effective_breadth = 6.0
-minimum_breadth_pass_fraction = 0.80
-minimum_active_bar_fraction = 0.80
-minimum_side_exposure_share = 0.20
+minimum_mean_gross_exposure = 0.2
+minimum_median_effective_breadth = 6
+minimum_breadth_pass_fraction = 0.8
+minimum_active_bar_fraction = 0.6
+minimum_side_exposure_share = 0.2
 minimum_realized_annual_volatility = 0.06
-maximum_realized_annual_volatility = 0.15
-maximum_risk_unit_capped_fraction = 0.50
-minimum_annualised_turnover = 4.0
-maximum_annualised_turnover = 90.0
-minimum_gross_edge_bps_per_turnover = 20.0
+maximum_realized_annual_volatility = 0.2
+maximum_risk_unit_capped_fraction = 0.5
+minimum_annualised_turnover = 4
+maximum_annualised_turnover = 189.88
+minimum_gross_edge_bps_per_turnover = 22.5
 maximum_cost_share_of_positive_gross = 0.50
-minimum_positive_fold_fraction = 0.60
-minimum_deflated_sharpe_probability = 0.60
-maximum_vol_normalised_drawdown = 0.25
-maximum_top_symbol_gross_pnl_share = 0.40
+minimum_positive_fold_fraction = 0.6
+minimum_deflated_sharpe_probability = 0.6
+maximum_vol_normalised_drawdown = 0.3448
+maximum_top_symbol_gross_pnl_share = 0.4
 minimum_deletion_profile_p05_sharpe = 0.0
 minimum_accepted_trials = 8
 volatility_reference = 0.10
 
 [statistics]
-bootstrap_samples = 20000
+bootstrap_samples = 10000
 bootstrap_expected_block_days = 10
 bootstrap_seed = 20260826
-field_false_discovery_rate = 0.10
+field_false_discovery_rate = 0.1
 deletion_block_days = 30
-deletion_percentile = 5.0
+deletion_percentile = 5
 
 [calibration]
 maximum_null_pass_rate = 0.45
@@ -147,21 +147,21 @@ good_population_per_level = 40
 # The calibrated tags below are placeholders pending the committed calibration run; activation
 # refuses a placeholder artifact id, so this file cannot be activated as it stands.
 [provenance]
-"sealed.block_days" = "derived:placeholder"
+"sealed.block_days" = "derived:df275b0bb7b20397"
 "sealed.stride" = "structural"
 "sealed.residues[0]" = "structural"
 "sealed.residues[1]" = "structural"
-"sealed.interleaved_count" = "derived:placeholder"
-"sealed.purge_days" = "derived:placeholder"
-"sealed.embargo_days" = "derived:placeholder"
+"sealed.interleaved_count" = "derived:df275b0bb7b20397"
+"sealed.purge_days" = "derived:df275b0bb7b20397"
+"sealed.embargo_days" = "derived:df275b0bb7b20397"
 
 "universe.size" = "inherited:top40-v4-r2"
-"universe.trailing_days" = "derived:placeholder"
-"universe.minimum_history_days" = "derived:placeholder"
-"universe.persistence_rank" = "derived:placeholder"
-"universe.persistence_window_weeks" = "derived:placeholder"
-"universe.persistence_minimum_weeks" = "derived:placeholder"
-"universe.minimum_completeness" = "derived:placeholder"
+"universe.trailing_days" = "derived:df275b0bb7b20397"
+"universe.minimum_history_days" = "derived:df275b0bb7b20397"
+"universe.persistence_rank" = "derived:df275b0bb7b20397"
+"universe.persistence_window_weeks" = "derived:df275b0bb7b20397"
+"universe.persistence_minimum_weeks" = "derived:df275b0bb7b20397"
+"universe.minimum_completeness" = "derived:df275b0bb7b20397"
 
 "execution.initial_equity_usdt" = "inherited:top40-v4-r2"
 "execution.taker_fee_bps_per_side" = "structural"
@@ -175,37 +175,37 @@ good_population_per_level = 40
 "execution.annualization_days" = "structural"
 
 "risk_unit.annualized_target" = "inherited:cup50-v2"
-"risk_unit.halflife_bars" = "calibrated:placeholder"
-"risk_unit.window_bars" = "calibrated:placeholder"
-"risk_unit.shrinkage" = "calibrated:placeholder"
-"risk_unit.minimum_scale" = "calibrated:placeholder"
-"risk_unit.maximum_scale" = "calibrated:placeholder"
-"risk_unit.warmup_bars" = "calibrated:placeholder"
+"risk_unit.halflife_bars" = "calibrated:5b96075c4989db53"
+"risk_unit.window_bars" = "calibrated:5b96075c4989db53"
+"risk_unit.shrinkage" = "calibrated:5b96075c4989db53"
+"risk_unit.minimum_scale" = "calibrated:5b96075c4989db53"
+"risk_unit.maximum_scale" = "calibrated:5b96075c4989db53"
+"risk_unit.warmup_bars" = "calibrated:5b96075c4989db53"
 
 "selection.desk_individual_count" = "structural"
-"selection.floors.minimum_mean_gross_exposure" = "calibrated:placeholder"
-"selection.floors.minimum_median_effective_breadth" = "derived:placeholder"
-"selection.floors.minimum_breadth_pass_fraction" = "calibrated:placeholder"
-"selection.floors.minimum_active_bar_fraction" = "calibrated:placeholder"
-"selection.floors.minimum_side_exposure_share" = "calibrated:placeholder"
-"selection.floors.minimum_realized_annual_volatility" = "calibrated:placeholder"
-"selection.floors.maximum_realized_annual_volatility" = "calibrated:placeholder"
-"selection.floors.maximum_risk_unit_capped_fraction" = "calibrated:placeholder"
-"selection.floors.minimum_annualised_turnover" = "derived:placeholder"
-"selection.floors.maximum_annualised_turnover" = "derived:placeholder"
-"selection.floors.minimum_gross_edge_bps_per_turnover" = "derived:placeholder"
+"selection.floors.minimum_mean_gross_exposure" = "calibrated:5b96075c4989db53"
+"selection.floors.minimum_median_effective_breadth" = "derived:df275b0bb7b20397"
+"selection.floors.minimum_breadth_pass_fraction" = "calibrated:5b96075c4989db53"
+"selection.floors.minimum_active_bar_fraction" = "calibrated:5b96075c4989db53"
+"selection.floors.minimum_side_exposure_share" = "calibrated:5b96075c4989db53"
+"selection.floors.minimum_realized_annual_volatility" = "calibrated:5b96075c4989db53"
+"selection.floors.maximum_realized_annual_volatility" = "calibrated:5b96075c4989db53"
+"selection.floors.maximum_risk_unit_capped_fraction" = "calibrated:5b96075c4989db53"
+"selection.floors.minimum_annualised_turnover" = "derived:df275b0bb7b20397"
+"selection.floors.maximum_annualised_turnover" = "derived:df275b0bb7b20397"
+"selection.floors.minimum_gross_edge_bps_per_turnover" = "derived:df275b0bb7b20397"
 "selection.floors.maximum_cost_share_of_positive_gross" = "inherited:top40-v3-extension"
-"selection.floors.minimum_positive_fold_fraction" = "calibrated:placeholder"
-"selection.floors.minimum_deflated_sharpe_probability" = "calibrated:placeholder"
-"selection.floors.maximum_vol_normalised_drawdown" = "calibrated:placeholder"
-"selection.floors.maximum_top_symbol_gross_pnl_share" = "calibrated:placeholder"
+"selection.floors.minimum_positive_fold_fraction" = "calibrated:5b96075c4989db53"
+"selection.floors.minimum_deflated_sharpe_probability" = "calibrated:5b96075c4989db53"
+"selection.floors.maximum_vol_normalised_drawdown" = "calibrated:5b96075c4989db53"
+"selection.floors.maximum_top_symbol_gross_pnl_share" = "calibrated:5b96075c4989db53"
 "selection.floors.minimum_deletion_profile_p05_sharpe" = "structural"
 "selection.floors.minimum_accepted_trials" = "inherited:top40-v4-r2"
 "selection.floors.volatility_reference" = "inherited:cup50-v2"
 
-"statistics.bootstrap_samples" = "derived:placeholder"
+"statistics.bootstrap_samples" = "derived:df275b0bb7b20397"
 "statistics.bootstrap_expected_block_days" = "inherited:top40-v4-r2"
 "statistics.bootstrap_seed" = "structural"
-"statistics.field_false_discovery_rate" = "calibrated:placeholder"
-"statistics.deletion_block_days" = "derived:placeholder"
-"statistics.deletion_percentile" = "calibrated:placeholder"
+"statistics.field_false_discovery_rate" = "calibrated:5b96075c4989db53"
+"statistics.deletion_block_days" = "derived:df275b0bb7b20397"
+"statistics.deletion_percentile" = "calibrated:5b96075c4989db53"
