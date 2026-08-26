@@ -129,23 +129,31 @@ def test_the_audit_notices_a_reference_to_a_forbidden_root(tmp_path, sources):
     assert not any(finding.startswith("clean.py") for finding in findings)
 
 
-def test_the_audit_does_not_accuse_a_numeric_sequence_of_being_a_path(tmp_path, sources):
-    """Found by rehearsing a real lane, not by reading the regex.
+def test_the_audit_does_not_accuse_honest_work_of_leaking(tmp_path, sources):
+    """Both false positives were found by running real lanes, not by reading the regex.
 
-    An agent wrote its ladder of lookback horizons as "24/72/168/336" in a genuine RATIONALE.md and
-    the audit reported it as an absolute path outside the workspace. A false positive accuses honest
-    work of a leak, and an audit nobody trusts gets ignored -- at which point it catches nothing.
+    First a strategy's ladder of lookback horizons, "24/72/168/336", was reported as a path. Then --
+    far worse -- every citation in a real scouting thesis was, because a URL contains a path-shaped
+    run and producing citations is the entire point of that phase. An audit that fires on honest
+    work gets ignored, and an ignored audit catches nothing at all.
     """
 
     space = _materialise(tmp_path, sources)
     produced = {
         "RATIONALE.md": b"Lookback ladder: 24/72/168/336 hours. Ratio 3/4/5 across regimes.",
+        "THESIS.md": (
+            b"Koijen et al, https://www.nber.org/papers/w19325 and "
+            b"https://arxiv.org/abs/2212.06888 and https://papers.ssrn.com/sol3/papers.cfm"
+        ),
         "leak.py": b"# copied from /home/roberto/crypto-trade/reports/board.json",
     }
 
     findings = workspace.audit_workspace(space, produced, forbidden_roots=[])
 
     assert not any(finding.startswith("RATIONALE.md") for finding in findings)
+    assert not any(finding.startswith("THESIS.md") for finding in findings), (
+        "a citation is not a filesystem read; producing them is the whole point of scouting"
+    )
     assert any(finding.startswith("leak.py") for finding in findings)
 
 

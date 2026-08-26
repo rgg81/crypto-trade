@@ -183,14 +183,32 @@ def assert_workspace_excludes(workspace: Workspace, forbidden: Sequence[str]) ->
         raise WorkspaceError(f"workspace contains forbidden files: {offending}")
 
 
-# A path-like run of segments, where at least one segment contains a letter.
+# Filesystem locations a lane's output has no honest reason to name. An **allowlist of suspicious
+# roots**, not a denylist of path-like shapes.
 #
-# The letter is load-bearing. Without it, a lane rehearsal flagged a genuine RATIONALE.md for
-# "24/72/168/336" -- a strategy's ladder of lookback horizons, read as an absolute path. A false
-# positive here accuses honest work of a leak, which is worse than useless: an audit nobody trusts
-# gets ignored, and then it catches nothing at all.
-_ABSOLUTE_PATH = re.compile(rb"(?:/[A-Za-z0-9._-]+){2,}")
-_HAS_LETTER = re.compile(rb"[A-Za-z]")
+# The shape-matching version was tried and abandoned twice over. It flagged a strategy's ladder of
+# lookback horizons ("24/72/168/336") as a path, and then -- far worse -- it flagged every citation
+# in a scouting thesis, because "https://arxiv.org/abs/2212.06888" contains a path-shaped run and
+# producing citations is the entire point of that phase. An audit that fires on honest work gets
+# ignored, and an ignored audit catches nothing.
+#
+# Naming the roots inverts it: a reference to /home/... or /srv/... in a lane's output is genuinely
+# hard to explain, while a URL, a ratio and a list of horizons are all simply not matched.
+_SUSPICIOUS_ROOTS = (
+    b"/home/",
+    b"/Users/",
+    b"/root/",
+    b"/srv/",
+    b"/opt/",
+    b"/var/",
+    b"/mnt/",
+    b"/etc/",
+)
+_SUSPICIOUS_PATH = re.compile(
+    rb"(?:" + rb"|".join(re.escape(root) for root in _SUSPICIOUS_ROOTS) + rb")[A-Za-z0-9._/-]*"
+)
+# A suspicious root reached through a URL is a citation, not a filesystem read.
+_URL_PREFIX = re.compile(rb"[a-z][a-z0-9+.-]*://[^\s]*$")
 
 
 def audit_workspace(
@@ -209,16 +227,14 @@ def audit_workspace(
         for root in forbidden_roots:
             if root.encode("utf-8") in payload:
                 findings.append(f"{name}: references forbidden root {root}")
-        for match in _ABSOLUTE_PATH.findall(payload):
-            if not _HAS_LETTER.search(match):
-                # An all-numeric run is arithmetic or a list of horizons, not a path.
-                continue
-            candidate = match.decode("utf-8", "replace")
+        for match in _SUSPICIOUS_PATH.finditer(payload):
+            candidate = match.group().decode("utf-8", "replace")
             if candidate.startswith(str(workspace.root)):
                 continue
-            if any(candidate.startswith(root) for root in ("/usr", "/lib", "/bin", "/etc")):
+            # A citation is not a filesystem read: skip a root reached through a URL scheme.
+            if _URL_PREFIX.search(payload[max(0, match.start() - 64) : match.start()]):
                 continue
-            findings.append(f"{name}: absolute path outside the workspace: {candidate}")
+            findings.append(f"{name}: filesystem path outside the workspace: {candidate}")
     return sorted(set(findings))
 
 
