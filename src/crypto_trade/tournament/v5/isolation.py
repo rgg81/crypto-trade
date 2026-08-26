@@ -1,4 +1,4 @@
-"""Permission profiles for the two Top-40 V5 research phases.
+"""Permission policy for the two Top-40 V5 research phases.
 
 V5 gives each lane a networked scouting phase so teams can research the professional literature
 rather than reinvent a mechanism from nothing. That introduces the one combination earlier editions
@@ -9,10 +9,24 @@ The rule that makes it safe is that those two never overlap. The scouting profil
 and no evaluation surface; the offline profile has the evaluation surface and no network. Neither
 can carry anything out.
 
-Concretely, the scouting profile deliberately does **not** mount the team root. The offline profile
-mounts it whole -- which necessarily includes ``feedback/`` -- and a networked process able to read
+Concretely, the scouting profile deliberately does **not** offer the team root. The offline profile
+offers it whole -- which necessarily includes ``feedback/`` -- and a networked process able to read
 lane-local evaluation results is an exfiltration channel regardless of anyone's intent. Scouting
-therefore mounts three named briefing files and a scratch directory, and nothing else.
+therefore gets three named briefing files and a scratch directory, and nothing else.
+
+**This module declares policy; it does not enforce it.** Enforcement is split, because measurement
+on this host showed neither half is sufficient alone:
+
+* :mod:`crypto_trade.tournament.v5.workspace` materialises the readable set into a directory
+  containing nothing else, so a forbidden file is *absent* rather than merely denied.
+* :mod:`crypto_trade.tournament.v5.runtime` renders the forbidden roots into deny rules and probes
+  them live before each launch, because a malformed rule denies nothing and says nothing.
+
+One correction worth stating plainly, since an earlier draft of this module implied otherwise:
+**"no network" is a tool-level property, not a process-level one.** A research phase cannot be put
+in a network namespace, because the agent needs the network to reach its own model API -- wrapping
+it in ``unshare --net`` simply hangs the process. What is withheld is the ability to *search and
+fetch*, which is a permission, not a kernel guarantee.
 
 The invariants below are asserted rather than described. ``assert_profile_invariants`` is called by
 the launcher before every phase, so a profile that drifts into overlapping the wrong surface fails
@@ -239,47 +253,33 @@ def assert_phases_are_separated(scouting: PermissionProfile, offline: Permission
         )
 
 
-def _toml_string(value: str) -> str:
-    return json.dumps(value, ensure_ascii=True)
+def readable_sources(profile: PermissionProfile) -> tuple[str, ...]:
+    """Paths a workspace for this profile may materialise. The materialiser copies these and
+    nothing else, which is what turns the policy into a directory a lane cannot read past."""
+
+    return tuple(path for path in profile.readable() if not path.startswith(":"))
 
 
-def codex_arguments(profile: PermissionProfile) -> list[str]:
-    """Render the profile as Codex ``-c`` overrides.
+def allowed_tools(profile: PermissionProfile) -> tuple[str, ...]:
+    """Tools this profile grants.
 
-    Ordering matters and is not cosmetic: a prior edition lost a whole run because
-    ``--ignore-user-config`` was applied *after* the permission overrides, so the process rebuilt
-    its configuration and entered read-only instead of the named profile. The launcher places the
-    strict-config flags before every override for that reason.
+    Network access is expressed here rather than as a sandbox flag, because that is where it is
+    actually decided: the agent process always has a socket to its own model API, so what separates
+    a research phase from a scouting phase is whether it holds the tools that reach anywhere else.
     """
 
-    entries = ",".join(
-        f"{_toml_string(path)}={_toml_string(mode)}"
-        for path, mode in sorted(profile.filesystem.items())
-    )
-    arguments = [
-        "-c",
-        f"default_permissions={_toml_string(profile.name)}",
-        "-c",
-        f"permissions.{profile.name}.filesystem={{{entries}}}",
-        "-c",
-        f"permissions.{profile.name}.network.enabled="
-        f"{'true' if profile.network_enabled else 'false'}",
-        "-c",
-        'approval_policy="never"',
-        "-c",
-        "allow_login_shell=false",
-        "-c",
-        "project_doc_max_bytes=0",
-        "-c",
-        "project_root_markers=[]",
-    ]
-    for capability in profile.disabled_capabilities:
-        arguments.extend(["--disable", capability])
-    return arguments
+    from crypto_trade.tournament.v5.runtime import RESEARCH_TOOLS, SCOUTING_TOOLS
+
+    return SCOUTING_TOOLS if profile.network_enabled else RESEARCH_TOOLS
 
 
 def expected_probe_keys(profile: PermissionProfile) -> frozenset[str]:
-    """Probes a live profile must pass before a phase may launch."""
+    """Probes a live profile must pass before a phase may launch.
+
+    Both an allowed read and a denied read appear in every set, deliberately. A sandbox that refuses
+    everything is as broken as one that refuses nothing, and a check that only looked for denials
+    would grade the first as healthy while the lane starved inside it.
+    """
 
     common = {
         "allowed_reads",
@@ -304,10 +304,11 @@ __all__ = [
     "SCOUTING_READABLE_FILES",
     "IsolationError",
     "PermissionProfile",
+    "allowed_tools",
     "assert_phases_are_separated",
     "assert_profile_invariants",
-    "codex_arguments",
     "expected_probe_keys",
     "offline_profile",
+    "readable_sources",
     "scouting_profile",
 ]

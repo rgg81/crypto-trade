@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from crypto_trade.tournament.v5 import isolation
+from crypto_trade.tournament.v5 import isolation, runtime
 from crypto_trade.tournament.v5.layout import TOP40_V5_LAYOUT
 
 ROOT = "/srv/tournament"
@@ -194,27 +194,62 @@ def test_a_lane_cannot_reach_a_peer_lane() -> None:
         )
 
 
-# -- rendering ---------------------------------------------------------------------------------
+# -- rendering to the enforcement layers ---------------------------------------------------------
 
 
-def test_codex_arguments_carry_the_network_setting_of_their_profile() -> None:
-    offline = " ".join(isolation.codex_arguments(_offline()))
-    scouting = " ".join(isolation.codex_arguments(_scouting()))
-    assert "network.enabled=false" in offline
-    assert "network.enabled=true" in scouting
+def test_the_network_tools_follow_the_profile_and_not_a_sandbox_flag() -> None:
+    """Network access is a tool grant, because that is where it is genuinely decided.
+
+    The agent process always holds a socket to its own model API -- a research phase cannot be put
+    in a network namespace without hanging it. What separates the phases is therefore whether they
+    are handed the tools that reach anywhere *else*.
+    """
+
+    offline = set(isolation.allowed_tools(_offline()))
+    scouting = set(isolation.allowed_tools(_scouting()))
+
+    assert not offline & set(runtime.NETWORK_TOOLS)
+    assert set(runtime.NETWORK_TOOLS) <= scouting
 
 
-def test_codex_arguments_disable_every_declared_capability() -> None:
-    arguments = isolation.codex_arguments(_offline())
-    disabled = {arguments[index + 1] for index, item in enumerate(arguments) if item == "--disable"}
-    assert disabled == set(_offline().disabled_capabilities)
+def test_no_phase_is_granted_a_general_purpose_shell() -> None:
+    """Bash is an escape from every other restriction in this module."""
+
+    assert "Bash" not in isolation.allowed_tools(_offline())
+    assert "Bash" not in isolation.allowed_tools(_scouting())
 
 
-def test_web_search_is_disabled_offline_and_permitted_while_scouting() -> None:
-    offline = isolation.codex_arguments(_offline())
-    scouting = isolation.codex_arguments(_scouting())
-    assert "standalone_web_search" in offline
-    assert "standalone_web_search" not in scouting
+def test_readable_sources_drop_the_pseudo_mounts_and_keep_real_paths() -> None:
+    """Only real paths can be materialised; ``:minimal`` names a runtime concept, not a path."""
+
+    sources = isolation.readable_sources(_offline())
+
+    assert sources
+    assert not any(path.startswith(":") for path in sources)
+    assert any(TEAM_ROOT in path for path in sources)
+
+
+def test_the_scouting_surface_stays_narrower_than_the_research_surface() -> None:
+    """The asymmetry is the safeguard: the networked phase sees strictly less.
+
+    Asserted on coverage rather than on the path strings. The two profiles describe the same lane at
+    different granularities -- scouting names three individual files, research offers the lane root
+    that contains them -- so a set comparison comes out false while the property it was meant to
+    check is true. The question is whether every scouting path lies *inside* something research can
+    reach, and whether research reaches something scouting cannot.
+    """
+
+    scouting, offline = _scouting(), _offline()
+
+    for path in isolation.readable_sources(scouting):
+        assert any(
+            isolation._covers(mounted, Path(path)) or mounted == path
+            for mounted in offline.filesystem
+        ), f"scouting can read {path}, which the research phase cannot"
+
+    evaluation = Path(f"{ROOT}/{TEAM_ROOT}") / isolation.EVALUATION_SURFACE[0]
+    assert any(isolation._covers(mounted, evaluation) for mounted in offline.filesystem)
+    assert not any(isolation._covers(mounted, evaluation) for mounted in scouting.filesystem)
 
 
 def test_the_profile_hash_changes_when_the_surface_changes() -> None:
