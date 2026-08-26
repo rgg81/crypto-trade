@@ -35,6 +35,32 @@ Return a finite `dict[str, float]`, `None` to hold, or `{}` for a flat book. Sym
 `context.eligible_symbols`. Submitted targets must satisfy `sum(abs(w)) <= 1.0`,
 `abs(sum(w)) <= 0.25` and `abs(w) <= 0.10`.
 
+## What the context actually gives you
+
+`protocol.py` in this kit is the authoritative definition — read it rather than inferring the shape.
+Guessing here is expensive in a way that is easy to miss: a strategy that reads a field or column
+that does not exist raises nothing, produces no book, and holds a flat position for the entire
+window. It looks like a strategy with no edge rather than a strategy that never ran.
+
+`DecisionContext` carries exactly five attributes:
+
+| attribute | type | contents |
+|---|---|---|
+| `decision_time` | `pd.Timestamp` | the decision boundary, UTC |
+| `bars` | `Mapping[str, pd.DataFrame]` | per-symbol history, rows no later than the boundary |
+| `funding` | `pd.DataFrame` | funding rows strictly earlier than the boundary |
+| `auxiliary` | `Mapping[str, pd.DataFrame]` | reserved; empty in this edition |
+| `eligible_symbols` | `Sequence[str]` | point-in-time members with an executable open |
+
+Each frame in `bars` has the columns `open`, `high`, `low`, `close`, `volume`, `quote_volume`,
+`trade_count`, `taker_buy_volume`, `taker_buy_quote_volume`, ordered oldest to newest. The `funding`
+frame has `symbol`, `funding_rate`, `funding_time`, `mark_price` and `settlement_time` — note that
+the rate column is **`funding_rate`**, not the raw Binance `last_funding_rate`.
+
+The executable open at the decision is deliberately not exposed. Symbols vary in history length: a
+recent member may have far fewer rows than an established one, and a symbol that stopped trading is
+absent from `eligible_symbols` rather than present with stale prices.
+
 ## The professional subset
 
 Earlier editions restricted executable source so tightly — no non-empty list literals, at most 24

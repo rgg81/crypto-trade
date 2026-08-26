@@ -183,7 +183,14 @@ def assert_workspace_excludes(workspace: Workspace, forbidden: Sequence[str]) ->
         raise WorkspaceError(f"workspace contains forbidden files: {offending}")
 
 
+# A path-like run of segments, where at least one segment contains a letter.
+#
+# The letter is load-bearing. Without it, a lane rehearsal flagged a genuine RATIONALE.md for
+# "24/72/168/336" -- a strategy's ladder of lookback horizons, read as an absolute path. A false
+# positive here accuses honest work of a leak, which is worse than useless: an audit nobody trusts
+# gets ignored, and then it catches nothing at all.
 _ABSOLUTE_PATH = re.compile(rb"(?:/[A-Za-z0-9._-]+){2,}")
+_HAS_LETTER = re.compile(rb"[A-Za-z]")
 
 
 def audit_workspace(
@@ -203,6 +210,9 @@ def audit_workspace(
             if root.encode("utf-8") in payload:
                 findings.append(f"{name}: references forbidden root {root}")
         for match in _ABSOLUTE_PATH.findall(payload):
+            if not _HAS_LETTER.search(match):
+                # An all-numeric run is arithmetic or a list of horizons, not a path.
+                continue
             candidate = match.decode("utf-8", "replace")
             if candidate.startswith(str(workspace.root)):
                 continue

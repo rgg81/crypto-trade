@@ -129,6 +129,26 @@ def test_the_audit_notices_a_reference_to_a_forbidden_root(tmp_path, sources):
     assert not any(finding.startswith("clean.py") for finding in findings)
 
 
+def test_the_audit_does_not_accuse_a_numeric_sequence_of_being_a_path(tmp_path, sources):
+    """Found by rehearsing a real lane, not by reading the regex.
+
+    An agent wrote its ladder of lookback horizons as "24/72/168/336" in a genuine RATIONALE.md and
+    the audit reported it as an absolute path outside the workspace. A false positive accuses honest
+    work of a leak, and an audit nobody trusts gets ignored -- at which point it catches nothing.
+    """
+
+    space = _materialise(tmp_path, sources)
+    produced = {
+        "RATIONALE.md": b"Lookback ladder: 24/72/168/336 hours. Ratio 3/4/5 across regimes.",
+        "leak.py": b"# copied from /home/roberto/crypto-trade/reports/board.json",
+    }
+
+    findings = workspace.audit_workspace(space, produced, forbidden_roots=[])
+
+    assert not any(finding.startswith("RATIONALE.md") for finding in findings)
+    assert any(finding.startswith("leak.py") for finding in findings)
+
+
 def test_the_evaluator_can_be_confined_to_an_empty_network_namespace(tmp_path, sources):
     """Kernel-enforced, and reserved for the evaluator.
 
