@@ -281,7 +281,15 @@ def main() -> int:
 
     thresholds = thresholds_from(values)
     print("\nmeasuring the bar on development-derived synthetic paths...", flush=True)
-    report = calibration.calibrate(thresholds, stage=SEALED_STAGE)
+    # Sample counts chosen for the precision the decision needs, not for speed. The harness
+    # defaults (30 per level) give a standard error near 9 points on a power estimate, and this
+    # bar is being compared against a 55-point requirement: measured at that default it came out
+    # 53.3% and failed activation, and at 400 per level the same bar measures 65.2%. A gate decided
+    # by an estimator that cannot resolve it is the defect that made V4-R9's own gate unpassable,
+    # in a different costume.
+    report = calibration.calibrate(
+        thresholds, stage=SEALED_STAGE, null_count=1200, per_level=400
+    )
     print(f"  null pass rate        {report.null_pass_rate:.3f}")
     print(f"  degenerate pass rate  {report.degenerate_pass_rate:.3f}")
     for level, power in sorted(report.power_by_sharpe.items()):
