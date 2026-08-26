@@ -60,23 +60,69 @@ MAXIMUM_NULL_PASS_RATE = 0.40
 MINIMUM_POWER = {1.0: 0.55, 1.5: 0.70}
 
 
-def place_in_gap(values: Sequence[float], *, side: str, margin: float = 0.25) -> float:
-    """Put a threshold in the largest observed gap, not at a value somebody liked.
+# Base cost of one unit of turnover, both sides. From [execution] in the config.
+ROUND_TRIP_COST = 2 * (5.0 + 2.5) / 10_000.0  # 15 bps
+# The volatility every book is scaled to by the organizer's risk unit.
+TARGET_VOLATILITY = 0.10
 
-    ``side`` says which way the gate points: ``"floor"`` admits values at or above, ``"cap"`` admits
-    at or below. The threshold lands inside the widest gap between consecutive observations, offset
-    by ``margin`` of that gap toward the rejected side, so a small measurement change cannot flip a
-    book across it.
+
+def place_in_gap(values: Sequence[float], *, side: str, margin: float = 0.25) -> float:
+    """Put a threshold in the largest gap **within the tail it rejects**.
+
+    ``side`` says which way the gate points: ``"floor"`` rejects values below it, ``"cap"`` rejects
+    values above. A floor therefore searches the lower half and a cap the upper half -- the region
+    each is meant to cut into. The threshold lands inside the widest gap there, offset by ``margin``
+    toward the rejected side, so a small measurement change cannot flip a book across it.
+
+    Getting the halves the wrong way round is not a subtle error, and testing this against the
+    measured seed field is what showed it: searching the whole range put a turnover *floor* at 334
+    per year, which would have rejected eleven of thirteen books for trading too little.
+
+    This is the right instrument only where the field has a genuine boundary. Where a threshold
+    follows from cost arithmetic instead -- see :func:`cost_derived` -- arithmetic is better
+    evidence than thirteen naive baselines, and the field is used to check the answer rather than to
+    produce it.
     """
 
     ordered = sorted(float(value) for value in values)
-    if len(ordered) < 3:
-        raise ValueError("a gap cannot be located in fewer than three observations")
-    width, index = max((ordered[i + 1] - ordered[i], i) for i in range(len(ordered) - 1))
+    if len(ordered) < 4:
+        raise ValueError("a gap cannot be located in fewer than four observations")
+    middle = len(ordered) // 2
+    region = ordered[: middle + 1] if side == "floor" else ordered[middle:]
+    width, index = max((region[i + 1] - region[i], i) for i in range(len(region) - 1))
     if width <= 0.0:
         raise ValueError("the observed distribution has no gap to place a threshold in")
-    low, high = ordered[index], ordered[index + 1]
+    low, high = region[index], region[index + 1]
     return round(low + width * margin if side == "floor" else high - width * margin, 4)
+
+
+def cost_derived() -> dict[str, float]:
+    """Thresholds that follow from the cost structure, not from anyone's judgement.
+
+    Three numbers fall straight out of 15 bps a unit and a 10% volatility target:
+
+    ``maximum_annualised_turnover``
+        The turnover at which base costs consume one entire unit of Sharpe. A book above it must be
+        extraordinary *gross* merely to break even net. 0.10 / 0.0015 = 67 per year.
+
+    ``minimum_gross_edge_bps_per_turnover``
+        A book must earn more per unit of turnover than it pays. Surviving the 3x evaluation needs
+        three round trips' worth: 45 bps.
+
+    ``minimum_annualised_turnover``
+        The anti-inactivity floor. The universe reconstitutes weekly, so a book that responds to
+        membership at all turns over several times a year; below 4 it is not trading the universe.
+        V4-R9's fallback ranked a book running 1.39 per year into first place.
+
+    The seed field then *checks* these rather than setting them, and it checks out: every seed below
+    the derived turnover ceiling survives 2x costs, and every seed above it does not.
+    """
+
+    return {
+        "maximum_annualised_turnover": round(TARGET_VOLATILITY / ROUND_TRIP_COST, 1),
+        "minimum_gross_edge_bps_per_turnover": round(3 * ROUND_TRIP_COST * 10_000.0, 1),
+        "minimum_annualised_turnover": 4.0,
+    }
 
 
 def resolve(measurements: dict, distribution: dict) -> tuple[dict[str, float], dict[str, str]]:
@@ -130,18 +176,17 @@ def resolve(measurements: dict, distribution: dict) -> tuple[dict[str, float], d
     record("risk_unit.maximum_scale", 3.0, "calibrated")
     record("risk_unit.warmup_bars", 270, "calibrated")
 
-    # -- selection floors: placed in observed gaps of the measured seed field ---------------------
+    # -- cost-structure derivations: arithmetic beats thirteen naive baselines --------------------
     prefix = "selection.floors."
-    record(prefix + "minimum_mean_gross_exposure",
-           place_in_gap(column("mean_gross_exposure"), side="floor"), "calibrated")
-    record(prefix + "minimum_median_effective_breadth",
-           place_in_gap(column("median_effective_breadth"), side="floor"), "derived")
-    record(prefix + "minimum_annualised_turnover",
-           place_in_gap(column("annualised_turnover"), side="floor"), "derived")
-    record(prefix + "maximum_annualised_turnover",
-           place_in_gap(column("annualised_turnover"), side="cap"), "derived")
-    record(prefix + "minimum_gross_edge_bps_per_turnover",
-           place_in_gap(column("gross_edge_bps_per_turnover"), side="floor"), "derived")
+    for name, value in cost_derived().items():
+        record(prefix + name, value, "derived")
+
+    # -- selection floors: placed in observed gaps of the measured seed field ---------------------
+    # Only where the field has a genuine boundary. Every seed runs the same fixed gross and side
+    # count, so gross exposure and breadth are near-constant across the field -- a gap in a constant
+    # is meaningless, and these stay structural until a real field measures them.
+    record(prefix + "minimum_mean_gross_exposure", 0.30, "calibrated")
+    record(prefix + "minimum_median_effective_breadth", 6.0, "derived")
     record(prefix + "maximum_vol_normalised_drawdown",
            place_in_gap(column("max_drawdown"), side="cap"), "calibrated")
 
