@@ -50,6 +50,11 @@ class EvaluatorConfig:
     # times equity -- the mechanism that destroyed 48% of V4-R9's research trials. Defaulting this
     # on means the hazard has to be opted into, not remembered.
     require_traded_bar_to_fill: bool = True
+    # A destroyed book is the strongest risk signal a candidate can produce, and V4-R9 threw all
+    # of it away: 86 of 180 research trials died on one bar and were recorded as infrastructure
+    # failures rather than as results. Scoring ruin keeps the evidence and lets the gates reject
+    # the candidate on its merits.
+    score_ruin_instead_of_raising: bool = True
 
     def validate(self) -> None:
         if self.interval_hours < 1 or self.initial_equity <= 0:
@@ -66,11 +71,79 @@ class EvaluatorConfig:
             raise ValueError("max_bar_participation must be in (0, 1]")
 
 
+# Every field a completed bar contributes to ``returns``. A ruined bar has to publish the same
+# schema or the frame becomes ragged; ``test_ruin_row_matches_the_normal_row_schema`` pins this
+# against drift so a new field cannot silently go missing from the ruin path.
+RETURN_ROW_FIELDS: tuple[str, ...] = (
+    "timestamp",
+    "price_pnl",
+    "long_price_pnl",
+    "short_price_pnl",
+    "funding_pnl",
+    "long_funding_pnl",
+    "short_funding_pnl",
+    "forced_exit_boundary_funding_pnl",
+    "fees",
+    "slippage",
+    "net_return",
+    "turnover",
+    "gross_exposure",
+    "net_exposure",
+    "long_exposure",
+    "short_exposure",
+    "requested_notional",
+    "unfilled_notional",
+    "forced_exit_requested_notional",
+    "forced_exit_unfilled_notional",
+    "forced_exit_turnover",
+    "conservative_settlement_notional",
+    "conservative_settlement_loss",
+    "terminal_unresolved_notional",
+    "risk_reduction_turnover",
+    "risk_cap_breach",
+    "risk_cap_required_scale",
+    "equity",
+)
+
+
+def _ruin_event(fill_time: pd.Timestamp, phase: str) -> dict[str, object]:
+    return {
+        "timestamp": fill_time,
+        "symbol": "",
+        "event_type": "ruin",
+        "phase": phase,
+        "quantity": 0.0,
+        "price": 0.0,
+        "notional": 0.0,
+        "funding_rate": 0.0,
+        "cashflow": 0.0,
+        "fee": 0.0,
+        "slippage": 0.0,
+    }
+
+
+def _ruin_row(fill_time: pd.Timestamp) -> dict[str, object]:
+    """The final bar of a ruined book: everything lost, nothing carried forward."""
+
+    row: dict[str, object] = dict.fromkeys(RETURN_ROW_FIELDS, 0.0)
+    row["timestamp"] = fill_time
+    row["net_return"] = -1.0
+    row["price_pnl"] = -1.0
+    row["risk_cap_breach"] = False
+    row["risk_cap_required_scale"] = 1.0
+    row["equity"] = 0.0
+    return row
+
+
 @dataclasses.dataclass(frozen=True)
 class EvaluationResult:
     returns: pd.DataFrame
     positions: pd.DataFrame
     events: pd.DataFrame
+    # Set when the book was wiped out. A ruined run is a measurement, not a crash: the return
+    # series ends with a -100% bar so every downstream statistic sees the loss, rather than a
+    # truncated series whose Sharpe looks untroubled.
+    ruined_at: pd.Timestamp | None = None
 
 
 def generate_targets(
@@ -250,6 +323,7 @@ def evaluate_targets(
     if len(evaluation_times) < 2:
         raise ValueError("at least two base bars within the target span are required")
 
+    ruined_at: pd.Timestamp | None = None
     quantities = pd.Series(0.0, index=symbols)
     policy_reference_weights = pd.Series(0.0, index=symbols)
     entry_prices = pd.Series(np.nan, index=symbols, dtype=float)
@@ -302,6 +376,11 @@ def evaluate_targets(
         )
         equity_after_boundary_funding = equity + funding_at_fill_usd
         if equity_after_boundary_funding <= 0:
+            if cfg.score_ruin_instead_of_raising:
+                ruined_at = fill_time
+                event_rows.append(_ruin_event(fill_time, "after_boundary_funding"))
+                return_rows.append(_ruin_row(fill_time))
+                break
             raise ValueError(f"portfolio insolvent after funding at {fill_time}")
 
         # Intersect the weekly universe with the actually executable cross-section. This mirrors
@@ -522,6 +601,11 @@ def evaluate_targets(
             executed_notional * execution_cost_rate
         )
         if equity_after_strategy_costs <= 0:
+            if cfg.score_ruin_instead_of_raising:
+                ruined_at = fill_time
+                event_rows.append(_ruin_event(fill_time, "after_execution_costs"))
+                return_rows.append(_ruin_row(fill_time))
+                break
             raise ValueError(f"portfolio insolvent after execution costs at {fill_time}")
         risk_scale = _cost_aware_risk_reduction_scale(
             quantities,
@@ -830,12 +914,22 @@ def evaluate_targets(
         net_return = net_change_usd / equity_at_start
         equity = equity_at_start + net_change_usd
         if equity <= 0:
+            if cfg.score_ruin_instead_of_raising:
+                ruined_at = fill_time
+                event_rows.append(_ruin_event(fill_time, "after_settlement"))
+                return_rows.append(_ruin_row(fill_time))
+                break
             raise ValueError(f"portfolio insolvent at {fill_time}")
 
         equity_after_execution_costs = (
             equity_after_boundary_funding - entry_fee_usd - entry_slippage_usd
         )
         if equity_after_execution_costs <= 0:
+            if cfg.score_ruin_instead_of_raising:
+                ruined_at = fill_time
+                event_rows.append(_ruin_event(fill_time, "after_held_weights"))
+                return_rows.append(_ruin_row(fill_time))
+                break
             raise ValueError(f"portfolio insolvent after execution costs at {fill_time}")
         held_weights = quantities.mul(current_mark).div(equity_after_execution_costs)
         risk_breach_scale = _risk_reduction_scale(held_weights, cfg)
@@ -895,7 +989,9 @@ def evaluate_targets(
     returns = pd.DataFrame(return_rows).set_index("timestamp")
     positions = pd.DataFrame(position_rows).fillna(0.0)
     events = pd.DataFrame(event_rows)
-    return EvaluationResult(returns=returns, positions=positions, events=events)
+    return EvaluationResult(
+        returns=returns, positions=positions, events=events, ruined_at=ruined_at
+    )
 
 
 def evaluate_base_and_double_cost(
