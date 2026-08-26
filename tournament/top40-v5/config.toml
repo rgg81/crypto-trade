@@ -1,0 +1,211 @@
+schema_version = 1
+name = "quant-portfolio-blind-top40-v5"
+policy_status = "pre-activation"
+charter_path = "TOURNAMENT-CHARTER-TOP40-V5.md"
+teams = [
+  "team-01", "team-02", "team-03", "team-04", "team-05",
+  "team-06", "team-07", "team-08", "team-09", "team-10",
+  "team-11", "team-12", "team-13", "team-14", "team-15",
+]
+
+[paths]
+tournament_root = "tournament/top40-v5"
+reports_root = "reports-top40-v5"
+team_root = "tournament/top40-v5/teams"
+research_journal = "tournament/top40-v5/research-journal.jsonl"
+nomination_registry = "tournament/top40-v5/nomination-registry.json"
+selection_freeze = "tournament/top40-v5/selection-freeze.json"
+activation_freeze = "tournament/top40-v5/activation-freeze.json"
+calibration_report = "tournament/top40-v5/calibration-report.json"
+snapshot_preflight = "tournament/top40-v5/snapshot-preflight.json"
+source_archive_root = "reports-top40-v5/source-archives/sha256"
+visible_reports_root = "reports-top40-v5/is"
+sealed_private_root = "tournament/top40-v5/private/sealed"
+scouting_private_root = "tournament/top40-v5/private/scouting"
+historical_private_root = "tournament/top40-v5/private/historical"
+historical_release_root = "reports-top40-v5/historical"
+
+[data]
+source = "binance-public-usdm"
+venue = "binance-usdm"
+instrument = "linear-usdt-perpetual"
+transaction_interval = "8h"
+snapshot_dir = "data/top40/snapshot-v3"
+manifest_path = "tournament/top40-v5/data-manifest.json"
+
+[splits]
+warmup_start = "2020-01-01T00:00:00Z"
+development_start = "2020-08-02T00:00:00Z"
+development_end_exclusive = "2024-02-01T00:00:00Z"
+historical_start = "2024-02-01T00:00:00Z"
+historical_end_exclusive = "2026-08-01T00:00:00Z"
+operational_embargo_start = "2026-08-01T00:00:00Z"
+forward_paper_start = "2026-09-01T00:00:00Z"
+historical_evidence_label = "candidate-relative-organizer-contaminated"
+historical_visible_to_teams = false
+
+[sealed]
+block_days = 45
+stride = 7
+residues = [1, 4]
+interleaved_count = 7
+terminal_block = true
+purge_days = 5
+embargo_days = 10
+
+[universe]
+rule = "seasoned-top-n"
+size = 40
+reconstitution = "weekly-monday-00:00-utc"
+trailing_days = 90
+minimum_history_days = 90
+persistence_rank = 60
+persistence_window_weeks = 10
+persistence_minimum_weeks = 8
+minimum_completeness = 0.95
+missing_slot_policy = "cash-no-backfill"
+require_traded_bars = true
+
+[execution]
+initial_equity_usdt = 100000.0
+taker_fee_bps_per_side = 5.0
+slippage_bps_per_side = 2.5
+max_gross_exposure = 1.0
+max_abs_net_exposure = 0.25
+max_symbol_exposure = 0.10
+max_bar_participation = 0.001
+double_cost_multiplier = 2.0
+triple_cost_multiplier = 3.0
+annualization_days = 365
+fill_timing = "next-executable-open"
+funding_at_rebalance_order = "funding-on-carried-position-then-rebalance"
+require_traded_bar_to_fill = true
+score_ruin_instead_of_raising = true
+
+[risk_unit]
+enabled = true
+annualized_target = 0.10
+halflife_bars = 90
+window_bars = 270
+shrinkage = 0.10
+minimum_scale = 0.10
+maximum_scale = 8.0
+warmup_bars = 90
+
+[research]
+maximum_accepted_trials_per_team = 12
+minimum_accepted_trials_before_decision = 8
+evaluator_fault_consumes_trial = false
+journal_before_market_access = true
+
+[selection]
+mode = "bar-not-rank-cut"
+fallback_promotion_allowed = false
+empty_field_is_valid = false
+desk_individual_count = 3
+ensemble_weighting = "equal"
+
+[selection.floors]
+minimum_mean_gross_exposure = 0.30
+minimum_median_effective_breadth = 6.0
+minimum_breadth_pass_fraction = 0.80
+minimum_active_bar_fraction = 0.80
+minimum_side_exposure_share = 0.20
+minimum_realized_annual_volatility = 0.06
+maximum_realized_annual_volatility = 0.15
+maximum_risk_unit_capped_fraction = 0.50
+minimum_annualised_turnover = 4.0
+maximum_annualised_turnover = 90.0
+minimum_gross_edge_bps_per_turnover = 20.0
+maximum_cost_share_of_positive_gross = 0.50
+minimum_positive_fold_fraction = 0.60
+minimum_deflated_sharpe_probability = 0.60
+maximum_vol_normalised_drawdown = 0.25
+maximum_top_symbol_gross_pnl_share = 0.40
+minimum_deletion_profile_p05_sharpe = 0.0
+minimum_accepted_trials = 8
+volatility_reference = 0.10
+
+[statistics]
+bootstrap_samples = 20000
+bootstrap_expected_block_days = 10
+bootstrap_seed = 20260826
+field_false_discovery_rate = 0.10
+deletion_block_days = 30
+deletion_percentile = 5.0
+
+[calibration]
+maximum_null_pass_rate = 0.45
+maximum_degenerate_pass_rate = 0.0
+minimum_power_at_sharpe_two = 0.60
+null_population_count = 100
+good_population_per_level = 40
+
+# Every number in a justified section carries exactly one tag. There is deliberately no
+# "judgement" tag: a number nobody can justify from one of these four sources does not activate.
+#
+# The calibrated tags below are placeholders pending the committed calibration run; activation
+# refuses a placeholder artifact id, so this file cannot be activated as it stands.
+[provenance]
+"sealed.block_days" = "derived:placeholder"
+"sealed.stride" = "structural"
+"sealed.residues[0]" = "structural"
+"sealed.residues[1]" = "structural"
+"sealed.interleaved_count" = "derived:placeholder"
+"sealed.purge_days" = "derived:placeholder"
+"sealed.embargo_days" = "derived:placeholder"
+
+"universe.size" = "inherited:top40-v4-r2"
+"universe.trailing_days" = "derived:placeholder"
+"universe.minimum_history_days" = "derived:placeholder"
+"universe.persistence_rank" = "derived:placeholder"
+"universe.persistence_window_weeks" = "derived:placeholder"
+"universe.persistence_minimum_weeks" = "derived:placeholder"
+"universe.minimum_completeness" = "derived:placeholder"
+
+"execution.initial_equity_usdt" = "inherited:top40-v4-r2"
+"execution.taker_fee_bps_per_side" = "structural"
+"execution.slippage_bps_per_side" = "inherited:top40-v4-r2"
+"execution.max_gross_exposure" = "inherited:top40-v4-r2"
+"execution.max_abs_net_exposure" = "inherited:top40-v4-r2"
+"execution.max_symbol_exposure" = "inherited:top40-v4-r2"
+"execution.max_bar_participation" = "inherited:top40-v4-r2"
+"execution.double_cost_multiplier" = "structural"
+"execution.triple_cost_multiplier" = "structural"
+"execution.annualization_days" = "structural"
+
+"risk_unit.annualized_target" = "inherited:cup50-v2"
+"risk_unit.halflife_bars" = "calibrated:placeholder"
+"risk_unit.window_bars" = "calibrated:placeholder"
+"risk_unit.shrinkage" = "calibrated:placeholder"
+"risk_unit.minimum_scale" = "calibrated:placeholder"
+"risk_unit.maximum_scale" = "calibrated:placeholder"
+"risk_unit.warmup_bars" = "calibrated:placeholder"
+
+"selection.desk_individual_count" = "structural"
+"selection.floors.minimum_mean_gross_exposure" = "calibrated:placeholder"
+"selection.floors.minimum_median_effective_breadth" = "derived:placeholder"
+"selection.floors.minimum_breadth_pass_fraction" = "calibrated:placeholder"
+"selection.floors.minimum_active_bar_fraction" = "calibrated:placeholder"
+"selection.floors.minimum_side_exposure_share" = "calibrated:placeholder"
+"selection.floors.minimum_realized_annual_volatility" = "calibrated:placeholder"
+"selection.floors.maximum_realized_annual_volatility" = "calibrated:placeholder"
+"selection.floors.maximum_risk_unit_capped_fraction" = "calibrated:placeholder"
+"selection.floors.minimum_annualised_turnover" = "derived:placeholder"
+"selection.floors.maximum_annualised_turnover" = "derived:placeholder"
+"selection.floors.minimum_gross_edge_bps_per_turnover" = "derived:placeholder"
+"selection.floors.maximum_cost_share_of_positive_gross" = "inherited:top40-v3-extension"
+"selection.floors.minimum_positive_fold_fraction" = "calibrated:placeholder"
+"selection.floors.minimum_deflated_sharpe_probability" = "calibrated:placeholder"
+"selection.floors.maximum_vol_normalised_drawdown" = "calibrated:placeholder"
+"selection.floors.maximum_top_symbol_gross_pnl_share" = "calibrated:placeholder"
+"selection.floors.minimum_deletion_profile_p05_sharpe" = "structural"
+"selection.floors.minimum_accepted_trials" = "inherited:top40-v4-r2"
+"selection.floors.volatility_reference" = "inherited:cup50-v2"
+
+"statistics.bootstrap_samples" = "derived:placeholder"
+"statistics.bootstrap_expected_block_days" = "inherited:top40-v4-r2"
+"statistics.bootstrap_seed" = "structural"
+"statistics.field_false_discovery_rate" = "calibrated:placeholder"
+"statistics.deletion_block_days" = "derived:placeholder"
+"statistics.deletion_percentile" = "calibrated:placeholder"
