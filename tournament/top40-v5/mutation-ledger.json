@@ -1,0 +1,281 @@
+{
+  "entries": [
+    {
+      "broken_field": [
+        "long_exposure_share",
+        "short_exposure_share"
+      ],
+      "category": "degeneracy",
+      "flipped": [
+        "both_sides_used"
+      ],
+      "gate": "both_sides_used",
+      "isolated": true,
+      "reads_its_field": true,
+      "verdict": "ok"
+    },
+    {
+      "broken_field": [
+        "breadth_pass_fraction"
+      ],
+      "category": "degeneracy",
+      "flipped": [
+        "breadth_persistence"
+      ],
+      "gate": "breadth_persistence",
+      "isolated": true,
+      "reads_its_field": true,
+      "verdict": "ok"
+    },
+    {
+      "broken_field": [
+        "invariance_suite_passed"
+      ],
+      "category": "degeneracy",
+      "flipped": [
+        "causal_invariance"
+      ],
+      "gate": "causal_invariance",
+      "isolated": true,
+      "reads_its_field": true,
+      "verdict": "ok"
+    },
+    {
+      "broken_field": [
+        "cost_share_of_positive_gross"
+      ],
+      "category": "cost",
+      "flipped": [
+        "cost_share"
+      ],
+      "gate": "cost_share",
+      "isolated": true,
+      "reads_its_field": true,
+      "verdict": "ok"
+    },
+    {
+      "broken_field": [
+        "deflated_sharpe_probability"
+      ],
+      "category": "performance",
+      "flipped": [
+        "deflated_sharpe"
+      ],
+      "gate": "deflated_sharpe",
+      "isolated": true,
+      "reads_its_field": true,
+      "verdict": "ok"
+    },
+    {
+      "broken_field": [
+        "deletion_profile_p05_sharpe"
+      ],
+      "category": "performance",
+      "flipped": [
+        "deletion_robustness"
+      ],
+      "gate": "deletion_robustness",
+      "isolated": true,
+      "reads_its_field": true,
+      "verdict": "ok"
+    },
+    {
+      "broken_field": [
+        "median_effective_breadth"
+      ],
+      "category": "degeneracy",
+      "flipped": [
+        "effective_breadth"
+      ],
+      "gate": "effective_breadth",
+      "isolated": true,
+      "reads_its_field": true,
+      "verdict": "ok"
+    },
+    {
+      "broken_field": [
+        "positive_fold_fraction"
+      ],
+      "category": "performance",
+      "flipped": [
+        "fold_breadth"
+      ],
+      "gate": "fold_breadth",
+      "isolated": true,
+      "reads_its_field": true,
+      "verdict": "ok"
+    },
+    {
+      "broken_field": [
+        "gross_edge_bps_per_turnover"
+      ],
+      "category": "cost",
+      "flipped": [
+        "gross_edge_density"
+      ],
+      "gate": "gross_edge_density",
+      "isolated": true,
+      "reads_its_field": true,
+      "verdict": "ok"
+    },
+    {
+      "broken_field": [
+        "mean_gross_exposure"
+      ],
+      "category": "degeneracy",
+      "flipped": [
+        "mean_gross_exposure"
+      ],
+      "gate": "mean_gross_exposure",
+      "isolated": true,
+      "reads_its_field": true,
+      "verdict": "ok"
+    },
+    {
+      "broken_field": [
+        "ruined"
+      ],
+      "category": "degeneracy",
+      "flipped": [
+        "not_ruined"
+      ],
+      "gate": "not_ruined",
+      "isolated": true,
+      "reads_its_field": true,
+      "verdict": "ok"
+    },
+    {
+      "broken_field": [
+        "active_bar_fraction"
+      ],
+      "category": "degeneracy",
+      "flipped": [
+        "participation"
+      ],
+      "gate": "participation",
+      "isolated": true,
+      "reads_its_field": true,
+      "verdict": "ok"
+    },
+    {
+      "broken_field": [
+        "accepted_trials"
+      ],
+      "category": "degeneracy",
+      "flipped": [
+        "research_budget"
+      ],
+      "gate": "research_budget",
+      "isolated": true,
+      "reads_its_field": true,
+      "verdict": "ok"
+    },
+    {
+      "broken_field": [
+        "realized_annual_volatility"
+      ],
+      "category": "degeneracy",
+      "flipped": [
+        "risk_unit_attained"
+      ],
+      "gate": "risk_unit_attained",
+      "isolated": true,
+      "reads_its_field": true,
+      "verdict": "ok"
+    },
+    {
+      "broken_field": [
+        "risk_unit_capped_fraction"
+      ],
+      "category": "degeneracy",
+      "flipped": [
+        "risk_unit_not_permanently_capped"
+      ],
+      "gate": "risk_unit_not_permanently_capped",
+      "isolated": true,
+      "reads_its_field": true,
+      "verdict": "ok"
+    },
+    {
+      "broken_field": [
+        "source_review_passed"
+      ],
+      "category": "degeneracy",
+      "flipped": [
+        "source_review"
+      ],
+      "gate": "source_review",
+      "isolated": true,
+      "reads_its_field": true,
+      "verdict": "ok"
+    },
+    {
+      "broken_field": [
+        "triple_cost_annualised_return"
+      ],
+      "category": "cost",
+      "flipped": [
+        "survives_triple_cost"
+      ],
+      "gate": "survives_triple_cost",
+      "isolated": true,
+      "reads_its_field": true,
+      "verdict": "ok"
+    },
+    {
+      "broken_field": [
+        "top_symbol_gross_pnl_share"
+      ],
+      "category": "performance",
+      "flipped": [
+        "symbol_concentration"
+      ],
+      "gate": "symbol_concentration",
+      "isolated": true,
+      "reads_its_field": true,
+      "verdict": "ok"
+    },
+    {
+      "broken_field": [
+        "annualised_turnover"
+      ],
+      "category": "cost",
+      "flipped": [
+        "turnover_ceiling"
+      ],
+      "gate": "turnover_ceiling",
+      "isolated": true,
+      "reads_its_field": true,
+      "verdict": "ok"
+    },
+    {
+      "broken_field": [
+        "annualised_turnover"
+      ],
+      "category": "degeneracy",
+      "flipped": [
+        "turnover_floor"
+      ],
+      "gate": "turnover_floor",
+      "isolated": true,
+      "reads_its_field": true,
+      "verdict": "ok"
+    },
+    {
+      "broken_field": [
+        "max_drawdown"
+      ],
+      "category": "performance",
+      "flipped": [
+        "vol_normalised_drawdown"
+      ],
+      "gate": "vol_normalised_drawdown",
+      "isolated": true,
+      "reads_its_field": true,
+      "verdict": "ok"
+    }
+  ],
+  "gate_count": 21,
+  "problems": 0,
+  "schema_version": "top40-v5-mutation-ledger-v1"
+}
