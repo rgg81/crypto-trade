@@ -21,7 +21,13 @@ def _bars(
 ) -> pd.DataFrame:
     dropped = set(drop)
     rows = [
-        {"open_time": stamp, "symbol": symbol, "open": 100.0}
+        {
+            "open_time": stamp,
+            "symbol": symbol,
+            "open": 100.0,
+            "close": 100.0,
+            "quote_volume": 1_000.0,
+        }
         for stamp in _grid()
         for symbol in symbols
         if (symbol, stamp) not in dropped
@@ -234,3 +240,112 @@ def test_report_json_is_serialisable_and_carries_no_prices() -> None:
     assert payload["ok"] is False
     text = repr(payload)
     assert "100.0" not in text, "preflight output must not leak price levels"
+
+
+def test_a_placeholder_bar_for_an_eligible_symbol_is_reported() -> None:
+    """Binance publishes a bar for a dormant contract with prices carried forward and no volume.
+
+    ICPUSDT held membership for six weeks in mid-2022 on the strength of such bars.
+    """
+
+    boundary = _grid()[9]
+    bars = _bars()
+    dormant = bars["symbol"].eq("AAAUSDT") & bars["open_time"].eq(boundary)
+    bars.loc[dormant, "quote_volume"] = 0.0
+    report = _check(bars=bars)
+    finding = next(
+        item for item in report.findings if item.kind == "placeholder_bar_for_eligible_symbol"
+    )
+    assert finding.boundary == boundary.isoformat()
+    assert finding.symbols == ("AAAUSDT",)
+
+
+def test_close_and_mark_disagreeing_by_orders_of_magnitude_is_reported() -> None:
+    """On a frozen bar the close stops moving while the index-based mark does not.
+
+    LUNA reached 25x at its delisting and SXP 989x. An evaluator that sizes quantity on the mark
+    and settles the residual at the close converts that gap into a loss many times equity, which
+    is what destroyed 48% of V4-R9's research trials.
+    """
+
+    boundary = _grid()[11]
+    marks = _marks()
+    stale = marks["symbol"].eq("BBBUSDT") & marks["mark_time"].eq(boundary)
+    marks.loc[stale, "mark_price"] = 100.0 / 25.0
+    report = _check(marks=marks)
+    finding = next(item for item in report.findings if item.kind == "mark_close_divergence")
+    assert finding.boundary == boundary.isoformat()
+    assert finding.symbols == ("BBBUSDT",)
+
+
+def test_a_mark_within_the_tolerance_is_not_reported() -> None:
+    """The check must not fire on ordinary mark-versus-last basis, only on incompatible claims."""
+
+    marks = _marks()
+    nudged = marks["symbol"].eq("BBBUSDT")
+    marks.loc[nudged, "mark_price"] = 100.0 * 1.5
+    report = _check(marks=marks)
+    assert "mark_close_divergence" not in report.counts_by_kind()
+
+
+def test_bars_missing_preflight_columns_are_rejected() -> None:
+    thin = _bars().drop(columns=["quote_volume"])
+    with pytest.raises(preflight.SnapshotPreflightError, match="missing columns"):
+        _check(bars=thin)
+
+
+def test_advisory_findings_do_not_block_the_grid() -> None:
+    """A dormant contract is a hazard the evaluator must handle, not a reason it cannot start.
+
+    Weekly reconstitution cannot foresee a contract going quiet mid-week, so placeholder bars are
+    irreducible at the universe level. Reporting them as blocking would only invite the threshold
+    to be relaxed until it stopped meaning anything.
+    """
+
+    boundary = _grid()[9]
+    bars = _bars()
+    bars.loc[bars["symbol"].eq("AAAUSDT") & bars["open_time"].eq(boundary), "quote_volume"] = 0.0
+    report = _check(bars=bars)
+    assert report.advisory
+    assert not report.blocking
+    assert report.ok, "an advisory hazard must not fail the grid"
+
+
+def test_blocking_findings_fail_the_grid() -> None:
+    report = _check(marks=_marks(drop=[("AAAUSDT", _grid()[9])]))
+    assert report.blocking
+    assert not report.ok
+
+
+def test_severities_are_disjoint_and_cover_every_emitted_kind() -> None:
+    """A kind with no severity would be silently neither blocking nor advisory."""
+
+    assert not (preflight.BLOCKING_KINDS & preflight.ADVISORY_KINDS)
+    emitted = set()
+    for report in (
+        _check(marks=_marks(drop=[("AAAUSDT", _grid()[9])])),
+        _check(funding=_funding(skip=["BBBUSDT"])),
+        _check(funding=pd.DataFrame(columns=["settlement_time", "symbol", "funding_rate"])),
+    ):
+        emitted |= {finding.kind for finding in report.findings}
+    bars = _bars()
+    bars.loc[bars["symbol"].eq("AAAUSDT"), "quote_volume"] = 0.0
+    emitted |= {finding.kind for finding in _check(bars=bars).findings}
+    marks = _marks()
+    marks.loc[marks["symbol"].eq("BBBUSDT"), "mark_price"] = 4.0
+    emitted |= {finding.kind for finding in _check(marks=marks).findings}
+    gaps = [("BTCUSDT", stamp) for stamp in _grid()[3:6]]
+    emitted |= {
+        finding.kind for finding in _check(bars=_bars(drop=gaps), marks=_marks(drop=gaps)).findings
+    }
+    unclassified = emitted - preflight.BLOCKING_KINDS - preflight.ADVISORY_KINDS
+    assert unclassified == set(), f"finding kinds with no declared severity: {unclassified}"
+
+
+def test_report_json_separates_the_two_severities() -> None:
+    bars = _bars()
+    bars.loc[bars["symbol"].eq("AAAUSDT"), "quote_volume"] = 0.0
+    payload = preflight.report_to_json(_check(bars=bars))
+    assert payload["ok"] is True
+    assert payload["blocking_findings"] == 0
+    assert payload["advisory_findings"] > 0

@@ -277,3 +277,58 @@ def test_invalid_settings_are_rejected(overrides: dict[str, object], match: str)
     listings = {"AAAUSDT": (FIRST_MONDAY - pd.Timedelta(days=60), 500.0)}
     with pytest.raises(universe.SeasonedUniverseError, match=match):
         _run(listings, _weeks(3), **overrides)
+
+
+# -- placeholder bars ------------------------------------------------------------------------
+
+
+def test_traded_bars_only_drops_zero_volume_rows() -> None:
+    frame = pd.DataFrame(
+        {
+            "open_time": pd.date_range("2021-01-01", periods=4, freq="8h", tz="UTC"),
+            "symbol": ["AAAUSDT"] * 4,
+            "quote_volume": [10.0, 0.0, 5.0, 0.0],
+        }
+    )
+    kept = universe.traded_bars_only(frame)
+    assert list(kept["quote_volume"]) == [10.0, 5.0]
+
+
+def test_traded_bars_only_requires_quote_volume() -> None:
+    frame = pd.DataFrame({"open_time": [], "symbol": []})
+    with pytest.raises(universe.SeasonedUniverseError, match="quote_volume"):
+        universe.traded_bars_only(frame)
+
+
+def test_a_dormant_contract_loses_membership_to_a_live_one() -> None:
+    """Binance publishes a placeholder bar for a dormant contract: prices carry forward and
+    volume is zero. Counting those as observations let ICPUSDT hold real membership for six
+    weeks in mid-2022 while it was not trading at all."""
+
+    listed = FIRST_MONDAY - pd.Timedelta(days=60)
+    weeks = _weeks(5)
+    through = weeks[-1] - pd.Timedelta(days=1)
+    listings = {
+        "AAAUSDT": (listed, 900.0),
+        "BBBUSDT": (listed, 800.0),
+        "DORMUSDT": (listed, 950.0),
+        "LIVEUSDT": (listed, 700.0),
+    }
+    bars = _bars(listings, through=through)
+    # DORMUSDT goes quiet for a minority of the ranking window while still publishing bars.
+    # A minority matters: the ranking statistic is a median, so zeroing the whole window would
+    # sink it under either rule and the test would prove nothing about completeness.
+    dormant = bars["symbol"].eq("DORMUSDT") & bars["open_time"].ge(
+        weeks[-1] - pd.Timedelta(days=3)
+    )
+    bars.loc[dormant, "quote_volume"] = 0.0
+
+    filtered = universe.seasoned_membership(bars, _metadata(listings), weeks, **SMALL)
+    assert "DORMUSDT" not in _members(filtered, weeks[-1])
+    assert "LIVEUSDT" in _members(filtered, weeks[-1])
+
+    # Mutation: counting placeholder bars puts the dormant contract back at the top of the book.
+    unfiltered = universe.seasoned_membership(
+        bars, _metadata(listings), weeks, **{**SMALL, "require_traded_bars": False}
+    )
+    assert _members(unfiltered, weeks[-1])[0] == "DORMUSDT"

@@ -15,6 +15,11 @@ The checks mirror ``engine_v2.evaluate_targets`` conditions rather than approxim
 * a boundary's eligible set is the point-in-time membership intersected with symbols that have a
   non-null open at that boundary — the same ``eligible & fillable`` intersection the engine takes;
 * every symbol in that set must have a boundary mark, or the engine raises;
+* an eligible symbol must have actually traded in the bar, because Binance publishes a
+  placeholder bar for a dormant contract with prices carried forward and zero volume;
+* its close and its mark must agree to within a factor, because on a placeholder bar the close
+  freezes while the index-based mark keeps moving, and an evaluator that sizes quantity on the
+  mark and settles at the close turns that gap into a loss many times equity;
 * funding must exist for every symbol-month in which a member actually traded;
 * BTCUSDT must be complete across the grid, because the regime labels every gate depends on are
   derived from it and a gap there silently relabels history.
@@ -33,6 +38,31 @@ import pandas as pd
 
 REGIME_SOURCE_SYMBOL = "BTCUSDT"
 MAX_REPORTED_BOUNDARIES = 200
+# A bar whose close and mark disagree by more than this factor is not a price, it is two
+# incompatible claims about one contract. LUNA reached 25x at its delisting and SXP reached 989x.
+MAX_MARK_CLOSE_RATIO = 2.0
+
+# Blocking findings mean the evaluator cannot run the grid at all: it raises on a missing mark,
+# and a missing funding month silently pays a carried position nothing. Advisory findings are
+# hazards the evaluator must *handle* rather than reasons it cannot start. Weekly reconstitution
+# cannot foresee a contract going dormant mid-week, so placeholder bars are irreducible here and
+# belong to the execution contract; reporting them as blocking would only invite the threshold to
+# be relaxed until it stopped meaning anything.
+BLOCKING_KINDS = frozenset(
+    {
+        "missing_mark_for_eligible_symbol",
+        "missing_funding_for_active_symbol_month",
+        "funding_table_empty",
+        "regime_source_absent",
+        "regime_source_gap",
+    }
+)
+ADVISORY_KINDS = frozenset(
+    {
+        "placeholder_bar_for_eligible_symbol",
+        "mark_close_divergence",
+    }
+)
 
 
 class SnapshotPreflightError(AssertionError):
@@ -61,8 +91,18 @@ class PreflightReport:
     truncated: bool = False
 
     @property
+    def blocking(self) -> tuple[Finding, ...]:
+        return tuple(finding for finding in self.findings if finding.kind in BLOCKING_KINDS)
+
+    @property
+    def advisory(self) -> tuple[Finding, ...]:
+        return tuple(finding for finding in self.findings if finding.kind in ADVISORY_KINDS)
+
+    @property
     def ok(self) -> bool:
-        return not self.findings
+        """True when the grid can execute. Advisory hazards do not make it false."""
+
+        return not self.blocking
 
     def counts_by_kind(self) -> dict[str, int]:
         counts: dict[str, int] = {}
@@ -78,6 +118,8 @@ class PreflightReport:
             "boundaries": self.boundaries,
             "membership_symbols": self.membership_symbols,
             "ok": self.ok,
+            "blocking_findings": len(self.blocking),
+            "advisory_findings": len(self.advisory),
             "counts_by_kind": self.counts_by_kind(),
             "findings": [finding.as_dict() for finding in self.findings],
             "findings_truncated": self.truncated,
@@ -147,7 +189,11 @@ def check_decision_grid(
         else end_exclusive
     )
 
-    frame = bars.loc[:, ["open_time", "symbol", "open"]].copy()
+    columns = ["open_time", "symbol", "open", "close", "quote_volume"]
+    missing = [name for name in columns if name not in bars.columns]
+    if missing:
+        raise SnapshotPreflightError(f"bars missing columns required by the preflight: {missing}")
+    frame = bars.loc[:, columns].copy()
     frame["open_time"] = pd.to_datetime(frame["open_time"], utc=True)
     frame = frame[(frame["open_time"] >= window_start) & (frame["open_time"] < window_end)]
     if frame.empty:
@@ -174,6 +220,31 @@ def check_decision_grid(
 
     missing_mark = eligible & ~mark_notna
     rows, was_truncated = _offending(missing_mark, "missing_mark_for_eligible_symbol", limit)
+    findings.extend(rows)
+    truncated |= was_truncated
+
+    traded = (
+        frame.pivot(index="open_time", columns="symbol", values="quote_volume")
+        .reindex(index=boundaries, columns=symbols)
+        .fillna(0.0)
+        .gt(0.0)
+    )
+    rows, was_truncated = _offending(
+        eligible & ~traded, "placeholder_bar_for_eligible_symbol", limit
+    )
+    findings.extend(rows)
+    truncated |= was_truncated
+
+    closes = frame.pivot(index="open_time", columns="symbol", values="close").reindex(
+        index=boundaries, columns=symbols
+    )
+    marks = mark_frame.pivot(index="mark_time", columns="symbol", values="mark_price").reindex(
+        index=boundaries, columns=symbols
+    )
+    with np.errstate(divide="ignore", invalid="ignore"):
+        ratio = (closes / marks).abs()
+    diverged = eligible & ((ratio > MAX_MARK_CLOSE_RATIO) | (ratio < 1.0 / MAX_MARK_CLOSE_RATIO))
+    rows, was_truncated = _offending(diverged.fillna(False), "mark_close_divergence", limit)
     findings.extend(rows)
     truncated |= was_truncated
 
@@ -264,11 +335,24 @@ def assert_decision_grid_is_executable(
     if report.ok:
         return report
     summary = ", ".join(f"{kind}={count}" for kind, count in report.counts_by_kind().items())
-    first = report.findings[0]
+    first = report.blocking[0]
     raise SnapshotPreflightError(
         f"snapshot cannot support its decision grid ({summary}); "
         f"first at {first.boundary or 'n/a'}: {first.kind} {list(first.symbols[:8])}"
     )
+
+
+def _assert_every_kind_has_a_severity() -> None:
+    """A finding kind with no severity would be silently neither blocking nor advisory."""
+
+    overlap = BLOCKING_KINDS & ADVISORY_KINDS
+    if overlap:
+        raise SnapshotPreflightError(
+            f"finding kinds declared both blocking and advisory: {overlap}"
+        )
+
+
+_assert_every_kind_has_a_severity()
 
 
 def report_to_json(report: PreflightReport) -> Mapping[str, object]:
@@ -276,6 +360,8 @@ def report_to_json(report: PreflightReport) -> Mapping[str, object]:
 
 
 __all__ = [
+    "ADVISORY_KINDS",
+    "BLOCKING_KINDS",
     "Finding",
     "PreflightReport",
     "SnapshotPreflightError",

@@ -3,9 +3,9 @@
     {
       "name": "archive_provenance",
       "path": "data/top40/snapshot-v3/archive_provenance.jsonl",
-      "rows": 38608,
-      "sha256": "e3e712429f5f75f0a6a72167ad0438c6bde7f537ab18201a2610458792ca5ca4",
-      "size": 25993732
+      "rows": 38725,
+      "sha256": "199a13cb5e399a5886afce708396d2ce0ddd52467dac1605223cb4ea278555f7",
+      "size": 26074205
     },
     {
       "name": "bars",
@@ -25,8 +25,8 @@
       "name": "coverage",
       "path": "data/top40/snapshot-v3/coverage.json",
       "rows": 670,
-      "sha256": "ba1970551b16d83df264ff9e4b70c2f5524b28a55e189e75ca81532b76e5415f",
-      "size": 602713
+      "sha256": "fcf98c7d947a4dc3068ce9a2299d3eb941152c3c10a765003d061b425d7d648b",
+      "size": 602802
     },
     {
       "name": "exchange_info",
@@ -38,16 +38,16 @@
     {
       "name": "funding",
       "path": "data/top40/snapshot-v3/funding.parquet",
-      "rows": 771791,
-      "sha256": "d50520baafd28cca058da2717a1b4a438d8d36a2102b03229b5d4437dad6be11",
-      "size": 8051949
+      "rows": 774695,
+      "sha256": "452756d3141a276901aa5b8a7360228ea3f176de385b8c198203bb134e6b00fc",
+      "size": 8079295
     },
     {
       "name": "mark_prices",
       "path": "data/top40/snapshot-v3/mark_prices.parquet",
-      "rows": 688840,
-      "sha256": "137f8fc7b8d111b3b0765421b491b68781b4825e60b025df948498ab3c2b4d39",
-      "size": 5031571
+      "rows": 691963,
+      "sha256": "f7184034519f99e76973c3fd5860bd9eefe75ef42c836dcad38bb38197d5ce60",
+      "size": 5056087
     },
     {
       "name": "mark_rest_provenance",
@@ -59,16 +59,16 @@
     {
       "name": "membership",
       "path": "data/top40/snapshot-v3/membership.parquet",
-      "rows": 12193,
-      "sha256": "cc0102c14a11f18ffc5cb1181cda02f874d6d2e392149ab8231e761dc5ce550a",
-      "size": 117324
+      "rows": 12191,
+      "sha256": "ce8adedeaa748eccb7371a8f5e40a5581029da5491b9333258fb3bf10568ef46",
+      "size": 117247
     },
     {
       "name": "rest_provenance",
       "path": "data/top40/snapshot-v3/rest_provenance.jsonl",
-      "rows": 10,
-      "sha256": "de47db5affee031a1c67fe9ce7b3150c8686b12b627c8630c7ac348f9e779a9f",
-      "size": 4869
+      "rows": 9,
+      "sha256": "330e26024de53a802de06c3bf6c4d906a60ecd9b5bc082f8370bcdb6672ad6e3",
+      "size": 4382
     },
     {
       "name": "btc_daily_returns",
@@ -101,17 +101,17 @@
   "schema_version": 1,
   "sources": {
     "archive_base_url": "https://data.binance.vision",
-    "archive_count": 38608,
+    "archive_count": 38725,
     "archive_provenance_path": "data/top40/snapshot-v3/archive_provenance.jsonl",
-    "archive_provenance_sha256": "e3e712429f5f75f0a6a72167ad0438c6bde7f537ab18201a2610458792ca5ca4",
+    "archive_provenance_sha256": "199a13cb5e399a5886afce708396d2ce0ddd52467dac1605223cb4ea278555f7",
     "archive_s3_url": "https://s3-ap-northeast-1.amazonaws.com/data.binance.vision",
     "builder_path": "src/crypto_trade/tournament/snapshot.py",
     "builder_sha256": "279eb8570be6419cf5b21e5bcf2a68b2a52ca7279853d380e78f257c54d47adf",
     "checksum_policy": "require-binance-sha256-sidecar",
     "config_path": "tournament/top40-v5/SNAPSHOT-BUILD.toml",
     "config_sha256": "7eb10728e99fae1091f4910adf6982eab27eee93734f70a3cb5456a71a7e253f",
-    "exchange_info_retrieved_at_utc": "2026-08-25T23:59:37.610271+00:00",
-    "exchange_info_server_time": 1787695210693,
+    "exchange_info_retrieved_at_utc": "2026-08-26T06:21:00.514989+00:00",
+    "exchange_info_server_time": 1787724010793,
     "exchange_info_url": "https://fapi.binance.com/fapi/v1/exchangeInfo",
     "funding_rate_url": "https://fapi.binance.com/fapi/v1/fundingRate",
     "mark_price_klines_url": "https://fapi.binance.com/fapi/v1/markPriceKlines",
@@ -119,8 +119,8 @@
     "mark_rest_provenance_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "mark_rest_request_count": 0,
     "rest_provenance_path": "data/top40/snapshot-v3/rest_provenance.jsonl",
-    "rest_provenance_sha256": "de47db5affee031a1c67fe9ce7b3150c8686b12b627c8630c7ac348f9e779a9f",
-    "rest_request_count": 10,
+    "rest_provenance_sha256": "330e26024de53a802de06c3bf6c4d906a60ecd9b5bc082f8370bcdb6672ad6e3",
+    "rest_request_count": 9,
     "source": "binance-public-usdm"
   },
   "window": {

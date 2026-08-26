@@ -10,9 +10,16 @@ requirements have to hold, and each is named so it can be tested on its own:
 
 * **maturity** — the contract has existed for at least ``minimum_history_days``;
 * **completeness** — at least ``minimum_completeness`` of the expected bars in the ranking window
-  are actually present, so a half-traded contract cannot rank on a thin sample;
+  actually traded, so a half-traded contract cannot rank on a thin sample;
 * **persistence** — the contract has been in the liquid pool for most of the recent past, so a
   single week of promotional volume cannot buy membership.
+
+Completeness counts *traded* bars, not published ones. Binance emits a placeholder bar for a
+dormant contract with prices carried forward and zero volume, and counting those let ICPUSDT hold
+membership for six weeks in mid-2022 while it was not trading at all. That is not a cosmetic
+defect: on such a bar the frozen close and the still-moving mark diverge by orders of magnitude
+— 25x for LUNA at its delisting, 989x for SXP — and an evaluator that sizes quantity on the mark
+and settles at the close turns the gap into a loss many times equity.
 
 A contract that fails any of them is simply absent. Missing slots are held as cash and are never
 backfilled with an immature contract merely to reach ``size``: a short universe is a truthful
@@ -57,6 +64,25 @@ def required_complete_days(trailing_days: int, minimum_completeness: float) -> i
     return max(1, math.ceil(minimum_completeness * trailing_days))
 
 
+def traded_bars_only(bars: pd.DataFrame) -> pd.DataFrame:
+    """Drop bars in which nothing actually traded.
+
+    Binance publishes a placeholder bar for a dormant contract: the row exists, the open and close
+    carry forward, and ``quote_volume`` is zero. Counting those as observations lets a contract
+    that has stopped trading keep its place in the universe on the strength of prices nobody
+    transacted at, and the divergence that opens up between a frozen close and a still-moving mark
+    is measured in orders of magnitude, not percent.
+
+    Filtering here rather than inside ``point_in_time_top40`` keeps the shared primitive frozen: a
+    day that loses a bar to this filter no longer has a full set, so it stops counting toward
+    completeness by the mechanism that is already there.
+    """
+
+    if "quote_volume" not in bars.columns:
+        raise SeasonedUniverseError("bars must carry quote_volume to identify placeholder bars")
+    return bars[pd.to_numeric(bars["quote_volume"], errors="raise") > 0.0]
+
+
 def _first_observed_date(bars: pd.DataFrame, bars_per_day: int) -> pd.Series:
     """Earliest fully observed UTC date per symbol.
 
@@ -87,6 +113,7 @@ def seasoned_membership(
     persistence_minimum_weeks: int = 8,
     minimum_completeness: float = 0.95,
     bars_per_day: int = 3,
+    require_traded_bars: bool = True,
 ) -> pd.DataFrame:
     """Build weekly seasoned Top-``size`` membership from completed prior days only.
 
@@ -112,6 +139,8 @@ def seasoned_membership(
 
     complete_days = required_complete_days(trailing_days, minimum_completeness)
     ordered_times = sorted(pd.to_datetime(list(reconstitution_times), utc=True))
+    if require_traded_bars:
+        bars = traded_bars_only(bars)
 
     pool = point_in_time_top40(
         bars,
@@ -194,4 +223,5 @@ __all__ = [
     "membership_shape",
     "required_complete_days",
     "seasoned_membership",
+    "traded_bars_only",
 ]

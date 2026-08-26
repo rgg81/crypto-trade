@@ -23,6 +23,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from crypto_trade.tournament.v5.layout import TOP40_V5_LAYOUT  # noqa: E402
 from crypto_trade.tournament.v5.snapshot_preflight import (  # noqa: E402
+    BLOCKING_KINDS,
+    MAX_REPORTED_BOUNDARIES,
     assert_decision_grid_is_executable,
     check_decision_grid,
 )
@@ -86,13 +88,16 @@ def _preflight(args: argparse.Namespace) -> int:
     shape = membership_shape(frames["membership"], size=int(config["universe"]["size"]))
     print(f"membership: {shape}")
 
-    report = (check_decision_grid if args.report_only else assert_decision_grid_is_executable)(
+    # Always compute the full report and write it before deciding whether to fail. Raising first
+    # would leave the previous run's report on disk next to a failed build, which reads as a pass.
+    report = check_decision_grid(
         frames["bars"],
         frames["mark_prices"],
         frames["funding"],
         frames["membership"],
         start=start,
         end_exclusive=end_exclusive,
+        limit=args.limit,
     )
 
     payload = dict(report.as_dict())
@@ -103,12 +108,27 @@ def _preflight(args: argparse.Namespace) -> int:
 
     print(
         f"preflight: ok={report.ok} boundaries={report.boundaries} "
-        f"symbols={report.membership_symbols} counts={report.counts_by_kind()}"
+        f"symbols={report.membership_symbols} "
+        f"blocking={len(report.blocking)} advisory={len(report.advisory)} "
+        f"counts={report.counts_by_kind()}"
     )
-    for finding in report.findings[:10]:
-        print(f"  {finding.kind} {finding.boundary} {list(finding.symbols)[:8]}")
+    for finding in (*report.blocking[:5], *report.advisory[:5]):
+        severity = "BLOCK" if finding.kind in BLOCKING_KINDS else "advise"
+        print(f"  [{severity}] {finding.kind} {finding.boundary} {list(finding.symbols)[:8]}")
     print(f"written: {destination.relative_to(ROOT)}")
-    return 0 if report.ok else 1
+
+    if report.ok or args.report_only:
+        return 0 if report.ok else 1
+    assert_decision_grid_is_executable(
+        frames["bars"],
+        frames["mark_prices"],
+        frames["funding"],
+        frames["membership"],
+        start=start,
+        end_exclusive=end_exclusive,
+        limit=args.limit,
+    )
+    return 1
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -125,6 +145,12 @@ def _parser() -> argparse.ArgumentParser:
 
     preflight = commands.add_parser(
         "preflight", help="assert the built snapshot supports its own decision grid"
+    )
+    preflight.add_argument(
+        "--limit",
+        type=int,
+        default=MAX_REPORTED_BOUNDARIES,
+        help="maximum offending boundaries to record per finding kind",
     )
     preflight.add_argument(
         "--report-only",
