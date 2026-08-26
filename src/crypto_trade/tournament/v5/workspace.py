@@ -12,15 +12,21 @@ not there. No policy failure can expose a file that was never copied.
 
 What this does and does not guarantee, stated plainly, because the distinction is the whole point:
 
-* **Prevention, verified.** Network denial for research phases comes from a network namespace, which
-  is enforced by the kernel. A process inside it cannot open a socket, whatever it intends.
 * **Prevention, structural.** Relative paths cannot leave the workspace, and the forbidden files do
-  not exist inside it. This is what materialisation buys.
-* **Detection, not prevention.** An absolute path out of the workspace remains readable on this
-  host, because bind mounts and chroot are unavailable inside an unprivileged user namespace here.
-  :func:`audit_workspace` therefore checks the harvested artifacts for references outside the lane,
-  and the honest statement is CUP-20's: a clean audit means the mechanical checks found no evidence
-  of a read, not that no read occurred.
+  not exist inside it. This is what materialisation buys, and it is the strongest guarantee here.
+* **Prevention, policy.** Absolute paths out of the workspace are refused by the runtime's deny
+  rules -- verified live on this host, in both directions, before every phase. It is enforcement,
+  but it is a permission check rather than a kernel boundary, and a malformed rule fails open
+  silently; see :mod:`crypto_trade.tournament.v5.runtime` for the guard that exists because of it.
+* **Detection, not prevention.** Whatever those two miss, :func:`audit_workspace` looks for after
+  the fact in the harvested artifacts. The honest statement is CUP-20's: a clean audit means the
+  mechanical checks found no evidence of a read, not that no read occurred.
+
+Note what is *not* on that list. A research phase cannot be confined to a network namespace: the
+agent needs the network to reach its own model API, so ``unshare --net`` starves it rather than
+isolating it. Withholding network *tools* is the available control, and it belongs to the runtime.
+:func:`network_isolated_command` survives here for the evaluator subprocess, which has no such need
+and genuinely can be confined.
 
 The runtime is a parameter, not a dependency. Nothing in this module knows which agent CLI executes
 inside the workspace.
@@ -43,6 +49,10 @@ WORKSPACE_LANE = "lane"
 LANE_WRITABLE = ("candidates", "outbox", "work")
 # The scouting phase gets exactly one, and no evaluation surface at all.
 SCOUTING_WRITABLE = ("scouting",)
+# Organizer-owned scratch for the pre-launch boundary probe. Deliberately not in LANE_WRITABLE and
+# never harvested: a live check on this host showed the probe's own report being collected out of
+# outbox/ beside a real submission, which would have entered it into selection as a team artifact.
+PROBE_DIRECTORY = ".probe"
 
 
 class WorkspaceError(RuntimeError):
@@ -131,7 +141,7 @@ def materialise(
     _copy_into(Path(kit_source).resolve(), kit, manifest, root)
     for name, source in lane_files.items():
         _copy_into(Path(source).resolve(), lane / name, manifest, root)
-    for name in writable:
+    for name in (*writable, PROBE_DIRECTORY):
         (lane / name).mkdir(parents=True, exist_ok=True)
 
     return Workspace(root=root, lane=lane, kit=kit, phase=phase, network=network, manifest=manifest)
@@ -203,11 +213,16 @@ def audit_workspace(
 
 
 def network_isolated_command(command: Sequence[str], *, network: bool) -> list[str]:
-    """Wrap a command so a research phase genuinely cannot open a socket.
+    """Wrap a command so it genuinely cannot open a socket.
 
-    ``unshare --net`` places the process in an empty network namespace, which the kernel enforces;
-    it is the one part of this design that is prevention rather than detection. The scouting phase
-    is deliberately not wrapped -- reaching the public literature is the entire point of it.
+    ``unshare --net`` places the process in an empty network namespace, which the kernel enforces --
+    the strongest guarantee available here, and verified on this host.
+
+    **This is for the evaluator, not for a research phase.** An agent process needs the network to
+    reach its own model API, so wrapping one in an empty namespace does not isolate it, it hangs it;
+    that was measured, not assumed. The evaluator has no such need: it reads a local snapshot and
+    computes, so confining it costs nothing and closes the one subprocess in this design that
+    handles market data and could otherwise reach outward.
     """
 
     if network:
@@ -229,6 +244,7 @@ def clean_environment(extra: Mapping[str, str] | None = None) -> dict[str, str]:
 
 __all__ = [
     "LANE_WRITABLE",
+    "PROBE_DIRECTORY",
     "SCOUTING_WRITABLE",
     "WORKSPACE_KIT",
     "WORKSPACE_LANE",

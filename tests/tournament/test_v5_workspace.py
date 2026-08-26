@@ -129,14 +129,19 @@ def test_the_audit_notices_a_reference_to_a_forbidden_root(tmp_path, sources):
     assert not any(finding.startswith("clean.py") for finding in findings)
 
 
-def test_a_research_phase_is_wrapped_for_network_denial_and_scouting_is_not(tmp_path, sources):
-    """Scouting reaching the public literature is the point of it; research must not."""
+def test_the_evaluator_can_be_confined_to_an_empty_network_namespace(tmp_path, sources):
+    """Kernel-enforced, and reserved for the evaluator.
 
-    offline = workspace.network_isolated_command(["agent", "run"], network=False)
-    online = workspace.network_isolated_command(["agent", "run"], network=True)
+    An agent process cannot be wrapped this way -- it needs the network for its own model API, and
+    an empty namespace hangs it rather than isolating it. The evaluator only reads a local snapshot
+    and computes, so confining it costs nothing.
+    """
 
-    assert offline[:1] == ["unshare"] and "--net" in offline
-    assert online == ["agent", "run"]
+    confined = workspace.network_isolated_command(["evaluate", "--candidate", "x"], network=False)
+    unconfined = workspace.network_isolated_command(["evaluate", "--candidate", "x"], network=True)
+
+    assert confined[:1] == ["unshare"] and "--net" in confined
+    assert unconfined == ["evaluate", "--candidate", "x"]
 
 
 def test_the_clean_environment_drops_whatever_was_not_named(tmp_path, monkeypatch):

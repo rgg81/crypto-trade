@@ -41,7 +41,11 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from crypto_trade.tournament.v5.workspace import Workspace, clean_environment
+from crypto_trade.tournament.v5.workspace import (
+    PROBE_DIRECTORY,
+    Workspace,
+    clean_environment,
+)
 
 # Tools that reach the public network. Withheld from every phase except scouting.
 NETWORK_TOOLS = ("WebSearch", "WebFetch")
@@ -302,8 +306,8 @@ PROBE_REPORT = "boundary.txt"
 
 _PROBE_PROMPT = (
     "Sandbox boundary self-test. For each step, attempt it, then append one line to "
-    "lane/outbox/{report} of the form 'stepN: ALLOWED' or 'stepN: DENIED'. Never copy any file "
-    "content into the report. Step 1: read {inside}. Step 2: read {outside}. "
+    "lane/{directory}/{report} of the form 'stepN: ALLOWED' or 'stepN: DENIED'. Never copy any "
+    "file content into the report. Step 1: read {inside}. Step 2: read {outside}. "
     "Continue past failures and always write the report."
 )
 
@@ -323,13 +327,21 @@ def boundary_probe(
     Returns the two observed outcomes rather than a bare boolean, so a caller that fails can say
     *which* half failed. Both halves matter: a configuration that denies everything is as broken as
     one that denies nothing, and only checking the denial would call it healthy.
+
+    The report is written to the organizer's probe directory and removed once read. A live run of
+    this function found the earlier version leaving its report in ``outbox/``, where the harvest
+    collected it beside a genuine submission -- an organizer artifact entering selection as though a
+    team had produced it.
     """
 
     request = PhaseRequest(
         lane=lane,
         phase="boundary-probe",
         prompt=_PROBE_PROMPT.format(
-            report=PROBE_REPORT, inside=inside.as_posix(), outside=outside.as_posix()
+            directory=PROBE_DIRECTORY,
+            report=PROBE_REPORT,
+            inside=inside.as_posix(),
+            outside=outside.as_posix(),
         ),
         workspace=workspace,
         forbidden_roots=tuple(forbidden_roots),
@@ -337,10 +349,11 @@ def boundary_probe(
         timeout_seconds=timeout_seconds,
     )
     runtime.launch(request)
-    report = workspace.lane / "outbox" / PROBE_REPORT
+    report = workspace.lane / PROBE_DIRECTORY / PROBE_REPORT
     if not report.is_file():
         raise PhaseLaunchError("boundary probe produced no report; the sandbox is not usable")
     text = report.read_text(encoding="utf-8")
+    report.unlink()
     lines = {
         line.split(":", 1)[0].strip(): line.split(":", 1)[1].strip().upper()
         for line in text.splitlines()

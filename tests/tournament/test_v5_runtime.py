@@ -90,7 +90,7 @@ def test_receipts_are_serialisable_for_the_journal(space):
 
 def _probe_runtime(step1: str, step2: str) -> runtime.ScriptedRuntime:
     def script(request: runtime.PhaseRequest) -> int:
-        report = request.workspace.lane / "outbox" / runtime.PROBE_REPORT
+        report = request.workspace.lane / workspace.PROBE_DIRECTORY / runtime.PROBE_REPORT
         report.write_text(f"step1: {step1}\nstep2: {step2}\n", encoding="utf-8")
         return 0
 
@@ -113,6 +113,22 @@ def test_a_healthy_sandbox_passes_the_probe(space):
 
     assert observed == {runtime.PROBE_ALLOWED: True, runtime.PROBE_DENIED: True}
     runtime.assert_boundary_probe_passed(observed)
+
+
+def test_the_probe_leaves_nothing_behind_for_the_harvest_to_collect(space):
+    """Found by running the real runtime, not by reading the code.
+
+    The first version wrote its report into ``outbox/``, and a live end-to-end check harvested
+    ``boundary.txt`` beside a genuine ``candidate.py`` -- an organizer artifact entering
+    selection as if a team had submitted it. The probe now writes to its own directory and clears
+    up after itself, and the harvest must see only what the lane actually produced.
+    """
+
+    _run_probe(space, _probe_runtime("ALLOWED", "DENIED"))
+    (space.lane / "outbox" / "candidate.py").write_text("w = {}", encoding="utf-8")
+
+    assert set(workspace.harvest(space, "outbox")) == {"candidate.py"}
+    assert not (space.lane / workspace.PROBE_DIRECTORY / runtime.PROBE_REPORT).exists()
 
 
 def test_a_sandbox_that_denies_nothing_fails_the_probe(space):
