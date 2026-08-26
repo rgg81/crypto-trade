@@ -1,0 +1,41 @@
+{
+  "family": "cross-sectional mispricing",
+  "forbidden": [
+    "any other lane",
+    "any prior edition of this tournament",
+    "the repository and its history",
+    "the market snapshot outside the mounted decision context",
+    "the sealed development blocks",
+    "the historical window"
+  ],
+  "mandated_directional": false,
+  "network": {
+    "research": false,
+    "scouting": true
+  },
+  "rationed_signal": null,
+  "readable": {
+    "research": [
+      "the whole lane",
+      "the team kit"
+    ],
+    "scouting": [
+      "ACCESS-POLICY.json",
+      "TEAM-BRIEF.md",
+      "SCOUTING-BRIEF.md",
+      "scouting/"
+    ]
+  },
+  "seed": "illiquidity_reversal",
+  "team_id": "team-05",
+  "writable": {
+    "research": [
+      "candidates/",
+      "outbox/",
+      "work/"
+    ],
+    "scouting": [
+      "scouting/"
+    ]
+  }
+}
