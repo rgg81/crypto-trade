@@ -48,7 +48,7 @@ def context() -> DecisionContext:
     funding = pd.DataFrame(
         {
             "symbol": np.repeat(SYMBOLS, 12),
-            "last_funding_rate": generator.normal(0.0001, 0.0004, size=len(SYMBOLS) * 12),
+            "funding_rate": generator.normal(0.0001, 0.0004, size=len(SYMBOLS) * 12),
         }
     )
     return DecisionContext(

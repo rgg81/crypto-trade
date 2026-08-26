@@ -36,6 +36,28 @@ SEED_GROSS = 0.60
 SEED_SIDE_COUNT = 6
 MINIMUM_HISTORY = 40
 
+# The columns the seeds actually read, declared so a fixture can be checked against the real
+# snapshot instead of against someone's memory of it.
+#
+# This exists because the alternative failed. The funding column is ``funding_rate``; an earlier
+# revision read ``last_funding_rate`` -- the raw Binance name, not the tournament's canonical one --
+# and two seeds silently produced no book at all. Nothing raised. The unit fixture used the same
+# wrong name, so it passed, and only a run against the real snapshot showed two lanes scoring
+# exactly zero across 808 days. A fixture that encodes the same assumption as the code cannot
+# falsify it.
+FUNDING_COLUMNS = ("symbol", "funding_rate")
+BAR_COLUMNS = (
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "quote_volume",
+    "trade_count",
+    "taker_buy_volume",
+    "taker_buy_quote_volume",
+)
+
 
 class SeedError(RuntimeError):
     """A seed was asked for something the context cannot support."""
@@ -120,12 +142,12 @@ class FundingCarrySeed(_Seed):
 
     def score(self, context: DecisionContext) -> pd.Series:
         funding = context.funding
-        if funding.empty or "last_funding_rate" not in funding.columns:
+        if funding.empty or "funding_rate" not in funding.columns:
             return pd.Series(dtype=float)
         recent = funding[funding["symbol"].isin(context.eligible_symbols)]
         if recent.empty:
             return pd.Series(dtype=float)
-        mean_rate = recent.groupby("symbol")["last_funding_rate"].mean()
+        mean_rate = recent.groupby("symbol")["funding_rate"].mean()
         # Negative funding means shorts pay longs, so a long earns it: score is the negated rate.
         return -mean_rate
 
@@ -142,7 +164,7 @@ class FundingConvexitySeed(_Seed):
         if funding.empty:
             return pd.Series(dtype=float)
         recent = funding[funding["symbol"].isin(closes.columns)]
-        dispersion = recent.groupby("symbol")["last_funding_rate"].std()
+        dispersion = recent.groupby("symbol")["funding_rate"].std()
         aligned = dispersion.reindex(volatility.index)
         return -(aligned / volatility.replace(0.0, np.nan))
 
@@ -456,6 +478,8 @@ __all__ = [
     "MINIMUM_HISTORY",
     "SEED_GROSS",
     "SEED_SIDE_COUNT",
+    "BAR_COLUMNS",
+    "FUNDING_COLUMNS",
     "SeedError",
     "assert_every_lane_has_a_seed",
     "build_seed",
