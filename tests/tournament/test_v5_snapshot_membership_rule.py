@@ -11,6 +11,7 @@ from crypto_trade.tournament.data import point_in_time_top40
 BARS_PER_DAY = 3
 EVALUATION_START = pd.Timestamp("2021-04-05", tz="UTC")
 HARD_END = pd.Timestamp("2021-05-03", tz="UTC")
+WARMUP_START = pd.Timestamp("2020-01-01", tz="UTC")
 
 LEGACY_CONFIG = {"size": 3, "trailing_days": 10, "minimum_history_days": 10}
 SEASONED_CONFIG = {
@@ -64,6 +65,7 @@ def _build(listings, universe_config):  # type: ignore[no-untyped-def]
         evaluation_start=EVALUATION_START,
         hard_end=HARD_END,
         universe_config=dict(universe_config),
+        warmup_start=WARMUP_START,
     )
 
 
@@ -155,3 +157,51 @@ def test_an_empty_reconstitution_is_rejected() -> None:
     listings = {"AAAUSDT": (EVALUATION_START - pd.Timedelta(days=2), 100.0)}
     with pytest.raises(ValueError, match="empty point-in-time universe"):
         _build(listings, LEGACY_CONFIG)
+
+
+def test_the_seasoned_grid_is_armed_before_the_first_scored_week() -> None:
+    """Persistence judged against prior weeks must have prior weeks to judge against.
+
+    A grid beginning at the first scored week exempts its own opening weeks and silently runs a
+    laxer rule there. Extending backwards into warmup and discarding the extension makes every
+    scored week judged identically -- and the returned frame must still start where scoring does.
+    """
+
+    listed = EVALUATION_START - pd.Timedelta(days=300)
+    listings = {f"SYM{index:02d}USDT": (listed, 1_000.0 - index) for index in range(6)}
+    membership = _build(listings, SEASONED_CONFIG)
+
+    first_scored = EVALUATION_START.floor("D") - pd.Timedelta(days=EVALUATION_START.weekday())
+    assert membership["reconstitution_time"].min() == first_scored
+
+    # Every scored week, including the first, must survive the persistence rule rather than be
+    # exempted from it: with a stable field that means the full membership is present throughout.
+    counts = membership.groupby("reconstitution_time")["symbol"].nunique()
+    assert set(counts) == {SEASONED_CONFIG["size"]}
+
+
+def test_a_warmup_too_short_to_arm_persistence_is_rejected() -> None:
+    """Failing loudly beats quietly scoring the opening weeks under a different rule."""
+
+    listings = {"AAAUSDT": (EVALUATION_START - pd.Timedelta(days=300), 900.0)}
+    with pytest.raises(ValueError, match="warmup is too short to arm the persistence window"):
+        snapshot._build_membership(
+            _bars(listings),
+            _metadata(listings),
+            evaluation_start=EVALUATION_START,
+            hard_end=HARD_END,
+            universe_config=dict(SEASONED_CONFIG),
+            warmup_start=EVALUATION_START - pd.Timedelta(days=5),
+        )
+
+
+def test_the_seasoned_rule_requires_a_warmup_start() -> None:
+    listings = {"AAAUSDT": (EVALUATION_START - pd.Timedelta(days=300), 900.0)}
+    with pytest.raises(ValueError, match="requires warmup_start"):
+        snapshot._build_membership(
+            _bars(listings),
+            _metadata(listings),
+            evaluation_start=EVALUATION_START,
+            hard_end=HARD_END,
+            universe_config=dict(SEASONED_CONFIG),
+        )

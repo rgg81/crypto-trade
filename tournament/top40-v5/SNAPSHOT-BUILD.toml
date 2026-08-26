@@ -13,9 +13,12 @@ archive_s3_url = "https://s3-ap-northeast-1.amazonaws.com/data.binance.vision"
 exchange_info_url = "https://fapi.binance.com/fapi/v1/exchangeInfo"
 funding_rate_url = "https://fapi.binance.com/fapi/v1/fundingRate"
 mark_price_klines_url = "https://fapi.binance.com/fapi/v1/markPriceKlines"
-# Warmup must precede the first reconstitution (2020-07-27) by at least the ranking window plus
-# the maturity requirement, i.e. 90 + 90 days, so that the first scored week is judged on the
-# same evidence as every later one rather than on whatever history happened to exist.
+# Membership is computed from persistence_window_weeks before the first scored reconstitution so
+# that persistence is already armed there; that arming week is 2020-05-18. Warmup must precede it
+# by max(trailing_days, minimum_history_days) = 90 days -- the ranking window and the maturity
+# requirement are both measured back from the same as-of date and overlap, so they do not add.
+# 2020-01-01 leaves 48 days of margin, and the liquid pool is measurably stable at 24 contracts
+# from the arming week onward.
 warmup_start = "2020-01-01"
 hard_end_exclusive = "2026-08-01"
 transaction_interval = "8h"

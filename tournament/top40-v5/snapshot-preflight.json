@@ -1,0 +1,17 @@
+{
+  "boundaries": 6570,
+  "counts_by_kind": {},
+  "end_exclusive": "2026-08-01T00:00:00+00:00",
+  "findings": [],
+  "findings_truncated": false,
+  "membership_shape": {
+    "full_slots": 273,
+    "minimum_members": 24,
+    "reconstitutions": 314,
+    "short_slots": 41
+  },
+  "membership_symbols": 176,
+  "ok": true,
+  "schema_version": "top40-v5-snapshot-preflight-v1",
+  "start": "2020-08-02T00:00:00+00:00"
+}

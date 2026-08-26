@@ -215,6 +215,7 @@ def build_snapshot(
             evaluation_start=evaluation_start,
             hard_end=hard_end,
             universe_config=config["universe"],
+            warmup_start=warmup_start,
         )
         membership_symbols = tuple(sorted(membership["symbol"].unique()))
         if not membership_symbols:
@@ -2708,6 +2709,7 @@ def _build_membership(
     evaluation_start: pd.Timestamp,
     hard_end: pd.Timestamp,
     universe_config: dict[str, Any],
+    warmup_start: pd.Timestamp | None = None,
 ) -> pd.DataFrame:
     """Build point-in-time membership under the rule the snapshot config declares.
 
@@ -2736,7 +2738,34 @@ def _build_membership(
             bars_per_day=3,
         )
     elif rule == SEASONED_MEMBERSHIP_RULE:
-        membership = _seasoned_membership(bars, metadata, reconstitutions, universe_config)
+        # Persistence is judged against prior reconstitutions, so a grid that begins at the first
+        # scored week has no history to judge it by and exempts its own opening weeks. Extend the
+        # grid backwards into warmup by exactly the persistence window and discard the extension:
+        # every scored week is then judged under the same rule as every later one, instead of the
+        # first few silently running a laxer one.
+        lookback = int(universe_config["persistence_window_weeks"])
+        armed_first = first - pd.Timedelta(weeks=lookback)
+        required_history = max(
+            int(universe_config["trailing_days"]), int(universe_config["minimum_history_days"])
+        )
+        if warmup_start is None:
+            raise ValueError("the seasoned membership rule requires warmup_start")
+        earliest_supported = warmup_start.floor("D") + pd.Timedelta(days=required_history)
+        if armed_first < earliest_supported:
+            raise ValueError(
+                "warmup is too short to arm the persistence window before the first scored "
+                f"reconstitution: arming needs {armed_first.date()} but warmup only supports "
+                f"{earliest_supported.date()}"
+            )
+        membership = _seasoned_membership(
+            bars,
+            metadata,
+            pd.date_range(armed_first, last, freq="7D", tz="UTC"),
+            universe_config,
+        )
+        membership = membership[
+            pd.to_datetime(membership["reconstitution_time"], utc=True) >= first
+        ]
     else:
         raise ValueError(f"unknown universe membership rule: {rule}")
     present = set(pd.to_datetime(membership["reconstitution_time"], utc=True))
