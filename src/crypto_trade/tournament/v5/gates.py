@@ -17,6 +17,28 @@ Three structural choices here make that class of defect harder to reproduce than
   and stay hard. Performance gates say a book was not good enough, and on development -- where
   every prior edition's floors admitted zero of ninety-four measured trials -- they are reported
   rather than enforced.
+
+**Where the search penalty belongs.** ``deflated_sharpe_probability`` must be computed with a trial
+count that matches the data it is measured on, and the two stages differ:
+
+* on **development**, a team selected its nominee from twelve trials on that very data, so the
+  deflation benchmark uses the team's full journalled trial count. That is what makes a development
+  Sharpe an honest statement about a search rather than about an edge.
+* on the **sealed blocks**, the trial count is **one**. The search happened on visible data the
+  sealed blocks never saw, so holding them out is already the correction; deflating again would
+  charge the same search twice. Measured, the double count cost power at a true Sharpe of 1.0
+  0.70 -> 0.24 while barely moving the false-positive rate.
+
+Deflation on sealed data would be right if all twelve candidates were scored there and the best
+kept. They are not: each team submits one frozen nominee.
+
+**Why the sealed stage is a screen and not the decision.** At 360 days the standard error of an
+annualised Sharpe is about 1.0, so a genuinely good book still produces weak evidence. Any
+field-wide correction applied here empties the bracket -- simulated across fifteen nominees with
+five real teams at Sharpe 1.0, Benjamini-Hochberg at q=0.10 selects 0.5 teams. The 2.5-year
+historical window has a standard error of 0.63 and is where candidates are actually ranked; the
+sealed stage exists to stop that window being spent on books that are degenerate, cost-annihilated
+or negative. Field multiplicity is *reported* beside the leaderboard, never used as a gate.
 """
 
 from __future__ import annotations
@@ -26,6 +48,11 @@ from collections.abc import Callable, Mapping
 
 DEVELOPMENT_STAGE = "development"
 SEALED_STAGE = "sealed"
+
+# Trial count for the deflation benchmark when evidence comes from the sealed blocks. The search
+# ran on visible data these blocks never saw, so the selection bias is already removed by holding
+# them out; a count above one charges the same search a second time.
+SEALED_TRIAL_COUNT = 1
 
 
 class GateError(ValueError):

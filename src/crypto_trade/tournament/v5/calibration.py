@@ -254,13 +254,19 @@ def calibrate(
     periods: int = 360,
     sharpe_grid: Sequence[float] = (0.5, 1.0, 1.5, 2.0),
     seed: int = 20260826,
-    trial_count: int = 12,
+    trial_count: int = 1,
     dispersion: float = 0.768,
 ) -> CalibrationReport:
     """Measure what this bar does, on development-derived synthetic paths only.
 
     ``periods`` defaults to the sealed budget of 360 days rather than a comfortable length: the
     bar has to be characterised on the evidence it will actually see.
+
+    ``trial_count`` defaults to one because that is the sealed stage's true multiplicity. The
+    search ran on visible data the sealed blocks never saw, so holding them out has already
+    removed the selection bias; deflating again charges the same search twice and cost power at a
+    true Sharpe of 1.0 0.70 -> 0.24 while leaving the false-positive rate essentially unchanged.
+    Pass the team's journalled trial count when characterising the *development* report instead.
     """
 
     nulls = build_null_population(

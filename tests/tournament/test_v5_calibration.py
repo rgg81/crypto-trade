@@ -92,25 +92,24 @@ def test_power_rises_monotonically_with_true_edge(report: cal.CalibrationReport)
     assert powers == sorted(powers), dict(zip(levels, powers, strict=True))
 
 
-def test_the_sealed_stage_cannot_certify_a_sharpe_of_one(
+def test_the_sealed_stage_is_a_usable_screen_but_not_a_certification(
     report: cal.CalibrationReport,
 ) -> None:
-    """The unflattering measurement, pinned deliberately.
+    """What the stage can and cannot do, measured.
 
-    At 360 days the standard error of an annualised Sharpe is about 1.0, and the deflated
-    benchmark for a twelve-trial search at the V4-R9 field's dispersion is about 1.28 -- above the
-    very Sharpe being tested for. No threshold reaches both a low false-positive rate and useful
-    power at true Sharpe 1.0; loosening the gates raises the false-positive rate far faster than
-    it raises power.
+    It lets most genuinely good books through, which is what a funnel into the 2.5-year window
+    needs. It does not certify: roughly a third of edgeless books also pass, because at 360 days
+    the standard error of an annualised Sharpe is about 1.0 and no threshold separates a real
+    Sharpe of 1.0 from luck at that width.
 
-    This is an information limit of the window, not a tuning failure, and it is why the sealed
-    stage screens against degeneracy and negative edge rather than certifying alpha, and why the
-    field-level false-discovery control -- not the per-candidate rate -- is what protects the
-    result.
+    An earlier version of this file asserted the opposite -- that power at 1.0 was necessarily
+    below 0.60. That was a consequence of a design error (deflating the sealed estimate by the
+    team's full trial count, double-charging a search that happened on other data), not of the
+    window. Removing the double count took power from 0.24 to 0.70.
     """
 
-    assert report.power_at(1.0) < 0.60
-    assert report.null_pass_rate > 0.10
+    assert report.power_at(1.0) >= 0.60
+    assert 0.15 < report.null_pass_rate < 0.50
 
 
 def test_the_deflation_benchmark_exceeds_a_sharpe_of_one_at_field_dispersion() -> None:
@@ -122,22 +121,41 @@ def test_the_deflation_benchmark_exceeds_a_sharpe_of_one_at_field_dispersion() -
     assert benchmark > 1.0
 
 
-def test_a_narrower_search_faces_a_lower_bar() -> None:
+def test_a_narrower_search_faces_a_lower_bar_on_development() -> None:
     """Deflation prices the search that produced the claim, so discipline is rewarded.
 
-    A team whose twelve trials cluster tightly is asked to beat a lower benchmark than one that
-    sprayed -- and the false-positive rate rises with it, which is the honest cost of that trade
-    rather than a defect.
+    This is a statement about the *development* report, where the nominee was selected from the
+    same data. On the sealed blocks the trial count is one and dispersion is irrelevant, which is
+    the whole point of holding them out.
     """
 
     wide = cal.calibrate(
-        THRESHOLDS, null_count=60, per_level=25, periods=SEALED_PERIODS, seed=5, dispersion=0.768
+        THRESHOLDS,
+        null_count=60,
+        per_level=25,
+        periods=SEALED_PERIODS,
+        seed=5,
+        trial_count=12,
+        dispersion=0.768,
     )
     narrow = cal.calibrate(
-        THRESHOLDS, null_count=60, per_level=25, periods=SEALED_PERIODS, seed=5, dispersion=0.30
+        THRESHOLDS,
+        null_count=60,
+        per_level=25,
+        periods=SEALED_PERIODS,
+        seed=5,
+        trial_count=12,
+        dispersion=0.30,
     )
     assert narrow.power_at(1.5) > wide.power_at(1.5)
     assert narrow.null_pass_rate > wide.null_pass_rate
+
+
+def test_dispersion_is_irrelevant_once_the_data_is_held_out() -> None:
+    """At a trial count of one the benchmark is zero however widely the team searched."""
+
+    assert stats.expected_maximum_sharpe(1, stats.annualised_to_period_variance(0.768)) == 0.0
+    assert stats.expected_maximum_sharpe(1, stats.annualised_to_period_variance(0.20)) == 0.0
 
 
 # -- the activation gate ---------------------------------------------------------------------
@@ -157,7 +175,14 @@ def test_activation_refuses_a_bar_no_plausible_strategy_can_pass() -> None:
 
 
 def test_activation_refuses_a_bar_a_null_population_walks_through() -> None:
-    """The opposite failure is just as disqualifying."""
+    """The opposite failure is just as disqualifying.
+
+    Note the permissive fixture cannot exceed a null pass rate of about 0.40 however far the
+    performance thresholds are relaxed: survives_triple_cost compares against zero and has no
+    threshold to loosen, so a book that cannot pay triple costs is rejected regardless. The
+    activation requirement is therefore set below that, which is what makes this fixture bite
+    rather than pass vacuously.
+    """
 
     permissive = dataclasses.replace(
         THRESHOLDS,
@@ -166,9 +191,10 @@ def test_activation_refuses_a_bar_a_null_population_walks_through() -> None:
         minimum_deletion_profile_p05_sharpe=-99.0,
         maximum_vol_normalised_drawdown=99.0,
     )
-    report = cal.calibrate(permissive, null_count=40, per_level=20, periods=SEALED_PERIODS)
+    report = cal.calibrate(permissive, null_count=60, per_level=20, periods=SEALED_PERIODS)
+    assert report.null_pass_rate > 0.25, "the fixture must actually admit nulls"
     with pytest.raises(cal.CalibrationError, match="null pass rate"):
-        cal.assert_bar_is_usable(report, maximum_null_pass_rate=0.45, minimum_power_at={2.0: 0.60})
+        cal.assert_bar_is_usable(report, maximum_null_pass_rate=0.25, minimum_power_at={2.0: 0.60})
 
 
 def test_activation_refuses_a_bar_that_admits_a_degenerate_book() -> None:
@@ -301,3 +327,78 @@ def test_calibration_is_deterministic_given_its_seed() -> None:
     first = cal.calibrate(THRESHOLDS, null_count=20, per_level=10, periods=SEALED_PERIODS, seed=4)
     second = cal.calibrate(THRESHOLDS, null_count=20, per_level=10, periods=SEALED_PERIODS, seed=4)
     assert first.as_dict() == second.as_dict()
+
+
+# -- where the search penalty belongs ----------------------------------------------------------
+
+
+def test_the_sealed_stage_does_not_charge_the_search_twice() -> None:
+    """A team selected its nominee on visible data the sealed blocks never saw.
+
+    Holding those blocks out is already the correction. Deflating the sealed estimate again by the
+    team's twelve-trial benchmark charges the same search a second time, and the cost is most of
+    the stage's power.
+    """
+
+    once = cal.calibrate(
+        THRESHOLDS, null_count=100, per_level=50, periods=SEALED_PERIODS, seed=99, trial_count=1
+    )
+    twice = cal.calibrate(
+        THRESHOLDS, null_count=100, per_level=50, periods=SEALED_PERIODS, seed=99, trial_count=12
+    )
+    assert once.power_at(1.0) > 2 * twice.power_at(1.0)
+    # And it buys almost nothing in exchange.
+    assert twice.null_pass_rate < once.null_pass_rate + 0.10
+
+
+def test_the_calibration_default_is_the_sealed_multiplicity() -> None:
+    """A default of twelve would silently reinstate the double count."""
+
+    import inspect
+
+    default = inspect.signature(cal.calibrate).parameters["trial_count"].default
+    assert default == gates.SEALED_TRIAL_COUNT == 1
+
+
+def test_the_screened_stage_passes_a_usable_fraction_of_real_teams(
+    report: cal.CalibrationReport,
+) -> None:
+    """The sealed stage is a funnel into the 2.5-year window, not the decision itself.
+
+    It has to let genuinely good books through at a workable rate; the ranking happens later,
+    where the standard error is 0.63 rather than 1.0.
+    """
+
+    assert report.power_at(1.0) >= 0.60
+    assert report.power_at(1.5) >= 0.75
+
+
+def test_field_wide_correction_would_empty_the_bracket() -> None:
+    """Why field multiplicity is reported rather than gated.
+
+    At 360 days a true Sharpe of 1.0 produces p-values around 0.15-0.30, while Benjamini-Hochberg
+    at q=0.10 over fifteen nominees needs the best below 0.0067. Averaged over repeated fields
+    containing five genuinely good teams it selects about half a team, so applying it here would
+    repeat V4-R2's failure in a new form: a correct-looking correction no candidate can pass.
+
+    Averaged deliberately -- a single draw is noisy enough to select three, which is exactly the
+    kind of one-shot reading that would make this look fine.
+    """
+
+    selected_counts = []
+    for trial in range(40):
+        generator = np.random.default_rng(1000 + trial)
+        p_values = {}
+        for index in range(15):
+            sealed = cal._path(
+                1.0 if index < 5 else 0.0,
+                periods=SEALED_PERIODS,
+                seed=int(generator.integers(1 << 31)),
+            )
+            p_values[f"team-{index:02d}"] = 1.0 - stats.probabilistic_sharpe_ratio(sealed)
+        selected_counts.append(sum(stats.benjamini_hochberg(p_values, q=0.10).values()))
+
+    assert float(np.mean(selected_counts)) < 2.0, (
+        "field-wide correction at this window length selects almost nobody, which is why the "
+        "charter reports it beside the leaderboard instead of gating on it"
+    )

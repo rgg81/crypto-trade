@@ -107,21 +107,34 @@ feedback-driven trials make a development Sharpe a statement about a search rath
 every prior edition's floor set admitted **zero** of the ninety-four measured V4-R9 trials.
 Enforcing performance there is precisely how a field ends up empty and a fallback ends up choosing.
 
-**Multiple testing is corrected where it exists.** Within a team, the Deflated Sharpe Ratio prices
-the search against the dispersion of that team's *own* journalled trials. Across teams, the
-false-discovery rate is controlled by Benjamini–Hochberg. Family-wise correction across independent
-research programmes is the wrong instrument: one lane's false positive does not weaken another's
-evidence, and treating 180 trials as one family is what made V4-R2's gate unreachable.
+**Multiple testing is corrected where it exists, and only there.** A team selects its nominee from
+twelve trials on *visible* data. The sealed blocks never saw that search, so holding them out is
+already the correction: the sealed estimate of the chosen strategy is unbiased. Deflating it again
+by the team's trial count would charge the same search twice, and measurably does — it costs power
+at a true Sharpe of 1.0 more than half. Deflation is therefore **reported on development**, where
+the nominee was selected on the same data and a Sharpe is a statement about a search, and the
+sealed evaluation carries a trial count of **one**.
+
+**Field multiplicity is reported, never gated.** Fifteen teams each submitting their best does
+create an upward bias in the field maximum, and the release publishes the expected maximum under
+the null beside the leaderboard so a reader can price it. It is not used as a gate: at a 360-day
+window a genuinely good book produces p-values around 0.15–0.30, and a false-discovery correction
+across fifteen nominees selects roughly half a team. That is V4-R2's failure in a new costume — a
+correct-looking correction nobody can pass — and this edition declines to repeat it.
 
 **The bar's operating characteristic is measured before activation and published.** A bar no
 plausible strategy clears cannot be activated; nor can one a null population walks through.
 
-> **Stated plainly:** at a 360-day sealed budget, no threshold reaches both a low false-positive
-> rate and useful power at a true Sharpe of 1.0. The deflation benchmark for a twelve-trial search
-> at the observed field dispersion is about 1.28 — above the Sharpe being tested for. The sealed
-> stage is a **screen against degeneracy and negative edge, not a certification of alpha.**
-> Certification, to the extent this edition can offer it, comes from the 2.5-year observation and
-> the forward desks.
+> **What each stage can conclude.** The sealed stage is a **screen**: it passes roughly two thirds
+> of books with a true Sharpe of 1.0 and roughly a third of books with none, because at 360 days
+> the standard error of an annualised Sharpe is about 1.0 and no threshold does better. Its job is
+> to stop the 2.5-year window being spent on books that are degenerate, cost-annihilated or
+> negative. **Ranking happens on the historical window**, where the standard error is 0.63 — the
+> most discriminating evidence this edition has. **Capital is decided on the forward record**,
+> which is the only uncontaminated evidence of any kind.
+>
+> Three independent filters in series, each weak alone. That is the honest shape of the problem;
+> a single strong gate at any one stage is not available at these window lengths.
 
 ## 6. Selection
 
