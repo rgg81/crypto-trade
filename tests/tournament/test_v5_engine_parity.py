@@ -15,6 +15,14 @@ import pytest
 from crypto_trade.tournament import engine_v2
 from crypto_trade.tournament.v5 import engine as engine_v5
 
+# Every V5 behavioural change, switched off. Parity is only meaningful against the complete set:
+# leaving one on turns "identical to the parent" into "identical apart from the bit I forgot".
+PARENT_EQUIVALENT = {
+    "require_traded_bar_to_fill": False,
+    "score_ruin_instead_of_raising": False,
+    "risk_unit_enabled": False,
+}
+
 INTERVAL_HOURS = 8
 START = pd.Timestamp("2021-01-04", tz="UTC")
 SYMBOLS = ("AAAUSDT", "BBBUSDT", "CCCUSDT", "DDDUSDT")
@@ -138,10 +146,13 @@ def test_v5_evaluator_matches_its_parent_frame_for_frame(
         fixtures["membership"],
         fixtures["targets"],
         mark_prices=fixtures["marks"],
-        config=engine_v5.EvaluatorConfig(require_traded_bar_to_fill=False),
+        config=engine_v5.EvaluatorConfig(**PARENT_EQUIVALENT),
         cost_multiplier=cost_multiplier,
     )
-    pd.testing.assert_frame_equal(parent.returns, forked.returns, check_exact=True)
+    # V5 adds diagnostic columns the parent never had. Parity is a claim about every field the
+    # parent produces, so compare on exactly those and pin the extras separately below.
+    shared = list(parent.returns.columns)
+    pd.testing.assert_frame_equal(parent.returns, forked.returns[shared], check_exact=True)
     pd.testing.assert_frame_equal(parent.positions, forked.positions, check_exact=True)
     pd.testing.assert_frame_equal(parent.events, forked.events, check_exact=True)
 
@@ -186,6 +197,41 @@ def test_the_parity_fixture_is_not_degenerate(fixtures: dict[str, pd.DataFrame])
     assert (result.returns["net_return"] < 0).any()
     assert (result.positions.abs() > 0).any(axis=1).sum() >= 2
     assert result.positions.gt(0).any().any() and result.positions.lt(0).any().any()
+
+
+def test_v5_adds_only_the_declared_diagnostic_columns(fixtures: dict[str, pd.DataFrame]) -> None:
+    """An unannounced column is how a schema quietly drifts apart from the record it binds."""
+
+    parent = engine_v2.evaluate_targets(
+        fixtures["bars"],
+        fixtures["funding"],
+        fixtures["membership"],
+        fixtures["targets"],
+        mark_prices=fixtures["marks"],
+        config=engine_v2.EvaluatorConfig(),
+    )
+    forked = _evaluate(engine_v5, fixtures, **PARENT_EQUIVALENT)
+    extra = [name for name in forked.returns.columns if name not in set(parent.returns.columns)]
+    assert extra == [
+        "risk_unit_scale",
+        "risk_unit_ex_ante_vol",
+        "risk_unit_attained_vol",
+        "risk_unit_binding",
+    ]
+
+
+def test_every_v5_flag_is_listed_in_the_parity_set() -> None:
+    """A new flag that parity forgets to disable would silently weaken this whole file."""
+
+    parent_fields = {f.name for f in engine_v2.EvaluatorConfig.__dataclass_fields__.values()}
+    v5_fields = {f.name for f in engine_v5.EvaluatorConfig.__dataclass_fields__.values()}
+    added = v5_fields - parent_fields
+    behavioural = {name for name in added if not name.startswith("risk_unit_")} | {
+        "risk_unit_enabled"
+    }
+    assert behavioural == set(PARENT_EQUIVALENT), (
+        "every V5 behavioural flag must appear in PARENT_EQUIVALENT"
+    )
 
 
 def test_v5_config_defaults_match_the_parent() -> None:

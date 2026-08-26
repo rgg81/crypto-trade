@@ -55,6 +55,23 @@ class EvaluatorConfig:
     # failures rather than as results. Scoring ruin keeps the evidence and lets the gates reject
     # the candidate on its merits.
     score_ruin_instead_of_raising: bool = True
+    # Organizer-owned ex-ante volatility unit. Without a common risk unit, a cross-team drawdown
+    # comparison collapses into "whoever sized smallest wins": V4-R9's five finalists spanned
+    # realized vol from 7.3% to 20.2%, a 2.8x range, so a shared drawdown cap was a cap on book
+    # size rather than on risk-adjusted quality. Normalised to a 10% unit, the least-risky book's
+    # 20.0% drawdown becomes 27.4% -- worst in the field -- and the winner's 19.4% becomes 9.6%.
+    # CUP-50 v2 mandated the same unit and held twelve lanes to 9.0%-11.7% realized.
+    risk_unit_enabled: bool = True
+    risk_unit_annualized_target: float = 0.10
+    risk_unit_halflife_bars: int = 90
+    risk_unit_window_bars: int = 270
+    risk_unit_shrinkage: float = 0.10
+    risk_unit_minimum_scale: float = 0.10
+    # Must exceed 1: a low-vol book has to be levered *up* to the common unit, and every V4-R9
+    # finalist was a low-vol book. That is why the cap projection below is mandatory rather than
+    # incidental -- the scaled book can transiently exceed the gross cap.
+    risk_unit_maximum_scale: float = 8.0
+    risk_unit_warmup_bars: int = 90
 
     def validate(self) -> None:
         if self.interval_hours < 1 or self.initial_equity <= 0:
@@ -69,6 +86,21 @@ class EvaluatorConfig:
             raise ValueError("invalid symbol-exposure cap")
         if not 0 < self.max_bar_participation <= 1:
             raise ValueError("max_bar_participation must be in (0, 1]")
+        if self.risk_unit_enabled:
+            if self.risk_unit_annualized_target <= 0:
+                raise ValueError("risk_unit_annualized_target must be positive")
+            if self.risk_unit_halflife_bars < 1 or self.risk_unit_window_bars < 2:
+                raise ValueError("risk-unit halflife and window must be positive")
+            if self.risk_unit_window_bars < self.risk_unit_warmup_bars:
+                raise ValueError("risk-unit window cannot be shorter than its warmup")
+            if not 0.0 <= self.risk_unit_shrinkage <= 1.0:
+                raise ValueError("risk_unit_shrinkage must lie in [0, 1]")
+            if not 0 < self.risk_unit_minimum_scale <= self.risk_unit_maximum_scale:
+                raise ValueError("invalid risk-unit scale bounds")
+            if self.risk_unit_maximum_scale < 1.0:
+                raise ValueError(
+                    "risk_unit_maximum_scale below 1 cannot lever a low-vol book to the unit"
+                )
 
 
 # Every field a completed bar contributes to ``returns``. A ruined bar has to publish the same
@@ -100,10 +132,164 @@ RETURN_ROW_FIELDS: tuple[str, ...] = (
     "conservative_settlement_loss",
     "terminal_unresolved_notional",
     "risk_reduction_turnover",
+    "risk_unit_scale",
+    "risk_unit_ex_ante_vol",
+    "risk_unit_attained_vol",
+    "risk_unit_binding",
     "risk_cap_breach",
     "risk_cap_required_scale",
     "equity",
 )
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class RiskUnitDecision:
+    """What the organizer-owned volatility unit did to a submitted book."""
+
+    weights: pd.Series
+    scale: float
+    ex_ante_vol: float
+    attained_vol: float
+    binding: str
+
+    @property
+    def acted(self) -> bool:
+        return self.binding != "none"
+
+
+_RISK_UNIT_NONE = "none"
+_RISK_UNIT_WARMUP = "warmup"
+
+
+def _annualisation(interval_hours: int) -> float:
+    return math.sqrt(365.0 * 24.0 / float(interval_hours))
+
+
+def _ewma_covariance(returns: pd.DataFrame, halflife_bars: int, shrinkage: float) -> np.ndarray:
+    """Exponentially weighted covariance, shrunk toward its own diagonal.
+
+    Shrinkage matters at this width: a 270-bar window over a book of tens of symbols gives a
+    near-singular sample covariance, and an unshrunk inverse-free quadratic form still understates
+    the volatility of a concentrated book.
+    """
+
+    values = returns.to_numpy(dtype=float)
+    count = values.shape[0]
+    ages = np.arange(count - 1, -1, -1, dtype=float)
+    weights = np.exp(-math.log(2.0) * ages / float(halflife_bars))
+    weights /= weights.sum()
+    centred = values - np.average(values, axis=0, weights=weights)
+    covariance = (centred * weights[:, None]).T @ centred
+    covariance /= max(1e-12, 1.0 - float((weights**2).sum()))
+    if shrinkage > 0.0:
+        covariance = (1.0 - shrinkage) * covariance + shrinkage * np.diag(np.diag(covariance))
+    return covariance
+
+
+def _portfolio_volatility(
+    weights: np.ndarray, covariance: np.ndarray, annualisation: float
+) -> float:
+    variance = float(weights @ covariance @ weights)
+    return math.sqrt(max(0.0, variance)) * annualisation
+
+
+def _project_into_caps(weights: pd.Series, cfg: EvaluatorConfig) -> tuple[pd.Series, str]:
+    """Bring a scaled book back inside the organizer's exposure caps.
+
+    Per-symbol excess is clipped rather than renormalised: renormalising would let one capped
+    name silently inflate every other position.
+    """
+
+    binding = _RISK_UNIT_NONE
+    projected = weights.clip(-cfg.max_symbol_exposure, cfg.max_symbol_exposure)
+    if not np.allclose(projected.to_numpy(), weights.to_numpy(), rtol=0.0, atol=1e-15):
+        binding = "symbol_cap"
+    gross = float(projected.abs().sum())
+    if gross > cfg.max_gross_exposure and gross > 0.0:
+        projected = projected * (cfg.max_gross_exposure / gross)
+        binding = "gross_cap"
+    net = float(abs(projected.sum()))
+    if net > cfg.max_abs_net_exposure and net > 0.0:
+        projected = projected * (cfg.max_abs_net_exposure / net)
+        binding = "net_cap"
+    return projected, binding
+
+
+def _ex_ante_risk_unit(
+    desired: pd.Series,
+    closes: pd.DataFrame,
+    quantities: pd.Series,
+    fill_time: pd.Timestamp,
+    cfg: EvaluatorConfig,
+) -> RiskUnitDecision:
+    """Scale a submitted book to the common ex-ante volatility target.
+
+    The estimator is strictly past-only. ``generate_targets`` hands a strategy bars closing at or
+    before the decision, so the unit uses ``closes.index < fill_time`` to match it exactly; reading
+    ``closes.loc[fill_time]`` would be a one-bar look-ahead invisible in every downstream metric.
+    """
+
+    if not cfg.risk_unit_enabled:
+        return RiskUnitDecision(desired, 1.0, float("nan"), float("nan"), _RISK_UNIT_NONE)
+
+    support = sorted(
+        set(desired.index[desired.abs() > 1e-12]) | set(quantities.index[quantities.ne(0.0)])
+    )
+    annualisation = _annualisation(cfg.interval_hours)
+    if not support:
+        return RiskUnitDecision(desired, 1.0, 0.0, 0.0, _RISK_UNIT_NONE)
+
+    history = closes.loc[closes.index < fill_time, support].tail(cfg.risk_unit_window_bars + 1)
+    returns = history.pct_change().dropna(how="all")
+    returns = returns.dropna(axis=1, how="any")
+    if len(returns) < cfg.risk_unit_warmup_bars or returns.shape[1] == 0:
+        return RiskUnitDecision(desired, 1.0, float("nan"), float("nan"), _RISK_UNIT_WARMUP)
+
+    covariance = _ewma_covariance(returns, cfg.risk_unit_halflife_bars, cfg.risk_unit_shrinkage)
+    columns = list(returns.columns)
+    vector = desired.reindex(columns).fillna(0.0).to_numpy(dtype=float)
+    ex_ante = _portfolio_volatility(vector, covariance, annualisation)
+    if ex_ante <= 0.0:
+        return RiskUnitDecision(desired, 1.0, ex_ante, ex_ante, _RISK_UNIT_NONE)
+
+    raw = cfg.risk_unit_annualized_target / ex_ante
+    scale = min(max(raw, cfg.risk_unit_minimum_scale), cfg.risk_unit_maximum_scale)
+    binding = _RISK_UNIT_NONE
+    if raw < cfg.risk_unit_minimum_scale:
+        binding = "min_scale"
+    elif raw > cfg.risk_unit_maximum_scale:
+        binding = "max_scale"
+
+    scaled = desired * scale
+    projected, cap_binding = _project_into_caps(scaled, cfg)
+    if cap_binding != _RISK_UNIT_NONE:
+        binding = cap_binding
+    attained = _portfolio_volatility(
+        projected.reindex(columns).fillna(0.0).to_numpy(dtype=float), covariance, annualisation
+    )
+    if binding == _RISK_UNIT_NONE and abs(scale - 1.0) > 1e-12:
+        binding = "target"
+    return RiskUnitDecision(projected, scale, ex_ante, attained, binding)
+
+
+def _risk_unit_event(
+    fill_time: pd.Timestamp, decision: RiskUnitDecision, notional_change: float
+) -> dict[str, object]:
+    """Report the unit as an explicit central risk action, never a silent rescale."""
+
+    return {
+        "timestamp": fill_time,
+        "symbol": "",
+        "event_type": "risk_unit",
+        "phase": decision.binding,
+        "quantity": 0.0,
+        "price": 0.0,
+        "notional": notional_change,
+        "funding_rate": 0.0,
+        "cashflow": 0.0,
+        "fee": 0.0,
+        "slippage": 0.0,
+    }
 
 
 def _ruin_event(fill_time: pd.Timestamp, phase: str) -> dict[str, object]:
@@ -129,6 +315,10 @@ def _ruin_row(fill_time: pd.Timestamp) -> dict[str, object]:
     row["timestamp"] = fill_time
     row["net_return"] = -1.0
     row["price_pnl"] = -1.0
+    row["risk_unit_scale"] = 1.0
+    row["risk_unit_ex_ante_vol"] = 0.0
+    row["risk_unit_attained_vol"] = 0.0
+    row["risk_unit_binding"] = _RISK_UNIT_NONE
     row["risk_cap_breach"] = False
     row["risk_cap_required_scale"] = 1.0
     row["equity"] = 0.0
@@ -513,6 +703,9 @@ def evaluate_targets(
             cooldown_bars_remaining = next_cooldowns
 
         requested_quantity_by_symbol = pd.Series(0.0, index=symbols)
+        risk_unit = RiskUnitDecision(
+            pd.Series(0.0, index=symbols), 1.0, float("nan"), float("nan"), _RISK_UNIT_NONE
+        )
         if fill_time in target_frame.index and bool(rebalance_instructions.loc[fill_time]):
             desired = pd.Series(0.0, index=symbols)
             supplied = target_frame.loc[fill_time].reindex(symbols).fillna(0.0).astype(float)
@@ -525,7 +718,17 @@ def evaluate_targets(
                 )
             active_symbols = list(eligible & set(symbols))
             desired.loc[active_symbols] = supplied.loc[active_symbols]
+            # The *submitted* book must be legal on its own terms before the organizer touches
+            # it, so this check stays on the strategy's own weights.
             _validate_weight_limits(desired, cfg, fill_time)
+            # Organizer-owned sizing comes next, and it may scale up, which is why the projection
+            # back into the caps is part of the unit rather than an afterthought.
+            risk_unit = _ex_ante_risk_unit(desired, closes, quantities, fill_time, cfg)
+            if risk_unit.acted:
+                before = float(desired.abs().sum()) * equity_after_boundary_funding
+                after = float(risk_unit.weights.abs().sum()) * equity_after_boundary_funding
+                event_rows.append(_risk_unit_event(fill_time, risk_unit, after - before))
+            desired = risk_unit.weights
             if risk_policy is not None and policy_decision is not None:
                 desired.loc[desired > 0.0] *= risk_policy.side_scaling.long_scale
                 desired.loc[desired < 0.0] *= risk_policy.side_scaling.short_scale
@@ -970,6 +1173,10 @@ def evaluate_targets(
             "conservative_settlement_loss": conservative_settlement_notional / equity_at_start,
             "terminal_unresolved_notional": terminal_unresolved_notional,
             "risk_reduction_turnover": float(risk_reduction_notional.abs().sum()) / equity_at_start,
+            "risk_unit_scale": risk_unit.scale,
+            "risk_unit_ex_ante_vol": risk_unit.ex_ante_vol,
+            "risk_unit_attained_vol": risk_unit.attained_vol,
+            "risk_unit_binding": risk_unit.binding,
             "risk_cap_breach": risk_breach_scale < 1.0 - 1e-12,
             "risk_cap_required_scale": risk_breach_scale,
             "equity": equity,

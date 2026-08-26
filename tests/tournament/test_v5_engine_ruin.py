@@ -214,4 +214,7 @@ def test_the_ruined_frame_is_not_ragged() -> None:
     bars, marks, targets = _ruinous_inputs()
     result = _evaluate(bars, marks, targets)
     assert list(result.returns.reset_index().columns) == list(engine.RETURN_ROW_FIELDS)
-    assert not result.returns.isna().any().any()
+    # The risk-unit volatility diagnostics are deliberately NaN when no estimate exists -- "not
+    # computed" and "zero volatility" are different claims and must not be conflated.
+    economic = result.returns.drop(columns=["risk_unit_ex_ante_vol", "risk_unit_attained_vol"])
+    assert not economic.isna().any().any()
