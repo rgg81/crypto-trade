@@ -109,6 +109,13 @@ class PhaseRequest:
     workspace: Workspace
     forbidden_roots: tuple[str, ...]
     allowed_tools: tuple[str, ...]
+    # The lane subdirectory this phase writes its submission into. A parameter rather than a
+    # constant because it is not always "outbox": the scouting phase writes to "scouting/", and
+    # hardcoding the research surface meant every sealed thesis was journalled with NO digest at
+    # all. The harvest read the right directory, so the theses existed and looked fine -- but a
+    # preregistration whose whole value is that it cannot be revised after the fact had nothing
+    # binding it. A seal that records nothing is not a seal.
+    output_surface: str = "outbox"
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
     model: str | None = None
 
@@ -256,7 +263,7 @@ class ClaudeCodeRuntime:
             exit_code=exit_code,
             duration_seconds=time.monotonic() - started,
             timed_out=timed_out,
-            produced=_produced_digests(request.workspace, "outbox"),
+            produced=_produced_digests(request.workspace, request.output_surface),
             denials=denials,
             transcript_sha256=hashlib.sha256(stdout.encode("utf-8")).hexdigest(),
         )
@@ -294,7 +301,7 @@ class ScriptedRuntime:
             exit_code=exit_code,
             duration_seconds=time.monotonic() - started,
             timed_out=False,
-            produced=_produced_digests(request.workspace, "outbox"),
+            produced=_produced_digests(request.workspace, request.output_surface),
             denials=(),
             transcript_sha256=hashlib.sha256(transcript.encode("utf-8")).hexdigest(),
         )

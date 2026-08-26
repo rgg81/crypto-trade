@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -258,3 +259,30 @@ def test_the_lease_is_released_when_its_block_exits():
 def test_an_unknown_phase_is_refused(bench):
     with pytest.raises(broker.BrokerError, match="unknown phase"):
         _run(bench, _healthy_runtime(), phase="freestyle")
+
+
+def test_a_scouting_phase_journals_a_digest_for_what_it_actually_wrote(bench):
+    """The seal has to bind the bytes, and it did not.
+
+    The runtime hardcoded the research surface, so a scouting phase -- which writes to scouting/,
+    not outbox/ -- was journalled with an empty ``produced`` map. The harvest read the right
+    directory, so the theses existed and the run looked healthy, but nothing bound them. A
+    preregistration whose entire value is that it cannot be revised after seeing a result had no
+    digest recorded anywhere. Fifteen sealed theses were affected before this was noticed.
+    """
+
+    outcome = _run(bench, _healthy_runtime({"THESIS.md": "preregistered"}), phase="scouting")
+
+    assert outcome.produced == {"THESIS.md": b"preregistered"}
+    assert set(outcome.receipt.produced) == {"THESIS.md"}, (
+        "a scouting phase must journal a digest for the thesis it wrote"
+    )
+    assert outcome.receipt.produced["THESIS.md"] == hashlib.sha256(b"preregistered").hexdigest()
+
+
+def test_a_research_phase_still_journals_its_outbox(bench):
+    """The other direction, so the fix cannot have simply moved the bug."""
+
+    outcome = _run(bench, _healthy_runtime(), phase="discovery")
+
+    assert set(outcome.receipt.produced) == {"candidate.py", "RATIONALE.md"}

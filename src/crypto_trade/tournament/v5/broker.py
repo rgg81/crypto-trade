@@ -204,6 +204,7 @@ def run_phase(
         },
     )
 
+    surface = "scouting" if phase == SCOUTING_PHASE else "outbox"
     receipt = agent_runtime.launch(
         runtime.PhaseRequest(
             lane=team_id,
@@ -212,11 +213,11 @@ def run_phase(
             workspace=space,
             forbidden_roots=tuple(forbidden_roots),
             allowed_tools=allowed_tools(profile),
+            output_surface=surface,
             timeout_seconds=timeout_seconds,
         )
     )
 
-    surface = "scouting" if phase == SCOUTING_PHASE else "outbox"
     try:
         produced = workspace.harvest(space, surface)
     except workspace.WorkspaceError:
