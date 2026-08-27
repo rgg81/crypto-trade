@@ -1,175 +1,191 @@
-# RATIONALE — team-06, cluster relative value (discovery baseline)
+# RATIONALE — team-06, cluster relative value
 
-**Candidate:** `lane/outbox/candidate.py`
-**Trial:** T1 of the preregistered search order (`lane/scouting/THESIS.md` §4.4).
-**Feedback consumed:** none. `lane/feedback/` is empty; this is the first candidate I have
-written and nothing in it is fitted to a result.
+**Trial:** T1, the preregistered baseline of `lane/scouting/THESIS.md` §4.4.
+**Phase:** discovery. No feedback packets exist yet; nothing here is fitted to a result.
 
 ---
 
-## 1. What this is
+## 1. What the book is
 
-The thesis at its declared midpoint defaults, with every optional axis switched off. It is the
-plainest possible expression of "rolling correlation clusters, trading deviation from cluster
-mean" that is still recognisably the thing the mandate names, and it is deliberately not clever.
+At every decision, from past-only rows only:
 
-| axis (THESIS §4.3) | this candidate | why this value |
-|---|---|---|
-| `W` correlation window | 180 bars (~60d) | midpoint of {90, 180, 270} |
-| `q_max` aspect ratio `N/T` | 0.4 | tighter of {0.4, 0.6}; keeps the matrix out of noise geometry |
-| `K` clusters | MP-adaptive, clamped [2, 10] | data-driven; not chosen against performance |
-| `m_min` | 5 | tighter of {3, 5} |
-| `H` deviation lookback | 3 bars (~1d) | interior of {1, 3, 6, 21}; §5.3 predicts `H = 1` dies on cost |
-| `Z` | within-cluster cross-sectional | simpler of the two; OU adds a fitted `κ` I cannot yet diagnose |
-| `S` smoothing | 3 decisions | midpoint of {1, 3, 6} |
-| `z_enter` | 0.75 | midpoint of {0, 0.75, 1.25} |
-| `α` funding tilt | **0** | off — a second mechanism would confound the first read |
-| `γ` liquidity weighting | **0** | off — same reason |
-| `sign_mode` | contrarian | the thesis's stated prior (§1.6) |
+1. Keep `eligible_symbols` with at least `W = 180` bars (60 days) of history.
+2. Rank by median `quote_volume` over the window, keep the top `N = floor(q_max · W) = 72`.
+3. Build the `W × N` close panel **aligned on `open_time`**, forward-fill genuine bar gaps, take
+   8h log returns, winsorize each column at 1%/99% within the window.
+4. Spearman correlation → Marchenko–Pastur eigenvalue clipping (bulk clipped to its own mean,
+   trace preserved) → **remove the top eigenvector** → renormalize to unit diagonal.
+5. Distance `d = √(2(1−ρ))`; average-linkage agglomerative clustering into `K` groups, where
+   `K = 1 + (#eigenvalues above λ₊ = (1+√q)², excluding the market mode)`, clamped to [2, 10].
+   Clusters with fewer than `m_min = 5` members are not traded.
+6. Residual = each name's `H = 3`-bar (1 day) return minus its cluster's equal-weight 3-bar return.
+7. Standardize the residual cross-sectionally **within its own cluster**, clip at ±3, and average
+   that z over the last `S = 3` decision boundaries.
+8. Contrarian sign, dead-zone `z_enter = 0.75` applied as a soft threshold.
+9. Demean within each cluster, then globally; normalize `Σ|w| = 1.0`; cap `|w| ≤ 0.10`.
 
-Three axes are set to their inert value on purpose. `α` and `γ` each add a *separate* economic
-claim (crowding/carry, and inventory rent concentrated in illiquid names). If I switch them on now
-and the book works, I will not know which claim carried it. They are trials T6 and T8, in that
-order, and they stay off until the residual reversal itself has been measured alone.
+`α = 0` and `γ = 0`: the funding tilt and the liquidity weighting are declared knobs (§4.3 axes 9
+and 10) held at their neutral setting. This is the mandate with nothing bolted on.
 
-## 2. The mechanism, in one paragraph
+---
 
-Leveraged directional flow in Binance USD-M perpetuals arrives aimed at a *theme* — an L1 basket,
-memecoins, an AI narrative, a rotation out of majors — but executes on *individual* contracts, each
-with its own book and its own inventory-constrained market makers. Liquidation and ADL engines make
-this worse: they sell what is margin-deficient, at whatever price, with no view at all. The result
-is that one member of a genuinely co-moving group gets pushed away from the group without any news
-about what the group has in common. Someone absorbs that at a price concession and lays it off over
-the following hours to days. **This candidate rents its balance sheet on those terms: it is short
-the members of a discovered co-movement group that have run rich to the group, and long the ones
-that have run cheap, in proportion, with each group's contribution summing to zero.** The return
-being claimed is the inventory concession, not a forecast.
+## 2. The mechanism
+
+Order flow in Binance USD-M perpetuals is **thematically correlated but name-specific in its
+execution**. Leveraged directional flow arrives aimed at a narrative group — L1s, memecoins, an AI
+basket, a rotation out of majors — but it lands on individual contracts, each with its own book, its
+own makers, and its own inventory limits. The group-level view that motivated the trade is usually
+not new information about the single member that absorbed it. So the flow pushes one name away from
+the contemporaneous move of the assets it genuinely co-moves with, without any change in the common
+factor driving all of them.
+
+Someone holds the other side at a price concession and unwinds it over the following hours to days.
+**The return claimed here is that concession, measured against the group rather than against the
+asset's own past.** Bianchi–Babiak–Dickerson (2022) and Farag et al. (2025) identify this premium as
+inventory rent for liquidity provision, not a behavioural anomaly, and find it concentrated exactly
+where liquidity provision is hardest.
+
+Two things make this a *cluster* claim rather than a generic reversal claim:
+
+- **The benchmark has to be the right one.** Liu–Tsyvinski–Wu (2022) show the crypto cross-section
+  is dominated by a market factor. "This name fell 4% today" is mostly "crypto fell 4% today," and a
+  reversal signal that does not remove that is trading beta while calling it relative value.
+  Demeaning against the whole universe removes the market factor and nothing else. Demeaning against
+  a discovered co-movement group removes the market factor **and** the narrative/sector factor the
+  group shares — where most of the remaining non-idiosyncratic variance lives.
+- **The groups cannot be declared.** Crypto has no GICS. Sector labels are marketing, assigned at
+  listing and never revised, while the co-movement structure they proxy rotates on a timescale of
+  months. The only defensible grouping is one re-estimated from the realized correlation matrix at
+  every decision.
+
+Two structural choices are not decoration. **MP eigenvalue clipping** is there because Laloux et al.
+(1999) show the bulk of an empirical correlation spectrum is indistinguishable from a matrix with no
+correlation structure at all — cluster on the raw sample matrix and you cluster noise geometry. The
+**`q_max` aspect-ratio cap** is the same constraint in universe terms: with ~150–250 eligible perps
+and a 180-bar window the sample matrix is rank-deficient and its partition meaningless, so the
+universe is capped at 72 names. **Removing the top eigenvector before clustering** is what stops the
+"discovered sectors" from being a beta sort.
+
+---
 
 ## 3. Who is on the other side
 
-- **Leveraged retail directional traders** picking the most salient name inside a narrative group.
-  They create the deviation; they are impatient rather than wrong.
-- **Liquidation and auto-deleveraging engines**, price-insensitive by construction.
-- **Basis and funding-carry desks**, whose delta-neutral hedging puts one-sided pressure on a single
-  contract's perp leg for reasons unrelated to that asset's value relative to its peers.
+- **Leveraged retail directional traders** buying the strongest-looking member of a narrative group.
+  Not stupid — impatient, and selecting the name within the group on salience rather than on relative
+  value. This is the flow that creates the deviation.
+- **Liquidation and auto-deleveraging engines.** Price-insensitive by construction: they sell what is
+  margin-deficient, not what is expensive. This is the cleanest version of the signal and it exists
+  in this venue in a way it does not exist in equities.
+- **Basis and funding-carry desks**, whose delta-neutral spot-perp hedging puts one-sided pressure on
+  a single contract's perp leg for reasons unrelated to that asset's value against its peers.
 - **Cross-sectional momentum and trend programs**, which by construction buy the group member that
-  has already moved most — the direct counterparty to the contrarian sign.
-- **On the days this loses: whoever was right.** The deviation was information — an unlock, a
-  listing, an exploit, a squeeze — and the book was short the start of it. There is no news feed,
-  no open interest and no liquidation feed in this context, so that case cannot be filtered out. It
-  is the adverse-selection cost the premium pays for, and it is unhedged.
+  has already moved most.
+- **On the losing days: whoever was right.** See §4.
 
-## 4. Why the cluster, and not the universe
+---
 
-This is the whole marginal claim of the lane, so it is worth being precise. A raw cross-sectional
-reversal signal in crypto is dominated by one market factor; demeaning against the whole universe
-removes that factor and nothing else. Demeaning against a *discovered co-movement group* removes
-the market factor **and** the narrative factor the group shares, which is where most of the
-remaining non-idiosyncratic variance lives. Crypto has no GICS — listing-time sector labels are
-marketing and are never revised — so the only defensible grouping is one re-estimated from the
-realized correlation matrix at every decision.
+## 4. What the premium pays for
 
-The implementation takes the Laloux noise-dressing result seriously rather than decoratively, in
-three places that are easy to skip:
+It is not a free lunch. Avellaneda–Lee report the equity version's Sharpe roughly halving from
+1997–2007 to 2003–2007 as it was competed, and PwC/AIMA report market-neutral as the *most common*
+declared crypto hedge fund strategy. This is a crowded bucket, and the payment is for:
 
-1. **`q_max` caps the universe against the window.** With ~200 eligible perps and a 180-bar window
-   the sample correlation matrix is rank-deficient and its "clusters" are noise geometry. The
-   candidate caps `N ≤ 0.4·T` using the *actual* aligned window length, not the requested one.
-2. **The Marchenko–Pastur bulk is clipped to its mean**, trace preserved, before anything is
-   clustered.
-3. **The top eigenvector is removed before clustering, not after.** Clustering raw correlations in
-   crypto returns one giant cluster, because everything correlates with the market. Detoning first
-   is what makes the partition about co-movement *structure* rather than about beta.
+1. **Immediacy** — renting balance sheet on the same terms as a market maker.
+2. **Adverse selection** — sometimes the deviant name is deviating for a reason (unlock, listing,
+   exploit, squeeze). With no news feed, no open interest and no liquidation feed, the residual will
+   occasionally say "short it, it is rich to its cluster" at the start of a 300% squeeze. The ±3
+   z-clip and the 0.10 cap are the only defence and they are not a good one.
+3. **Correlation-regime risk** — the cluster is a hedge that fails when it is needed. In a drawdown
+   correlations converge, the partition collapses toward one market cluster, and residual variance
+   vanishes.
+4. **Crowding and deleveraging** — Khandani–Lo's August 2007 template: a crowded residual book loses
+   on a mechanical unwind, not on signal decay, and it loses when the counterparty that normally pays
+   the immediacy premium has stepped away. Perps have an exchange-run version of this.
 
-`K` is then set to `1 + (# eigenvalues above the MP edge, excluding the top)`, clamped to [2, 10].
-This is the one place the candidate reads structure out of the data instead of being told it, and
-it is deliberate: `K`, `m_min` and `q_max` are the three parameters the thesis committed to
-choosing from stability diagnostics rather than from performance.
+The expected edge is budgeted accordingly. The estimation constraints above push the tradeable
+universe toward the *liquid* end — which is the *competed* end — and §1.5 of the thesis preregisters
+the expectation that this costs most of the edge.
 
-## 5. Construction details that are choices, stated so they can be argued with
+---
 
-- **Dead-zone is a hard entry gate, weight linear in z.** The frozen weight transform is "linear in
-  clipped, smoothed z", so the gate zeroes names inside the dead zone rather than shrinking every
-  name toward it. A soft threshold was written first and rejected: it concentrates gross onto the
-  few extreme z's and puts the effective-breadth gate at risk. The discontinuity is bounded in book
-  terms because a name entering at the gate carries the *smallest* weight in the book.
-- **Smoothing reuses the current partition across all `S` lags.** The `H`-bar returns ending at
-  `t`, `t−1`, `t−2` are all residualized against the partition estimated at `t`. This is past-only
-  and it isolates smoothing of the *signal* from churn in the *partition*, which is the thing F1 is
-  about.
-- **Within-cluster demeaning is over each cluster's active names.** Demeaning over all members would
-  spray tiny positions onto names the dead zone deliberately excluded.
-- **Winsorization is near-inert under Spearman** and is applied only for fidelity to the
-  preregistration. Rank correlation is already robust to the clipped tail; I would rather note this
-  than quietly drop a frozen step.
-- **Gross targets 0.98 and the per-name cap is 0.099**, purely as headroom under the hard 1.0/0.10
-  limits. This is book *shape*, not risk sizing — the engine owns the ex-ante volatility unit and
-  will rescale the whole book. No volatility targeting appears anywhere in the file.
-- **Statelessness is structural, not asserted.** Nothing is carried between calls; every decision
-  recomputes the panel, the matrix, the partition and the book from the streamed past-only rows.
-  Turnover is controlled by making the *signal* slowly varying (`H`, `S`, `z_enter`), never by
-  remembering positions.
-- **No symbol identity, no date literals, no embedded data.** Symbols are used only as dictionary
-  keys and are filtered to strings not beginning with `__` so the organizer's reserved target
-  column can never be traded. Every quantity is a rank, a log return, a correlation or a
-  z-score, so the book is invariant to a rescaling of price and volume levels.
+## 5. What would falsify this
 
-## 6. What would falsify this
+Stated in the sealed thesis before any data was mounted, and restated here unchanged.
 
-In priority order, as preregistered. **A profitable book that fails F2 is still a falsified thesis
-and I will report it as one.**
+**F2 — PRIMARY. The cluster must earn its place.** At matched gross and matched turnover, this
+book's gross edge per unit turnover must exceed that of the identical book with `K = 1` — a single
+global cluster, i.e. plain universe-demeaned cross-sectional reversal. If it does not, the mandate is
+falsified: the only thing "sectors are discovered" adds is the claim that a *discovered partition* is
+a better benchmark than the universe mean. If it adds nothing, the clustering is decoration and this
+is a generic reversal strategy carrying extra estimation error — **even if it makes money.** A
+profitable book that fails F2 is a falsified thesis and will be reported as one. `K = 1` is the next
+trial (T2) precisely because it is the only one that can embarrass me.
 
-**F2 (primary) — the cluster must earn its place.** At matched gross and matched turnover, this
-book's gross edge per unit turnover must exceed that of the identical book with `K = 1`, i.e. plain
-universe-demeaned reversal. If a discovered partition adds nothing over the universe mean, the
-clustering is decoration and this is a generic reversal strategy carrying extra estimation error.
-Trial T2 is that null, and it goes early precisely because it is the only trial that can embarrass
-me.
+**F1a — cluster identity must survive re-estimation.** Median Adjusted Rand Index between the
+partition from `[t−W, t)` and the partition from the **disjoint** window `[t−2W, t−W)` must exceed
+0.15. Disjoint, not adjacent: overlapping rolling windows share ~90% of their data and would score
+high mechanically, which is a test that cannot fail.
 
-**F1 — the lane falsifier.** If cluster membership is unstable across a *genuine* estimation
-boundary, deviations from cluster mean are noise. Operationally: median Adjusted Rand Index between
-partitions fitted on the disjoint windows `[t−2W, t−W)` and `[t−W, t)` must exceed 0.15 (disjoint,
-not adjacent — adjacent windows overlap ~99% here and would score high mechanically, which is a
-test that cannot fail); and the median count of eigenvalues above the MP edge, excluding the top,
-must be ≥ 2. If it is ≤ 1, "cluster" is a synonym for "market beta" and the premise is dead
-regardless of the backtest.
+**F1b — structure above noise.** Median count of eigenvalues above the MP edge `λ₊ = (1+√q)²`,
+excluding the market mode, must be ≥ 2. If it is ≤ 1, the only structure in the matrix is the market
+factor, "cluster" is a synonym for "market," and the discovered-sector premise is dead regardless of
+what any backtest says. (This is the same quantity the code uses to set `K`, so a degenerate spectrum
+shows up as `K` pinned at its floor of 2.)
 
-**F3 — the sign must be stable.** Split the visible window into four contiguous sub-blocks; the
-sign of the cluster-residual autocorrelation at `H` must agree in at least 3 of 4. A sign that
-flips across sub-blocks makes any full-window Sharpe an average over a coin flip.
+**F3 — the sign must be stable.** Split the visible window into four contiguous sub-blocks; the sign
+of the cluster-residual autocorrelation at `H` must agree in at least 3 of 4. Otherwise the effect is
+regime-contingent and any full-window Sharpe is an average over a coin flip.
 
-If a falsifier fires I retire the thesis rather than substituting a different mechanism into the
-slot. Specifically: I will not ship the `K = 1` book and call it cluster relative value, I will not
-switch to declared sector labels to manufacture stability, and I will not select the sub-blocks
-where the sign agreed.
+**If a falsifier fires I retire the thesis rather than substitute a mechanism into the same slot.**
+Specifically: if F2 fires I will not ship the `K = 1` global-demeaned book and call it cluster
+relative value; if F1 fires I will not switch to declared sector labels to manufacture stability; if
+F3 fires I will not select the sub-blocks where the sign agreed.
 
-## 7. What I most expect to be wrong, before seeing any number
+Zaremba et al. (2021) find daily cross-sectional reversal in crypto driven by illiquidity but
+*momentum* in the largest and most tradeable coins — the tier a Binance-perp universe sits in. The
+sign is therefore not assumed: `sign_mode` is a declared, literature-motivated, last-in-search-order
+knob (§4.3 axis 11). I expect reversal to survive cluster-demeaning, because much of that large-cap
+"momentum" is unremoved market direction and demeaning removes it. If only the sign-flipped
+configuration works, that is weak evidence, not a discovery.
 
-Named now so that seeing them later is a confirmation rather than a discovery.
+---
 
-1. **A degenerate partition.** Average linkage chains. If detoning does not break it, the cut into
-   `K` groups will be one giant cluster plus singletons; the singletons fall below `m_min` and are
-   dropped, and what remains is a single global cluster — the F2 null, arrived at by accident. The
-   diagnostic is a book that behaves identically to universe-demeaned reversal.
-2. **Partition churn dominating turnover.** The partition is re-estimated every decision. When a
-   name changes cluster its residual and therefore its weight can flip sign for reasons that have
-   nothing to do with price. `S = 3` smooths the signal but not the partition, by design.
-3. **The universe cap pushing me away from the edge.** The liquidity-provision literature puts the
-   premium in small, illiquid, high-adverse-selection pairs. `q_max` and the `L_min = W` history
-   requirement force the tradeable set toward the top ~72 names by volume, which is the *competed*
-   end. This was declared in the thesis before data was mounted and I expect it to cost most of the
-   edge.
-4. **Effective breadth.** With ~72 names, a 0.75 gate on a smoothed z of standard deviation ~0.85
-   should leave roughly a third of the cross-section active. If it leaves far fewer, `z_enter` and
-   `S` move together at T7 — that is a gate repair, not a performance search.
-5. **Cost.** `H = 3` on an 8h decision grid is a demanding turnover profile against a triple-cost
-   survival gate. If the book only clears at 1x, it is not a book.
+## 6. Reading decisions, recorded rather than argued later
 
-## 8. What I am not claiming
+- **Winsorized returns feed both the correlation and the signal.** §4.1 winsorizes at panel
+  construction (step 3) and step 8 operates on that panel. Using raw returns for the signal would put
+  a single 300% bar into a 5-member cluster's cross-sectional standard deviation and squash everyone
+  else to zero. The ±3 z-clip is the second line, not the first.
+- **Smoothing is stateless.** `S = 3` averages the z measured at the last three decision boundaries,
+  all recomputed from the same panel. Turnover is controlled by making the *signal* slowly varying
+  (`H`, `S`, `z_enter`), never by remembering previous positions — which the rules forbid and which
+  would fail exact-replay determinism.
+- **The dead-zone is a soft threshold**, `sign(z)·max(|z|−0.75, 0)`, so the ranking inside the
+  surviving tails is preserved rather than flattened to ±1.
+- **A missing bar is forward-filled**, i.e. treated as a bar with no observed price change, not as a
+  hole that disqualifies the name.
+- **No volatility targeting.** Gross is fixed at `Σ|w| = 1.0` before the engine's common ex-ante risk
+  unit rescales it. Cross-sectional z-scoring is per-name signal standardization, not book risk
+  scaling; this interpretation was recorded in §4.5 before data was mounted.
+- **The per-decision `except` returns a flat book, not a masked bug.** A degenerate cross-section at
+  one decision (failed eigendecomposition, collapsed panel) should cost that decision, not the run. A
+  *systematic* failure is unmistakable in the packet — gross exposure and turnover are zero
+  everywhere, which is not what a strategy with no edge looks like.
 
-That this is a neglected corner. Market-neutral is the most populated declared strategy bucket in
-crypto funds, and the canonical equity version of this trade had its Sharpe roughly halve as it was
-competed. The claim is narrower: the *supply* of the flow — retail leverage, liquidation cascades,
-carry-desk hedging — is structurally large and renewing, while the capital that absorbs it is
-concentrated in the largest contracts and is subject to periodic forced withdrawal. That is a thin
-edge in a crowded trade, and I would rather report a thin one honestly than a thick one I fitted.
+---
+
+## 7. What I want back from this packet
+
+Beyond the standard metrics: **mean number of names held**, **mean gross**, **turnover**, and
+**gross edge per unit turnover** — the last is the F2 comparison quantity, and T2 (`K = 1`) is
+useless without it measured the same way here. Also whether the book is ever flat, which would
+indicate the universe filters are biting harder than intended rather than the signal being off.
+
+Structural expectations, stated now so a miss is informative: roughly 60–72 names in the universe,
+~35–40% of them non-zero after the dead-zone (the `H`-bar windows at consecutive lags overlap, so the
+smoothed z shrinks less than independence would suggest), both sides used by construction since every
+cluster is demeaned to zero, and net ≈ 0.
+
+The costly corner is turnover: `H = 3` with `S = 3` on an 8h grid is a demanding hurdle against
+~9bp round-trip at 1× and ~27bp at 3×. If the triple-cost gate is what fails, that is the
+pre-registered job of T7, not evidence against the mechanism.
