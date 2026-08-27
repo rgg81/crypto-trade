@@ -286,3 +286,20 @@ def test_a_research_phase_still_journals_its_outbox(bench):
     outcome = _run(bench, _healthy_runtime(), phase="discovery")
 
     assert set(outcome.receipt.produced) == {"candidate.py", "RATIONALE.md"}
+
+
+def test_a_changed_kit_is_a_different_phase(bench):
+    """The kit is as much a lane's instructions as its prompt.
+
+    Learned the hard way: a documentation defect in the kit cost two lanes a discovery phase, and
+    because correcting the kit left the fingerprint unchanged, the restart logic would have skipped
+    both as already complete and served the broken result as final.
+    """
+
+    first = _run(bench, _healthy_runtime(), suffix="a")
+    assert first.usable and not first.skipped
+
+    (bench["kit"] / "RULES.md").write_text("the rules, now corrected", encoding="utf-8")
+    second = _run(bench, _healthy_runtime(), suffix="b")
+
+    assert not second.skipped, "a corrected kit must re-run the phase, not inherit its completion"

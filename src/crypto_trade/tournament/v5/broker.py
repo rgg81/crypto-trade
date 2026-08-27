@@ -92,15 +92,33 @@ class PhaseOutcome:
         }
 
 
-def phase_fingerprint(team_id: str, phase: str, prompt: str) -> str:
+def _digest_tree(root: Path) -> str:
+    """One digest over a directory's relative paths and contents."""
+
+    if not root.is_dir():
+        return ""
+    body = hashlib.sha256()
+    for path in sorted(root.rglob("*")):
+        if path.is_file():
+            body.update(path.relative_to(root).as_posix().encode("utf-8"))
+            body.update(hashlib.sha256(path.read_bytes()).digest())
+    return body.hexdigest()
+
+
+def phase_fingerprint(team_id: str, phase: str, prompt: str, kit_digest: str = "") -> str:
     """Identifies a phase attempt for restart purposes.
 
-    The prompt is part of it deliberately. A changed mandate is a different phase, and silently
+    The prompt is part of it deliberately: a changed mandate is a different phase, and silently
     inheriting the previous one's completion would let an edition claim work it never did under the
     instructions it actually issued.
+
+    So is the **kit**, for exactly the same reason and learned the harder way. The kit is as much
+    part of a lane's instructions as its prompt -- when a documentation defect in it cost two lanes
+    a discovery phase, correcting the kit left the fingerprint unchanged, so the restart logic would
+    have skipped both lanes as already complete and served the broken result as final.
     """
 
-    payload = f"{team_id}\x00{phase}\x00{prompt}".encode()
+    payload = f"{team_id}\x00{phase}\x00{prompt}\x00{kit_digest}".encode()
     return hashlib.sha256(payload).hexdigest()
 
 
@@ -148,7 +166,8 @@ def run_phase(
         forbidden_roots=forbidden_roots,
     )
 
-    fingerprint = phase_fingerprint(team_id, phase, prompt)
+    kit_digest = _digest_tree(Path(kit_source))
+    fingerprint = phase_fingerprint(team_id, phase, prompt, kit_digest)
     if already_completed(journal_path, fingerprint):
         return PhaseOutcome(
             team_id=team_id,

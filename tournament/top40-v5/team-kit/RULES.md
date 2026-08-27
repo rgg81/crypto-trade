@@ -52,10 +52,37 @@ window. It looks like a strategy with no edge rather than a strategy that never 
 | `auxiliary` | `Mapping[str, pd.DataFrame]` | reserved; empty in this edition |
 | `eligible_symbols` | `Sequence[str]` | point-in-time members with an executable open |
 
-Each frame in `bars` has the columns `open`, `high`, `low`, `close`, `volume`, `quote_volume`,
-`trade_count`, `taker_buy_volume`, `taker_buy_quote_volume`, ordered oldest to newest. The `funding`
-frame has `symbol`, `funding_rate`, `funding_time`, `mark_price` and `settlement_time` — note that
-the rate column is **`funding_rate`**, not the raw Binance `last_funding_rate`.
+Each frame in `bars` has the columns `open_time`, `symbol`, `open`, `high`, `low`, `close`,
+`volume`, `close_time`, `quote_volume`, `trade_count`, `taker_buy_volume`,
+`taker_buy_quote_volume`, ordered oldest to newest. The `funding` frame has `symbol`,
+`funding_rate`, `funding_time`, `mark_price` and `settlement_time` — note that the rate column is
+**`funding_rate`**, not the raw Binance `last_funding_rate`.
+
+### Aligning across symbols — read this before building a cross-sectional panel
+
+Three facts about the shape, all of which bite together:
+
+1. **Each per-symbol frame carries a positional `RangeIndex`, not a timestamp index.** The index is
+   `0 … n-1` for that symbol.
+2. **Symbols have unequal history.** A long-listed contract may have thousands of rows where a
+   recent member has a few hundred, and both are truncated at the same decision boundary.
+3. **The timestamp lives in the `open_time` column**, and that is the only correct alignment key.
+
+Put together: `pd.concat({s: bars[s]["close"].iloc[-W:] for s in symbols}, axis=1)` aligns on the
+*integer* index, and two symbols of different length occupy disjoint integer ranges — so the panel
+comes back almost entirely `NaN`, every name is dropped, and the strategy silently returns an empty
+book on every decision. It raises nothing. It looks like a strategy with no edge.
+
+Build the panel on `open_time` instead:
+
+```python
+panel = pd.concat(
+    {s: bars[s].set_index("open_time")["close"] for s in symbols},
+    axis=1,
+).sort_index()
+```
+
+This is stated at length because two lanes lost a discovery phase to it before it was written down.
 
 The executable open at the decision is deliberately not exposed. Symbols vary in history length: a
 recent member may have far fewer rows than an established one, and a symbol that stopped trading is
