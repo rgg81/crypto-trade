@@ -116,6 +116,16 @@ def _lane_files(lane_root: Path, phase: str) -> dict[str, Path]:
     if feedback.is_dir():
         for packet in sorted(feedback.glob("*.json")):
             files[f"feedback/{packet.name}"] = packet
+    # The decision phase may re-nominate an earlier book, so it needs the sources as well as the
+    # scores. Earlier phases do not get the archive -- discovery has nothing to look back on, and
+    # handing refinement its own previous attempt invites tuning where the guidance asks for
+    # diagnosis.
+    if phase == "decision":
+        archive = lane_root / "candidates"
+        if archive.is_dir():
+            for prior in sorted(archive.iterdir()):
+                if prior.is_file():
+                    files[f"candidates/{prior.name}"] = prior
     return files
 
 
@@ -211,6 +221,15 @@ def run_lane(
             destination.mkdir(parents=True, exist_ok=True)
             for name, body in outcome.produced.items():
                 (destination / name).write_bytes(body)
+            # Archive under the phase that produced it, so a later phase can still nominate an
+            # earlier book. Without this each phase overwrote the last and refinement became a
+            # ratchet that could only lose: team-09's discovery candidate was admitted and its
+            # refined one was not, and it had no way to go back to the source that worked.
+            if phase != isolation.SCOUTING_PHASE:
+                archive = lane_root / "candidates"
+                archive.mkdir(parents=True, exist_ok=True)
+                for name, body in outcome.produced.items():
+                    (archive / f"{phase}-{name}").write_bytes(body)
         return outcome
     finally:
         shutil.rmtree(staging, ignore_errors=True)
