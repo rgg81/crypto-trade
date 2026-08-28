@@ -1,306 +1,296 @@
-# team-13 — universe inclusion and attention
+# team-13 — universe inclusion and attention (nomination)
 
-**Family:** event and state · **Mandate:** weekly membership entry and exit
-**Phase:** refinement, on one feedback packet (`t01`, the unmodified organizer seed)
+**Family:** event and state · **Mandate:** trade weekly membership entry and exit
+**Thesis:** `lane/scouting/THESIS.md`, sealed 2026-08-26 · **Evidence:** `t01` (organizer seed), `t02`
 
 ---
 
-## 1. What the feedback actually said
+## 0. The falsifier fired. Reporting it first, because that is the result.
 
-`t01` is the organizer seed, not my design, but it is the only evidence I have and it is
-informative about the *lane*, not just the seed.
+My sealed F1 read:
 
-| Gate | Value | Verdict |
+> I am falsified if |t| < 2.0 on that pooled spread, **or if the spread's magnitude is smaller than a
+> round-trip cost estimate for the marginal-liquidity names that constitute entrants and leavers.**
+
+I now have that round-trip cost estimate, and it is the most reliable number in this lane because two
+structurally unrelated books agree on it to within 6%:
+
+| | t01 (organizer seed) | t02 (my thesis, expressed) |
 |---|---|---|
-| median effective breadth | 14.5 | pass |
-| mean gross exposure | 0.867 | pass |
-| long / short exposure share | 0.491 / 0.509 | pass |
-| annualised turnover | 163.8 | pass (inside band) |
-| participation | — | pass |
-| **gross edge per turnover** | **−1.83 bps** | **fail** |
-| **cost share of positive gross** | **2.7e11** | **fail** |
-| **survives triple cost** | **−33.2% / yr** | **fail** |
+| annualised turnover | 163.77 | 65.91 |
+| gross return `= edge/turn × turns` | −1.831 bps × 163.77 = **−3.00%** | −5.416 bps × 65.91 = **−3.57%** |
+| net return | −14.64% | −8.54% |
+| **implied cost** | 11.64% / 163.77 = **7.11 bps/turn** | 4.97% / 65.91 = **7.54 bps/turn** |
 
-Those three failures are one failure with three names. `gross_edge_bps_per_turnover` is
-negative, so the book loses money *before* a single basis point of cost; the `cost_share`
-figure is large only because its denominator — positive gross P&L — is essentially zero.
+Call it **7.3 bps per unit of annualised turnover.** `survives_triple_cost` therefore requires
 
-The seed's cost level falls straight out of the packet. Gross annual return
-≈ −1.83 bps × 163.8 turns ≈ **−3.0%**; net was **−14.6%**. The difference is cost:
+> **gross edge > 3 × 7.3 ≈ 22 bps per unit of turnover.**
 
-> **≈ 11.6% / yr of cost on 163.8 turns ⇒ ≈ 7 bps per unit of turnover.**
+I measured **−5.4**. The magnitude clause of F1 has fired, on precisely the quantity it named.
 
-Triple cost is then ≈ 35%/yr of drag, which is why `triple_cost_annualised_return` is
-−33.2% and why nothing about the seed's signal could have saved it.
+**What has *not* fired is F4.** The gross Sharpe is −3.57 / 9.71 = **−0.37 over 808 days**, i.e.
+|t| ≈ **0.55**. That is not an inverted mechanism; it is *no measurable effect in either direction*,
+sitting ~27 bps/turn below the cost bar. The seed shows the same thing (gross Sharpe −0.27, |t| ≈ 0.40).
+So the honest statement is:
 
-**The diagnosis is structural, not parametric.** At 7 bps per turn, surviving 3× cost
-requires roughly **21 bps of gross edge per unit of turnover**. No cross-sectional signal
-in 8h alt-perp data produces 21 bps per turn while turning over 164 times a year. The
-seed's design spends its entire turnover budget re-deciding at high frequency. The fix is
-not a better ranker at the same frequency — it is a book that **holds**. That is the one
-change this candidate is really making, and every other choice below follows from it.
+> **On visible development data, the weekly-inclusion event carries no return I can distinguish from
+> zero, and it is an order of magnitude short of clearing Binance perpetual costs as I expressed it.**
 
-Note also what the seed *did* get right and I must not break: breadth 14.5, gross 0.87,
-and a genuine 49/51 exposure split. Those are the gates a narrow event book fails. Any
-"three entrants a week" expression of this mandate would fix the edge gate by destroying
-the portfolio gates. So the book has to be an event book **and** a portfolio.
+I am not flipping the sign. F4 forbids it, and the arithmetic makes it pointless anyway: inverting
+−5.4 gives +5.4 bps/turn, still 17 bps short, obtained from a t-statistic of 0.55. That would be
+fitting a sign to noise *and* failing the gate.
+
+I am also not searching for configuration 49 on a metric with |t| = 0.55. Twelve feedback-driven
+trials make a development Sharpe a statement about a search; two make it a statement about nothing.
+
+**Why nominate at all, then.** Because qualification is a bar on *structure and cost*, ranking happens
+on sealed evidence, and I have one thing worth putting forward: a genuine portfolio, on a
+preregistered mechanism, whose one remaining problem is a cost arithmetic I can now attack with a
+*measured* number rather than a fitted one. Retiring would forfeit the lane to keep a book I already
+know how to make cheaper. What I will not do is dress up the negative result — it is stated above,
+first, and it is the honest reading of this nomination.
 
 ---
 
-## 2. Mechanism
+## 1. Mechanism
 
-From the sealed thesis (§1.2), the committed sign is:
-
-> **short the crowded entrant, long the uncrowded entrant, mirror on the leaver leg.**
-
-Split the mandate into its two legs and the algebra collapses to one line. Let
-`A_in ≥ 0` be entrant intensity, `A_out ≥ 0` leaver intensity, `C` the crowdedness of
-leveraged positioning. The entrant leg is `−A_in · C` and the mirrored leaver leg is
-`+A_out · C`; with `E = A_in − A_out`,
-
-```
-score = −E · C
-```
-
-which is exactly what `candidate.py` computes. Quadrant by quadrant:
+**The event decides who is in the book; the state decides the sign and the size.** `score = −E · C`,
+which is the sign committed in the sealed thesis §1.2, unchanged:
 
 | event | state | position | what I am doing |
 |---|---|---|---|
 | entrant | crowd levered long | **short** | selling immediacy to attention buyers; paid funding while I wait |
 | entrant | crowd absent / short | **long** | genuine liquidity migration, not an attention shock — it continues |
-| leaver | crowd levered long | **long** | buying inventory from holders facing a delisting / exit clock |
+| leaver | crowd levered long | **long** | buying inventory from holders facing an exit clock |
 | leaver | crowd absent / short | **short** | selling to forced short-coverers into the same clock |
 
-The economics are index inclusion restated for a venue with no substitutes. Wurgler &
-Zhuravskaya's result is that the inclusion effect survives precisely where arbitrage
-between close substitutes fails; an alt USD-M perp is the limiting case (no ETF, no
-creation/redemption, no cash-index arb, no sector basket). Greenwood & Sammon's
-"disappearing index effect" is the base rate I have to beat, and the reason the book is
-*conditional*: Messari's practitioner work found Binance listings delivered ≈ 0%
-five-day outperformance once outliers were controlled, so the unconditional
-long-the-new-name trade is dead **on this venue specifically**. The return has to come
-from the state, not the event. Barber & Odean supply the attention channel — retail buys
-what has abnormal volume and extreme returns, and universe entry is by construction
-exactly that name.
+A weekly liquidity-ranked universe is a published, forecastable, synchronized demand schedule. Entry
+in crypto is *endogenous to attention* — a symbol enters because its turnover just surged relative to
+peers — so membership entry is a dated, observable attention shock, exactly Barber & Odean's trigger
+set (abnormal volume plus extreme recent return). Exit is genuinely forced: Binance delists USD-M
+perps for low volume with a scheduled auto-settlement clock, and falling out of a volume ranking is
+positively correlated with that.
 
-Crucially, on perpetuals the reversal trade and the carry trade are the same trade: when
-the crowd is levered long an entrant, funding turns positive and the short is paid every
-settlement. What I give up is convexity — funding is capped at 0.75 × maintenance margin
-ratio while a squeeze is not. That asymmetry is not a flaw in the thesis; it is the
-identity of the premium.
+The sign is conditional rather than unconditional because the evidence says the unconditional version
+is dead *on this venue specifically*: after outlier control, Binance listings delivered ≈ 0% five-day
+outperformance against ≈ 29% for Coinbase, and Zaremba et al. find crypto reversal is
+liquidity-conditional — the illiquid majority reverses while the most tradeable names show momentum.
+The return has to come from the state, not the event.
 
-### 2.1 Who is on the other side
+And on perpetuals the reversal trade and the carry trade are the same trade: when the crowd is levered
+long an entrant, funding turns positive and the short is paid every settlement. What I give up is
+convexity — funding is capped at 0.75 × maintenance margin ratio while a squeeze is not. That is not a
+flaw in the thesis; it is the identity of the premium.
 
-1. **Leveraged retail directional traders on Binance Futures**, selecting off volume- and
-   gainer-ranked tables. Barber & Odean's attention buyers, at 10–50×. Primary
-   counterparty on the crowded-entrant short.
-2. **Copy-trading followers**, who synchronise and deepen that flow.
-3. **Other systematic books running the same trailing-dollar-volume screen** — the crypto
-   analogue of Russell reconstitution. Published rules-based crypto indices reconstitute
-   on liquidity screens with record dates; when a name crosses, many books add it in the
-   same window.
-4. **Token treasuries, market makers on loan-and-option deals, and unlock recipients**,
-   distributing supply into attention.
-5. **Forced closers at delisting** — Binance removes USD-M perps for low volume and
-   reduced liquidity, with scheduled auto-settlement and non-reduce-only orders restricted
-   before the cutoff. A counterparty with a hard clock is the cleanest one that exists.
+### 1.1 Observing the event without state
 
-I sell immediacy to (1)–(3) when they most demand it and buy it from (4)–(5) when they
-least can wait, and I am paid funding on the leg where the crowd is levered long.
-
----
-
-## 3. How the mandate's event is observed without state
-
-`DecisionContext` carries no membership history — only the current `eligible_symbols` —
-and persistent state across decisions is forbidden. The literal "member at week *w*,
-absent at *w−1*" event is therefore **unobservable to a compliant strategy**. My sealed
-parameter surface anticipated this: knob 5 level (ii) declares a *self-computed trailing
-dollar-volume rank-crossing proxy*. That is what is implemented, from three past-only
-measurements per symbol, each recomputed from scratch at every decision:
+`DecisionContext` carries no membership history, so the literal "member at *w*, absent at *w−1*" event
+is unobservable to a compliant strategy. Two past-only readings stand in, both recomputed from scratch
+at every decision:
 
 | component | construction | what it captures |
 |---|---|---|
-| rank crossing | cross-sectional rank of mean quote volume over the last week **minus** its rank over the preceding two weeks | the inclusion-threshold crossing itself |
-| dollar-volume surge | `log(mean quote volume, 1w / mean quote volume, prior 2w)` | Barber & Odean's abnormal-volume trigger, in time series |
-| seasoning | bars of available history at the decision | how *newly the contract exists* — the purest form of "new member" |
+| **seasoning** | bars of available history at the decision | how newly the contract exists at all — definitionally a new member, and the one membership fact needing no cross-sectional estimate |
+| **rank crossing** | rank of mean quote volume over the last week **minus** its rank over the preceding two weeks | the inclusion-threshold crossing itself |
 
-Crowding uses exactly the declared composite (knob 4, level ii), no more:
+They are averaged and then re-ranked, which means **`E` fires on concurrence**: the top of the
+cross-section is *young and climbing*, the bottom is *old and falling*. That is deliberate. The
+rank-crossing channel is attackable — fabricated volume demonstrably improves exchange rankings, so a
+crossing can be an artifact — while seasoning cannot be faked. Requiring the two independent readings
+to agree costs me the "established name surging into the top-N" case and buys a much lower false-event
+rate. It is separately falsifiable (§4).
 
-| component | construction |
-|---|---|
-| funding level | mean `funding_rate` over the trailing three weeks (`L_z = 63`, knob 2 level 2) |
-| taker-buy skew | `Σ taker_buy_quote_volume / Σ quote_volume − 0.5` over the same window |
+### 1.2 The state, net of volatility — the one measurement change
 
-Both `E` and `C` are built by ranking each component to `[−1, 1]`, averaging, and
-re-ranking. Rank rather than z, because alt-perp funding and volume cross-sections carry
-outliers that would otherwise set the scale for every other name; the bounded score also
-keeps the product bounded, which is what makes the `±0.10` cap non-binding for most names.
+Crowding is the declared composite (funding level + taker-buy skew, both over the declared slow
+`L_z = 63` bars), **residualised cross-sectionally on trailing realised volatility.**
 
-### 3.1 Declared deviations, stated rather than buried
+This is a measurement fix, not a hedge bolted on afterwards. Funding is the *price of leverage*, and
+the price of leverage rises with the volatility of the underlying. Raw funding rank is therefore part
+crowding and part volatility rank wearing a crowding costume. Two consequences, one of which I
+preregistered as the way this book most likely dies:
 
-Per §4.3 of the thesis I owe an explicit account of anything outside the sealed surface:
+- **It mismeasures the state.** A name is crowded when the crowd pays *more than its own volatility
+  already justifies*. That residual is the quantity §1.2 of the thesis was reaching for and did not
+  isolate.
+- **It made the book structurally short volatility.** `−E·C` shorts high-`C` names. If `C` is partly a
+  volatility rank, then a dollar-balanced book is systematically short the high-volatility, high-beta
+  half of the cross-section — which is preregistered failure mode #3, "momentum crash on the short
+  leg," arriving not as a tail event but as a permanent drag. Both packets show a gross loss near −3%
+  on books with nothing else in common; a common short-volatility exposure is the most plausible
+  single explanation I can name, and this removes it.
 
-- **Seasoning is an added component of `E`.** It is not a dollar-volume construct. I hold
-  that it implements the *fixed* membership definition of §4.1 (a newly listed contract is
-  definitionally a new member) rather than being a searched knob, but it is a deviation and
-  I count it. **Effective N = 49, not 48.**
-- **Trade-size and funding-slope were dropped.** §1.2 named "small average trade size" and
-  "rising funding" as crowding proxies, but §4.2 knob 4 enumerates only funding level and
-  taker imbalance. I stayed inside the declared surface and left both out.
-- **Bounded rank scores replace "z clipped at ±3".** Same intent — outlier control — one
-  choice, stated once.
-- **This is one configuration**, evaluated once: `H = 3 weeks`, `L_z = 63`,
-  `S = funding + taker composite`, `A` = the rank-crossing proxy. The threshold `θ` does
-  not appear because the book is continuous in the state rather than split at a cut; that
-  removes a knob rather than adding one.
+I residualise the *state variable*, not the portfolio. A portfolio-level neutrality constraint would
+be gutted by collinearity — the more the two are correlated, the more of the signal it deletes.
+Residualising `C` and then re-ranking keeps the score bounded in [−1, 1] regardless of how collinear
+the two turn out to be.
 
----
-
-## 4. How the cost gates are attacked
-
-Everything below exists to move `gross_edge_bps_per_turnover` from −1.83 to something
-above ~21, and all of it works on the denominator first.
-
-**Hold the event.** The declared linear decay over `H = 3` weeks is implemented statelessly
-as a lag-weighted average of the same rules evaluated at 21 historical offsets, weights
-declining linearly to zero at three weeks. The book at each decision is the decayed average
-of the books these rules would have chosen over the past three weeks. It is recomputed from
-scratch every time — no state, no look-ahead — but it behaves like a held position with a
-decaying event weight. Two effects: per-bar innovations are averaged across offsets whose
-new information is largely independent, cutting signal noise by roughly √21; and the target
-vector moves slowly, so turnover collapses. I expect roughly **40–70 annualised turns**
-against the seed's 164.
-
-**Slow the state.** `L_z = 63` bars (the declared slow level) rather than 21. Crowding is a
-state; measuring it over three weeks costs almost nothing in fidelity and buys a great deal
-of smoothness.
-
-**Weight toward what can absorb the book.** Entrants and leavers are by construction the
-widest, thinnest names in the universe — thesis failure mode #5, and the reason the sealed
-falsifier F1 carries a magnitude clause. Weights are multiplied by
-`0.25 + 0.75 × liquidity_rank`, which keeps the leaver leg alive but stops the book paying
-top dollar for its worst fills, and keeps positions inside the 0.1%-of-prior-24h-volume
-participation limit rather than relying on the evaluator to truncate them.
-
-**Spend turnover only on conviction.** Names inside a soft threshold go to exactly zero, so
-the book does not churn a long tail of near-zero positions. The threshold is continuous
-(`sign(u)·max(|u| − τ, 0)`), so a small perturbation moves weights smoothly instead of
-flipping names in and out — this is a turnover control *and* a small-perturbation-stability
-control. `τ` adapts downward if fewer than ~30 names would survive, so breadth cannot fail
-in a thin cross-section.
-
-**Cost arithmetic at the three charge levels**, using the 7 bps/turn implied by `t01` (my
-liquidity tilt should make it lower, but I am not going to assume that):
-
-| turnover | 1× | 2× | 3× | gross Sharpe needed at 3× (11% vol unit) |
-|---|---|---|---|---|
-| 40 | 2.8% | 5.6% | 8.4% | ≈ 0.76 |
-| 60 | 4.2% | 8.4% | 12.6% | ≈ 1.15 |
-| 164 (seed) | 11.5% | 23% | 34% | ≈ 3.1 — unreachable |
-
-That table is the whole refinement. A book that only survives at 1× is not a book, and at
-164 turns nothing survives at 3× regardless of signal quality.
+**This is not volatility targeting.** Nothing in this file scales the book by any volatility estimate;
+gross is set by a pure sum-of-absolute-weights rescale. Removing a cross-sectional characteristic
+exposure is a neutrality constraint of the same kind as `Σw = 0`. The ex-ante risk unit remains the
+organizer's and I do not touch it.
 
 ---
 
-## 5. Why this stays a portfolio
+## 2. Who is on the other side
 
-The organizer scales every book to a common ex-ante volatility unit before re-applying
-caps, so I do not target volatility anywhere. But the risk unit does determine whether I
-pass `mean_gross_exposure`, and that is worth reasoning about explicitly. The seed reached
-11.1% realised vol at 0.867 gross on 14.5 effective names — consistent with ~50%
-idiosyncratic vol per name and `√Σw²` ≈ 0.26. This book runs ~30–45 non-zero names with
-effective breadth ~20–30, giving `√Σw²` ≈ 0.18–0.22 and a raw book vol *below* the unit, so
-the scaler levers toward the 1.0 gross cap rather than shrinking me. Breadth and gross
-exposure are therefore load-bearing in the same direction as cost, which is a pleasant
-coincidence rather than a designed one.
+1. **Leveraged retail directional traders on Binance Futures**, selecting off volume- and gainer-ranked
+   tables the venue itself publishes. Barber & Odean's attention buyers at 10–50×. Primary
+   counterparty on the crowded-entrant short.
+2. **Copy-trading and social-trading followers**, who synchronize that flow and deepen the crowding.
+3. **Other systematic books running the same trailing-dollar-volume screen.** Every rules-based crypto
+   index screens on trailing liquidity with published record dates and buffers; when a name crosses,
+   many books add it in the same window. The crypto analogue of Russell reconstitution.
+4. **Token treasuries, market makers on loan-and-option deals, and unlock recipients**, distributing
+   supply into attention — the natural sellers who appear once a name is finally liquid enough to sell
+   into.
+5. **Forced closers at delisting**, facing scheduled auto-settlement and restricted order types. A
+   counterparty with a hard clock is the cleanest one that exists.
 
-Both sides are used by construction: the score is demeaned and then exactly dollar-balanced
-by scaling the heavier side, so `Σw = 0` before the per-name cap and `|Σw| ≤ 0.20` after it,
-with `Σ|w| ≤ 1` and `|w| ≤ 0.10` enforced directly.
-
----
-
-## 6. Compliance and the invariance checks
-
-- **Stateless.** No instance attributes, no accumulation across calls. Every number is
-  recomputed from `context`. Exact-replay determinism and future-append invariance follow
-  from this rather than being patched in.
-- **No panel-alignment trap.** The book never concatenates per-symbol frames. All
-  cross-symbol work is on *scalars* per symbol, so the positional-`RangeIndex` failure that
-  silently produces an all-`NaN` panel and an empty book cannot occur here. Where time
-  alignment is genuinely needed — matching funding rows to a bar — it is done by
-  `searchsorted` on `open_time` / `funding_time`, never by position.
-- **Column names taken from `protocol.py`**, including `funding_rate` (not
-  `last_funding_rate`), with `volume` / `taker_buy_volume` as fallbacks.
-- **Magnitude-scale equivariant.** Every input is a ratio (`volume surge`, `taker share`), a
-  rank (`crossing`, `liquidity`), a count (`seasoning`), or a rate (`funding`). A uniform
-  rescaling of prices or volumes leaves the book unchanged.
-- **Calendar-shift equivariant.** No absolute date is read. Bars-per-week is *inferred* from
-  the median `open_time` spacing rather than hard-coded at 21, so a different cadence
-  rescales every window consistently.
-- **Pseudonymisation-safe.** No symbol literal appears; all operations are symmetric in
-  symbol order (ties take average ranks).
-- **Small-perturbation stable.** All transforms are continuous or rank-based; the only
-  thresholding is soft.
-- **No RNG** (`seed` is accepted and discarded), no network, subprocess, filesystem,
-  `eval`/`exec`, no embedded data or fitted parameters.
-- Per-symbol extraction is guarded field-by-field and a symbol that cannot be measured is
-  skipped rather than poisoning the cross-section; the book returns `{}` only if fewer than
-  10 names can be scored at all.
+I sell immediacy to (1)–(3) when they most demand it, buy it from (4)–(5) when they least can wait,
+and am paid funding on the leg where the crowd is levered long — in exchange for wearing the squeeze
+tail. Madhavan's summary of the reconstitution trade is the same sentence: supplying immediacy is
+profitable but undiversified, costly to trade, and price-risky on the unwind.
 
 ---
 
-## 7. What would falsify this
+## 3. How the cost gates are attacked
 
-The sealed falsifiers stand, restated against what the feedback packet can actually show:
+All three failing gates are one gate with three names: `gross_edge_bps_per_turnover` is negative, so
+`cost_share_of_positive_gross` explodes on a vanishing denominator and `survives_triple_cost` cannot
+hold. Everything below works on the denominator, because 7.3 bps/turn is *measured* and a positive
+signal is not.
 
-**F1 — the mandate's falsifier, made numeric.** *If entrants and leavers show no abnormal
-return around their membership change, inclusion carries no attention effect.* Observable
-here as `gross_edge_bps_per_turnover`. **If it is not positive, the event leg is dead and I
-say so.** I will not respond by widening the event window or adding event types until
-something clears.
+**Hold longer: H = 3 → 6 weeks.** The declared linear decay is implemented statelessly as a
+lag-weighted average of the same rules evaluated at 18 historical offsets. Doubling the hold roughly
+halves turnover and so roughly doubles edge density for any given gross return.
 
-**F1b — the magnitude clause, which is the one that matters at this venue.** A positive but
-small gross edge falsifies the *tradeable* claim even if the effect is real. **If gross edge
-per turnover is positive but below ~21 bps, this mandate does not clear costs in Binance
-perpetuals**, and the honest report is that the effect exists and is not harvestable — not a
-search for a cheaper parameterisation. `survives_triple_cost` is the gate that decides this
-and it is the one I am designing against.
+*Why 6 and not 12.* The arithmetic keeps pushing longer — at 20 turns the required gross Sharpe falls
+to ~0.45 — and I am deliberately not following it. My sealed grid was `H ∈ {1, 2, 3}` weeks, an
+explicit statement that I believed this effect lives inside three weeks. Six weeks is a 2× departure
+justified by a measured cost; twelve would be trading a preregistered belief for a gate, which is the
+same overfitting in a different costume. Six also keeps expected turnover near **30–45**, comfortably
+inside a band I have *observed* to admit 66 and 164 — the band's lower edge is unobserved and I would
+rather not discover it by falling through it.
 
-**F2 — the state claim.** The book earns from the *interaction*, not from either main
-effect. If the return is actually coming from unconditional crowding (a funding-carry book
-wearing an inclusion costume) then the state conditioning has not been demonstrated. The
-signature would be a book whose long/short split tracks funding rank rather than the
-event-by-state quadrants; because `E` is demeaned and the score is `−E·C`, net funding
-exposure is ≈ 0 by construction, so a large realised carry contribution would itself be the
-falsification.
+**Size to what the tape can absorb.** Each name's weight is ceilinged at
+`0.10 × clip(capacity_i / median(capacity), 0.15, 1)`, where capacity is the more conservative of its
+trailing-one-week and trailing-three-week mean quote volume. Entrants and leavers are by construction
+the thinnest names in the universe. Oversizing them is paid for twice — once in impact, and once in
+turnover spent every bar re-requesting a target the participation limit truncates. The ratio is taken
+against the cross-sectional median, so the rule carries no absolute currency scale. The 0.15 floor
+keeps the leaver leg alive rather than excluding the thin half outright.
 
-**F3 — the unseasoned-universe rerun, which the mandate demands I prove rather than
-discover.** I committed before seeing data that **the effect should be at least as strong in
-the unseasoned universe, not weaker** — an unseasoned universe contains more entrants,
-younger entrants, and more extreme attention shocks. This candidate is built to make that
-testable rather than accidental: seasoning is an explicit, first-class component of `E`, so
-young contracts are actively engaged and *conditioned on crowding* rather than being an
-unmodelled exposure the book quietly dies of. **I am falsified if the unseasoned rerun
-halves the effect or inverts its sign** — that would mean what I measured on the seasoned
-universe was survivorship, and the mechanism is wrong for this venue.
+**Stop generating turnover that carries no signal.** The previous book's soft-threshold cut adapted to
+the 30th-largest score magnitude, so *every* weight moved whenever that one order statistic moved. The
+cut is now fixed at 0.40σ. It remains soft — `sign(u)·max(|u|−τ, 0)` — so a name entering the book
+enters at zero size and grows, and no name round-trips on a crossing.
 
-**F4 — sign integrity.** The four quadrants in §2 are preregistered. If the data shows the
-opposite sign, that is a falsification of the mechanism, not a parameter to flip. Any book
-that later trades the inverted sign will be labelled post-hoc and reported without the
+**Bound the unseasoned leg by size, not by exclusion.** The kernel divides by its *full* mass rather
+than by the mass a name was present for, so a contract's engagement ramps linearly from zero over its
+first six weeks. The book is tilted toward young names by *signal* and bounded in them by *size*. The
+mandate asks for the inclusion effect to be modelled explicitly rather than discovered by accident by
+a book that then dies of it; this is that, in one line. The previous book instead required 42 bars of
+history to trade a name at all, which silently excluded the purest entrants there are.
+
+**The bar, stated plainly.** At ~35 turns and 7.3 bps/turn, triple-cost survival needs ≈ 7.7%/yr gross,
+a gross Sharpe near **0.8**. I have measured **−0.37**. These changes raise edge *density* by roughly
+2×; they cannot manufacture edge. If the mechanism is worth zero, this book will fail the same three
+gates less badly. I would rather say that now than discover it later.
+
+---
+
+## 4. What would falsify this
+
+**F1 — the mandate's falsifier, already fired on magnitude (§0).** Restated forward: if
+`gross_edge_bps_per_turnover` returns below ~22 on sealed data, the weekly-inclusion event does not
+clear Binance perpetual costs, and the correct report is that the effect is not harvestable here — not
+a fiftieth configuration. Retiring honestly remains available and I will take it rather than search.
+
+**F1b — concurrence.** `E` requires seasoning and rank crossing to agree. If the return survives
+replacing the rank-crossing term with a constant, I have written a contract-age book with decoration,
+not an inclusion book. This is the single most important ablation on the returning packet.
+
+**F2 — the state claim.** The book earns from the *interaction*, not from either main effect. `E` is
+re-ranked and hence roughly cross-sectionally centred, so net funding exposure is ≈ 0 by construction;
+a large realised carry contribution would itself be the falsification — a funding-carry book wearing
+an inclusion costume.
+
+**F2b — the volatility residual, new and therefore owed a test.** I claim residualising `C` on
+volatility is a *measurement* improvement, not a signal deletion. If the residualised book's gross
+edge is materially worse than the raw one's, the volatility component *was* the signal, my §1.2 story
+about the price of leverage is wrong, and I should say so.
+
+**F3 — the unseasoned-universe rerun, which the mandate demands I prove rather than discover.** I
+committed before seeing any data: **the effect should be at least as strong in an unseasoned universe,
+not weaker** — it contains more entrants, younger entrants, and more extreme attention shocks. That
+commitment stands and this book is built to make it testable rather than accidental: seasoning is a
+first-class, explicit component of `E`, young contracts are actively engaged from ~24 bars of history
+rather than excluded at 42, and their *size* is bounded by an explicit linear ramp. Because every
+input is a cross-sectional rank, the book holds the relatively youngest and oldest names whatever the
+universe's age distribution, so its unseasoned exposure is bounded by construction rather than by
+luck. **I am falsified if the rerun halves the effect or inverts its sign** — that would mean what I
+measured on the seasoned universe was survivorship.
+
+**F4 — sign integrity.** The four quadrants in §1 are preregistered and unchanged. I have not flipped
+them and will not. Any book trading the inverted sign is post-hoc and must be reported without the
 pretence of preregistration.
 
-**Known failure modes, preregistered so none can later be sold as a discovery:** decay with
-arriving capital (the equity instance lost ~90% of its effect in three decades); migration
-into the anticipation window; momentum crash on the short leg — shorting a crowded entrant
-during a real bull leg, with capped funding compensation against an uncapped squeeze, is the
-single most likely way this book dies; wash-traded volume corrupting the rank crossing;
-funding-cap saturation censoring the crowding proxy exactly at the extreme where it should
-be strongest; and funding being a *price* rather than a *quantity*, which with no open
-interest in the dataset caps how sharply the state can ever be measured here.
+**Preregistered failure modes that remain live:** decay with arriving capital (the equity instance of
+this family lost ~90% of its effect in three decades — that is the base rate); migration of the move
+into the anticipation window; momentum crash on the short leg, with capped funding compensation
+against an uncapped squeeze; wash-traded volume corrupting the rank crossing; funding-cap saturation
+censoring the crowding proxy exactly at the extreme where it should be strongest; and funding being a
+*price* rather than a *quantity*, which with no open interest in the dataset caps how sharply the
+state can ever be measured here.
 
-Retiring honestly remains available. If `gross_edge_bps_per_turnover` comes back negative
-again, the correct report is that this lane's mandate does not pay at Binance perpetual
-costs — not a forty-ninth configuration.
+---
+
+## 5. Search accounting
+
+Sealed surface: **N = 48**. Everything outside it, declared rather than buried, per thesis §4.3:
+
+| # | deviation | why |
+|---|---|---|
+| 49 | seasoning as a component of `E` | declared at t02; a newly listed contract is definitionally a new member |
+| 50 | `H = 6` weeks, outside the declared `{1, 2, 3}` grid | measured cost of 7.3 bps/turn; F1's magnitude clause |
+| 51 | participation-share weight ceiling | cost control; replaces t02's multiplicative liquidity tilt |
+| 52 | volatility residualisation of `C` | measurement of crowding net of the price of leverage; failure mode #3 |
+
+**Effective N = 52**, and deflation should be computed on 52 regardless of how many configurations I
+actually evaluated — I evaluated two. Declaring a surface and then claiming credit for under-searching
+it is the same overfitting in a different costume.
+
+Fixed and *not* searched: the sign (§1), both legs traded, `L_z = 63`, the state composite, no
+per-symbol parameters, no sample-period selection, the harness cost model untuned, and no volatility
+targeting.
+
+---
+
+## 6. Compliance
+
+- **Stateless.** No instance attributes, no accumulation across calls; every number is recomputed from
+  `context`. Exact-replay determinism and future-append invariance follow from this rather than being
+  patched in. `seed` is accepted and discarded.
+- **No panel-alignment trap.** Per-symbol frames are never concatenated. All cross-symbol work is on
+  *scalars* per symbol, so the positional-`RangeIndex` failure that silently yields an all-`NaN` panel
+  and an empty book cannot occur. Where time alignment is genuinely needed — matching funding rows to
+  a bar — it is `searchsorted` on `open_time` / `funding_time`, never position.
+- **Columns taken from `protocol.py`**, including `funding_rate` (not `last_funding_rate`), with
+  `volume` / `taker_buy_volume` / `open` as guarded fallbacks. A symbol that cannot be measured is
+  skipped rather than poisoning the cross-section.
+- **Calendar-shift equivariant.** No absolute date is read. Bars-per-week is inferred from median
+  `open_time` spacing, and an inference outside a sane range falls back to the 8h grid rather than
+  being clipped onto a boundary — clipping would silently mis-scale every window in the file.
+- **Magnitude-scale equivariant.** Every input is a ratio (taker share), a rank (crossing, capacity
+  share, volatility), a count (seasoning), a log-return standard deviation, or a rate (funding). A
+  uniform rescaling of prices or volumes leaves the book unchanged; the capacity ceiling is a ratio to
+  the cross-sectional median.
+- **Pseudonymisation-safe.** No symbol literal appears; ranks use average ties, so nothing depends on
+  symbol ordering.
+- **Small-perturbation stable.** All transforms are rank-based or continuous; the only threshold is
+  soft, and it is fixed rather than adaptive.
+- **Limits enforced directly**, with headroom: `Σ|w| ≤ 0.98` target and a hard renormalisation,
+  `|w| ≤ 0.10`, `|Σw| ≤ 0.20` against a 0.25 limit, and sides dollar-balanced before sizing so both are
+  genuinely used *on exposure*.
+- No network, subprocess, filesystem, `eval`/`exec`, RNG, embedded data or fitted parameters.

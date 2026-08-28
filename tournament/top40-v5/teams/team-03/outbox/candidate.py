@@ -1,4 +1,4 @@
-"""team-03 refinement candidate — defensive, beta-controlled cross-sectional book.
+"""team-03 nomination — defensive, beta-controlled cross-sectional book.
 
 Long low realised volatility / low trailing funding, short high realised volatility / high
 trailing funding, across seasoned and liquid Binance USD-M perpetual members. Weights are
@@ -9,6 +9,10 @@ The book is deliberately slow. It recomputes and resubmits targets on a 42-bar (
 data-relative grid and returns ``None`` in between, which holds quantities and costs nothing.
 Every decision is a pure function of the supplied ``DecisionContext``: no attribute is mutated,
 no state is carried, no absolute date, symbol name or price level is referenced.
+
+This is the trial-2 book, nominated unchanged. Every constant traces to a value declared in
+lane/scouting/THESIS.md section 4 before market data was mounted; nothing here was re-tuned
+after reading a feedback packet. See RATIONALE.md for why nothing moved.
 """
 
 from __future__ import annotations
@@ -183,7 +187,9 @@ class DefensiveBetaControlledBook:
             return None
 
         # Data-relative rebalance clock. Row counts shift with the calendar, so this grid is
-        # calendar-shift equivariant in a way that a timestamp modulo would not be.
+        # calendar-shift equivariant in a way that a timestamp modulo would not be. Taken over
+        # eligible symbols only: an eligible symbol has an executable open at the decision, so
+        # its frame grows by one row per bar and the clock cannot freeze on a dead contract.
         clock = max(len(context.bars[s]) for s in eligible)
         if clock < MIN_HISTORY or clock % REBALANCE_BARS != 0:
             return None

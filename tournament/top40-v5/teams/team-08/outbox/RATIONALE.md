@@ -1,281 +1,302 @@
-# team-08 — slow-ladder per-contract time-series trend
+# team-08 — nomination: slow-ladder per-contract time-series trend, day-averaged book
 
 **Family:** time-series trend. **Mandate:** the CTA transplant — per-contract, volatility scaled,
-multiple lookbacks. **Phase:** refinement, working from `lane/feedback/t01.json` (the unmodified
-organizer seed) and the sealed preregistration in `lane/scouting/THESIS.md`.
+multiple lookbacks. **Phase:** decision. **Evidence:** `lane/feedback/t01.json` (unmodified
+organizer seed), `lane/feedback/t02.json` (slow ladder, admitted), and the sealed preregistration
+in `lane/scouting/THESIS.md`.
 
 ---
 
-## 1. What the seed's packet actually says
+## 1. What I am nominating, and why it is not the packet I already passed
 
-The seed passed every structural gate and failed exactly three, all of them cost gates.
+I am nominating the t02 mechanism with two changes, neither of which is aimed at Sharpe. t02 is
+admitted and I could nominate it verbatim. I am not, and the reason is specific rather than
+temperamental.
 
-| passed | value | | failed | value |
-|---|---|---|---|---|
-| effective breadth | 21.37 (pass fraction 1.0) | | gross edge / turnover | 14.64 bps |
-| mean gross exposure | 0.478 | | cost share of gross | 0.512 |
-| participation | 1.0 active bars | | triple-cost return | −0.1035 |
-| long / short exposure | 50.6 / 49.4 | | | |
-| turnover band | 130.5 (inside) | | | |
+The seed failed exactly three gates — `gross_edge_density`, `cost_share`, `survives_triple_cost` —
+and t02's remaining margin is thinnest on exactly those three. Its triple-cost annualised return is
+**+2.6%**; its density is **28.7 bps** against a triple-cost break-even of **22.3–24.0 bps**. Those
+gates are re-enforced on sealed blocks, on shorter samples than the 808 days I can see, and a
+margin of 1.2× on the gate that killed the seed is not a margin I want to carry into a block I
+cannot inspect. The two changes below spend a small and *bounded* amount of gross Sharpe to roughly
+double that margin. Both sit inside the sealed parameter surface.
 
-Two independent routes recover the cost schedule from the packet, and they agree:
+---
 
-- from triple cost: `C = (net − triple)/2 = (0.0905 + 0.1035)/2 = 0.0970` → **7.43 bps** per unit turnover
-- from density: `gross = 130.5 × 14.64bps = 0.1910`, `C = gross − net = 0.1005` → **7.70 bps**
+## 2. The one thing here that is measured rather than assumed
 
-So the charge is **≈7.4–7.7 bps per unit turnover at 1×** — essentially the 7.5 bps that THESIS §7.1
-fixed as its accounting assumption, which is a useful confirmation that the preregistered cost model
-was not naive.
+Two packets identify the cost schedule twice each, and they close:
 
-The decisive reframing. Define the *break-even gross Sharpe at triple cost*:
+| | t01 (seed) | t02 (slow ladder) |
+|---|---|---|
+| implied 1× cost `(net − triple)/2 / turnover` | **7.43 bps** | **8.00 bps** |
+| identity `density × turnover × cost_share` vs implied cost | 0.0979 vs 0.0970 | 0.0385 vs 0.0410 |
+| annualised turnover | 130.51 | 51.32 |
+| gross return `net + cost` | 0.1875 | 0.1490 |
+| **gross Sharpe** | **1.559** | **1.314** |
+| net Sharpe | 0.780 | 0.961 |
 
-```
-S_required = 3 · c · turnover / volatility
-```
+Two consequences, both load-bearing.
 
-| | seed (t01) |
+**(a) The refinement's cost model was right.** It predicted a turnover cut of 2.45× from restricting
+the ladder to the declared `SLOW(5–8)` window, on the argument that a rung-*L* z-score has per-bar
+innovation `√(2/L)` so the fast four rungs carry ~80% of the position innovation. Realised: **2.54×**
+(130.51 → 51.32). A four-percent miss on an ex-ante structural prediction is the strongest evidence
+I have that I understand where this book's turnover comes from, and it is what licenses the second
+change below — which is a prediction of the same kind, from the same model.
+
+**(b) The cost of slowing down is now measured, not guessed.** Cutting turnover 2.54× cost **16% of
+gross Sharpe** (1.559 → 1.314). Fitting `S_gross ≈ a + b·log(turnover)` through those two points
+gives `b = 0.263`, and the net-Sharpe optimum of that curve at 1× cost sits at **turnover ≈ 48** —
+which is where t02 already is. So t02 is close to optimal *at 1× cost*. The same curve's optimum at
+**3×** cost sits far slower. Since the tournament charges 1×, 2× and 3× independently and says
+plainly that "a book that only survives at 1× is not a book," the relevant optimum is not the 1× one.
+
+---
+
+## 3. The two changes
+
+### 3.1 The ladder is sampled at √2 inside the same declared span — turnover-neutral
+
+`LADDER = (45, 64, 90, 127, 180, 254, 360)` bars ≈ {15, 21, 30, 42, 60, 85, 120} days. Same
+endpoints as the declared `SLOW(5–8)` window; the three new rungs are interpolations of it.
+
+| | mean rung innovation `1/√L` |
 |---|---|
-| gross Sharpe delivered | 0.1875 / 0.1203 = **1.56** |
-| gross Sharpe required at 3× | 3 × 7.43e-4 × 130.5 / 0.1203 = **2.42** |
-| shortfall | cleared **64%** of its own bar |
+| declared SLOW-4 {45, 90, 180, 360} | 0.09543 |
+| nominated DENSE-7 {45, 64, 90, 127, 180, 254, 360} | 0.09403 |
 
-**The seed does not have a weak signal.** A gross Sharpe of 1.56 on a 21-name book is a good trend
-signal — it is above what THESIS §P6 predicted from Hurst/Ooi/Pedersen's ~0.4 per-market calibration.
-It failed because it set itself a bar of 2.42 by trading at 130× turnover a year. Costs consumed
-exactly half its Sharpe (1.56 → 0.78).
+**−1.5%.** This is turnover-neutral by construction, so it is not a cost move — it is a
+variance-reduction move. **It cannot express hindsight:** neither packet contains a per-rung
+decomposition, so I have no evidence about which lookback worked and could not have fitted this if
+I wanted to. What it removes is the possibility that a quarter of the book rests on one lookback
+that happened to land well. It is also a more honest reading of "multiple lookbacks" than four
+rungs at 2× spacing.
 
-This is why the fix cannot be a parameter. `S_required` is linear in turnover, and turnover is set by
-the *horizon at which the ladder places its risk*. Nothing else in the design moves it.
+### 3.2 The submitted book is the mean of the last three bars' books — the real cost move
 
----
+The book at bar *t* is the equal-weighted mean of the books this identical construction would have
+formed at bars *t*, *t−1*, *t−2*. On an 8h clock that is **one day**, and it is the declared Tier-2
+cadence `R = "every 3 bars (daily)"` from THESIS §7.3 — expressed as a running mean rather than as a
+discrete schedule.
 
-## 2. Diagnosis: two structural errors, neither of them a knob
+The continuous form is strictly better than the discrete one for three reasons that matter here:
+a discrete daily rebalance is **calendar-anchored** (it would fail calendar-shift equivariance and
+target an absolute time of day), it trades in **lumps** three times larger than it needs to, and it
+has a **threshold** — the schedule boundary — which is exactly what the small-perturbation stability
+check is looking for. The running mean has none of these. Everything in the path from data to weight
+remains continuous, which was the governing design constraint identified in the refinement: with no
+position exposed in `DecisionContext` and no persistent state permitted, turnover has to be designed
+into the signal rather than filtered out afterwards.
 
-### 2.1 My preregistered turnover control is unimplementable under this contract
+**Why it is nearly free.** For a signal whose bar-to-bar innovation is dominated by the newest
+return (which it is — that term is common to every rung), a *k*-bar running mean reduces per-bar
+position innovation by `1/√k` while leaving the level essentially unchanged, because *k* = 3 is tiny
+against a 45–360 bar signal. The organizer's ex-ante risk unit therefore cannot undo it: it is not an
+amplitude shrink, it is removal of high-frequency content relative to low-frequency content. The
+cost is a mean lag of **one bar** on a signal whose lag-1 autocorrelation is ≈ 1 − 1/L ≈ 0.978 at the
+*fastest* rung. A 15–120 day signal has no business re-trading three times a day; the two extra
+decisions per day are close to pure noise-trading.
 
-THESIS §7.1 fixed a no-trade band of `0.10 × target weight`. A band is a **position-space** control:
-it compares the target to the position currently held. `DecisionContext` carries exactly five
-attributes and none of them is a position, and RULES.md forbids state that persists across decisions.
-So the band cannot be written at all.
+The recomputation at *t−1* and *t−2* reads only rows at or before its own anchor bar — its own EWMA
+volatility, its own rung returns — so the average is over *past* books and adds no look-ahead. The
+funding drag and the universe membership are held at the decision bar, which is information
+available at the decision; holding the drag fixed also means it contributes zero turnover.
 
-That is not an inconvenience, it is the governing constraint of the whole design. **Turnover cannot
-be filtered out after the target is formed; it has to be designed into the signal.** Every map from
-data to weight in `candidate.py` is therefore continuous — `tanh`, a median-based concentration cap,
-a proportional net cap that approaches identity at its own boundary — so that the weight *path* is
-smooth because the signal is smooth, not because trades are being suppressed. This also means nothing
-in the book depends on a threshold crossing, which is what the organizer's small-perturbation
-stability check is looking for.
+### 3.3 Everything else is t02 unchanged
 
-### 2.2 Equal-weighting rungs equalises risk but not cost
-
-Under a random-walk null the per-bar innovation of a rung-*L* z-score is `√(2/L)`. Across the eight
-preregistered rungs:
-
-| rung (8h bars) | 3 | 6 | 12 | 21 | 45 | 90 | 180 | 360 |
-|---|---|---|---|---|---|---|---|---|
-| √(2/L) | .816 | .577 | .408 | .309 | .211 | .149 | .105 | .075 |
-
-The fast four carry **half the ladder's signal weight and 80% of its position innovation**
-(2.110 / 2.650). Meanwhile edge per unit turnover scales as **√L**, while per-market Sharpe is roughly
-flat in *L* across the 1–12 month band — that flatness is the Moskowitz–Ooi–Pedersen and
-Hurst–Ooi–Pedersen result itself, not an assumption I am adding.
-
-So an equal-weighted ladder is mis-specified in cost space by construction: the fast rungs are funded
-by the slow rungs' edge and consume it. No transform, no band and no universe size repairs that,
-because the defect is in where the ladder puts its trading, not in how the trading is executed.
-
-Restricting to the declared `SLOW(5–8)` window predicts a turnover factor of
-`(2.650/8) / (0.540/4) = 2.45×`.
+Universe N=30 on a 270-bar trailing median of quote volume; EWMA vol at com 180 bars; `tanh`
+transform; funding-inclusive signal basis; concentration cap at 3× median; net cap 0.20. These
+produced measured breadth 21.87 at pass-fraction 1.0 and a 49.3/50.7 long/short split. I am not
+touching what is measured and good.
 
 ---
 
-## 3. What the candidate does
+## 4. The mechanism, and who is on the other side
 
-Per contract, and reading nothing else — no cross-sectional rank, no relative strength, no
-market-wide state variable, and (per the §0 commitment I bound myself to before seeing data) **no
-volatility gate, no drawdown control, no exposure throttle**:
+Per contract and nothing else — no cross-sectional rank, no relative strength, no market-wide state
+variable, and (per the §0 commitment I bound myself to before seeing data) **no volatility gate, no
+drawdown control, no exposure throttle**:
 
 ```
-z_L   = (log return over L bars − funding paid over L bars) / (σ · √L)
-g     = mean over available rungs of tanh(z_L)
-w_raw = g / σ                       # inverse-vol, relative weights only
+z_L,j = (log return over L bars ending at t−j − funding paid over L) / (σ_j · √L)
+g_j   = mean over available rungs of tanh(z_L,j)
+w_raw = mean over j ∈ {0,1,2} of g_j / σ_j        # inverse-vol, relative weights only
 w     = normalise → concentration cap → net cap
 ```
-
-| element | value | status |
-|---|---|---|
-| ladder window `W` | `SLOW(5–8)` = {45, 90, 180, 360} bars ≈ {15, 30, 60, 120}d | declared Tier-1, 1 of 5 |
-| transform `T` | `tanh` | declared Tier-1, 1 of 3 |
-| breadth `N` | 30 | declared Tier-1, 1 of 3 |
-| vol estimator `V` | EWMA of squared bar returns, com 180 (~60d) | declared Tier-2 |
-| signal basis `B` | funding-inclusive total return | declared Tier-2 |
-| cadence `R` | every bar | declared default |
-| concentration cap | 3× median contract weight | fixed, THESIS §7.1 |
-
-Three choices deserve their reasons stated rather than listed.
-
-**The vol estimator is slowed to match the signal.** `σ` enters the weights, so *its* innovation is
-turnover carrying no directional information at all. A 20-day vol estimate driving a 15–120 day
-signal is a mismatch that generates pure cost. com 180 bars sits at the ladder's centre of gravity.
-
-**Funding is inside the signal, not just the P&L.** THESIS §1.6 is the crypto-specific half of my
-thesis: Binance's documented funding formula pays shorts ≈0.01%/8h by default at zero premium, so a
-perpetual long carries a structural ≈11%/yr financing headwind that has no analogue anywhere in the
-CTA literature. The tradeable return of a long *is* the price return net of funding, so that is what
-the trend should be measured on. This is knob `B`, and it is emphatically **not** a carry signal —
-funding never generates a position by itself (THESIS §5). It degrades to price-only on any
-malformation of the funding frame rather than to an empty book.
-
-**The universe rank uses a 90-day trailing median of quote volume.** A short-window rank makes names
-oscillate across the rank-30 boundary and churn full positions in and out for no informational reason
-— membership churn is turnover with negative expected edge. A long, robust window makes the
-membership edge quiet.
-
-**Why the book cannot silently vanish.** RULES.md warns that a strategy misreading the context
-returns nothing and scores as a book with no edge. Because this design is strictly per-contract it
-never builds a cross-symbol panel, so the positional-`RangeIndex` trap cannot arise: every read is
-positional inside one symbol's frame. Timestamps are used only for the funding window, via epoch
-integers that work for tz-aware, tz-naive and non-datetime columns alike, with an 8h fallback.
-
----
-
-## 4. Who is on the other side
 
 At a 15–120 day horizon the counterparties are, in descending order of how much of the transfer I
 think they explain:
 
 1. **Inventory hedgers.** Miners hedging production, treasuries and foundations hedging holdings,
-   recipients of token unlocks, market makers laying off spot. They short into strength and buy into
-   weakness for reasons unrelated to expected return. This is the classical MOP risk-transfer story
-   and it is the counterparty best matched to the slow ladder's clock.
+   recipients of token unlocks, market makers laying off spot flow. They short into strength and buy
+   into weakness for reasons unrelated to expected return. This is the classical Moskowitz–Ooi–
+   Pedersen risk-transfer story and it is the counterparty best matched to the slow ladder's clock.
 2. **Extrapolative demand arriving late.** Liu & Tsyvinski put crypto return predictability at a 1–8
-   week horizon and identify investor attention as the channel. Binance's listing process is itself
+   week horizon with investor attention as the channel. Binance's listing process is itself
    attention-selecting — perps get listed after a narrative catches — so the tradeable cross-section
    is populated with exactly the assets where late extrapolative demand is strongest. Crucially,
    **there is no valuation anchor**: nobody can compute a fair value for a token with no cash flows,
    so the corrective force that kills under-reaction in an equity index has no seat at this table.
 3. **The cash-and-carry basis desk.** Long spot, short the perp, structurally short and completely
    indifferent to direction. They are *not* losing this trade — they are being paid by me, in
-   funding, by exchange design. This is the one counterparty I can name from documentation rather
-   than inference, and §3 now prices it into the signal instead of discovering it in the P&L.
+   funding, by exchange design (Binance's documented default is +0.01% per 8h at zero premium, ≈11%
+   a year, longs to shorts, and the exchange takes no fee). This is the one counterparty I can name
+   from documentation rather than by inference, and the signal prices it in rather than discovering
+   it in the P&L.
 
-**And one I have deliberately stopped trading against.** THESIS §1.4(d) named short-horizon liquidity
-providers — Shen/Urquhart/Wang's channel, the intraday momentum manufactured by the liquidation
-engine's forced, price-insensitive, momentum-aligned order flow. I believe that transfer is real. The
-seed's packet says it does not clear a 7.4–22.3 bps schedule. Abandoning it is the substance of this
-refinement, and §6 is written so that being wrong about it is visible rather than deniable.
+**And one I have now abandoned twice.** THESIS §1.3–§1.4(d) argued the more interesting half of the
+thesis: that the perpetual's liquidation engine manufactures a fast, mechanical, momentum-aligned
+order flow that has no analogue in the CTA literature, and that Shen/Urquhart/Wang's intraday result
+names its counterparty. I still believe that transfer is real. t01's packet says it does not clear a
+7.4–8.0 bps schedule at 1×, let alone 3×. The slow ladder walked away from it; the daily average
+walks further. That is the substance of both refinements and §6 is written so that being wrong about
+it stays visible.
 
 ---
 
-## 5. Quantified prediction, stated before the packet returns
+## 5. Quantified predictions, stated before the packet
 
-The redesign cuts the break-even bar by 2.45×: `S_required` falls from **2.42 to ≈0.99**. Since the
-seed delivered 1.56, **the slow ladder needs to retain 63% of the seed's gross Sharpe to clear triple
-cost.**
+Turnover: `51.32 × 0.985 (ladder) × ~0.62 (smoothing, 1/√3 diluted by unsmoothed universe churn)`.
 
-| quantity | seed | predicted |
+| quantity | t02 (measured) | nominated (predicted) |
 |---|---|---|
-| annualised turnover | 130.5 | **45 – 65** |
-| gross edge / turnover | 14.64 bps | **26 – 40 bps** (break-even 22.3) |
-| cost share of gross | 0.512 | **0.19 – 0.29** |
-| triple-cost return | −0.103 | **positive** |
-| effective breadth | 21.4 | 18 – 24 |
-| long / short exposure | 50.6 / 49.4 | 35/65 – 65/35 (wider than the seed; see §8) |
+| annualised turnover | 51.32 | **26 – 40**, central **32** |
+| gross edge / turnover | 28.67 bps | **38 – 52 bps** (3× break-even ≈ 24) |
+| cost share of gross | 0.262 | **0.15 – 0.21** |
+| net Sharpe | 0.961 | **0.95 – 1.10** |
+| double-cost Sharpe | 0.621 | **0.72 – 0.85** |
+| triple-cost return | +0.0259 | **+0.05 – +0.08** |
+| effective breadth | 21.87 | 21 – 24 (averaging three books de-concentrates slightly) |
+| long / short share | 49.3 / 50.7 | ≈ 50/50 |
+
+Bracketing the signal cost of smoothing both ways, because that is the number I am least sure of:
+
+- **Central** (lag costs 2% of gross Sharpe → 1.29): net Sharpe 1.06, triple-cost return **+0.070**.
+- **Pessimistic** (charge the smoothing the *full* log-turnover penalty measured from deleting rungs,
+  `b = 0.263` → gross Sharpe 1.19 — an over-charge, since a one-bar lag does not delete signal the
+  way removing four rungs does): net Sharpe 0.96, triple-cost return **+0.058**.
+
+**Under both, 1× net Sharpe is flat against t02 and the triple-cost margin is 2.2–2.7× larger.** That
+insensitivity is the whole argument for the trade, and it is why I prefer this book to the one I
+already passed with.
 
 ---
 
 ## 6. What would falsify this
 
-### F-R — the refinement falsifier
+### F-N — the nomination falsifier
+The claim is that the last two of every three daily decisions are noise-trading, and that removing
+them is nearly free in signal and large in cost. Three discriminating outcomes, all committed now:
 
-The claim is that the seed's edge lives at the slow end and is being consumed by fast-rung turnover.
-The next packet discriminates three outcomes, and I commit to all three readings now:
-
-- **Turnover falls into 45–65 and density clears ~22 bps.** The diagnosis holds.
-- **Turnover falls as predicted but density does not move** — i.e. gross Sharpe fell in proportion to
-  turnover. Then **the edge was in the fast rungs**, the √L argument is wrong for this universe, and
-  time-series trend in Binance perpetuals is a microstructure effect that does not clear this cost
-  schedule at any horizon. That is the family failing the cost gates, not a parameter miss, and per
-  the THESIS §6 stopping rule I will report it rather than mine the grid for a passing cell.
-- **Turnover does not fall into the predicted range.** Then my model of where the seed's turnover
-  comes from is wrong, and the residual is being generated by the vol estimate, universe churn, or
-  the organizer's risk-unit rescale — each separable from the next packet.
+- **Turnover lands in 26–40 and net Sharpe holds near 0.96+.** The claim holds; the extra
+  intra-day decisions were noise.
+- **Turnover falls as predicted but net Sharpe falls with it, proportionally.** Then the 8h clock
+  was carrying real information at the slow ladder's horizon, my innovation model is wrong about
+  *which* frequencies hold the edge, and the correct reading is that this family's edge in Binance
+  perps is more frequency-dependent than a 15–120 day signal has any right to be.
+- **Turnover does not fall into range.** Then the residual turnover is not signal-driven — it is
+  universe churn, the vol estimate, or the organizer's risk-unit rescale — and my model of this
+  book's cost, which correctly predicted 2.54×, has a term missing.
 
 ### F-C — the mandate falsifier, as assigned
-
 > If no lookback horizon produces positive average returns per contract, time-series trend does not
 > persist in this universe.
 
-**Not currently breached.** The seed's gross return of 0.187 at a gross Sharpe of 1.56 establishes
-that some horizon in the ladder is positive. What is in question is not whether the premium exists
-but whether it survives being paid for.
+**Not breached.** Two packets show gross Sharpe of 1.56 (all eight rungs) and 1.31 (slow four) on 808
+days. Some horizon in the ladder is positive. The open question was never whether the premium exists
+here; it is whether it survives being paid for, and that is what both refinements have addressed.
 
-### F-A and F-B — what I could not run, stated plainly
-
-THESIS §6 preregistered F-A (a 1,000-path sign-scrambled block-bootstrap control, to establish that
+### F-A and F-B — preregistered and still unrun, stated plainly
+THESIS §6 preregistered F-A (a 1,000-path sign-scrambled block-bootstrap control establishing that
 the *sign forecast* adds something above the organizer's imposed risk unit — the test Kim/Tse/Wald's
-critique demands) and F-B (standalone per-rung net returns, requiring a contiguous positive block of
-three adjacent rungs).
+critique demands) and F-B (standalone per-rung net returns requiring a contiguous positive block of
+three adjacent rungs). **Neither is executable.** This phase returns one aggregate metric packet per
+trial, not a backtest harness; a bootstrap distribution and a per-rung decomposition cannot be built
+from `{net_sharpe, turnover, cost_share, …}`.
 
-**I cannot execute either.** This phase returns one aggregate metric packet per trial, not a backtest
-harness; there is no way to construct a bootstrap distribution or a per-rung decomposition from it,
-and twelve feedback-driven trials cannot substitute. I am recording this as an unmet preregistered
-commitment rather than quietly substituting a weaker test that I *can* run and calling it F-A.
-Consequently, **if this book makes money I am not entitled to claim it for the trend family** — the
-Kim/Tse/Wald alternative (that the result is the imposed risk unit plus an inverse-volatility tilt)
-remains open and untested. The §0 no-vol-gate commitment is what keeps that question at least
-honest: this book has no volatility-conditional exposure anywhere, so whatever it earns, it does not
-earn from disguised volatility timing.
+I am recording this as an unmet preregistered commitment rather than substituting a weaker test I
+*can* run and calling it F-A. The consequence, stated without hedging: **if this book makes money I
+am not entitled to claim it for the trend family.** The Kim/Tse/Wald alternative — that the result is
+the organizer's imposed risk unit plus an inverse-volatility tilt, with the sign forecast
+contributing nothing — remains open and untested. The §0 no-vol-gate commitment is what keeps the
+question at least honest: there is no volatility-conditional exposure anywhere in this book, so
+whatever it earns, it does not earn from disguised volatility timing.
 
----
-
-## 7. Declared deviations from the sealed parameter surface
-
-THESIS §7.5 requires that moving a fixed default is counted and reported rather than quietly amended.
-Five, of which two are forced by the contract:
-
-1. **No-trade band `D` not implemented — forced.** §7.1 fixed 0.10 × target weight. Position-space
-   control is impossible here (§2.1). Turnover control moved to signal space.
-2. **Tier-2 knobs used without completing Tier 1 — forced.** §7.3 made Tier 2 contingent on F-A/F-B
-   passing and on a Tier-1 grid winner; §7.4 fixed the selection rule. No grid can be run (§6). One
-   cell was selected by mechanism reasoning instead. This *lowers* the effective trial count well
-   below the declared 81 rather than raising it, which helps the deflation argument — but it is a
-   departure from the declared selection rule and is recorded as one.
-3. **Net-exposure cap at 0.20 added.** Not in §7.1. It is constraint hygiene mirroring the hard
-   |net| ≤ 0.25, applied smoothly by me instead of bluntly by the evaluator, which would impose the
-   same reduction anyway. It shrinks the dominant side proportionally and approaches the identity at
-   its own boundary, so it introduces no jump turnover. Note what it does **not** do — see §8.
-4. **Funding drag approximated** by a trailing mean rate per settlement scaled to a per-bar drag,
-   rather than an exact per-rung sum. Chosen for robustness; the smoothing is mild and, if anything,
-   less noisy than the exact quantity.
-5. **Minimum history fixed at 200 bars.** §7.1 said "sufficient history" without a number.
+### On `positive_fold_fraction = 0.4`
+t02 turned in 2 of 5 positive folds at a net Sharpe of 0.96, down from the seed's 0.6. I read this as
+**preregistered prediction P5 confirming, not as fragility**: P5 said before any data that "performance
+should be concentrated in a small number of large-move episodes" and that if it were not, the return
+was not coming from trend capture. A convex, lookback-straddle payoff is *supposed* to be lumpy.
+Arithmetically it is also unremarkable: at annual Sharpe 0.96 a 162-day fold has expected Sharpe 0.64,
+so P(fold > 0) ≈ 0.74 and P(≤ 2 of 5) ≈ 0.12 — inside noise. The seed's higher fold consistency at a
+*lower* Sharpe is the same fact from the other side: faster trading spreads P&L more evenly and then
+hands it to the cost schedule. **Secondary prediction:** averaging three books tilts toward the
+persistent component, so fold consistency should tick up rather than down. If it falls further while
+Sharpe holds, that is a sign the return is concentrating into fewer episodes than trend capture
+explains, and I would distrust it.
 
 ---
 
-## 8. Where this is exposed
+## 7. Where this is exposed
 
-- **Effective breadth is my main exposure among the gates I currently pass.** `tanh` weights times an
-  inverse-vol spread put my estimate at 18–24 against the seed's 21.4. The mitigating read: a pass
-  fraction of 1.0 with a *median* of 21.37 means the threshold sits below the realised *minimum*, so
-  it is likely well under 15. The concentration cap at 3× median is what holds the top of the book
-  down and is doing real work here, not decoration.
-- **Slow trends are market-directional, and the net cap does not rescue the "both sides used" gate.**
-  With ~0.6 average pairwise crypto correlation (Man Group), the raw slow book will be one-sided more
-  often than the seed's near-perfect 50.6/49.4. It is worth being exact about what the cap buys.
-  After it binds, `net = 0.20` and `gross = 0.20 + 2·short_sum`, so the long share is
-  `(0.20 + short_sum)/(0.20 + 2·short_sum)`. That tends to 0.5 only when the minority side carries
-  real mass: at `short_sum = 0.3` the split is 62/38, and in a cross-section with no shorts at all it
-  is 100/0 with gross collapsing to 0.20. So the cap enforces the *net* constraint and nothing more —
-  it is not a both-sides-used guarantee, and I am not claiming one. The gate is protected only by the
-  cross-section genuinely containing both signs, which the seed's 50.6/49.4 suggests it does over the
-  window but does not promise bar by bar. This is the second real exposure after breadth, and both
-  are consequences of the same fact: slowing the ladder makes the book more market-directional.
-- **A turnover-band floor.** 130.5 was inside the band; 45–65 may not be. If it fails low, that is a
-  clean, diagnosable result.
+- **The turnover band floor is the single named qualification risk.** Evidence establishes only that
+  the band contains [51.3, 130.5]. My prediction of ~32 is below anything I have observed to pass. If
+  the floor sits above ~32 this book fails a structural gate outright and scores nothing, and the
+  trade I made in §1 was the wrong one. I judged this less likely than the triple-cost risk it buys
+  down — a floor above 32 would exclude essentially every genuine slow-trend CTA, in a tournament
+  that fields a time-series-trend lane and warns at length about cost gates — but it is a real
+  binary risk and I am not going to dress it up as anything else.
 - **THESIS §3.1 remains the honest failure regime:** a high-realised-volatility, zero-net-drift range.
-  Slowing the ladder does not defend against chop — it lengthens the period over which chop can bleed.
-  Owning a lookback straddle means paying the premium in whipsaw, and that is the trade.
-- **THESIS §3.4 is unrepaired and unrepairable.** The CTA result stands on a tripod — small
-  per-market Sharpe, made investable by aggregating many weakly-correlated markets. Crypto supplies
-  one leg at ~0.6 correlation. A 30-perp book is not 30 bets. No choice available in this lane
-  restores that, and the correct expectation for this family here is therefore modest.
+  Slowing the book does not defend against chop; it lengthens the period over which chop can bleed,
+  and inverse-vol sizing shrinks positions *after* the volatility arrives, not before. Owning a
+  lookback straddle means paying the premium in whipsaw. That is the trade, not a defect to engineer
+  away.
+- **THESIS §3.4 is unrepaired and unrepairable.** The CTA result stands on a tripod: small per-market
+  Sharpe (~0.4), made investable by aggregating ~67 weakly-correlated markets. Crypto supplies one leg
+  at ~0.6 average pairwise correlation. A 30-perp book is not 30 bets; measured effective breadth of
+  21.9 flatters what is closer to a handful of independent ones. No choice available in this lane
+  restores that leg, and the correct expectation for this family here is therefore modest. A
+  development gross Sharpe of 1.31 is well above THESIS §P6's ~0.4 per-market calibration, and P6 said
+  in advance to read that as a warning rather than a discovery.
+- **Slow trends are market-directional.** The net cap enforces `|net| ≤ 0.20` and *nothing more* — it
+  is not a both-sides-used guarantee. That gate is protected only by the cross-section genuinely
+  containing both signs, which two packets suggest it does over 808 days but which is not promised bar
+  by bar.
+- **Survivorship (THESIS §3.7) is untestable from here** and would inflate the long side if present.
+  Flagged before data, unresolved, and no strategy choice in this lane repairs it.
+
+---
+
+## 8. Declared deviations from the sealed surface, and the trial count
+
+THESIS §7.5 requires that moving a fixed default be counted and reported rather than quietly amended.
+Seven, of which two are forced by the contract and two are new at this phase.
+
+1. **No-trade band `D` not implemented — forced.** §7.1 fixed 0.10 × target weight. A band is a
+   position-space control; `DecisionContext` exposes no position and persistent state is forbidden.
+   Turnover control moved into signal space, which is what §3.2 is.
+2. **Tier-2 knobs used without completing Tier 1 — forced.** §7.3 made Tier 2 contingent on F-A/F-B
+   passing and on a Tier-1 grid winner; §7.4 fixed the selection rule. No grid is runnable (§6). Cells
+   were selected by mechanism reasoning instead.
+3. **Net-exposure cap at 0.20 added.** Not in §7.1. Constraint hygiene mirroring the hard |net| ≤ 0.25,
+   applied smoothly by me rather than bluntly by the evaluator.
+4. **Funding drag approximated** by a trailing mean rate scaled to a per-bar drag, held fixed across
+   the three smoothing lags, rather than an exact per-rung sum.
+5. **Minimum history fixed at 202 bars.** §7.1 said "sufficient history" without a number; 202 gives
+   200 usable observations at every smoothing lag, so all three books rest on the same ladder depth.
+6. **NEW — ladder densified to √2 spacing inside the declared span.** §7.1 fixed the rungs at 2×
+   spacing. Same endpoints, seven rungs instead of four, turnover-neutral (§3.1). Counted as a move of
+   a fixed default. It is an averaging move over horizons, not a selection among them, and no per-rung
+   evidence exists that could have informed it.
+7. **NEW — cadence `R = daily` implemented as a running mean rather than a discrete schedule.** The
+   *value* is the declared Tier-2 one; the continuous implementation is the deviation, taken because
+   the discrete form is calendar-anchored and threshold-based (§3.2).
+
+**Trial count.** The declared surface is 81 cells (§7.5). Charged trials actually spent: t01 (the
+organizer seed, not mine and not in the count) plus **two of my own** — t02 and this nomination. Two
+configurations drawn from an 81-cell declared space, each selected by a stated mechanism argument
+rather than by grid search, and each with its structural prediction written down before the packet
+returned. Both predictions were quantitative; the one that has been checked (2.45× predicted, 2.54×
+realised) came in within 4%. That is the deflation argument, and it is a stronger one than a higher
+development Sharpe would have been.

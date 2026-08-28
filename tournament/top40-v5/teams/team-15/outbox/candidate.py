@@ -1,9 +1,18 @@
-"""team-15 -- regime-allocated ensemble of carry, trend and short-horizon reversal.
+"""team-15 -- nomination: regime-allocated ensemble of carry, trend and short-horizon reversal.
 
-Three cross-sectional sleeves on Binance USD-M perpetuals, combined by a soft state variable
-built from the cross-sectional level of funding.  The allocator scores each sleeve on its own
-reconstructed, past-only, turnover-charged return path, so a sleeve that cannot pay for its own
-trading is pushed to its shrinkage floor rather than being carried by gross performance.
+Three cross-sectional sleeves on Binance USD-M perpetuals, blended by weights conditioned on a
+soft state variable built from the cross-sectional level of funding.  The allocator scores each
+sleeve on its own reconstructed, past-only, turnover-charged return path, so a sleeve that cannot
+pay for its own trading is pushed to its shrinkage floor rather than carried by gross performance.
+
+This is the trial-2 object (`lane/candidates/refinement-candidate.py`) with exactly two constants
+moved, both solved from the one number the feedback packets measure rather than searched:
+
+    k = 7.45 bps of cost per unit of turnover at 1x, recovered independently from t01 and t02.
+
+`survives_triple_cost` therefore requires gross edge density > 3k = 22.4 bps per unit turnover.
+t02 delivered 11.2 bps.  `H_TARGET` (the common turnover governor) and `COST_PER_TURNOVER` (the
+charge the allocator applies to itself) are both set from that identity; see RATIONALE.md.
 
 Everything is recomputed from the rows streamed in ``DecisionContext``; no state survives a call,
 no absolute date, symbol identity or price level is referenced, and every transform is a smooth
@@ -25,7 +34,11 @@ H_TREND = 45               # bars, trailing return (15 days)
 H_REV = 3                  # bars, trailing return (1 day)
 
 # --- turnover governor -------------------------------------------------------------------------
-H_TARGET = 15              # bars; every sleeve is smoothed toward this common effective horizon
+# Every sleeve is averaged toward this common effective horizon.  Solved, not searched: at
+# k = 7.45 bps the triple-cost gate needs > 22.4 bps of gross edge per unit turnover, which the
+# t01 -> t02 scaling reaches only at an annualised turnover near 25.  90 bars is also 2x the trend
+# sleeve's own formation horizon -- the point past which a momentum signal should not be held.
+H_TARGET = 90
 
 # --- regime definition (Block B) ---------------------------------------------------------------
 W_REGIME = 180             # bars, trailing window for the state variable (60 days)
@@ -34,8 +47,10 @@ STATE_SLOPE = 2.0          # logistic slope in inter-quartile units; ~0.73 membe
 
 # --- allocation map (Block C) ------------------------------------------------------------------
 ALLOC_MIN_OBS = 200        # bars of reconstructed sleeve history before the allocator is trusted
-LAMBDA_EW = 0.50           # shrinkage toward equal weight
-COST_PER_TURNOVER = 0.0015  # 15 bps per unit of |dw|, ~2x the venue's 1x charge (see RATIONALE)
+LAMBDA_EW = 0.50           # shrinkage toward equal weight (Phase-S default, unmoved)
+# A stated cost assumption, not a fitted parameter: 3 x the 7.45 bps per unit turnover implied by
+# t01 and t02.  The allocator scores sleeves at the charge the binding gate applies.
+COST_PER_TURNOVER = 0.0022
 
 # --- book construction (Block D) ---------------------------------------------------------------
 MIN_NAMES = 5              # cross-section below this is not a portfolio

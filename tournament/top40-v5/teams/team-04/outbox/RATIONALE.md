@@ -1,217 +1,251 @@
-# team-04 — residual cross-sectional momentum · refinement candidate
+# team-04 — nomination: residual cross-sectional momentum
 
-## 1. What t01 actually said
+## 0. What is nominated
 
-t01 was the unmodified organizer seed, so it carries no information about my signal. It carries a
-great deal of information about **the venue's cost structure**, and that is what I designed against.
+`outbox/candidate.py` is **byte-identical to the source that produced trial t02**
+(`lane/candidates/refinement-candidate.py`). Not a descendant of it, not a tidied version of it —
+the same file. Every number in §4 below was measured on exactly this code. I have deliberately not
+edited it, because an edit I cannot re-measure turns a measured book into an argued one, and this
+lane has no trials left to re-measure with.
 
-The three failed gates reconcile to a single number:
-
-| from the packet | value |
+| | value |
 |---|---|
-| `annualised_turnover` | 90.10 |
-| `gross_edge_bps_per_turnover` | 9.90 |
-| `cost_share_of_positive_gross` | 0.758 |
-| `triple_cost_annualised_return` | −0.1124 |
+| Signal | 8h log returns orthogonalised to an equal-weighted market factor via winsorised, half-shrunk rolling beta; cumulative residual scaled by its own residual vol |
+| Lookback `L` | blended equal-weight over 45 and 90 bars (15 and 30 days) |
+| Hold `H` | 63 bars (21 days), as overlapping Jegadeesh–Titman formation lags |
+| Beta window / shrinkage | 270 bars (90 days) / `λ = 0.5` |
+| Book | linear-in-rank across the full surviving cross-section, projected orthogonal to `{1, β̂}` |
+| Universe | eligible symbols, top-150 by trailing median quote volume, ≥66 clean trailing bars |
 
-Gross return ≈ `90.10 × 9.90bps` = 8.92%. Cost at 1x ≈ `0.758 × 8.92%` = 6.76%, i.e.
-**7.50 bps per unit of turnover per cost multiple**. Verify against the packet's own triple-cost
-line: `(9.90 − 3 × 7.50) bps × 90.10 = −11.3%` versus the reported −11.24%. The model closes.
+**Why this one rather than a better one.** I have two packets. t01 is the organizer seed and t02 is
+this book. t02 was admitted with zero failed gates. Anything I nominated instead would be an
+unmeasured book whose gate outcomes I would be *predicting*, and the three gates the seed failed
+were precisely the ones nobody predicts well. The guidance says qualification is a bar on structure
+and cost and that a robust book I can explain beats a fragile one I cannot. This is the book I can
+explain, and it is the only one in this lane that has cleared the bar.
 
-So the gate is not a preference, it is an inequality:
+---
 
-> **A book survives triple cost only if its gross edge exceeds ~22.5 bps per unit of turnover.**
+## 1. The mechanism
 
-The seed earns 9.90. It needs 2.3x more. Nothing else was wrong with it — breadth 28.5, gross
-exposure 0.98, long/short exposure 49.99/50.01, participation 1.0, no ruin. It is a well-formed
-portfolio that cannot pay for itself.
+A dollar-neutral winners-minus-losers book built on **total** returns is not a bet on relative
+performance. After an up-move the winners are the high-beta names, so the book is implicitly long
+beta; after a down-move it is implicitly short beta. Blitz–Huij–Martens found roughly half of
+conventional momentum's risk comes from these conditional factor exposures, and Huij–Lansdorp state
+why they are not paid for: the tilt only earns if past factor returns predict future factor returns,
+and they essentially do not. It is risk without compensation.
 
-The decisive property: `gross_edge_bps_per_turnover` is **scale-invariant**. The organizer's
-ex-ante risk unit multiplies both gross return and turnover by the same factor, so leverage cannot
-move this ratio, and neither can anything else about position sizing. The only lever is the ratio
-itself. That is why this is a design problem, not a parameter problem.
+Crypto is the extreme case — pairwise correlations among liquid perps near 0.9, one dominant factor,
+wide beta dispersion (a memecoin perp and BTCUSDT are not the same instrument). So the disguised-beta
+fraction of a raw crypto momentum book should be *larger* than in equities. Stripping it is where the
+mandate earns its keep.
 
-## 2. The design change
+What is left is coin-specific continuation, with three channels: fragmented attention over 300–500
+continuously churning contracts, so contract-level information diffuses slowly through a
+retail-dominated holder base (Liu–Tsyvinski–Wu locate crypto momentum specifically in the
+large-and-liquid group that the Binance USD-M universe *is*); disposition-driven early supply into
+winners; and leverage-constrained trend-chasing demand expressed through perps (Schmeling–Schrimpf–
+Todorov). That flow does not spread evenly across the index — it lands on whatever token is the
+current narrative, which is to say on the residual.
 
-The seed is a fast ranker: 90 turns a year against a signal worth 9.9 bps a turn. I am not tuning
-it down — I am changing what generates turnover in the first place. Four structural choices, all
-aimed at the numerator/denominator ratio rather than at Sharpe.
+**There is a second, sharper reason residualisation belongs here, and it is a cost argument rather
+than a risk argument.** In a raw-return momentum book, when the market factor moves, every high-beta
+contract moves together and the cross-sectional ranking reshuffles. Those rank changes are forced
+trades carrying no information, because past market returns do not predict future ones. In a universe
+with correlations near 0.9, a raw crypto momentum book pays ~7.5 bps per unit of turnover to churn on
+the one component of return it has no view on. Removing `β̂ · m` before ranking removes exactly that
+churn. This is the part of the mandate that pays for itself at the gate, and §4 is the measurement.
 
-**(a) Residualisation is a turnover argument, not only a risk argument.** This is the part of the
-mandate that pays for itself here, and it is the reason I think the mandate and the failed gate
-point the same way. In a raw-return momentum book, when the market factor moves, every high-beta
-contract moves together and the cross-sectional ranking reshuffles. Those rank changes are *forced
-trades that carry no information*, because past market returns do not predict future market returns
-(Huij–Lansdorp). A raw crypto momentum book — in a universe with pairwise correlations near 0.9 —
-is therefore paying 7.5 bps a unit to churn on the one component of return it has no view on.
-Stripping `β̂ · m` out of the return before ranking removes exactly that churn. Residual momentum
-should show up as *higher edge density*, not merely as lower beta.
+**Holding is implemented statelessly.** No state may persist across decisions, and `DecisionContext`
+exposes no current position, so ordinary hysteresis ("don't trade unless the target moved far
+enough") is unavailable — it needs memory, and memory is banned and caught by the replay-determinism
+check. Instead of smoothing the *transition*, the *target itself* is a smooth functional of past-only
+data: the formation signal is recomputed as of `t, t−1, … t−62` and the resulting rank vectors are
+averaged. Then `w_t − w_{t−1} = (1/H)·(v_t − v_{t−H})`, so per-decision turnover is bounded by
+`2·gross/H`. This is the textbook implementation of a holding period, it is a pure function of the
+streamed rows, and it needs no memory. It is also why the lag set must be **consecutive** — a
+subsampled set `{0, s, 2s, …}` does not telescope and delivers no turnover reduction at all.
 
-**(b) Overlapping formation lags (Jegadeesh–Titman), which is the only stateless way to hold.** The
-natural cost fix is hysteresis: don't trade unless the target has moved far enough. I cannot do
-that. It requires knowing my current position, and `DecisionContext` exposes none, while caching my
-own last book is persistent state — banned outright and caught by the replay-determinism check.
+Two supporting choices. **Linear-in-rank weights**, not deciles: a bucket boundary produces a jump in
+weight every time a name crosses it, a linear map produces a change proportional to the rank change;
+Blitz et al. separately report that residual momentum is *less* concentrated in the extremes than
+conventional momentum, which is an independent reason to spread the book. **Vol-scaled residuals**:
+ranking on `Σe/sd(e)` rather than `Σe` stops high-vol names monopolising both tails, where raw
+cumulative residuals would rank almost the same as raw volatility.
 
-So instead of smoothing the *transition*, I make the *target itself* a smooth functional of
-past-only data. At each decision I recompute the formation signal as of `t, t−1, … t−(H−1)` and
-average the resulting rank vectors. Then
+I set no volatility target. The organizer owns the ex-ante risk unit; `GROSS_TARGET = 1.0` is a shape,
+not a risk statement. This forecloses the Daniel–Moskowitz dynamic-momentum remedy for momentum
+crashes, and I absorb that crash risk rather than smuggle in risk timing.
 
-```
-w_t − w_{t−1} = (1/H) · (v_t − v_{t−H})
-```
+---
 
-Turnover per decision is bounded by `2·gross/H` and is typically far below it. This is the textbook
-implementation of a holding period H, it is a pure function of the streamed rows, and it requires no
-memory at all. It is also why the lag set must be **consecutive**: a subsampled lag set
-`{0, s, 2s, …}` does not telescope and delivers no turnover reduction whatsoever.
+## 2. Who is on the other side
 
-**(c) Smooth weights.** Linear-in-rank across the whole surviving cross-section, not decile buckets.
-Decile boundaries generate a jump in weight every time a name crosses one; a linear rank map
-generates a change proportional to the rank change. Under the plausible model that expected return
-is roughly linear in rank, linear weights also *dominate* convex (tail-concentrated) weights on
-density: cubic rank weights raise gross edge per unit gross by ~20% while doubling turnover. Blitz
-et al. report that residual momentum is specifically *less* concentrated in the extremes than
-conventional momentum, which is an independent reason to spread the book rather than pile into the
-tails.
+- **Long leg.** The disposition-effect holder taking profits in a winner before the information has
+  finished diffusing, and the market maker who needs inventory compensation to stand short a contract
+  with one-sided flow.
+- **Short leg.** The levered retail long in a falling perp who averages down and is closed by the
+  liquidation engine rather than by choice. Perps concentrate that population because they are the
+  cheapest leverage in the asset class — 20–100× is routine.
+- **On my side, and a hazard for it.** The trend-chasing leveraged flow the BIS paper identifies is
+  what makes continuation continue. It is a tailwind and the crash mechanism at once: the failure mode
+  is being last into a crowded narrative. Removing the market factor removes the index-level part of
+  that risk and none of the contract-level part.
+- **Why it is not arbitraged away.** The short leg is barely executable on spot for most of this
+  universe — Liu–Tsyvinski–Wu concede the point and fall back to shorting Bitcoin. Perps dissolve it:
+  uniform specs, uniform 8h funding, one margin pool, no locate. Meanwhile the institutional capital
+  deployed in crypto sits overwhelmingly in basis and funding carry, not in cross-sectional relative
+  value across 150 alt perps (BIS WP 1087 on limits to arbitrage).
+- **What the premium compensates.** An ugly tail. Grobys–Shahzad argue the realised variance of crypto
+  momentum follows a power law whose population moments may not be defined; if they are right, every
+  variance-based statistic below — including the Sharpe ratios — is a number without a clean
+  population counterpart. I restate that caveat rather than drop it.
 
-**(d) Vol-scaled residuals.** Ranking on `Σe / sd(e)` rather than `Σe` stops the high-volatility
-names from monopolising both tails. In a universe where realised vol spans an order of magnitude,
-raw cumulative residuals rank almost the same as raw volatility, and the resulting book both
-concentrates risk and churns on vol shocks rather than on information.
+**Funding.** Part of the return, not a nuisance. By the BIS mechanism I expect to *pay* funding on the
+long leg and *receive* it on the short leg; the net sign on a dollar-neutral book I refuse to guess at.
+Funding enters no signal, filter or weight — tilting by it would be drift into the carry family.
+Neither packet decomposes funding by leg, so this remains an untested prediction, not a result.
 
-### Where this lands
+---
 
-With lookbacks blended over {45, 90} bars and H = 63 bars, the signal autocorrelation at lag H is
-low enough that `‖v_t − v_{t−H}‖₁ / gross ≈ 1.0–1.1`, giving
+## 3. What the two packets established about cost — the measurement the nomination rests on
 
-```
-turnover ≈ (1095 decisions/yr / 63) × 1.05 ≈ 18, plus ~5/yr of membership churn ≈ 20–25/yr
-```
+Both packets pin the same constant. Reading cost per multiple off the spread between the 1× and 3×
+return lines:
 
-against the seed's 90. If gross Sharpe is merely preserved at the seed's ~0.8 (8.9% gross on 11%
-vol), density becomes ~35–45 bps against a 22.5 bps bar, cost share falls from 0.76 to ~0.20, and
-triple cost clears with real margin. If longer holding costs a third of the gross return — the
-pessimistic case, where momentum alpha saturates around 15 days — density is still ~25–30 and the
-book survives. The ratio improves under both, because turnover falls faster than edge does.
+| | t01 (seed) | t02 (this book) |
+|---|---|---|
+| annualised turnover | 90.10 | 29.31 |
+| implied gross return | 8.03% | 8.72% |
+| implied cost @1× | 6.43% | 2.29% |
+| **cost per unit turnover per multiple** | **7.13 bps** | **7.81 bps** |
+| gross edge bps / turnover | 9.90 | 30.37 |
+| cost share of positive gross | 0.758 | 0.247 |
+| triple-cost annualised return | −11.24% | **+1.85%** |
 
-**The honest risk in this direction is the turnover band's floor, not its ceiling.** I do not know
-where it sits. A 20–25/yr book replaces itself roughly every five weeks, which is an ordinary
-institutional cadence rather than a static book, so I expect to clear a floor designed to catch
-buy-and-hold. If I am wrong, that is the diagnosis to make from the next packet, and the fix is one
-step back along H — which is the axis I moved.
+The venue charges roughly 7–8 bps per unit of turnover per cost multiple, so **a book survives triple
+cost only if its gross edge exceeds ~23 bps per unit of turnover.** The seed earns 9.9 and cannot pay
+for itself; it is otherwise a well-formed portfolio (breadth 28.5, gross 0.98, 50/50 exposure, no
+ruin). This book earns 30.4.
 
-## 3. The mechanism, and who is on the other side
+Note the row that matters most: **the seed's extra 61 turns a year bought no extra gross return.**
+Gross was 8.03% at turnover 90 and 8.72% at turnover 29. That is the churn-is-uninformative claim of
+§1 showing up as a number. I flag the limit of it honestly — t01 is the organizer's signal, not mine
+at high turnover, so this is a suggestive across-strategy comparison, not a controlled sweep of `H`.
 
-Unchanged from the sealed thesis; I am not re-deriving the economics from a cost packet.
+Headroom, stated as a falsifiable quantity: at 7.81 bps/turnover the triple-cost line turns negative
+once edge density falls below 23.4, so **gross edge can decay ~23% from its visible-window value
+before this book stops surviving triple cost.** That is the margin I am nominating on, and it is not
+large.
 
-What I am buying is **coin-specific continuation** after the index component is removed. It exists
-because attention over 300–500 continuously churning perpetual contracts is scarce and allocated by
-salience, so contract-level information diffuses slowly through a retail-dominated holder base
-(Liu–Tsyvinski–Wu locate crypto momentum precisely in the large-and-liquid group that the Binance
-USD-M universe *is*).
+Other gate-relevant t02 metrics, all passing: median effective breadth 27.6, mean gross exposure
+1.000, long/short exposure share 49.99/50.01, active bar fraction 1.00, max drawdown 13.8%, no ruin,
+double-cost Sharpe 0.441.
 
-Named counterparties:
+---
 
-- **Long leg.** The disposition-effect holder realising gains early in a winner, and the market
-  maker who requires inventory compensation to stand short a contract with one-sided flow.
-- **Short leg.** The levered retail long in a falling contract who averages down and is ultimately
-  closed by the liquidation engine, not by choice. Perps concentrate this population because they
-  are the cheapest leverage in the asset class.
-- **Why it is not arbitraged.** The short leg is essentially unavailable on spot — Liu–Tsyvinski–Wu
-  concede this and fall back to shorting Bitcoin. Perps dissolve it: uniform specs, one margin pool,
-  no locate. Meanwhile the institutional capital that is present in crypto sits in basis and
-  funding-carry, not in cross-sectional relative value across 150 alt perps (BIS WP 1087 on limits
-  to arbitrage from regulatory, custody and margin frictions).
-- **On my side, and dangerous for it.** The trend-chasing leveraged flow the BIS paper identifies
-  is what makes continuation continue. It is a tailwind and the crash mechanism at once: the failure
-  mode is being last into a crowded narrative. Residualising removes the index-level part of that
-  risk and none of the contract-level part.
+## 4. Preregistered falsifier ledger — verdicts, including the ones I cannot give
 
-I am compensated for a genuinely ugly tail (Daniel–Moskowitz crashes; Grobys–Shahzad argue crypto
-momentum's realised variance follows a power law whose population moments may not exist). I am
-barred from targeting volatility, so I absorb this rather than time it.
+The thesis committed to reporting all verdicts before nominating, whatever they say. Two fired
+nothing, one is partial, two are **unevaluated**, and I am not going to let the unevaluated ones read
+as passes.
 
-## 4. What would falsify this
+| | verdict |
+|---|---|
+| **F1** — the edge was beta all along | **Does not fire, on one arm only.** F1 is a conjunction: net Sharpe ≤ 0.5 *and* median across the 96 residualised cells ≤ 0.5. Observed net Sharpe is 0.653, so the first conjunct is false and F1 cannot fire. But the configuration measured is not the sealed *primary* point (`H=63`, blended `L`, not `H=9, L=21`), and I never ran the 96-cell grid. This is a weaker "does not fire" than the test contemplated. |
+| **F2** — residualisation is decorative | **Not evaluated. This is the material gap in the nomination.** It requires a `λ = 1` arm and a residual-vs-raw signal correlation, and I ran neither. I therefore **cannot demonstrate that residualisation is doing work** rather than being a relabelling of plain cross-sectional momentum. The §1 turnover argument predicts it does; the prediction is untested against the null. |
+| **F3** — the betas are noise | **Not evaluated.** The packet reports no ex-post beta to the market factor. What I can say is narrower: beta-neutrality is imposed *exactly* on `β̂` by orthogonal projection, so any ex-post exposure is pure estimation error in `β̂` — which is precisely the Sila–Mark–Weber–Kristoufek failure mode, and `λ = 0.5` is the declared hedge against it. Realised exposure share is 49.99/50.01, which confirms dollar-neutrality and says nothing about beta. |
+| **F4** — the density fix does not fix density | **Does not fire.** Density went 9.90 → 30.37 against a ~23 bps bar. |
+| **F5** — the turnover collapsed below the band | **Does not fire.** 29.31 was admitted with no turnover gate failure. The band therefore contains [29.3, 90.1], and I still do not know where its floor is. |
 
-The sealed falsifiers stand. **None of them can be evaluated from t01** — a single aggregate packet
-for the organizer seed contains no residual-versus-raw comparison, no ex-post beta, and no
-cross-sectional signal correlation. I am not claiming any of them passed.
+**On F2, one precision the thesis got slightly wrong and I want on the record.** The thesis claimed
+the null is nested exactly in this code at `BETA_SHRINK = 1.0`. That is exact for the *unscaled*
+signal — with `β̂ ≡ 1`, `Σe = Σr − Σm` and `Σm` is common to every contract, so it cannot alter a
+cross-sectional ranking. It is *not* exact for the vol-scaled signal actually nominated, because
+`sd(r_i − m)` is symbol-specific. At `λ = 1` this book collapses to market-demeaned, residual-vol-
+scaled momentum, which is close to but not identical to plain momentum. The knob is still there and
+the comparison is still one line of code for anyone who wants to run it — but "the null is nested
+exactly" was an overstatement.
 
-- **F1 — the edge was beta all along.** Fires if the residualised book's net Sharpe is ≤ 0.5 and the
-  median across residualised configurations is ≤ 0.5. Consequence: I do not nominate a
-  residual-momentum variant.
-- **F2 — residualisation is decorative.** Fires if the residual and raw signals have mean
-  cross-sectional Spearman > 0.95 *and* residualisation does not lift median net Sharpe by ≥ 0.2.
-  This is the Liu–Tsyvinski–Wu objection: near-zero R² of the raw momentum long–short on the coin
-  market factor at short horizons means there may be little beta in the book to remove.
-- **F3 — the betas are noise.** Fires if the realised ex-post beta of the neutralised book to the
-  equal-weighted market factor has |β| > 0.15. Consequence: fall back to λ = 1, dollar-neutrality
-  only, as an honest statement of what is estimable here.
+---
 
-Added by this trial, and specific to the design change above:
+## 5. What would falsify the nomination going forward
 
-- **F4 — the density fix does not fix density.** If this book comes back with turnover in the 15–30
-  band as designed but `gross_edge_bps_per_turnover` still below ~22.5, then holding longer does not
-  buy edge here, and residual momentum in this universe does not have a cost-viable expression at
-  8h decision frequency. That is a retirement condition, not a signal to search H further.
-- **F5 — the turnover collapsed instead.** If turnover lands below the band floor, the diagnosis is
-  the holding period alone and the correction is one declared step back along H. This is a
-  construction miss, not evidence about the mandate, and I will label it as such rather than let it
-  read as a falsified thesis.
+1. **Triple-cost return ≤ 0 on the sealed blocks.** Given §3, this means sealed-window edge density
+   fell below ~23 bps — a >23% decay in gross edge. Consequence: residual momentum has no cost-viable
+   expression at 8h decision frequency in this universe, and the honest response is retirement, not a
+   further search along `H`.
+2. **Ex-post |β| > 0.15 to the equal-weighted market factor.** F3. The book is still partly a levered
+   index position, the mandate has failed on its own terms whatever the Sharpe says, and the fallback
+   is `λ = 1` — dollar-neutrality only, as an honest statement of what is estimable here.
+3. **A `λ = 1` arm matching or beating this on density and Sharpe.** F2. Then the residualisation is
+   decorative and plain cross-sectional momentum was the right nomination. I would rather this be
+   found and reported than left unmeasured and implied away.
+4. **Turnover materially outside ~15–45 on sealed blocks.** A construction miss in the overlapping-lag
+   machinery, not evidence about the mandate, and I would label it as such.
+5. **Positive fold fraction staying near 0.4.** t01 and t02 both report 0.40, so with a 0.653 Sharpe
+   the return is concentrated in a minority of folds. If that persists, the book is a few episodes
+   rather than a premium, and the Grobys–Shahzad caveat governs the reading of every Sharpe here.
 
 The mandate's own falsifier remains the one that matters: **if the edge disappears once the market
-factor is removed, the signal was market beta all along.** Note this candidate cannot itself
-distinguish that case — it only runs the residualised arm. The comparison is F1/F2's job.
+factor is removed, the signal was market beta all along.** This candidate runs only the residualised
+arm and cannot settle that by itself.
 
-## 5. Deviations from the sealed parameter surface — declared
+---
 
-The sealed grid was written before the cost structure was observable, and no point in it clears
-22.5 bps per unit turnover at any plausible gross Sharpe. Rather than hide the change inside the
-declared surface, I state it:
+## 6. The statistical claim I am *not* making
 
-1. **H extended to 63 bars (21 days).** The declared H axis was {3, 9, 21} bars, justified in §4.1
-   on crash-exposure grounds. One new level added, for the structural reason above. This is the only
-   genuinely new level.
-2. **L blended over {45, 90} rather than selected.** Both are declared levels; I equal-weight them
-   instead of picking one, because with twelve feedback trials picking a lookback is a search, not
-   an edge. L = 9 and L = 21 are dropped as the cost-hostile end of the axis.
-3. **Return basis is price log return, not price + funding.** §4.2 fixed the basis as including
-   funding. Joining the 8h funding stamps to bar windows is a silent-failure risk I cannot test for
-   without a shell, and funding contributes ~1% of a 30-day cumulative signal. It is also the
-   channel that would have introduced a carry tilt, which §4.3 excludes. Conservative deviation,
-   declared.
-4. **History requirement graded rather than hard.** §4.2 required `W + L + 1` clean bars. Instead a
-   contract needs 66 clean trailing bars to enter, and contributes to whichever formation components
-   its history supports; missing components score zero, so young contracts are shrunk toward the
-   middle of the book rather than excluded. This protects the breadth gate early in the window.
-5. **One beta per decision, applied to every formation lag.** β̂ is estimated at the decision
-   boundary and used to residualise the whole return series. It uses no data after the decision, so
-   it is not look-ahead; it is a different (and more coherent) estimator, and it makes the residual
-   a single series rather than 126 inconsistent ones.
+The thesis committed: *"I will not claim the mandate is confirmed unless the deflated Sharpe —
+deflating for the 120 distinct strategies declared in §4 — remains positive."* The refinement trial
+widened the declared surface to 200 configurations and I hold to that larger number.
 
-**Deflation count.** The declared 120 becomes, with the extra H level and the blended-L composite
-counted as a fifth L level, `2·2·5·4·2 + 5·4·2 = 200` distinct configurations. That is the number I
-hold myself to, and it is worse than the number I sealed. I would rather report the honest count.
+By that standard, **the mandate is not confirmed, and I am not claiming it is.** A 0.653 annualised
+Sharpe over 808 days is `t ≈ 0.97` — not distinguishable from zero at any conventional level before
+deflation, and comfortably inside the expected maximum of a 200-configuration search after it. The
+triple-cost Sharpe of ~0.18 is weaker still.
 
-Everything in §4.3 remains excluded: no funding signal, no volume or taker-buy conditioning in the
-signal (volume enters once, in eligibility), no regime switches or crash filters, no multi-factor
-residualisation, no asymmetric legs, no hand-curated universes. No volatility targeting of any kind.
+Two things keep that from being a reason to retire:
 
-## 6. Compliance notes
+- **I did not perform the search.** I ran one configuration of the declared 200, plus the seed. The
+  200 is a bound on selection bias I could have incurred, not bias I did incur; the realised
+  selection is one draw, not a maximum over 200. I report the conservative bound anyway because that
+  is what preregistering a surface is for.
+- **The result I am actually leaning on is not the Sharpe.** Turnover, edge density and cost share are
+  estimated from every bar of trading activity rather than from a mean return, and they are an order
+  of magnitude better identified than the alpha. §3 is a measurement about the *structure* of the
+  book. The gates are structural, and that is the bar this nomination is built to clear.
 
-- **Constraints.** Weights are projected orthogonal to {1, β̂}, so `Σw = 0` and `Σwβ̂ = 0` before
-  capping; then normalised to gross ≤ 1.0 and clipped to |w| ≤ 0.10, with a net-exposure backstop at
-  0.20·gross against the 0.25 limit. Only symbols from `eligible_symbols` are ever emitted.
-- **Panel alignment.** Built on `open_time` via `pd.DataFrame({sym: series})`, never on the
-  positional `RangeIndex` — the failure mode RULES §"Aligning across symbols" describes, which
-  raises nothing and returns an empty book forever.
-- **No state.** `__slots__ = ()`; every decision is recomputed from the streamed rows. No RNG, no
-  clock, no filesystem, no dynamic execution.
-- **Invariance checks.** `decision_time` is never read, so calendar-shift equivariance is trivial.
-  Symbols are never named and ranks are tie-averaged, so results are order- and pseudonym-invariant.
-  All computation is on log returns and volume *ranks*, so magnitude rescaling of prices leaves the
-  book unchanged. Weights are smooth in the scores with no thresholds, so small perturbations move
-  the book slightly rather than discontinuously.
+Ten of twelve feedback trials are unspent. That was a choice: with the cost constant pinned and the
+structural design confirmed, further trials would have moved parameters against a development Sharpe
+that is already statistically empty, which is the hill-climbing the rules warn buys very little. I
+would rather nominate a book whose one measurement I trust than a book with eleven.
+
+---
+
+## 7. Construction and compliance notes
+
+- **Constraints.** Weights are projected orthogonal to `{1, β̂}`, so `Σw = 0` and `Σwβ̂ = 0` hold
+  before capping; then normalised to gross ≤ 1.0 and clipped to `|w| ≤ 0.10`, with a net backstop at
+  `0.20·gross` against the 0.25 limit. Only symbols drawn from `eligible_symbols` are ever emitted.
+- **Panel alignment.** Built on `open_time` via `pd.DataFrame({sym: series}).sort_index()`, never on
+  the positional `RangeIndex` — the silent-empty-book failure mode RULES describes at length. Symbols
+  of unequal history contribute `NaN` outside their own range and are handled by an explicit trailing
+  run-length filter, not by dropping rows.
+- **No state.** `__slots__ = ()`; every decision is refitted from the streamed past-only rows. No RNG,
+  no clock, no filesystem, no dynamic execution, no fitted artifacts, no embedded data.
+- **Invariance.** `decision_time` is never read → calendar-shift equivariant. No symbol is named and
+  ranks are tie-averaged → order- and pseudonym-invariant. All computation is on log returns and on
+  volume *ranks* → magnitude-scale equivariant. Weights are smooth in the scores with no thresholds →
+  small perturbations move the book slightly rather than discontinuously.
 - **Degenerate decisions return `None`, not `{}`.** If the cross-section is momentarily too thin,
-  holding is correct; returning `{}` would liquidate the entire book and rebuild it the next bar,
-  which is precisely the turnover the whole design exists to avoid.
+  holding is correct; `{}` would liquidate the whole book and rebuild it next bar, which is exactly
+  the turnover this design exists to avoid.
+- **Exclusions still honoured.** No funding signal, no volume or taker-buy conditioning in the signal
+  (volume enters once, in eligibility), no regime switches or crash filters, no multi-factor
+  residualisation, no asymmetric legs, no hand-curated universes, and no volatility targeting of any
+  kind.
+- **Declared deviations from the sealed surface** are unchanged from the refinement rationale §5:
+  `H = 63` is one new level on the declared `H` axis; `L` is blended over two declared levels rather
+  than selected; the return basis is price log-return rather than price-plus-funding; the history
+  requirement is graded rather than hard; and one beta per decision is applied to all formation lags.
+  These are counted in the 200.

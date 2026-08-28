@@ -1,19 +1,32 @@
-"""team-11 -- participant mix from average trade size.
+"""team-11 nomination -- participant mix from average trade size.
 
 Economic family: microstructure and participation.
+Mandate: average trade size as a retail-versus-institutional proxy.
 
-Average trade size S = quote_volume / trade_count is the notional that rode on each print.
-log S == log V - log N exactly, so S is the *composition* of trading, orthogonal in direction to
-the *scale* of trading that a volume factor loads on. S is unsigned, so it cannot set a direction
-on its own; it conditions the sign of taker order flow, which is the one signed participation
-variable this dataset exposes.
+Average trade size S = quote_volume / trade_count is the USD notional that rode on each print.
 
-Long  when large prints accompany net taker buying   (professional accumulation -> continuation).
-Short when small prints accompany net taker buying   (retail chasing            -> reversal).
+    log S  ==  log V - log N        (exact identity)
 
-Both inputs are measured only as within-asset deviations from their own trailing distribution,
-never as levels and never as raw cross-sectional ranks, so the book cannot become a size or
-liquidity factor in disguise.
+N is the arrival clock; conditional on the clock, S is the *composition* of trading rather than
+its *scale*. A volume factor loads on the (+1,+1) direction in (log V, log N) space; this mandate
+lives on (+1,-1) and nowhere else.
+
+S is unsigned -- large prints do not say "up" -- so it conditions the sign of the one signed
+participation variable this dataset exposes, the taker imbalance:
+
+    OFI = 2 * taker_buy_quote_volume / quote_volume - 1      in [-1, +1]
+
+    long  when large prints accompany relative net taker buying    (professional accumulation)
+    short when small prints accompany relative net taker buying    (retail chasing)
+
+The sign is the one pre-committed in the sealed thesis and is unchanged after a negative
+development result. Both inputs enter only as within-asset deviations from their own trailing
+distribution -- never as levels, never as raw cross-sectional ranks -- so the book cannot become a
+size or liquidity factor in disguise.
+
+The signature property, preserved exactly by the construction below: a name whose average trade
+size sits at its own trailing median gets conviction zero and weight zero, no matter how large its
+volume is. A volume proxy cannot have that property.
 """
 
 from __future__ import annotations
@@ -26,26 +39,28 @@ import pandas as pd
 # --- Signal construction -------------------------------------------------------------------
 NORM_WINDOW = 180   # 60d: trailing distribution for the within-asset z-score
 NORM_MIN = 90       # 30d: shortest trailing window accepted
-SMOOTH = 45         # 15d: conviction smoothing -- this is the turnover budget knob
+SMOOTH = 90         # 30d: conviction smoothing -- this is the turnover budget knob
 BURN_IN = 30        # declared hygiene: discard a listing's first 30 bars
 CLIP = 3.0          # declared winsorisation, in SD
 
-MIN_ROWS = BURN_IN + NORM_MIN + SMOOTH   # 165 bars ~ 55 days of clean history
-TAIL_ROWS = NORM_WINDOW + SMOOTH         # all that the last z-value can depend on
+MIN_ROWS = BURN_IN + NORM_MIN + SMOOTH   # 210 bars ~ 70 days of clean history
+TAIL_ROWS = NORM_WINDOW + SMOOTH         # 270 bars: all the last smoothed z can depend on
 
 # --- Rebalance cadence ---------------------------------------------------------------------
-# 9 bars = 3 days = 9 funding epochs. The decision grid is 8h; trading it is not affordable.
-REBALANCE_EVERY = 9
+# 18 bars = 6 days = 61 book refreshes per year. Between refreshes the strategy returns None,
+# which the protocol defines as holding current quantities: no trade, no cost.
+REBALANCE_EVERY = 18
 
 # --- Portfolio construction ----------------------------------------------------------------
 MAX_WEIGHT = 0.09   # inside the 0.10 per-symbol cap
 MAX_GROSS = 1.0
-MAX_NET = 0.20      # inside the 0.25 net cap
-MIN_NAMES = 12
+MAX_NET = 0.25
+MIN_NAMES = 10
+SIDE_FLOOR = 0.05   # a side thinner than this is not a portfolio; sit the refresh out
 DUST = 2e-4
 
 
-def _last_smoothed_z(values: np.ndarray) -> float | None:
+def _smoothed_z(values: np.ndarray) -> float | None:
     """Mean of the last SMOOTH trailing z-scores of ``values``; None if not identified.
 
     The z-score is taken first and smoothed second, so the trailing scale is estimated from
@@ -67,8 +82,12 @@ def _last_smoothed_z(values: np.ndarray) -> float | None:
     return float(np.clip(value, -CLIP, CLIP))
 
 
-def _conviction(frame) -> float | None:
-    """Signed conviction for one symbol: smoothed z(taker imbalance) x smoothed z(log trade size)."""
+def _factors(frame) -> tuple[float, float] | None:
+    """Return ``(z_size, z_flow)`` for one symbol, or None if either is not identified.
+
+    Every quantity is read out of the symbol's own frame, so no cross-symbol panel is ever
+    built and the positional-RangeIndex alignment trap cannot arise here.
+    """
     if not isinstance(frame, pd.DataFrame) or frame.empty:
         return None
     for column in ("quote_volume", "trade_count", "taker_buy_quote_volume"):
@@ -90,88 +109,123 @@ def _conviction(frame) -> float | None:
         return None
     quote, count, taker = quote[BURN_IN:], count[BURN_IN:], taker[BURN_IN:]
 
-    # Composition: USD notional per print. Scale-equivariant once z-scored.
+    # Composition: USD notional per print. A price rescaling shifts log S by a constant that the
+    # trailing mean subtraction removes, so this is scale-equivariant by construction.
     size = np.log(quote / count)
-    # Direction: net taker imbalance in [-1, +1]. Scale-invariant by construction.
+    # Direction: net taker imbalance in [-1, +1], a ratio and so scale-invariant outright.
     flow = 2.0 * np.clip(taker / quote, 0.0, 1.0) - 1.0
 
-    z_size = _last_smoothed_z(size)
-    z_flow = _last_smoothed_z(flow)
+    z_size = _smoothed_z(size)
+    z_flow = _smoothed_z(flow)
     if z_size is None or z_flow is None:
         return None
-    return float(np.clip(z_flow * z_size, -CLIP, CLIP))
+    return z_size, z_flow
 
 
-def _weights(convictions: dict[str, float]) -> dict[str, float] | None:
-    """Cross-sectionally demeaned conviction -> signed, capped, net-zero weights.
+def _balance(weights: np.ndarray) -> np.ndarray | None:
+    """Scale each side until long and short gross are equal.
 
-    The signed square root is portfolio construction, not signal: the conviction is a product of
-    two z-scores and is therefore leptokurtic with a peak at zero, which concentrates a linear
-    book into a handful of names. The compression is monotone and odd, so it preserves the
-    ordering and the zero -- a name sitting at its own trailing median still gets no weight.
+    Neutralisation by *scaling* rather than by *shifting*: a shift would hand a nonzero weight to
+    a name sitting at its own trailing median, which is precisely the property that separates this
+    book from a volume book. Scaling maps zero to zero and preserves the ordering within a side.
     """
-    symbols = sorted(convictions)
-    raw = np.array([convictions[s] for s in symbols], dtype="float64")
-    centred = raw - raw.mean()
-
-    tilt = np.sign(centred) * np.sqrt(np.abs(centred))
-    tilt = tilt - tilt.mean()
-    gross = float(np.abs(tilt).sum())
+    longs = weights > 0.0
+    shorts = weights < 0.0
+    long_gross = float(weights[longs].sum())
+    short_gross = float(-weights[shorts].sum())
+    gross = long_gross + short_gross
     if not math.isfinite(gross) or gross <= 0.0:
         return None
+    if min(long_gross, short_gross) < SIDE_FLOOR * gross:
+        return None
 
-    weights = tilt / gross
-    weights = np.clip(weights, -MAX_WEIGHT, MAX_WEIGHT)
-    weights = weights - weights.mean()
+    balanced = weights.copy()
+    balanced[longs] = weights[longs] * (0.5 * gross / long_gross)
+    balanced[shorts] = weights[shorts] * (0.5 * gross / short_gross)
+    return balanced
+
+
+def _book(sizes: list[float], flows: list[float]) -> np.ndarray | None:
+    """Per-symbol factors -> signed, capped, side-balanced weights."""
+    size = np.asarray(sizes, dtype="float64")
+    flow = np.asarray(flows, dtype="float64")
+
+    # Cross-sectional demeaning of the *flow* factor only. It removes the market-wide buy/sell
+    # wave that would otherwise put a common directional tilt on every name, and it guarantees
+    # both sides are populated -- while leaving conviction exactly zero wherever z_size is zero.
+    flow = flow - flow.mean()
+    conviction = np.clip(flow * size, -CLIP, CLIP)
+
+    # Signed square root: conviction is a product of two z-scores, so it is leptokurtic with a
+    # density that diverges at zero, and a linear map concentrates the book into a few names.
+    # The map is monotone and odd, so it preserves the ordering and the zero. Portfolio
+    # construction, not a re-specified signal.
+    weights = np.sign(conviction) * np.sqrt(np.abs(conviction))
     gross = float(np.abs(weights).sum())
     if not math.isfinite(gross) or gross <= 0.0:
         return None
     weights = weights / gross
 
-    # Scale down by whichever constraint binds; the organizer owns the risk unit, not me.
-    denom = max(
-        1.0,
-        float(np.abs(weights).max()) / MAX_WEIGHT,
-        float(np.abs(weights).sum()) / MAX_GROSS,
-        abs(float(weights.sum())) / MAX_NET,
-    )
-    weights = weights / denom
+    balanced = _balance(weights)
+    if balanced is None:
+        return None
+    balanced = _balance(np.clip(balanced, -MAX_WEIGHT, MAX_WEIGHT))
+    if balanced is None:
+        return None
 
-    book: dict[str, float] = {}
-    for symbol, weight in zip(symbols, weights):
-        value = float(weight)
-        if not math.isfinite(value):
-            return None
-        book[symbol] = 0.0 if abs(value) < DUST else value
-    return book
+    gross = float(np.abs(balanced).sum())
+    peak = float(np.abs(balanced).max())
+    net = abs(float(balanced.sum()))
+    if not math.isfinite(gross) or gross <= 0.0 or not math.isfinite(peak) or peak <= 0.0:
+        return None
+
+    # One uniform rescale by whichever contract constraint binds. Uniform, so the exact side
+    # balance survives it. The organizer owns the risk unit; these are caps, not a risk target.
+    scale = min(MAX_GROSS / gross, MAX_WEIGHT / peak)
+    if net > 0.0:
+        scale = min(scale, MAX_NET / net)
+    weights = balanced * scale
+    if not np.all(np.isfinite(weights)):
+        return None
+    return np.where(np.abs(weights) < DUST, 0.0, weights)
 
 
 class ParticipantMixStrategy:
     """Stateless: every decision is recomputed from the past-only rows in the context."""
 
     def target_weights(self, context, *, seed):
+        del seed  # nothing here is stochastic; the book is a pure function of the context
+
         bars = context.bars
         eligible = context.eligible_symbols
         if bars is None or eligible is None or len(bars) == 0 or len(eligible) == 0:
             return None
 
         # Data-derived cadence counter. Bar history grows by one row per decision, so this
-        # advances with the run without referring to any absolute date.
+        # advances with the run without ever referring to an absolute date.
         lengths = [len(frame) for frame in bars.values() if frame is not None]
         if not lengths:
             return None
         if max(lengths) % REBALANCE_EVERY != 0:
             return None  # hold current quantities; no trade, no cost
 
-        convictions: dict[str, float] = {}
-        for symbol in eligible:
-            value = _conviction(bars.get(symbol))
-            if value is not None:
-                convictions[symbol] = value
-        if len(convictions) < MIN_NAMES:
+        symbols: list[str] = []
+        sizes: list[float] = []
+        flows: list[float] = []
+        for symbol in sorted(eligible):
+            factors = _factors(bars.get(symbol))
+            if factors is None:
+                continue
+            symbols.append(symbol)
+            sizes.append(factors[0])
+            flows.append(factors[1])
+        if len(symbols) < MIN_NAMES:
             return None
 
-        return _weights(convictions)
+        weights = _book(sizes, flows)
+        if weights is None:
+            return None
+        return {symbol: float(weight) for symbol, weight in zip(symbols, weights)}
 
 
 def build_strategy():

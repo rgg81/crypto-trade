@@ -1,36 +1,47 @@
-"""team-08 -- per-contract multi-horizon time-series trend, slow ladder.
+"""team-08 -- per-contract multi-horizon time-series trend, slow ladder, day-averaged book.
 
 Economic family: time-series trend. Mandate: the CTA transplant -- per-contract, volatility
 scaled, multiple lookbacks.
 
-Refinement candidate. Trial t01 (unmodified organizer seed) passed every structural gate --
-effective breadth 21.4, mean gross 0.478, participation 1.0, long/short exposure 50.6/49.4,
-turnover inside the band -- and failed exactly three: gross_edge_density, cost_share and
-survives_triple_cost. Those three are one disease. The seed earned about 14.6 bps of gross edge
-per unit turnover against a charge of about 7.4 bps at 1x, so it needs roughly 22.3 bps to break
-even at 3x. Its signal is not the problem; the frequency at which it spends that signal is.
+Nomination. This is the trial-t02 mechanism with two changes, both aimed at the cost gates rather
+than at Sharpe, and both inside the sealed parameter surface in ``lane/scouting/THESIS.md``.
 
-Two design consequences, both structural rather than parametric:
+The evidence is two packets. The seed (t01) traded at 130.5x turnover, earned 14.6 bps of gross
+edge per unit of it against a charge of ~7.4-8.0 bps, and failed gross_edge_density, cost_share
+and survives_triple_cost. Restricting the ladder to the declared SLOW(5-8) window (t02) cut
+turnover 2.54x for only 16% of gross Sharpe (1.56 -> 1.31) and cleared every gate. The two packets
+agree on the cost schedule to within 1%, so the trade-off between turnover and edge is the one
+quantity here that is measured rather than assumed.
 
-1. The preregistered no-trade band (THESIS 7.1) is a position-space control and cannot be
-   implemented here. DecisionContext exposes no position and persistent state is forbidden, so
-   turnover has to be designed into the signal path rather than filtered out afterwards. Every
-   map below from data to weight is therefore continuous, and the weight path is smooth because
-   the signal is smooth -- not because trades are suppressed.
+What that measurement says about t02 is that its remaining margin is thin exactly where the seed
+died: +2.6% annualised at triple cost, and a density of 28.7 bps against a triple-cost break-even
+of ~24. Both are re-enforced on blocks I never see. So the two changes below spend a small,
+bounded amount of gross Sharpe to buy margin on those two gates:
 
-2. Equal-weighting the eight preregistered rungs equalizes each rung's contribution to risk but
-   not to cost. Under a random-walk null a rung-L z-score has per-bar innovation sqrt(2/L), so
-   the fast four rungs {3,6,12,21} carry half the risk and about four fifths of the position
-   innovation. Edge per unit turnover scales as sqrt(L) while per-market Sharpe is roughly flat
-   in L, so the fast rungs are funded by the slow rungs' edge. Restricting the ladder to the
-   declared SLOW(5-8) window predicts a turnover reduction of about 2.45x.
+1. **The ladder is sampled at sqrt(2) inside the same declared span** -- seven rungs from 45 to
+   360 bars instead of four. The mean rung innovation 1/sqrt(L) moves 0.09543 -> 0.09403, so this
+   is turnover-neutral by construction. It is a variance-reduction move, not a selection move: no
+   per-rung result exists in either packet, so it cannot express hindsight about which lookback
+   worked. What it removes is the possibility that a quarter of the book rests on one lucky rung.
+
+2. **The submitted book is the mean of the books this construction would have formed at the last
+   three bars** -- one day on an 8h clock. This is the declared Tier-2 cadence R = "every 3 bars
+   (daily)" expressed continuously rather than as a discrete schedule. A discrete daily rebalance
+   would be calendar-anchored and would trade in lumps; the running mean is calendar-shift
+   equivariant, has no threshold, and reduces per-bar position innovation by ~1/sqrt(3) while
+   costing a mean lag of one bar on a 45-360 bar signal. A signal with a 15-120 day horizon has no
+   business re-trading three times a day; the extra two decisions are close to pure noise-trading.
+
+Every recomputation reads only rows at or before its own anchor bar, so the average is over past
+books and introduces no look-ahead; the funding drag and the universe are held at the decision
+bar, which is information available at the decision.
 
 Construction, per contract and nothing else -- no cross-sectional rank, no relative strength, no
 market-wide state variable, no volatility gate or exposure throttle (THESIS 0 and 5):
 
-    z_L   = (log return over L bars - funding paid over L bars) / (sigma * sqrt(L))
-    g     = mean over available rungs of tanh(z_L)
-    w_raw = g / sigma
+    z_L,j = (log return over L bars ending at t-j - funding paid over L bars) / (sigma_j * sqrt(L))
+    g_j   = mean over available rungs of tanh(z_L,j)
+    w_raw = mean over j in {0,1,2} of g_j / sigma_j
     w     = w_raw normalised to gross, concentration-capped, net-capped
 
 Because the design is strictly per-contract it never builds a cross-symbol panel, so the
@@ -49,20 +60,28 @@ import math
 import numpy as np
 import pandas as pd
 
-# --- Ladder: the declared Tier-1 window W = SLOW(5-8) of the preregistered 8-rung ladder.
-# 8h bars, so {45, 90, 180, 360} bars ~ {15d, 30d, 60d, 120d}.
-LADDER = (45, 90, 180, 360)
+# --- Ladder: the declared Tier-1 window W = SLOW(5-8), sampled at sqrt(2) inside the same span.
+# 8h bars, so {45 ... 360} bars ~ {15 ... 120} days. Same endpoints as the declared window; the
+# added rungs are interpolations of it, chosen by spacing rule and not by any measured result.
+LADDER = (45, 64, 90, 127, 180, 254, 360)
+
+# Book smoothing: the mean of the books formed at the last SMOOTH_LAGS bars = one day on an 8h
+# clock. Declared Tier-2 cadence R = daily, expressed as a running mean rather than a schedule.
+SMOOTH_LAGS = 3
 
 # Per-contract ex-ante volatility: EWMA of squared bar log returns (MOP form). Declared Tier-2
 # estimator V = com 180 bars (~60d), matched to the centre of gravity of the slow ladder. A vol
 # estimate faster than the signal injects weight churn that carries no directional information.
 VOL_COM = 180.0
 VOL_MAX_LAG = 1500
+MIN_VOL_OBS = 60
 
-# Data adequacy: 200 bars makes rungs 45/90/180 available and gives the com-180 EWMA an
-# effective sample of roughly 120 observations. Rung 360 is used when history allows.
+# Data adequacy: 200 usable bars at every smoothing lag, so MIN_HISTORY carries the extra lags.
+# 200 bars makes rungs 45/64/90/127/180 available and gives the com-180 EWMA an effective sample
+# of roughly 120 observations. The two longest rungs are used when history allows.
 MIN_BARS = 200
-MIN_RUNGS = 2
+MIN_HISTORY = MIN_BARS + SMOOTH_LAGS - 1
+MIN_RUNGS = 4
 
 # Universe: declared Tier-1 breadth axis N = 30, ranked on a long trailing median of quote
 # volume so that the membership edge is stable and does not churn positions on its own.
@@ -132,27 +151,40 @@ def _median_spacing_hours(col: pd.Series, default: float) -> float:
     return hours
 
 
-def _ewma_last(values: np.ndarray, com: float, max_lag: int) -> float:
+def _decay_weights(size: int, com: float) -> np.ndarray:
+    """Adjusted-EWMA weights for a window of ``size`` observations, oldest first.
+
+    The weights of a shorter window are exactly the tail of those of a longer one, so a caller
+    that evaluates the same EWMA at several nearby anchors builds this array once and slices it.
+    """
+    lam = com / (1.0 + com)
+    ages = np.arange(size - 1, -1, -1, dtype=float)
+    return lam**ages
+
+
+def _ewma_last(values: np.ndarray, weights: np.ndarray) -> float:
     """Final value of an adjusted EWMA over ``values``, computed without a Python loop."""
     n = values.size
     if n == 0:
         return float("nan")
-    window = values[-max_lag:] if n > max_lag else values
-    lam = com / (1.0 + com)
-    ages = np.arange(window.size - 1, -1, -1, dtype=float)
-    weights = lam**ages
-    total = float(weights.sum())
+    window = values[-weights.size :] if n > weights.size else values
+    tail = weights[-window.size :]
+    total = float(tail.sum())
     if not np.isfinite(total) or total <= 0.0:
         return float("nan")
-    return float(np.dot(weights, window) / total)
+    return float(np.dot(tail, window) / total)
 
 
 def _clean_closes(frame: pd.DataFrame) -> np.ndarray | None:
-    """Longest usable suffix of strictly positive, finite closes, or None."""
+    """Longest usable suffix of strictly positive, finite closes, or None.
+
+    The length floor is ``MIN_HISTORY`` rather than ``MIN_BARS`` so that every smoothing lag sees
+    at least ``MIN_BARS`` usable observations and all three books rest on the same ladder depth.
+    """
     if "close" not in frame.columns:
         return None
     close = _as_float_array(frame["close"])
-    if close.size < MIN_BARS:
+    if close.size < MIN_HISTORY:
         return None
     good = np.isfinite(close) & (close > 0.0)
     if not bool(good[-1]):
@@ -160,7 +192,7 @@ def _clean_closes(frame: pd.DataFrame) -> np.ndarray | None:
     if not bool(good.all()):
         start = int(np.flatnonzero(~good)[-1]) + 1
         close = close[start:]
-        if close.size < MIN_BARS:
+        if close.size < MIN_HISTORY:
             return None
     return close
 
@@ -191,6 +223,10 @@ def _funding_drag(
     signal basis B = funding-inclusive total return -- funding as a property of the return being
     measured, never as a carry signal (THESIS 5). Any malformation degrades to price-only rather
     than to an empty book.
+
+    Held fixed across the smoothing lags: it is a trailing mean over the full ladder span, so
+    re-anchoring it one or two bars back would move it by far less than the noise it carries, and
+    holding it fixed keeps it from contributing any turnover at all.
     """
     empty: dict[str, float] = {}
     if not isinstance(funding, pd.DataFrame) or len(funding) == 0:
@@ -226,6 +262,54 @@ def _funding_drag(
         return empty
 
 
+def _smoothed_raw_weight(close: np.ndarray, carry: float) -> float:
+    """Mean over the last ``SMOOTH_LAGS`` bars of the inverse-vol-scaled ladder blend.
+
+    Each lag ``j`` is a self-contained rebuild of the per-contract weight using only rows at or
+    before bar ``t-j``: its own EWMA volatility, its own rung returns. Returns NaN unless every
+    lag is supportable, so a contract is never carried on an unevenly-anchored average.
+    """
+    log_price = np.log(close)
+    rets = np.diff(log_price)
+    squared = rets * rets
+    # One weight vector for all lags: the lagged windows are nested, so the shorter ones slice it.
+    weights = _decay_weights(min(rets.size, VOL_MAX_LAG), VOL_COM)
+
+    accumulated = 0.0
+    for lag in range(SMOOTH_LAGS):
+        end = rets.size - lag
+        if end < MIN_VOL_OBS:
+            return float("nan")
+        variance = _ewma_last(squared[:end], weights)
+        if not np.isfinite(variance) or variance <= 0.0:
+            return float("nan")
+        sigma = math.sqrt(variance)
+        if not np.isfinite(sigma) or sigma <= 0.0:
+            return float("nan")
+
+        anchor = log_price.size - 1 - lag
+        total = 0.0
+        used = 0
+        for rung in LADDER:
+            if anchor - rung < 0:
+                continue
+            # Signal on bar (t-lag)'s close; the engine fills at the next executable open.
+            excess = float(log_price[anchor] - log_price[anchor - rung]) - carry * rung
+            z = excess / (sigma * math.sqrt(rung))
+            if not np.isfinite(z):
+                continue
+            # Declared Tier-1 transform T = tanh: bounded, saturating and everywhere continuous,
+            # so no threshold crossing can manufacture a round trip.
+            total += math.tanh(z)
+            used += 1
+        if used < MIN_RUNGS:
+            return float("nan")
+
+        accumulated += (total / used) / sigma
+
+    return accumulated / float(SMOOTH_LAGS)
+
+
 class SlowLadderTrend:
     """Per-contract, volatility-scaled trend over the slow half of a fixed log-spaced ladder."""
 
@@ -242,7 +326,7 @@ class SlowLadderTrend:
         ranked: list[tuple[float, str]] = []
         for symbol in symbols:
             frame = bars.get(symbol)
-            if frame is None or len(frame) < MIN_BARS:
+            if frame is None or len(frame) < MIN_HISTORY:
                 continue
             liquidity = _liquidity(frame)
             if np.isfinite(liquidity) and liquidity > 0.0:
@@ -282,34 +366,7 @@ class SlowLadderTrend:
             close = _clean_closes(bars[symbol])
             if close is None:
                 continue
-            log_price = np.log(close)
-            rets = np.diff(log_price)
-            variance = _ewma_last(rets * rets, VOL_COM, VOL_MAX_LAG)
-            if not np.isfinite(variance) or variance <= 0.0:
-                continue
-            sigma = math.sqrt(variance)
-            if not np.isfinite(sigma) or sigma <= 0.0:
-                continue
-
-            carry = drag.get(symbol, 0.0)
-            total = 0.0
-            used = 0
-            for rung in LADDER:
-                if rets.size < rung:
-                    continue
-                # Signal on bar t's close; the engine fills at the next executable open.
-                excess = float(log_price[-1] - log_price[-1 - rung]) - carry * rung
-                z = excess / (sigma * math.sqrt(rung))
-                if not np.isfinite(z):
-                    continue
-                # Declared Tier-1 transform T = tanh: bounded, saturating and everywhere
-                # continuous, so no threshold crossing can manufacture a round trip.
-                total += math.tanh(z)
-                used += 1
-            if used < MIN_RUNGS:
-                continue
-
-            weight = (total / used) / sigma
+            weight = _smoothed_raw_weight(close, drag.get(symbol, 0.0))
             if np.isfinite(weight):
                 names.append(symbol)
                 weights.append(weight)

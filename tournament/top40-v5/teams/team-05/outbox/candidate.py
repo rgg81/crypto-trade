@@ -1,31 +1,45 @@
-"""team-05 -- illiquidity-conditioned short-horizon reversal.
+"""team-05 -- illiquidity-conditioned short-horizon reversal (nomination).
 
-Refinement candidate. The premium being harvested is the rent paid to whoever supplies
-immediacy when the intermediary sector will not (Nagel 2012): a lagged cross-sectional
-return is a noisy observation of the inventory the market-making sector was just forced
-to absorb, and the compensation for holding that inventory scales with how thin the book
-was when it arrived (Amihud 2002; Bianchi/Babiak/Dickerson 2022).
+The premium is the rent paid to whoever supplies immediacy when the intermediary sector
+will not (Nagel 2012). A lagged cross-sectional return is a noisy observation of the
+inventory the market-making sector was just forced to absorb; the compensation for
+holding that inventory scales with how thin the book was when it arrived (Amihud 2002;
+Bianchi/Babiak/Dickerson 2022). Hence the mandate: reversal strength should rise with
+ex-ante illiquidity, and the trade should be taken on the moves a thin book had to
+absorb rather than on every short-horizon move.
 
 Structure, in the order the code applies it:
 
-  1. a 9-bar (72h) dislocation, normalised by the symbol's own trailing volatility and
-     cross-sectionally demeaned, so the signal is relative mispricing rather than beta;
-  2. blended with the reversal of 9-bar taker-buy imbalance -- a directly observed read
-     on which side crossed the spread, i.e. on the inventory the makers ended up with;
-  3. selected to the extreme tails of the combined cross-sectional rank, because only
-     large dislocations are plausibly inventory rather than information;
-  4. tilted linearly toward high ex-ante Amihud illiquidity -- this is the mandate, and
-     it is the term that is supposed to carry the edge;
-  5. risk-balanced by inverse trailing volatility at constant gross exposure;
-  6. and finally averaged across 18 overlapping sleeves. That last step is the whole
-     point of this revision: the identity w_t - w_{t-1} = (s_t - s_{t-H}) / H makes
-     turnover fall as 1/H with no dependence on the intervening sleeves, which is the
-     only lever that moves gross edge per unit turnover by the order of magnitude the
-     cost gate demands.
+  1. a 24h dislocation, normalised by the symbol's own trailing volatility and ranked
+     cross-sectionally, so the signal is relative mispricing rather than beta;
+  2. residualised, in the cross-section and at every sleeve date, against the 4-day
+     trend measured up to the *start* of the formation window -- the non-overlapping
+     medium-horizon momentum factor. Trial t02 showed that factor is large and
+     continuation-signed in this universe; a reversal book that does not hedge it is
+     short momentum by accident (Da/Liu/Schaumburg 2014, Liu/Tsyvinski/Wu 2022);
+  3. tilted linearly by the ex-ante Amihud illiquidity percentile -- this is the
+     mandate, and the term that is supposed to carry the edge. The most liquid name in
+     the cross-section carries no weight at all;
+  4. risk-balanced by inverse trailing volatility at constant gross exposure, clipped
+     tightly so the balance cannot cancel the illiquidity tilt it sits next to;
+  5. averaged across overlapping dated sleeves, weighted by how liquidity-stressed the
+     market was on the bar each sleeve was formed -- the "when liquidity was actually
+     scarce" half of the mandate, bounded to a 4:1 emphasis;
+  6. and finally re-neutralised, as a whole book, against the current medium-horizon
+     trend, so the delivered exposure is momentum-orthogonal at every decision and not
+     merely at formation.
+
+The sleeve average is what controls turnover. Under equal sleeve weights the difference
+w_t - w_{t-1} = (s_t - s_{t-H}) / H telescopes exactly, so turnover falls as 1/H with no
+dependence on the intervening path; the bounded stress weighting perturbs that identity
+rather than replacing it, at the cost of some extra turnover. It is the only lever that
+moves realised cost by an order of magnitude, and t02 demonstrated it works
+(797/yr -> 81/yr). It does *not* move gross edge per unit turnover, which is invariant
+to holding period -- see RATIONALE.md section 2.
 
 No volatility targeting: gross is pinned at 1.0 every bar and the organizer's common
-ex-ante risk unit sets the scale. No funding signal. No persistent state, no RNG, no
-absolute dates, no symbol identities, no price levels.
+ex-ante risk unit sets the scale. Funding is never read. No persistent state, no RNG,
+no absolute dates, no symbol identities, no price levels.
 """
 
 from __future__ import annotations
@@ -35,40 +49,35 @@ import math
 import numpy as np
 import pandas as pd
 
-# ---- horizon and window lengths (bars; the dataset bar is 8h) -----------------------
-FORMATION_BARS = 9          # 72h dislocation window
-SLEEVE_SPAN = 18            # overlapping sleeves -> ~3.2d mean holding, turnover ~ 2/H
+# ---- horizons, in dataset bars (the bar is 8h) --------------------------------------
+FORMATION_BARS = 3          # 24h dislocation -- the daily horizon of the crypto reversal
+MOMENTUM_BARS = 12          # 4d trend, measured up to the start of the formation window
+SLEEVE_SPAN = 18            # overlapping dated sleeves; turnover ~ 2/SLEEVE_SPAN
+ILLIQ_BARS = 21             # Amihud averaging window (~7d)
 VOL_BARS = 21               # trailing realised volatility
-ILLIQ_BARS = 21             # Amihud averaging window
-LIQVOL_BARS = 30            # median quote volume, for the tradeability floor
-PANEL_BARS = 72             # rows retained per symbol (>= LIQVOL_BARS + SLEEVE_SPAN + 2)
-MIN_HISTORY = 30            # a symbol needs this many bars to enter the panel at all
+DEPTH_BARS = 30             # median quote volume, for the tradeability floor
+PANEL_BARS = 96             # rows retained per symbol
+MIN_HISTORY = 30            # a symbol needs this many rows to enter the panel at all
 
 VOL_MIN_PERIODS = 10
 ILLIQ_MIN_PERIODS = 10
-LIQVOL_MIN_PERIODS = 10
-FLOW_MIN_PERIODS = 4
+DEPTH_MIN_PERIODS = 10
 
-# ---- signal shaping ----------------------------------------------------------------
-FLOW_WEIGHT = 0.30          # weight on the taker-imbalance reversal rank
-KEEP_FRACTION = 0.60        # fraction of the cross-section carrying weight
-MIN_KEEP = 16
-MAX_KEEP = 40
-TILT_FLOOR = 0.40           # illiquidity tilt at the most liquid name
-TILT_SLOPE = 1.20           # tilt at the most illiquid name = FLOOR + SLOPE
-VOL_CLIP_LO = 0.50          # winsorise sigma to [LO, HI] x cross-sectional median
-VOL_CLIP_HI = 2.50
-LIQ_FLOOR_Q = 0.10          # drop the thinnest decile by median quote volume
+# ---- shaping ------------------------------------------------------------------------
+DEPTH_FLOOR_Q = 0.10        # drop the thinnest decile: below it participation caps bind
+VOL_CLIP_LO = 0.70          # winsorise sigma to [LO, HI] x cross-sectional median
+VOL_CLIP_HI = 1.50
+STRESS_RANGE = 0.60         # sleeve weight in [1-R, 1+R]: a 4:1 stressed/calm emphasis
 
-# ---- book limits (the evaluator re-applies its own) --------------------------------
+# ---- book limits (the evaluator re-applies its own) ---------------------------------
 GROSS_TARGET = 1.0
 MAX_WEIGHT = 0.10
 NET_CAP = 0.10
-DUST = 0.0015
+DUST = 0.0010
 MIN_NAMES = 12
 MIN_SLEEVES = 3
 
-REQUIRED_COLUMNS = ("open_time", "close", "quote_volume", "taker_buy_quote_volume")
+REQUIRED_COLUMNS = ("open_time", "close", "quote_volume")
 
 
 def _usable_symbols(bars, eligible):
@@ -108,7 +117,8 @@ def _column_panel(bars, symbols, column):
 
 def _centered_rank(values):
     """Cross-sectional rank mapped to (-0.5, +0.5); non-finite entries are dropped."""
-    finite = values[np.isfinite(values.to_numpy(dtype=float))]
+    numeric = pd.to_numeric(values, errors="coerce")
+    finite = numeric[np.isfinite(numeric.to_numpy(dtype=float))]
     count = len(finite)
     if count < MIN_NAMES:
         return None
@@ -116,8 +126,33 @@ def _centered_rank(values):
     return (ranks - (count + 1.0) / 2.0) / float(count)
 
 
+def _residual(target, factor):
+    """Cross-sectional residual of ``target`` after projecting out ``factor``.
+
+    Both arguments are centred ranks, so the slope is a correlation and the residual is
+    bounded. This is a hedge, not a bet: the slope is measured on the cross-section
+    present at this decision rather than assumed.
+    """
+    aligned = factor.reindex(target.index)
+    y = target.to_numpy(dtype=float)
+    x = aligned.to_numpy(dtype=float)
+    usable = np.isfinite(x) & np.isfinite(y)
+    if int(usable.sum()) < MIN_NAMES:
+        return target
+    x = np.where(usable, x, 0.0)
+    x = x - float(x[usable].mean())
+    x = np.where(usable, x, 0.0)
+    denominator = float(np.dot(x, x))
+    if not (np.isfinite(denominator) and denominator > 0.0):
+        return target
+    slope = float(np.dot(x, np.where(usable, y, 0.0))) / denominator
+    if not np.isfinite(slope):
+        return target
+    return pd.Series(y - slope * x, index=target.index)
+
+
 def _balance(weights):
-    """Scale each side to half the gross target, so the sleeve is exactly neutral."""
+    """Scale each side to half the gross target, so the book is exactly neutral."""
     finite = weights[np.isfinite(weights.to_numpy(dtype=float))]
     if finite.empty:
         return None
@@ -135,62 +170,51 @@ def _balance(weights):
     return book
 
 
-def _sleeve(formation, sigma, illiquidity, liquid_volume, imbalance):
-    """One dated reversal sleeve: gross 1.0, dollar neutral, illiquidity-tilted."""
+def _sleeve(dislocation, trend, sigma, illiquidity, depth):
+    """One dated sleeve: gross 1.0, dollar neutral, momentum-hedged, illiquidity-tilted."""
     usable = (
-        formation.notna()
+        dislocation.notna()
+        & trend.notna()
         & sigma.notna()
         & illiquidity.notna()
-        & liquid_volume.notna()
+        & depth.notna()
         & (sigma > 0.0)
         & (illiquidity > 0.0)
-        & (liquid_volume > 0.0)
+        & (depth > 0.0)
     )
     names = usable.index[usable.to_numpy()]
     if len(names) < MIN_NAMES:
         return None
 
-    # Tradeability floor: the mandate tilts into thinness, so the very thinnest tail is
-    # excluded rather than levered into, where realised cost would outrun the premium.
-    depth = liquid_volume.reindex(names)
-    deep = depth.index[(depth >= depth.quantile(LIQ_FLOOR_Q)).to_numpy()]
+    # Tradeability floor. The mandate tilts into thinness, so the very thinnest tail is
+    # excluded rather than levered into: below it the participation cap binds and the
+    # weight becomes un-filled gross rather than a position.
+    available = depth.reindex(names)
+    deep = available.index[(available >= available.quantile(DEPTH_FLOOR_Q)).to_numpy()]
     if len(deep) >= MIN_NAMES:
         names = deep
 
     volatility = sigma.reindex(names)
-    dislocation = formation.reindex(names) / (volatility * math.sqrt(FORMATION_BARS))
-    dislocation = dislocation - dislocation.median()
-
-    score = _centered_rank(-dislocation)
-    if score is None:
+    fast = _centered_rank(dislocation.reindex(names) / volatility)
+    slow = _centered_rank(trend.reindex(names) / volatility)
+    if fast is None:
         return None
 
-    # Observable inventory: takers who lifted offers left the maker sector short, and a
-    # move the makers had to absorb is the move that should decay.
-    flow = imbalance.reindex(score.index)
-    if int(flow.notna().sum()) >= max(MIN_NAMES, int(0.6 * len(score))):
-        flow = flow.fillna(flow.median())
-        flow_score = _centered_rank(-(flow - flow.median()))
-        if flow_score is not None:
-            blended = (1.0 - FLOW_WEIGHT) * score.reindex(
-                flow_score.index
-            ) + FLOW_WEIGHT * flow_score
-            reblended = _centered_rank(blended)
-            if reblended is not None:
-                score = reblended
+    # Fade the dislocation, but only the part of it that is not the medium-horizon
+    # trend. The trend window ends where the formation window begins, so the hedge
+    # cannot cancel the signal it is protecting.
+    score = -fast if slow is None else -_residual(fast, slow)
 
     names = score.index
-    magnitude = score.abs()
-    keep = int(round(KEEP_FRACTION * len(names)))
-    keep = min(max(keep, MIN_KEEP), MAX_KEEP, len(names) - 1)
-    if keep < 4:
-        return None
-    threshold = float(magnitude.nlargest(keep).iloc[-1])
-    selected = np.sign(score) * (magnitude - threshold).clip(lower=0.0)
 
-    # The mandate, as a continuous multiplier rather than a fitted gate.
-    tilt = TILT_FLOOR + TILT_SLOPE * illiquidity.reindex(names).rank(pct=True)
+    # The mandate, as a continuous multiplier rather than a fitted gate: weight rises
+    # linearly in the ex-ante illiquidity percentile, and the most liquid name in the
+    # cross-section carries no weight at all.
+    tilt = illiquidity.reindex(names).rank(pct=True)
 
+    # Cross-sectional risk balancing at constant gross -- not a volatility target. The
+    # clip is deliberately tight: illiquid names are usually the volatile ones, and an
+    # unbounded 1/sigma would quietly undo the tilt above it.
     volatility = sigma.reindex(names)
     median_volatility = float(volatility.median())
     if not (np.isfinite(median_volatility) and median_volatility > 0.0):
@@ -200,7 +224,61 @@ def _sleeve(formation, sigma, illiquidity, liquid_volume, imbalance):
     )
     inverse_volatility = median_volatility / winsorised
 
-    return _balance(selected * tilt * inverse_volatility)
+    return _balance(score * tilt * inverse_volatility)
+
+
+def _stress_weights(stress, positions):
+    """Sleeve weights in [1-R, 1+R], ranked by market-wide liquidity stress.
+
+    ``stress`` is the cross-sectional median of each bar's realised price impact
+    divided by that symbol's own recent average impact -- a unitless, scale-free read
+    on whether the market as a whole was thinner than its own norm on that bar. Ranking
+    inside the sleeve window keeps it relative, so there is no level and no threshold.
+    """
+    count = len(positions)
+    if count == 0:
+        return None
+    values = np.asarray(
+        [float(stress.iloc[position]) for position in positions], dtype="float64"
+    )
+    if not np.all(np.isfinite(values)):
+        return np.full(count, 1.0 / count, dtype="float64")
+    if count == 1:
+        return np.ones(1, dtype="float64")
+    percentile = (
+        np.asarray(pd.Series(values).rank(method="average"), dtype="float64") - 0.5
+    ) / float(count)
+    raw = (1.0 - STRESS_RANGE) + 2.0 * STRESS_RANGE * percentile
+    total = float(raw.sum())
+    if not (np.isfinite(total) and total > 0.0):
+        return np.full(count, 1.0 / count, dtype="float64")
+    return raw / total
+
+
+def _neutralise(book, factor):
+    """Project the delivered book off the current medium-horizon trend factor."""
+    if factor is None:
+        return book
+    common = book.index.intersection(factor.index)
+    if len(common) < MIN_NAMES:
+        return book
+    weights = book.reindex(common).to_numpy(dtype=float)
+    exposure = factor.reindex(common).to_numpy(dtype=float)
+    usable = np.isfinite(weights) & np.isfinite(exposure)
+    if int(usable.sum()) < MIN_NAMES:
+        return book
+    exposure = np.where(usable, exposure, 0.0)
+    exposure = exposure - float(exposure[usable].mean())
+    exposure = np.where(usable, exposure, 0.0)
+    denominator = float(np.dot(exposure, exposure))
+    if not (np.isfinite(denominator) and denominator > 0.0):
+        return book
+    slope = float(np.dot(exposure, np.where(usable, weights, 0.0))) / denominator
+    if not np.isfinite(slope):
+        return book
+    adjusted = book.copy()
+    adjusted.loc[common] = weights - slope * exposure
+    return adjusted
 
 
 def _finalise(weights):
@@ -238,7 +316,7 @@ def _finalise(weights):
 
 
 class IlliquidityConditionedReversal:
-    """Overlapping-sleeve cross-sectional reversal, tilted toward illiquid names.
+    """Overlapping-sleeve short-horizon reversal, conditioned on illiquidity.
 
     Stateless: every decision is a pure function of the past-only rows in ``context``.
     """
@@ -255,53 +333,65 @@ class IlliquidityConditionedReversal:
             return None
 
         close = _column_panel(bars, symbols, "close")
-        if close is None or len(close.index) < FORMATION_BARS + 2:
+        if close is None:
+            return None
+        rows = len(close.index)
+        if rows < MOMENTUM_BARS + FORMATION_BARS + 2:
             return None
         quote_volume = _column_panel(bars, symbols, "quote_volume")
-        taker_buy = _column_panel(bars, symbols, "taker_buy_quote_volume")
-        if quote_volume is None or taker_buy is None:
+        if quote_volume is None:
             return None
         quote_volume = quote_volume.reindex(index=close.index, columns=close.columns)
-        taker_buy = taker_buy.reindex(index=close.index, columns=close.columns)
 
         log_close = np.log(close.where(close > 0.0))
         bar_return = log_close.diff()
         traded = quote_volume.where(quote_volume > 0.0)
 
-        formation = log_close.diff(FORMATION_BARS)
+        dislocation = log_close.diff(FORMATION_BARS)
+        # The trend window ends where the formation window begins: the hedge and the
+        # signal never share a bar.
+        trend = log_close.diff(MOMENTUM_BARS).shift(FORMATION_BARS)
         sigma = bar_return.rolling(VOL_BARS, min_periods=VOL_MIN_PERIODS).std()
-        illiquidity = (
-            (bar_return.abs() / traded)
-            .rolling(ILLIQ_BARS, min_periods=ILLIQ_MIN_PERIODS)
-            .mean()
-        )
-        depth = traded.rolling(LIQVOL_BARS, min_periods=LIQVOL_MIN_PERIODS).median()
-        imbalance = (
-            (taker_buy / traded - 0.5)
-            .rolling(FORMATION_BARS, min_periods=FLOW_MIN_PERIODS)
-            .mean()
-        )
 
-        rows = len(close.index)
+        impact = bar_return.abs() / traded
+        illiquidity = impact.rolling(ILLIQ_BARS, min_periods=ILLIQ_MIN_PERIODS).mean()
+        depth = traded.rolling(DEPTH_BARS, min_periods=DEPTH_MIN_PERIODS).median()
+        # Market-wide liquidity stress: how impactful this bar was relative to each
+        # symbol's own recent norm, taken at the cross-sectional median.
+        stress = (impact / illiquidity.where(illiquidity > 0.0)).median(axis=1)
+
+        positions = [
+            rows - 1 - lag for lag in range(min(SLEEVE_SPAN, rows)) if rows - 1 - lag >= 0
+        ]
         sleeves = []
-        for lag in range(min(SLEEVE_SPAN, rows)):
-            position = rows - 1 - lag
-            if position < 0:
-                break
+        kept_positions = []
+        for position in positions:
             sleeve = _sleeve(
-                formation.iloc[position],
+                dislocation.iloc[position],
+                trend.iloc[position],
                 sigma.iloc[position],
                 illiquidity.iloc[position],
                 depth.iloc[position],
-                imbalance.iloc[position],
             )
             if sleeve is not None:
                 sleeves.append(sleeve)
+                kept_positions.append(position)
         if len(sleeves) < MIN_SLEEVES:
             return None
 
-        composite = pd.concat(sleeves, axis=1).fillna(0.0).mean(axis=1)
-        book = _finalise(composite)
+        weights = _stress_weights(stress, kept_positions)
+        if weights is None:
+            return None
+        panel = pd.concat(sleeves, axis=1, keys=range(len(sleeves))).fillna(0.0)
+        composite = panel.mul(weights, axis=1).sum(axis=1)
+
+        # Keep the delivered exposure momentum-orthogonal at the decision itself, not
+        # only at the date each sleeve was formed.
+        current_trend = _centered_rank(
+            trend.iloc[-1].reindex(composite.index)
+            / sigma.iloc[-1].reindex(composite.index)
+        )
+        book = _finalise(_neutralise(composite, current_trend))
         if book is None:
             return None
 

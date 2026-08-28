@@ -1,461 +1,501 @@
-"""team-06 -- cluster relative value.
+"""team-06 -- cluster relative value.  Nomination candidate.
 
-Statistical arbitrage on the deviation of a perpetual's *cumulative* return from the
-equal-weight mean of the correlation cluster it is discovered to belong to.
+Mandate: rolling correlation clusters, trading deviation from cluster mean.
+Sector-neutral statistical arbitrage where the sectors are discovered rather
+than declared.
 
-Pipeline at each decision (all quantities recomputed from past-only rows):
+The book at each decision, recomputed from past-only rows and nothing else:
 
-  1. snap the view to a coarse decision grid derived from bar counts, so the target book
-     is piecewise constant between weekly refreshes;
-  2. select the liquid universe, capped by the matrix aspect ratio N/T;
-  3. Spearman correlation of winsorised 8h log returns;
-  4. Marchenko-Pastur eigenvalue clipping, then removal of the top (market) eigenvector;
-  5. average-linkage agglomerative clustering into an MP-adaptive number of groups;
-  6. leave-one-out cluster-mean residual return series per name;
-  7. Ornstein-Uhlenbeck fit of the cumulative residual -> s-score, with a mean-reversion
-     speed filter;
-  8. contrarian dead-zoned s-score, tilted by cluster-relative funding;
-  9. within-cluster then global demean, gross normalisation and per-name caps.
+  1. eligible symbols with enough history, ranked by median quote_volume;
+     the top ``q_max * W`` form the correlation universe, and the tradeable
+     weight is tapered to zero across the bottom of that ranking so a name
+     crossing the universe boundary does not generate a discrete trade;
+  2. Spearman correlation of winsorised 8h log returns;
+  3. Marchenko-Pastur eigenvalue clipping of the noise bulk, then removal of
+     the top (market) eigenvector;
+  4. average-linkage agglomeration, read off at FIVE nested cut levels
+     (K = 12, 8, 6, 4, 3) rather than one -- a consensus benchmark;
+  5. per level, the leave-one-out mean of the name's own group; the benchmark
+     is the average of those across levels, skipping levels where the group is
+     smaller than m_min;
+  6. residual return series, scaled by the name's own residual volatility;
+  7. displacement = a symmetric triangular kernel over the last 63 bars
+     (21 days) of that residual -- a slow spread *level*, near-blind to the
+     most recent bars;
+  8. centred within the coarse (K = 4) partition, scaled cross-sectionally,
+     clipped at +/-3, contrarian sign, soft dead zone;
+  9. plus a cluster-relative funding tilt, which costs no turnover;
+ 10. taper-weighted demean inside each coarse cluster and then globally, gross
+     normalised to 1.0, per-name cap 0.09, |net| <= 0.20.
 
-No persistent state, no randomness, no absolute dates, no symbol identity, no price levels.
+No persistent state, no RNG, no network, no filesystem, no absolute dates, no
+symbol identity, no price levels.  ``seed`` is unused.
 """
 
 from __future__ import annotations
 
-import math
-
 import numpy as np
 import pandas as pd
 
-# --- estimation windows (8h bars) ---------------------------------------------------
-CORR_WINDOW = 180  # W: correlation window, 60 days
-FALLBACK_WINDOW = 90  # used only if too few names carry W bars of history
-OU_WINDOW = 90  # M: OU fit window on the cumulative residual, 30 days
-ASPECT_CAP = 0.4  # q_max: N <= q_max * W, keeps the sample matrix out of the noise regime
+# --- universe -----------------------------------------------------------
+_W_LADDER = (180, 120, 90)   # correlation window in 8h bars; first that fills
+_Q_MAX = 0.40                # cap on the matrix aspect ratio N / T
+_TAPER_FRAC = 0.60           # full trading weight below this fraction of ranks
+_MIN_NAMES = 24              # below this the cross-section is not a portfolio
 
-# --- clustering ---------------------------------------------------------------------
-MIN_CLUSTER = 5  # m_min: clusters smaller than this are not traded
-MAX_CLUSTERS = 10
-MIN_NAMES = 12
+# --- clustering ---------------------------------------------------------
+_CUTS = (12, 8, 6, 4, 3)     # nested cut levels of one dendrogram
+_NEUTRAL_CUT = 4             # partition the book is made neutral to
+_M_MIN = 5                   # smallest group allowed to be a benchmark
 
-# --- signal -------------------------------------------------------------------------
-COVERAGE = 0.85  # minimum fraction of finite returns for a column to be usable
-WINSOR = 0.01
-Z_ENTER = 0.75  # dead zone on the s-score
-Z_CLIP = 3.0
-B_MAX = 0.97  # OU: reversion faster than half the fit window
-FUND_TILT = 0.5  # alpha: weight on the cluster-relative funding deviation
-FUND_TAIL = 21  # funding settlements averaged
-FUND_CLIP = 2.0
+# --- signal -------------------------------------------------------------
+_L = 63                      # triangular kernel length, 21 days
+_WINSOR = 0.005              # per-column return winsorization
+_Z_CLIP = 3.0
+_Z_ENTER = 0.85              # soft dead zone
+_SIGN = -1.0                 # contrarian
+_ALPHA = 0.40                # weight on the cluster-relative funding tilt
+_FUND_TAIL = 21              # funding settlements averaged
+_FUND_ROWS = 20000           # rows of the funding frame inspected
+_FUND_CLIP = 3.0
 
-# --- trading cadence and portfolio --------------------------------------------------
-REBAL_GRID = 21  # decisions between signal refreshes (7 days)
-SKIP_BARS = 3  # bars excluded from the signal (1 day)
-NAME_CAP = 0.06  # soft per-name cap, below the 0.10 contract limit
-HARD_NAME_CAP = 0.095
-GROSS = 0.999
-NET_CAP = 0.15
-DUST = 1e-4
-
-
-# ------------------------------------------------------------------------------------
-# small pure helpers
-# ------------------------------------------------------------------------------------
-def _reference_length(bars) -> int:
-    """Longest available history, used as a shift-invariant bar counter."""
-    best = 0
-    for frame in bars.values():
-        n = len(frame)
-        if n > best:
-            best = n
-    return best
+# --- book ---------------------------------------------------------------
+_GROSS = 1.0
+_MAX_W = 0.09
+_NET_CAP = 0.20
+_DUST = 1e-5
+_EPS = 1e-12
 
 
-def _median_quote_volume(frame, n_drop: int, window: int) -> float:
-    col = frame["quote_volume"]
-    if n_drop:
-        keep = len(col) - n_drop
-        if keep <= 0:
-            return float("nan")
-        col = col.iloc[:keep]
-    arr = col.iloc[-window:].to_numpy(dtype="float64")
-    if arr.size == 0:
-        return float("nan")
-    with np.errstate(invalid="ignore"):
-        if not np.isfinite(arr).any():
-            return float("nan")
-        return float(np.nanmedian(arr))
+# ------------------------------------------------------------------------
+# pure helpers
+# ------------------------------------------------------------------------
+def _corr(a: np.ndarray) -> np.ndarray:
+    """Column-wise Pearson correlation, safe on constant columns."""
+    x = a - a.mean(axis=0, keepdims=True)
+    sd = np.sqrt((x * x).sum(axis=0))
+    x = x / np.where(sd > _EPS, sd, 1.0)
+    c = x.T @ x
+    c = 0.5 * (c + c.T)
+    np.fill_diagonal(c, 1.0)
+    return np.clip(c, -1.0, 1.0)
 
 
-def _close_panel(bars, names, rows):
-    frames = {}
-    for sym in names:
-        frame = bars[sym]
-        tail = frame.iloc[-rows:]
-        stamps = pd.to_datetime(tail["open_time"].to_numpy(), utc=True)
-        series = pd.Series(tail["close"].to_numpy(dtype="float64"), index=stamps)
-        series = series[~series.index.duplicated(keep="last")]
-        frames[sym] = series
-    if not frames:
-        return None
-    return pd.concat(frames, axis=1).sort_index()
+def _denoise(c: np.ndarray, q: float) -> np.ndarray:
+    """MP-clip the noise bulk, drop the market mode, renormalise to unit diagonal.
 
-
-def _winsorise(mat, frac):
-    with np.errstate(invalid="ignore"):
-        lo = np.nanquantile(mat, frac, axis=0)
-        hi = np.nanquantile(mat, 1.0 - frac, axis=0)
-    lo = np.where(np.isfinite(lo), lo, -np.inf)
-    hi = np.where(np.isfinite(hi), hi, np.inf)
-    return np.clip(mat, lo, hi)
-
-
-def _spearman(mat):
-    """Rank correlation of the columns of ``mat`` (rows are time)."""
-    ranks = pd.DataFrame(mat).rank(axis=0).to_numpy(dtype="float64")
-    ranks -= ranks.mean(axis=0, keepdims=True)
-    scale = ranks.std(axis=0, keepdims=True)
-    scale = np.where(scale > 0.0, scale, 1.0)
-    ranks /= scale
-    corr = (ranks.T @ ranks) / float(ranks.shape[0])
-    corr = 0.5 * (corr + corr.T)
-    np.fill_diagonal(corr, 1.0)
-    return np.clip(corr, -1.0, 1.0)
-
-
-def _denoise_and_strip_market(corr, aspect):
-    """MP-clip the noise bulk, drop the market eigenvector, renormalise to a correlation.
-
-    Returns the residual correlation matrix and the number of informative directions
-    remaining once the market direction is set aside.
+    Laloux et al.: the bulk of an empirical spectrum is indistinguishable from
+    a matrix with no correlation structure, so clustering the raw sample matrix
+    clusters noise geometry.  Removing the leading eigenvector afterwards is
+    what stops the discovered partition from being a beta sort.
     """
-    edge = (1.0 + math.sqrt(max(aspect, 0.0))) ** 2
-    vals, vecs = np.linalg.eigh(corr)
-    bulk = vals < edge
-    clipped = vals.copy()
+    vals, vecs = np.linalg.eigh(0.5 * (c + c.T))
+    order = np.argsort(vals)[::-1]
+    vals = vals[order]
+    vecs = vecs[:, order]
+
+    edge = (1.0 + np.sqrt(max(q, 0.0))) ** 2
+    bulk = vals <= edge
+    v = vals.copy()
     if bulk.any():
-        clipped[bulk] = float(vals[bulk].mean())
-    n_struct = int(np.count_nonzero(~bulk))
-    clipped[-1] = 0.0  # eigh returns ascending order: the last is the market factor
-    clipped = np.clip(clipped, 0.0, None)
-    resid = (vecs * clipped) @ vecs.T
-    diag = np.sqrt(np.clip(np.diag(resid), 1e-12, None))
-    resid = resid / np.outer(diag, diag)
-    resid = 0.5 * (resid + resid.T)
-    np.fill_diagonal(resid, 1.0)
-    return np.clip(resid, -1.0, 1.0), max(0, n_struct - 1)
+        v[bulk] = float(vals[bulk].mean())
+    v = np.clip(v, 0.0, None)
+    v[0] = 0.0
+
+    resid = (vecs * v) @ vecs.T
+    d = np.sqrt(np.clip(np.diag(resid), 1e-10, None))
+    rc = resid / d[:, None] / d[None, :]
+    rc = np.clip(0.5 * (rc + rc.T), -1.0, 1.0)
+    np.fill_diagonal(rc, 1.0)
+    return rc
 
 
-def _average_linkage(dist, k):
-    """Agglomerative average-linkage clustering down to ``k`` groups."""
-    n = dist.shape[0]
-    if k >= n:
-        return np.arange(n)
-    work = dist.astype("float64").copy()
+def _linkage_cuts(dist: np.ndarray, cuts) -> dict:
+    """Average-linkage agglomeration, labels snapshotted at each cut level.
+
+    One dendrogram, read at several heights.  The cuts are nested by
+    construction, which is what lets an undersized group at a fine level fall
+    back on a coarser one.
+    """
+    n = int(dist.shape[0])
+    work = np.array(dist, dtype=float, copy=True)
+    work = np.where(np.isfinite(work), work, 4.0)
     np.fill_diagonal(work, np.inf)
-    alive = np.ones(n, dtype=bool)
-    sizes = np.ones(n, dtype="float64")
-    members = [[i] for i in range(n)]
-    remaining = n
-    while remaining > k:
-        live = np.where(alive)[0]
-        block = work[np.ix_(live, live)]
-        flat = int(np.argmin(block))
-        row, col = divmod(flat, live.size)
-        i, j = int(live[row]), int(live[col])
-        if i == j or not np.isfinite(work[i, j]):
+
+    sizes = np.ones(n, dtype=float)
+    labels = np.arange(n, dtype=np.int64)
+    wanted = {int(k) for k in cuts if 2 <= int(k) <= n}
+    snaps: dict = {}
+    for k in cuts:
+        if int(k) > n:
+            snaps[int(k)] = np.arange(n, dtype=np.int64)
+    if not wanted:
+        return snaps
+
+    live = n
+    lowest = min(wanted)
+    while live > lowest:
+        flat = int(np.argmin(work))
+        i, j = flat // n, flat % n
+        if not np.isfinite(work[i, j]):
             break
-        merged = (sizes[i] * work[i, :] + sizes[j] * work[j, :]) / (sizes[i] + sizes[j])
-        work[i, :] = merged
-        work[:, i] = merged
-        work[i, i] = np.inf
+        wi, wj = sizes[i], sizes[j]
+        row = (wi * work[i, :] + wj * work[j, :]) / (wi + wj)
+        row[i] = np.inf
+        row[j] = np.inf
+        work[i, :] = row
+        work[:, i] = row
         work[j, :] = np.inf
         work[:, j] = np.inf
-        sizes[i] += sizes[j]
-        members[i] = members[i] + members[j]
-        members[j] = []
-        alive[j] = False
-        remaining -= 1
-    labels = np.zeros(n, dtype="int64")
-    for tag, root in enumerate(np.where(alive)[0]):
-        for member in members[root]:
-            labels[member] = tag
-    return labels
+        sizes[i] = wi + wj
+        labels[labels == j] = i
+        live -= 1
+        if live in wanted:
+            snaps[live] = np.unique(labels, return_inverse=True)[1].astype(np.int64)
+    return snaps
 
 
-def _cluster_residuals(returns, labels, n_clusters):
-    """Leave-one-out demeaning of each name against its own cluster."""
-    resid = np.zeros_like(returns)
-    tradable = np.zeros(returns.shape[1], dtype=bool)
-    for tag in range(n_clusters):
-        idx = np.where(labels == tag)[0]
-        if idx.size < MIN_CLUSTER:
+def _loo_resid(rets: np.ndarray, lab: np.ndarray, m_min: int):
+    """Leave-one-out group-mean residual; names in undersized groups are invalid."""
+    n = rets.shape[1]
+    resid = np.zeros_like(rets)
+    valid = np.zeros(n, dtype=bool)
+    for c in range(int(lab.max()) + 1):
+        idx = np.flatnonzero(lab == c)
+        m = idx.size
+        if m < m_min:
             continue
-        block = returns[:, idx]
-        total = block.sum(axis=1, keepdims=True)
-        peers = (total - block) / float(idx.size - 1)
-        resid[:, idx] = block - peers
-        tradable[idx] = True
-    return resid, tradable
+        block = rets[:, idx]
+        peer = (block.sum(axis=1, keepdims=True) - block) / float(m - 1)
+        resid[:, idx] = block - peer
+        valid[idx] = True
+    return resid, valid
 
 
-def _ou_scores(resid, window):
-    """Avellaneda-Lee s-score of the cumulative residual, with a reversion-speed filter."""
-    block = resid[-window:, :]
-    cum = np.cumsum(block, axis=0)
-    lag, lead = cum[:-1, :], cum[1:, :]
-    m_lag = lag.mean(axis=0)
-    m_lead = lead.mean(axis=0)
-    d_lag = lag - m_lag
-    d_lead = lead - m_lead
-    var = (d_lag * d_lag).sum(axis=0)
-    cov = (d_lag * d_lead).sum(axis=0)
-    safe_var = np.where(var > 0.0, var, 1.0)
-    slope = np.where(var > 0.0, cov / safe_var, 1.0)
-    intercept = m_lead - slope * m_lag
-    err = lead - (intercept + slope * lag)
-    dof = max(1, lag.shape[0] - 2)
-    err_var = (err * err).sum(axis=0) / float(dof)
-
-    gap = 1.0 - slope
-    gap_sq = 1.0 - slope * slope
-    good = (
-        (var > 0.0)
-        & (slope > 0.0)
-        & (slope < B_MAX)
-        & (err_var > 0.0)
-        & (gap_sq > 1e-9)
-        & (np.abs(gap) > 1e-6)
-    )
-    level = np.where(np.abs(gap) > 1e-6, intercept / np.where(np.abs(gap) > 1e-6, gap, 1.0), 0.0)
-    spread = np.sqrt(np.maximum(err_var, 1e-30) / np.maximum(gap_sq, 1e-9))
-    spread = np.where(spread > 0.0, spread, 1.0)
-    score = (cum[-1, :] - level) / spread
-    score = np.where(np.isfinite(score), score, 0.0)
-
-    if int(good.sum()) < MIN_NAMES:
-        # Numerical fallback: plain standardisation of the cumulative residual.
-        centre = cum.mean(axis=0)
-        scale = cum.std(axis=0)
-        alt_good = scale > 0.0
-        alt = np.where(alt_good, (cum[-1, :] - centre) / np.where(alt_good, scale, 1.0), 0.0)
-        return np.where(np.isfinite(alt), alt, 0.0), alt_good
-    return score, good
+def _unit(v: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    """Scale a component to unit cross-sectional dispersion over ``mask``."""
+    if not mask.any():
+        return np.zeros_like(v)
+    s = float(v[mask].std())
+    if s > _EPS:
+        return v / s
+    return np.zeros_like(v)
 
 
-def _funding_means(funding, cutoff):
-    out = {}
-    if funding is None or len(funding) == 0:
-        return out
+def _group_demean(vec: np.ndarray, lab: np.ndarray, taper: np.ndarray,
+                  active: np.ndarray, m_min: int) -> None:
+    """Taper-weighted demean inside each group, in place.
+
+    Weighting the offset by the taper is what keeps a boundary name at a
+    boundary-sized weight: a flat demean would hand it back the group offset
+    and undo the taper.
+    """
+    for c in range(int(lab.max()) + 1):
+        idx = np.flatnonzero((lab == c) & active)
+        if idx.size < m_min:
+            continue
+        tt = float(taper[idx].sum())
+        if tt > _EPS:
+            vec[idx] -= taper[idx] * (float(vec[idx].sum()) / tt)
+
+
+def _global_demean(vec: np.ndarray, taper: np.ndarray, active: np.ndarray) -> None:
+    idx = np.flatnonzero(active)
+    if idx.size == 0:
+        return
+    tt = float(taper[idx].sum())
+    if tt > _EPS:
+        vec[idx] -= taper[idx] * (float(vec[idx].sum()) / tt)
+
+
+def _finalise(raw: np.ndarray, taper: np.ndarray, active: np.ndarray):
+    """Gross normalisation, per-name cap, net cap.  No volatility targeting."""
+    w = np.where(active, raw, 0.0).astype(float)
+    for _ in range(10):
+        g = float(np.abs(w).sum())
+        if g <= _EPS:
+            return None
+        w = w * (_GROSS / g)
+        if float(np.abs(w).max()) <= _MAX_W + 1e-12:
+            break
+        w = np.clip(w, -_MAX_W, _MAX_W)
+        _global_demean(w, taper, active)
+        w = np.where(active, w, 0.0)
+
+    w = np.clip(w, -_MAX_W, _MAX_W)
+    g = float(np.abs(w).sum())
+    if g <= _EPS:
+        return None
+    if g > _GROSS:
+        w = w * (_GROSS / g)
+
+    net = float(w.sum())
+    if abs(net) > _NET_CAP:
+        idx = np.flatnonzero(active)
+        if idx.size:
+            w[idx] -= (net - np.sign(net) * _NET_CAP) / float(idx.size)
+        w = np.clip(w, -_MAX_W, _MAX_W)
+        g = float(np.abs(w).sum())
+        if g > _GROSS:
+            w = w * (_GROSS / g)
+
+    if not np.isfinite(w).all():
+        return None
+    return w
+
+
+def _funding_means(funding) -> dict:
+    """Mean funding rate over the last settlements, per symbol.
+
+    Read positionally from the tail of the frame and sorted only within that
+    tail, so no absolute date enters and a large frame is not re-sorted at
+    every decision.  If the frame is not time-ordered the tail covers too few
+    symbols and the tilt disables itself rather than misreading.
+    """
+    if not isinstance(funding, pd.DataFrame) or len(funding) == 0:
+        return {}
     cols = set(funding.columns)
     if "symbol" not in cols or "funding_rate" not in cols:
-        return out
-    frame = funding.loc[:, [c for c in ("symbol", "funding_rate", "funding_time") if c in cols]]
-    frame = frame.dropna(subset=["symbol", "funding_rate"])
-    if len(frame) == 0:
-        return out
-    if "funding_time" in frame.columns:
-        stamps = pd.to_datetime(frame["funding_time"], utc=True, errors="coerce")
-        bound = pd.Timestamp(cutoff)
-        bound = bound.tz_localize("UTC") if bound.tzinfo is None else bound.tz_convert("UTC")
-        frame = frame.loc[stamps.notna() & (stamps <= bound)]
-        if len(frame) == 0:
-            return out
-        frame = frame.assign(_stamp=stamps.loc[frame.index]).sort_values("_stamp")
-    recent = frame.groupby("symbol", sort=False).tail(FUND_TAIL)
-    means = recent.groupby("symbol", sort=False)["funding_rate"].mean()
+        return {}
+    keep = ["symbol", "funding_rate"]
+    if "funding_time" in cols:
+        keep.append("funding_time")
+    f = funding.iloc[-_FUND_ROWS:].loc[:, keep].dropna()
+    if len(f) == 0:
+        return {}
+    if "funding_time" in f.columns:
+        f = f.sort_values("funding_time", kind="mergesort")
+    tail = f.groupby("symbol", sort=False).tail(_FUND_TAIL)
+    means = tail.groupby("symbol", sort=False)["funding_rate"].mean()
     return {str(k): float(v) for k, v in means.items() if np.isfinite(v)}
 
 
-def _standardise(vec, mask):
-    if not mask.any():
-        return vec
-    scale = float(vec[mask].std())
-    if scale > 0.0:
-        return vec / scale
-    return vec
+def _rank_universe(bars, eligible):
+    """Point-in-time universe: enough history, then the most liquid.
+
+    The window ladder exists so the book is not silently flat at the start of
+    the run, when few contracts carry 60 days of history.  Ties in the
+    liquidity ranking fall back on the order the organiser supplied
+    ``eligible_symbols`` in, never on the symbol string.
+    """
+    for window in _W_LADDER:
+        scored = []
+        for sym in eligible:
+            if sym not in bars:
+                continue
+            frame = bars[sym]
+            if frame is None or len(frame) < window + 1:
+                continue
+            qv = np.asarray(frame["quote_volume"].to_numpy(), dtype=float)[-window:]
+            qv = qv[np.isfinite(qv)]
+            if qv.size < window // 2:
+                continue
+            med = float(np.median(qv))
+            if np.isfinite(med) and med > 0.0:
+                scored.append((med, sym))
+        if len(scored) >= _MIN_NAMES + 8:
+            scored.sort(key=lambda pair: -pair[0])
+            n_max = min(int(_Q_MAX * window), len(scored))
+            if n_max >= _MIN_NAMES:
+                return window, [sym for _, sym in scored[:n_max]]
+    return 0, []
 
 
-def _shape_book(raw, labels, active, n_clusters):
-    """Cluster-neutral, market-neutral, gross-normalised, capped."""
-    weights = raw.copy()
-    weights[~active] = 0.0
-    for tag in range(n_clusters):
-        idx = np.where((labels == tag) & active)[0]
-        if idx.size >= MIN_CLUSTER:
-            weights[idx] -= weights[idx].mean()
-        else:
-            weights[idx] = 0.0
-    live = np.where(active)[0]
-    if live.size == 0:
+def _taper(n_max: int) -> np.ndarray:
+    """Trading weight by liquidity rank: flat, then a linear ramp to zero.
+
+    A hard top-N cut turns every boundary crossing into a full-size trade.
+    Ramping the weight to zero at the boundary means a name arrives and leaves
+    at ~0, which removes universe churn as a turnover source without any
+    memory of the previous book.
+    """
+    ranks = np.arange(n_max, dtype=float)
+    full = float(int(_TAPER_FRAC * n_max))
+    denom = max(float(n_max) - full, 1.0)
+    return np.clip((float(n_max) - ranks) / denom, 0.0, 1.0)
+
+
+def _panel(bars, names, rows: int):
+    """Closes aligned across symbols on ``open_time``, never on the row index.
+
+    Each per-symbol frame carries a positional RangeIndex and symbols have
+    unequal history, so concatenating on the default index puts two symbols in
+    disjoint integer ranges and returns an all-NaN panel -- a strategy that
+    raises nothing and holds a flat book forever.  ``open_time`` is the only
+    correct key, and the columns are re-indexed back onto ``names`` so the
+    liquidity ordering the taper depends on cannot be permuted.
+    """
+    tail_rows = rows + 30
+    series = []
+    for sym in names:
+        frame = bars[sym].iloc[-tail_rows:]
+        s = pd.Series(
+            np.asarray(frame["close"].to_numpy(), dtype=float),
+            index=pd.Index(frame["open_time"].to_numpy()),
+        )
+        series.append(s[~s.index.duplicated(keep="last")])
+    if not series:
         return None
-    weights[live] -= weights[live].mean()
+    panel = pd.concat(series, axis=1, keys=list(names)).sort_index()
+    panel = panel.loc[:, list(names)]
 
-    for _ in range(4):
-        gross = float(np.abs(weights).sum())
-        if gross <= 0.0:
-            return None
-        weights *= GROSS / gross
-        weights = np.clip(weights, -NAME_CAP, NAME_CAP)
-        weights[live] -= weights[live].mean()
-        weights[~active] = 0.0
-
-    gross = float(np.abs(weights).sum())
-    if gross <= 0.0:
+    present = panel.notna().to_numpy().sum(axis=1)
+    panel = panel.loc[present >= max(2, int(0.5 * panel.shape[1]))]
+    panel = panel.ffill(limit=4).iloc[-rows:]
+    if panel.shape[0] < rows:
         return None
-    if gross > GROSS:
-        weights *= GROSS / gross
-    weights = np.clip(weights, -HARD_NAME_CAP, HARD_NAME_CAP)
-
-    net = float(weights.sum())
-    if abs(net) > NET_CAP:
-        weights[live] -= (net - math.copysign(NET_CAP, net)) / float(live.size)
-        weights = np.clip(weights, -HARD_NAME_CAP, HARD_NAME_CAP)
-    gross = float(np.abs(weights).sum())
-    if gross > GROSS:
-        weights *= GROSS / gross
-    weights[np.abs(weights) < DUST] = 0.0
-    if not np.isfinite(weights).all():
-        return None
-    return weights
+    return panel
 
 
-# ------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------
 # the decision
-# ------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------
 def _decide(context):
     bars = context.bars
     if not bars:
-        return {}
+        return None
     eligible = [str(s) for s in context.eligible_symbols]
-    if not eligible:
-        return {}
-    eligible_set = set(eligible)
-    flat = {sym: 0.0 for sym in eligible}
+    if len(eligible) < _MIN_NAMES:
+        return None
 
-    ref_len = _reference_length(bars)
-    if ref_len <= 0:
-        return flat
-    # Snap to a coarse decision grid. ``n_drop`` grows by one bar per decision inside a
-    # block, so the observation window -- and therefore the target book -- is unchanged
-    # until the grid advances. Derived from row counts only, so it is invariant to any
-    # calendar shift.
-    n_drop = (ref_len % REBAL_GRID) + SKIP_BARS
-
-    window = 0
-    candidates = []
-    for trial in (CORR_WINDOW, FALLBACK_WINDOW):
-        need = trial + 1 + n_drop
-        found = [s for s, frame in bars.items() if len(frame) >= need]
-        if len(found) >= MIN_NAMES:
-            window, candidates = trial, found
-            break
+    window, names = _rank_universe(bars, eligible)
     if window == 0:
-        return flat
+        return None
 
-    ranked = []
-    for sym in candidates:
-        med = _median_quote_volume(bars[sym], n_drop, window)
-        if np.isfinite(med) and med > 0.0:
-            ranked.append((med, sym))
-    if len(ranked) < MIN_NAMES:
-        return flat
-    ranked.sort(key=lambda item: -item[0])
-    cap = max(MIN_NAMES, int(ASPECT_CAP * window))
-    names = [sym for _, sym in ranked[:cap]]
+    taper = _taper(len(names))
+    panel = _panel(bars, names, window + 1)
+    if panel is None or panel.shape[1] < _MIN_NAMES:
+        return None
 
-    panel = _close_panel(bars, names, window + 1 + n_drop + 8)
-    if panel is None or panel.shape[1] < MIN_NAMES:
-        return flat
-    if n_drop:
-        keep = len(panel) - n_drop
-        if keep <= OU_WINDOW + 2:
-            return flat
-        panel = panel.iloc[:keep]
-    panel = panel.iloc[-(window + 1):]
-    if len(panel) < OU_WINDOW + 2:
-        return flat
+    px = np.asarray(panel.to_numpy(), dtype=float)
+    ok = np.isfinite(px).all(axis=0) & (px > 0.0).all(axis=0)
+    if int(ok.sum()) < _MIN_NAMES:
+        return None
+    keep = np.flatnonzero(ok)
+    px = px[:, keep]
+    names = [names[i] for i in keep]
+    taper = taper[keep]
 
-    panel = panel.where(panel > 0.0).ffill(limit=2)
-    cutoff = panel.index[-1]
-    names = [str(c) for c in panel.columns]
-    prices = panel.to_numpy(dtype="float64")
-    with np.errstate(invalid="ignore", divide="ignore"):
-        returns = np.diff(np.log(prices), axis=0)
+    rets = np.diff(np.log(px), axis=0)
+    rets = np.where(np.isfinite(rets), rets, 0.0)
+    lo = np.quantile(rets, _WINSOR, axis=0)
+    hi = np.quantile(rets, 1.0 - _WINSOR, axis=0)
+    rets = np.clip(rets, lo, hi)
 
-    finite = np.isfinite(returns)
-    coverage = finite.sum(axis=0) / float(returns.shape[0])
-    usable = (coverage >= COVERAGE) & np.isfinite(prices[-1])
-    keep_idx = np.where(usable)[0]
-    if keep_idx.size < MIN_NAMES:
-        return flat
-    names = [names[i] for i in keep_idx]
-    returns = np.where(finite, returns, 0.0)[:, keep_idx]
-    returns = _winsorise(returns, WINSOR)
-    n_names, n_obs = returns.shape[1], returns.shape[0]
+    n_obs, n_sym = rets.shape
+    if n_obs < _L + 4 or n_sym < _MIN_NAMES:
+        return None
 
-    corr = _spearman(returns)
-    resid_corr, n_struct = _denoise_and_strip_market(corr, n_names / float(n_obs))
-
-    n_clusters = min(MAX_CLUSTERS, max(2, 1 + n_struct))
-    n_clusters = max(2, min(n_clusters, n_names // MIN_CLUSTER, n_names - 1))
+    # -- discovered sectors: one dendrogram, read at five heights ---------
+    ranks = pd.DataFrame(rets).rank(axis=0).to_numpy(dtype=float)
+    resid_corr = _denoise(_corr(ranks), float(n_sym) / float(n_obs))
     dist = np.sqrt(np.clip(2.0 * (1.0 - resid_corr), 0.0, None))
-    labels = _average_linkage(dist, n_clusters)
-    n_clusters = int(labels.max()) + 1
+    cuts = _linkage_cuts(dist, _CUTS)
 
-    resid, tradable = _cluster_residuals(returns, labels, n_clusters)
-    if not tradable.any():
-        return flat
+    acc = np.zeros_like(rets)
+    cnt = np.zeros(n_sym, dtype=float)
+    for k in _CUTS:
+        lab = cuts.get(int(k))
+        if lab is None:
+            continue
+        block, valid = _loo_resid(rets, lab, _M_MIN)
+        if not valid.any():
+            continue
+        acc[:, valid] += block[:, valid]
+        cnt[valid] += 1.0
+    tradable = cnt > 0.0
+    if int(tradable.sum()) < _MIN_NAMES:
+        return None
+    resid = acc / np.where(cnt > 0.0, cnt, 1.0)[None, :]
 
-    scores, reverting = _ou_scores(resid, min(OU_WINDOW, n_obs))
-    eligible_mask = np.array([sym in eligible_set for sym in names], dtype=bool)
-    active = tradable & reverting & eligible_mask & np.isfinite(scores)
-    if int(active.sum()) < MIN_NAMES:
-        # Too narrow to be a portfolio: stand aside rather than fail breadth on purpose.
-        return flat
+    # -- displacement: a slow spread level, not a recent return -----------
+    scale = resid.std(axis=0)
+    typical = float(np.median(scale[tradable]))
+    scale = np.where(scale > _EPS, scale, typical if typical > _EPS else 1.0)
+    kern = 1.0 - np.abs(np.arange(_L, dtype=float) - 0.5 * (_L - 1)) / (0.5 * (_L - 1))
+    kern = np.clip(kern, 0.0, None)
+    norm = float(np.sqrt(float((kern * kern).sum())))
+    disp = (kern[::-1] @ resid[-_L:, :]) / (scale * norm)
+    disp = np.where(np.isfinite(disp), disp, 0.0)
 
-    clipped = np.clip(scores, -Z_CLIP, Z_CLIP)
-    deviation = np.sign(clipped) * np.maximum(np.abs(clipped) - Z_ENTER, 0.0)
-    price_signal = -deviation  # rich to its cluster -> short it
-    price_signal[~active] = 0.0
-    price_signal = _standardise(price_signal, active)
+    # -- the partition the book is made neutral to ------------------------
+    lab_n = cuts.get(_NEUTRAL_CUT)
+    if lab_n is None:
+        lab_n = np.zeros(n_sym, dtype=np.int64)
+    big = np.zeros(n_sym, dtype=bool)
+    for c in range(int(lab_n.max()) + 1):
+        idx = np.flatnonzero(lab_n == c)
+        if idx.size >= _M_MIN:
+            big[idx] = True
 
-    fund_map = _funding_means(context.funding, cutoff)
-    fund_signal = np.zeros(n_names, dtype="float64")
-    if fund_map:
-        raw_fund = np.array([fund_map.get(sym, np.nan) for sym in names], dtype="float64")
-        has_fund = np.isfinite(raw_fund)
-        for tag in range(n_clusters):
-            idx = np.where((labels == tag) & active & has_fund)[0]
-            if idx.size < MIN_CLUSTER:
-                continue
-            block = raw_fund[idx]
-            scale = float(block.std())
-            if scale > 0.0:
-                fund_signal[idx] = np.clip((block - block.mean()) / scale, -FUND_CLIP, FUND_CLIP)
-        fund_signal = -fund_signal  # crowded longs pay: be the short
-        fund_signal = _standardise(fund_signal, active)
+    active = tradable & big & np.isfinite(disp)
+    if int(active.sum()) < _MIN_NAMES:
+        return None
 
-    combined = price_signal + FUND_TILT * fund_signal
-    weights = _shape_book(combined, labels, active, n_clusters)
+    centred = np.where(active, disp, 0.0)
+    for c in range(int(lab_n.max()) + 1):
+        idx = np.flatnonzero((lab_n == c) & active)
+        if idx.size >= _M_MIN:
+            centred[idx] -= centred[idx].mean()
+    sd = float(centred[active].std())
+    if sd <= _EPS:
+        return None
+    z = np.where(active, np.clip(centred / sd, -_Z_CLIP, _Z_CLIP), 0.0)
+
+    price = _SIGN * np.sign(z) * np.maximum(np.abs(z) - _Z_ENTER, 0.0)
+    price = _unit(price * taper, active)
+
+    # -- funding tilt: carry and crowding, at no turnover cost ------------
+    fund = np.zeros(n_sym, dtype=float)
+    try:
+        fmap = _funding_means(context.funding)
+        if fmap:
+            rate = np.array([fmap.get(s, np.nan) for s in names], dtype=float)
+            have = np.isfinite(rate) & active
+            if int(have.sum()) >= _MIN_NAMES:
+                f = np.where(have, rate, 0.0)
+                for c in range(int(lab_n.max()) + 1):
+                    idx = np.flatnonzero((lab_n == c) & have)
+                    if idx.size >= _M_MIN:
+                        f[idx] -= f[idx].mean()
+                    else:
+                        f[idx] = 0.0
+                fs = float(f[have].std())
+                if fs > _EPS:
+                    tilt = -np.clip(f / fs, -_FUND_CLIP, _FUND_CLIP)
+                    fund = _unit(np.where(have, tilt, 0.0) * taper, active)
+    except Exception:
+        fund = np.zeros(n_sym, dtype=float)
+
+    raw = np.where(active, price + _ALPHA * fund, 0.0)
+    for _ in range(2):
+        _group_demean(raw, lab_n, taper, active, _M_MIN)
+        _global_demean(raw, taper, active)
+        raw = np.where(active, raw, 0.0)
+
+    weights = _finalise(raw, taper, active)
     if weights is None:
-        return flat
+        return None
 
-    book = dict(flat)
-    for sym, weight in zip(names, weights):
-        if weight != 0.0 and sym in eligible_set:
-            book[sym] = float(weight)
+    book = {sym: 0.0 for sym in eligible}
+    for pos, sym in enumerate(names):
+        value = float(weights[pos])
+        if np.isfinite(value) and abs(value) > _DUST:
+            book[sym] = value
     return book
 
 
 class ClusterRelativeValue:
-    """Stateless: every decision is recomputed from the past-only rows it is handed."""
+    """Stateless: every number is recomputed from the past-only rows supplied."""
+
+    __slots__ = ()
 
     def target_weights(self, context, *, seed):
         try:
             return _decide(context)
         except Exception:
-            # Hold rather than churn if anything about the shape surprises us.
+            # A degenerate cross-section at one decision should cost that
+            # decision, not the run.  Holding beats churning to flat and back.
             return None
 
 

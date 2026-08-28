@@ -1,8 +1,12 @@
-"""team-10 -- taker-flow pressure (refinement candidate).
+"""team-10 -- taker-flow pressure (nomination).
 
 Aggressor imbalance, accumulated and conditioned by three preset-sign resolution
 variables, residualised against the contemporaneous price/volume state, and held
-at a horizon the organizer's cost model can actually pay for.
+long enough that a flat 7.5 bps-per-unit-turnover charge cannot eat the edge.
+
+The mechanism is unchanged from the refinement candidate.  The one substantive
+change is the position filter, which is set from cost arithmetic recovered from
+the two feedback packets -- not from any return, Sharpe or drawdown.
 
 No network, no filesystem, no subprocess, no RNG, no embedded data, and no state
 carried across decisions: every number below is recomputed from the past-only
@@ -26,11 +30,12 @@ _STD = (90, 360)                 # knob 3 (W): trailing standardisation windows
 _NORMS = ("ratio", "trailing")   # knob 1 (N): flow normalisation fork
 
 _WINSOR = 3.0                    # fixed, thesis 5.3.3
-_HALFLIFE = 12.0                 # bars; position-level linear low-pass filter
-_SMOOTH = 48                     # bars retained for the filter and the OLS panel
+_HALFLIFE = 24.0                 # bars (8 days); position-level linear low-pass
+_SMOOTH = 96                     # bars retained for the filter (4 half-lives)
+_RESID = 192                     # bars pooled into the residualising regression
 _MIN_OBS = 60                    # minimum pooled rows before residualising
 
-_HIST = 460                      # panel depth: max(L + W) + smoothing + headroom
+_HIST = 620                      # panel depth: max(L + W) + _RESID + headroom
 _MIN_HISTORY = 130               # bars a symbol needs before it can be held
 
 _GROSS = 1.0
@@ -317,6 +322,10 @@ def _residualise(signal, controls):
     variable is demeaned per timestamp first, which absorbs the intercept and
     any common time effect; the regression uses only quantities observable at
     the same instant as the signal, so it cannot import a forward return.
+
+    The window is deliberately long.  Betas re-estimated on a short window
+    wander from bar to bar, and that wander is turnover the book is charged for
+    and earns nothing on.
     """
     target = _xs_demean(signal)
     design = [_xs_demean(c) for c in controls]
@@ -421,14 +430,16 @@ class TakerFlowPressure:
             ret, ratio, trailing, comp, logv, fund
         )
 
-        window = min(_SMOOTH, signal.shape[0])
+        window = min(_RESID, signal.shape[0])
         if window < 2:
             return flat
         resid = _residualise(
             signal[-window:],
             (ctrl_ret[-window:], ctrl_vol[-window:], ctrl_r1[-window:]),
         )
-        score = _smooth(resid)
+
+        tail = min(_SMOOTH, resid.shape[0])
+        score = _smooth(resid[-tail:])
 
         live = np.isfinite(score)
         if int(live.sum()) < _MIN_NAMES:
