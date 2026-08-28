@@ -780,9 +780,30 @@ def evaluate_targets(
                 )
             active_symbols = list(eligible & set(symbols))
             desired.loc[active_symbols] = supplied.loc[active_symbols]
-            # The *submitted* book must be legal on its own terms before the organizer touches
-            # it, so this check stays on the strategy's own weights.
-            _validate_weight_limits(desired, cfg, fill_time)
+            # A breaching submission is projected into the caps, not raised on.
+            #
+            # This raised once, and the cost was absurd: team-14 lost its entire 3.5-year
+            # evaluation to one bar out of 3834 whose net exposure was 0.250076 against a 0.25
+            # cap -- 7.6e-5 over, floating-point accumulation in the lane's own normalisation
+            # rather than any attempt to breach, and from the one lane MANDATED to run non-zero
+            # net and therefore forced to work at that boundary. That is V4-R9's failure mode in
+            # a new costume: one bar, one raise, a whole trial destroyed.
+            #
+            # The charter has the evaluator enforce "exposure reductions" and score ruin rather
+            # than raise it, so projecting is what it asks for. The breach is recorded as an event
+            # so it stays visible in the artifacts instead of being silently absorbed.
+            breach = _weight_limit_breach(desired, cfg)
+            if breach is not None:
+                desired, _ = _project_into_caps(desired, cfg)
+                event_rows.append(
+                    {
+                        "event_type": "submission_cap_projected",
+                        "open_time": fill_time,
+                        "symbol": "",
+                        "notional": 0.0,
+                        "detail": breach,
+                    }
+                )
             # Organizer-owned sizing comes next, and it may scale up, which is why the projection
             # back into the caps is part of the unit rather than an afterthought.
             submitted_breadth = effective_breadth(desired)
@@ -1565,6 +1586,27 @@ def _funding_event_rows(
             }
         )
     return rows
+
+
+def _weight_limit_breach(weights: pd.Series, config: EvaluatorConfig) -> str | None:
+    """Describe a cap breach in a submitted book, or return None.
+
+    Reports rather than raises: the caller projects. Kept separate from
+    :func:`_validate_weight_limits`, which still raises, because a breach *after* the organizer's
+    own projection would be an organizer bug and should stop the run.
+    """
+
+    tolerance = 1e-10
+    gross = float(weights.abs().sum())
+    net = float(abs(weights.sum()))
+    largest = float(weights.abs().max()) if len(weights) else 0.0
+    if gross > config.max_gross_exposure + tolerance:
+        return f"gross {gross:.6f} > {config.max_gross_exposure}"
+    if net > config.max_abs_net_exposure + tolerance:
+        return f"net {net:.6f} > {config.max_abs_net_exposure}"
+    if largest > config.max_symbol_exposure + tolerance:
+        return f"symbol {largest:.6f} > {config.max_symbol_exposure}"
+    return None
 
 
 def _validate_weight_limits(
