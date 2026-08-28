@@ -10,9 +10,15 @@ gates to first place.
 parameter that could suppress it. This script cannot override that, and does not try; a lane that
 fails is retired.
 
-Nomination reads whichever trial is the lane's best **admitted** result, not necessarily its last.
-team-09's discovery book was admitted and its refined book was not, so "last" would have discarded
-the only qualifying evidence it has.
+The nominee is the lane's **decision-phase candidate**, and nothing else. That phase exists so the
+team chooses, and its guidance says in as many words that a nomination need not be the highest-Sharpe
+book -- so picking a lane best-scoring trial on its behalf would be the organizer choosing and
+calling it the team's decision. A lane whose decision candidate does not clear the bar is retired;
+promoting an earlier trial instead would be a fallback, which this edition does not have.
+
+The candidate archive is what makes that fair rather than harsh: every lane could read all of its
+earlier books and their scores before deciding, so carrying a weaker final candidate is a choice
+rather than an accident.
 
 Usage::
 
@@ -32,6 +38,8 @@ from crypto_trade.tournament.v5.layout import TOP40_V5_LAYOUT
 REPO = Path(__file__).resolve().parents[1]
 TOURNAMENT = REPO / TOP40_V5_LAYOUT.tournament_root
 JOURNAL = TOURNAMENT / "research-journal.jsonl"
+# The trial that scored each lane's decision-phase candidate, which is its nomination.
+DECISION_TRIAL = "t03"
 
 
 class _Trial:
@@ -76,11 +84,9 @@ def main() -> int:
             print(f"  {lane.team_id:10s} already decided")
             continue
         trials = by_team.get(lane.team_id, [])
-        admitted = [t for t in trials if t["admitted"]]
-        if admitted:
-            # Best admitted by 2x-cost Sharpe: a book that survives costs is the one worth carrying,
-            # and the sealed stage will judge robustness rather than this number.
-            best = max(admitted, key=lambda t: t["packet"]["double_cost_sharpe"])
+        final = next((t for t in trials if t["trial_id"] == DECISION_TRIAL), None)
+        if final is not None and final["admitted"]:
+            best = final
             label = (
                 f"NOMINATE {best['trial_id']} "
                 f"(2x sharpe {best['packet']['double_cost_sharpe']:+.3f})"
@@ -93,13 +99,18 @@ def main() -> int:
                 )
             nominated += 1
         else:
-            worst = trials[-1]["failures"] if trials else ["no trial completed"]
+            worst = (final or (trials[-1] if trials else {})).get(
+                "failures", ["no decision-phase trial completed"]
+            )
             label = f"retire ({','.join(worst[:3])})"
             if not arguments.dry_run:
                 orchestrator.retire(
                     str(JOURNAL),
                     lane.team_id,
-                    reason=f"no admitted candidate across {len(trials)} trial(s)",
+                    reason=(
+                        f"decision-phase candidate did not clear the bar "
+                        f"({len(trials)} trial(s) run)"
+                    ),
                 )
             retired += 1
         print(f"  {lane.team_id:10s} {label}")
