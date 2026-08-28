@@ -1,313 +1,403 @@
-"""team-13 — universe inclusion and attention (discovery baseline).
+"""team-13 — universe inclusion and attention.
 
-The mandate is *event and state*: trade weekly membership entry and exit.
+Weekly membership entry and exit, expressed as a cross-sectional interaction between
+inclusion/attention intensity and the crowdedness of leveraged positioning:
 
-This book states that in its most direct form.
+    score = - (inclusion/attention intensity) x (crowding state)
 
-  * The **event** decides *who is in the book*. A weekly liquidity-ranked universe turns over
-    because a symbol's trailing dollar volume crosses its peers. That crossing is reconstructed
-    here from bars alone -- trailing-week notional rank versus its own three-week baseline rank --
-    plus a listing-recency channel for names too young to have a baseline (a brand-new member is
-    the purest entrant there is).
+which is exactly the preregistered sign, quadrant by quadrant --
 
-  * The **state** decides *the sign and the size*. Crowdedness of leveraged positioning going into
-    the transition, proxied by the trailing-week funding level and by taker-buy aggressor skew,
-    both standardised cross-sectionally. The book is short the crowded side of a transition and
-    long the uncrowded side.
+    entrant  x crowded    -> short   (sell immediacy to the attention crowd)
+    entrant  x uncrowded  -> long    (genuine liquidity migration, continues)
+    leaver   x crowded    -> long    (buy from forced closers of long inventory)
+    leaver   x uncrowded  -> short   (sell to forced closers of short inventory)
 
-The entrant leg and the leaver leg use the same function, and that is the point. An entrant is an
-excess-demand shock: if the crowd is paying to be long it must unwind, so fade it. A leaver is an
-excess-supply shock: the forced closers are selling, funding goes negative, so buy it. "Short the
-crowded side" produces the entrant/leaver mirror without a hand-flipped sign.
+because -(E)(C) with E = entrant_intensity - leaver_intensity reproduces the two legs
+additively.
 
-Everything is recomputed from ``DecisionContext`` at every decision. No persistent state, no RNG,
-no absolute dates, no symbol identity, no price levels -- only ranks, ratios and rates.
+The book is stateless. Membership history is not carried in ``DecisionContext``, so the
+membership event is reconstructed at every decision from past-only rows: a trailing
+dollar-volume rank crossing, a dollar-volume surge, and contract seasoning (bars of
+available history, i.e. how newly the name exists at all).
+
+Cost discipline is structural rather than incidental. The event position is held with a
+linear three-week decay, implemented statelessly as a lag-weighted average of the signal
+recomputed at each historical offset; the crowding state is measured over three weeks; the
+book is weighted toward the tradeable half of the cross-section; and low-conviction names
+are soft-thresholded to exactly zero so that turnover is spent only where the signal is.
 """
 
 from __future__ import annotations
 
+import math
+from collections.abc import Mapping
+
 import numpy as np
 import pandas as pd
 
-# --- Structural constants (thesis §4.1, fixed rather than searched) -------------------------
-BARS_PER_WEEK_FALLBACK = 21  # Binance funding settles every 8h -> 21 bars per week ([C10]).
-FUNDING_ROWS_PER_WEEK = 21  # Funding prints are on the same 8h grid.
-EVENT_HORIZON_WEEKS = 3  # Post-event holding horizon H (thesis §4.2 knob 1, upper level).
-BASELINE_WEEKS = 3  # Rank baseline spans the three weeks preceding the trailing week.
-Z_CLIP = 3.0  # Signal transform: clip standardised scores at ±3.
+__all__ = ["build_strategy"]
 
-# --- Portfolio construction constants -------------------------------------------------------
-GROSS_TARGET = 0.98  # Hard cap is sum(|w|) <= 1.0.
-MAX_WEIGHT = 0.08  # Hard cap is |w| <= 0.10; the headroom forces breadth.
-NET_LIMIT = 0.15  # Hard cap is |sum(w)| <= 0.25.
-DUST_WEIGHT = 1e-3  # Below this a line is noise, not a position.
-LIQUIDITY_FLOOR = 0.10  # Drop names below 10% of median trailing notional: untradeable, not cheap.
-MIN_UNIVERSE = 10
-MIN_BOOK = 6
+# --- structural constants (declared surface; none is fitted to a result) -------------
+_WEEK_NS = 7 * 24 * 3600 * 1_000_000_000
+_DEFAULT_WEEK_BARS = 21          # 8h bars: one week, one funding settlement per bar
+_MIN_WEEK_BARS = 3
+_MAX_WEEK_BARS = 84
+_HORIZON_WEEKS = 3               # H: post-event holding horizon (declared knob 1, level 3)
+_STATE_WEEKS = 3                 # L_z: crowding lookback (declared knob 2, level 2)
+_LAG_NODES_PER_WEEK = 7          # sampling density of the linear-decay holding kernel
+_MIN_FUNDING_OBS = 3
+_MIN_NAMES = 10
+_TARGET_NAMES = 30               # breadth floor enforced through an adaptive threshold
+_SOFT_THRESHOLD = 0.40           # in cross-sectional sigma of the final score
+_LIQ_FLOOR = 0.25
+_MAX_WEIGHT = 0.10
+_MAX_NET = 0.20
+_DUST = 1e-6
+_NAT = np.iinfo(np.int64).min
+_EMPTY_TIMES = np.zeros(0, dtype="int64")
+_EMPTY_CUM = np.zeros(1, dtype=float)
 
 
-def _bars_per_week(frames):
-    """Infer bars per seven days from timestamp spacing, falling back to the 8h grid.
+# --- pure helpers --------------------------------------------------------------------
+def _epoch_ns(values) -> np.ndarray:
+    """Monotone integer time key. Any consistent unit works; only ordering is used."""
+    stamps = pd.to_datetime(pd.Series(np.asarray(values)), utc=True, errors="coerce")
+    return stamps.dt.tz_localize(None).to_numpy().astype("int64")
 
-    Assuming the bar frequency would be a silent failure mode: every window in this file is
-    expressed in weeks, so a wrong step size would quietly mis-scale every lookback.
+
+def _csum(values: np.ndarray) -> np.ndarray:
+    """Prefix sums with a leading zero, so any window sum is one subtraction."""
+    return np.concatenate((np.zeros(1, dtype=float), np.cumsum(values)))
+
+
+def _rank_unit(values: np.ndarray) -> np.ndarray:
+    """Cross-sectional rank mapped to [-1, 1]. Non-finite entries map to 0 (neutral).
+
+    Rank rather than z is used deliberately: alt-perp volume and funding cross-sections
+    carry outliers that would otherwise set the scale of every other name, and a bounded
+    score keeps the product of two components bounded.
     """
-    for frame in frames:
-        index = getattr(frame, "index", None)
-        if not isinstance(index, pd.DatetimeIndex) or len(index) < 9:
-            continue
-        step = pd.Series(index[-9:]).diff().dt.total_seconds().median()
-        if step is None or not np.isfinite(step) or step <= 0:
-            continue
-        return int(max(2, min(400, round(7.0 * 86400.0 / float(step)))))
-    return BARS_PER_WEEK_FALLBACK
+    out = np.zeros(values.shape[0], dtype=float)
+    usable = np.isfinite(values)
+    count = int(usable.sum())
+    if count < 3:
+        return out
+    ranks = pd.Series(values[usable]).rank(method="average").to_numpy()
+    out[usable] = 2.0 * (ranks - 0.5) / float(count) - 1.0
+    return out
 
 
-def _numeric(frame, column):
-    """Return a float array for ``column``, or ``None`` when the column is absent."""
-    if column not in frame.columns:
+def _rank_crossing(now: np.ndarray, prior: np.ndarray) -> np.ndarray:
+    """Change in cross-sectional liquidity rank: the inclusion-threshold proxy."""
+    out = np.full(now.shape[0], np.nan)
+    usable = np.isfinite(now) & np.isfinite(prior)
+    if int(usable.sum()) < 3:
+        return out
+    high = _rank_unit(np.where(usable, now, np.nan))
+    low = _rank_unit(np.where(usable, prior, np.nan))
+    out[usable] = high[usable] - low[usable]
+    return out
+
+
+def _numeric_column(view: pd.DataFrame, name: str, fallback: str, order) -> np.ndarray | None:
+    column = name if name in view.columns else (fallback if fallback in view.columns else None)
+    if column is None:
         return None
-    values = np.asarray(frame[column].to_numpy(), dtype="float64")
-    return values if values.size else None
+    values = pd.to_numeric(view[column], errors="coerce").to_numpy(dtype=float)
+    if order is not None:
+        values = values[order]
+    return values
 
 
-def _notional(frame):
-    """Per-bar quote (dollar) volume, with a close x volume fallback."""
-    quote = _numeric(frame, "quote_volume")
-    if quote is not None and np.nansum(quote) > 0.0:
-        return quote
-    close = _numeric(frame, "close")
-    volume = _numeric(frame, "volume")
-    if close is None or volume is None or close.size != volume.size:
+def _infer_week_bars(frames) -> tuple[int, float]:
+    """Bars per week, read off the data rather than assumed, so the book is
+    equivariant to a calendar shift or a different bar cadence."""
+    ordered = sorted(((int(frame.shape[0]), idx) for idx, (_, frame) in enumerate(frames)),
+                     reverse=True)
+    spacings = []
+    for _, idx in ordered[:8]:
+        stamps = _epoch_ns(frames[idx][1]["open_time"].iloc[-65:])
+        gaps = np.diff(stamps)
+        gaps = gaps[gaps > 0]
+        if gaps.size >= 8:
+            spacings.append(float(np.median(gaps)))
+    if not spacings:
+        return _DEFAULT_WEEK_BARS, float(_WEEK_NS) / _DEFAULT_WEEK_BARS
+    spacing = float(np.median(spacings))
+    if not spacing > 0.0:
+        return _DEFAULT_WEEK_BARS, float(_WEEK_NS) / _DEFAULT_WEEK_BARS
+    week = int(round(_WEEK_NS / spacing))
+    return max(_MIN_WEEK_BARS, min(_MAX_WEEK_BARS, week)), spacing
+
+
+def _prepare_symbol(frame: pd.DataFrame, tail: int) -> dict | None:
+    """Per-symbol prefix sums over just the window the book can reach."""
+    n_full = int(frame.shape[0])
+    if n_full < 8:
         return None
-    return close * volume
+    view = frame.iloc[n_full - tail:] if n_full > tail else frame
+    stamps = _epoch_ns(view["open_time"])
+    length = int(stamps.shape[0])
+    if length < 8 or bool(np.any(stamps == _NAT)):
+        return None
+    order = None
+    if bool(np.any(np.diff(stamps) <= 0)):
+        order = np.argsort(stamps, kind="stable")
+        stamps = stamps[order]
+    quote = _numeric_column(view, "quote_volume", "volume", order)
+    if quote is None:
+        return None
+    quote = np.where(np.isfinite(quote) & (quote > 0.0), quote, 0.0)
+    taker = _numeric_column(view, "taker_buy_quote_volume", "taker_buy_volume", order)
+    if taker is None:
+        taker = np.full(length, np.nan)
+    taker_ok = np.isfinite(taker) & (taker >= 0.0) & (quote > 0.0)
+    return {
+        "n_full": n_full,
+        "m": length,
+        "t": stamps,
+        "cq": _csum(quote),
+        "ctb": _csum(np.where(taker_ok, taker, 0.0)),
+        "cqt": _csum(np.where(taker_ok, quote, 0.0)),
+        "ft": _EMPTY_TIMES,
+        "fc": _EMPTY_CUM,
+    }
 
 
-def _taker_skew(frame, window):
-    """Aggressor buy share of the trailing window, centred on zero.
+def _funding_map(funding, min_time: int) -> dict:
+    """Per-symbol funding times and prefix-summed rates, truncated to the reachable window."""
+    out: dict = {}
+    if not isinstance(funding, pd.DataFrame) or funding.shape[0] == 0:
+        return out
+    columns = funding.columns
+    if "symbol" not in columns or "funding_rate" not in columns or "funding_time" not in columns:
+        return out
+    times = _epoch_ns(funding["funding_time"])
+    rates = pd.to_numeric(funding["funding_rate"], errors="coerce").to_numpy(dtype=float)
+    keep = (times != _NAT) & np.isfinite(rates) & (times >= min_time)
+    if not bool(keep.any()):
+        return out
+    table = pd.DataFrame(
+        {"sym": funding["symbol"].to_numpy()[keep], "t": times[keep], "r": rates[keep]}
+    ).sort_values(["sym", "t"], kind="stable")
+    for symbol, group in table.groupby("sym", sort=False):
+        out[str(symbol)] = (group["t"].to_numpy(), _csum(group["r"].to_numpy()))
+    return out
 
-    The only independent order-flow direction signal in the dataset. It is a ratio, so it is
-    invariant to any common rescaling of prices or of contract size.
+
+def _features_at(prep: dict, end: int, week: int, state_win: int):
+    """Inclusion and crowding measurements as of ``end`` bars into this symbol's history.
+
+    Every quantity is a ratio or a rank input, so the book is invariant to a uniform
+    rescaling of prices and volumes.
     """
-    for buy_col, all_col in (
-        ("taker_buy_quote_volume", "quote_volume"),
-        ("taker_buy_volume", "volume"),
-    ):
-        buys = _numeric(frame, buy_col)
-        total = _numeric(frame, all_col)
-        if buys is None or total is None or buys.size != total.size:
-            continue
-        denominator = float(np.nansum(total[-window:]))
-        if not np.isfinite(denominator) or denominator <= 0.0:
-            continue
-        numerator = float(np.nansum(buys[-window:]))
-        if not np.isfinite(numerator):
-            continue
-        return numerator / denominator - 0.5
-    return np.nan
+    cum_q = prep["cq"]
+    short_lo = end - week
+    short_total = cum_q[end] - cum_q[short_lo]
+    if not short_total > 0.0:
+        return None
+    mean_short = short_total / float(week)
+
+    prior_lo = max(0, end - _HORIZON_WEEKS * week)
+    prior_hi = short_lo
+    prior_n = prior_hi - prior_lo
+    if prior_n < 1:
+        return None
+    mean_prior = (cum_q[prior_hi] - cum_q[prior_lo]) / float(prior_n)
+
+    if mean_prior > 0.0:
+        surge = math.log(mean_short / mean_prior)
+    else:
+        surge = float("nan")
+
+    state_lo = max(0, end - state_win)
+    taker_total = prep["ctb"][end] - prep["ctb"][state_lo]
+    quote_total = prep["cqt"][end] - prep["cqt"][state_lo]
+    if quote_total > 0.0:
+        taker = taker_total / quote_total - 0.5
+    else:
+        taker = float("nan")
+
+    liquidity = (cum_q[end] - cum_q[state_lo]) / float(end - state_lo)
+
+    funding = float("nan")
+    times = prep["ft"]
+    if times.shape[0] > 0:
+        stamps = prep["t"]
+        cutoff = stamps[end - 1]
+        window_start = stamps[state_lo] if state_lo < end else stamps[0]
+        hi = int(np.searchsorted(times, cutoff, side="right"))
+        lo = int(np.searchsorted(times, window_start, side="left"))
+        if hi - lo >= _MIN_FUNDING_OBS:
+            funding = float((prep["fc"][hi] - prep["fc"][lo]) / float(hi - lo))
+
+    return surge, mean_short, mean_prior, taker, funding, liquidity
 
 
-def _funding_means(funding, symbols, rows):
-    """Mean funding rate over each symbol's last ``rows`` prints (its trailing week).
-
-    Taking a tail count rather than filtering on a timestamp keeps this free of any absolute-date
-    or dtype assumption; the frame is already restricted to rows strictly before the decision.
-    """
-    means = {}
-    columns = getattr(funding, "columns", None)
-    if columns is None or len(funding) == 0:
-        return means
-    if "symbol" not in columns or "funding_rate" not in columns:
-        return means
-
-    frame = funding[funding["symbol"].isin(set(symbols))]
-    if len(frame) == 0:
-        return means
-
-    for time_column in ("funding_time", "settlement_time"):
-        if time_column in columns:
-            frame = frame.sort_values(time_column, kind="mergesort")
-            break
-
-    tail = frame.groupby("symbol", sort=False).tail(rows)
-    for symbol, value in tail.groupby("symbol", sort=False)["funding_rate"].mean().items():
-        rate = float(value)
-        if np.isfinite(rate):
-            means[symbol] = rate
-    return means
-
-
-def _pct_rank(values):
-    """Tie-averaged percentile rank in [0, 1]. Rank-based, so scale- and level-invariant."""
-    array = np.asarray(values, dtype="float64")
-    size = array.size
-    if size < 2:
-        return np.full(size, 0.5, dtype="float64")
-    ranks = np.zeros(size, dtype="float64")
-    order = np.argsort(array, kind="mergesort")
-    ordered = array[order]
-    start = 0
-    while start < size:
-        stop = start
-        while stop + 1 < size and ordered[stop + 1] == ordered[start]:
-            stop += 1
-        ranks[order[start : stop + 1]] = 0.5 * (start + stop)
-        start = stop + 1
-    return ranks / (size - 1)
-
-
-def _robust_z(values):
-    """Median/MAD cross-sectional score, clipped. Non-finite entries score zero."""
-    array = np.asarray(values, dtype="float64")
-    scores = np.zeros(array.size, dtype="float64")
-    finite = np.isfinite(array)
-    if int(finite.sum()) < 4:
-        return scores
-    sample = array[finite]
-    deviation = sample - float(np.median(sample))
-    scale = 1.4826 * float(np.median(np.abs(deviation)))
-    if not np.isfinite(scale) or scale <= 0.0:
-        scale = float(np.std(sample))
-    if not np.isfinite(scale) or scale <= 0.0:
-        return scores
-    scores[finite] = np.clip(deviation / scale, -Z_CLIP, Z_CLIP)
-    return scores
-
-
-def _shape_book(scores, target, cap):
-    """Water-fill to a gross of ``target`` with no line above ``cap``."""
-    weights = np.asarray(scores, dtype="float64").copy()
-    for _ in range(12):
-        gross = float(np.abs(weights).sum())
-        if gross <= 0.0:
-            return weights
-        weights = np.clip(weights * (target / gross), -cap, cap)
-    return weights
-
-
-def _cap_net(weights, limit):
-    """Shrink the dominant side until net exposure is inside ``limit``."""
-    net = float(weights.sum())
-    if abs(net) <= limit:
-        return weights
-    dominant = weights > 0.0 if net > 0.0 else weights < 0.0
-    side_gross = float(np.abs(weights[dominant]).sum())
-    if side_gross <= 0.0:
-        return weights
-    factor = max(0.0, (side_gross - (abs(net) - limit)) / side_gross)
-    adjusted = weights.copy()
-    adjusted[dominant] = adjusted[dominant] * factor
-    return adjusted
-
-
+# --- strategy ------------------------------------------------------------------------
 class InclusionAttentionBook:
-    """Membership transition selects the names; leveraged crowding signs and sizes them."""
+    """Stateless cross-sectional inclusion x crowding book."""
 
     def target_weights(self, context, *, seed):
-        symbols = list(getattr(context, "eligible_symbols", ()) or ())
-        bars = getattr(context, "bars", {}) or {}
+        del seed  # nothing here is random; the book is a pure function of the context
 
-        frames = {}
-        for symbol in symbols:
+        bars = getattr(context, "bars", None)
+        eligible = getattr(context, "eligible_symbols", None)
+        if not isinstance(bars, Mapping) or eligible is None:
+            return {}
+
+        frames = []
+        for symbol in sorted(dict.fromkeys(str(name) for name in eligible)):
             frame = bars.get(symbol)
-            if frame is None or not hasattr(frame, "columns") or len(frame) == 0:
-                continue
-            frames[symbol] = frame
-        if len(frames) < MIN_UNIVERSE:
+            if (
+                isinstance(frame, pd.DataFrame)
+                and frame.shape[0] >= 8
+                and "open_time" in frame.columns
+            ):
+                frames.append((symbol, frame))
+        if len(frames) < _MIN_NAMES:
             return {}
 
-        week = _bars_per_week(frames.values())
-        horizon = EVENT_HORIZON_WEEKS * week
-        baseline_span = BASELINE_WEEKS * week
+        week, spacing = _infer_week_bars(frames)
+        horizon = _HORIZON_WEEKS * week
+        state_win = _STATE_WEEKS * week
+        step = max(1, week // _LAG_NODES_PER_WEEK)
+        lags = range(0, horizon, step)
+        tail = horizon + state_win + 4
 
-        names, recent_dv, baseline_dv, skew, age = [], [], [], [], []
-        for symbol, frame in frames.items():
-            notional = _notional(frame)
-            if notional is None:
-                continue
-            recent = notional[-week:]
-            if recent.size == 0:
-                continue
-            recent_mean = float(np.nansum(recent)) / recent.size
-            if not np.isfinite(recent_mean) or recent_mean <= 0.0:
-                continue
-
-            # The baseline is the BASELINE_WEEKS window ending one week back; Python slicing
-            # clamps it for young symbols, and short baselines are discarded below.
-            baseline = notional[-(week + baseline_span) : -week]
-            if baseline.size >= max(2, week // 2):
-                baseline_mean = float(np.nansum(baseline)) / baseline.size
-                if not np.isfinite(baseline_mean) or baseline_mean <= 0.0:
-                    baseline_mean = np.nan
-            else:
-                baseline_mean = np.nan
-
-            names.append(symbol)
-            recent_dv.append(recent_mean)
-            baseline_dv.append(baseline_mean)
-            skew.append(_taker_skew(frame, week))
-            age.append(float(len(frame)))
-
-        if len(names) < MIN_UNIVERSE:
+        prepared = []
+        for symbol, frame in frames:
+            prep = _prepare_symbol(frame, tail)
+            if prep is not None and prep["m"] >= 2 * week:
+                prep["symbol"] = symbol
+                prepared.append(prep)
+        if len(prepared) < _MIN_NAMES:
             return {}
 
-        recent_dv = np.asarray(recent_dv, dtype="float64")
-        baseline_dv = np.asarray(baseline_dv, dtype="float64")
-        age = np.asarray(age, dtype="float64")
-
-        # Names an order of magnitude below the median are not cheap, they are untradeable.
-        keep = recent_dv >= LIQUIDITY_FLOOR * float(np.median(recent_dv))
-        if int(keep.sum()) < MIN_UNIVERSE:
-            return {}
-        names = [name for name, alive in zip(names, keep) if alive]
-        skew = [value for value, alive in zip(skew, keep) if alive]
-        recent_dv, baseline_dv, age = recent_dv[keep], baseline_dv[keep], age[keep]
-
-        # --- Event: the weekly membership transition, reconstructed from the tape ------------
-        # Trailing-week notional rank minus the same symbol's rank over the preceding three
-        # weeks. Positive means climbing into the universe, negative means falling out of it.
-        rank_change = np.zeros(len(names), dtype="float64")
-        has_baseline = np.isfinite(baseline_dv)
-        indices = np.where(has_baseline)[0]
-        if indices.size >= 4:
-            rank_change[indices] = _pct_rank(recent_dv[indices]) - _pct_rank(baseline_dv[indices])
-
-        # A symbol too young to have a baseline is a fresh member by construction. Its event
-        # weight decays linearly to zero over the holding horizon.
-        recency = np.clip(1.0 - age / float(horizon), 0.0, 1.0)
-
-        intensity = np.maximum(np.abs(rank_change), recency)
-        # Smooth top-half gate: zero weight and zero derivative at the median, so no name sits on
-        # a threshold that a small perturbation could flip.
-        event = np.clip((_pct_rank(intensity) - 0.5) * 2.0, 0.0, 1.0) ** 2
-
-        # --- State: crowdedness of leveraged positioning -------------------------------------
-        funding_means = _funding_means(
-            getattr(context, "funding", None), names, FUNDING_ROWS_PER_WEEK
+        latest = max(int(prep["t"][-1]) for prep in prepared)
+        funding = _funding_map(
+            getattr(context, "funding", None), latest - int((tail + 8) * spacing)
         )
-        funding = np.asarray(
-            [funding_means.get(name, np.nan) for name in names], dtype="float64"
-        )
-        crowding = 0.5 * _robust_z(funding) + 0.5 * _robust_z(np.asarray(skew, dtype="float64"))
+        for prep in prepared:
+            times, cumulative = funding.get(prep["symbol"], (_EMPTY_TIMES, _EMPTY_CUM))
+            prep["ft"] = times
+            prep["fc"] = cumulative
 
-        # --- Book: short the crowded side of a transition, long the uncrowded side ------------
-        selected = np.where(event > 0.0)[0]
-        if selected.size < MIN_BOOK:
+        count = len(prepared)
+        numerator = np.zeros(count)
+        denominator = np.zeros(count)
+        liquidity = np.full(count, np.nan)
+
+        # Linear-decay holding kernel: the book at each decision is the decayed average of
+        # the books the same rules would have chosen over the past H weeks. Recomputed from
+        # scratch every time, so it carries no state and cannot see forward.
+        for lag in lags:
+            kernel = 1.0 - lag / float(horizon)
+            if kernel <= 0.0:
+                continue
+            surge = np.full(count, np.nan)
+            level_now = np.full(count, np.nan)
+            level_prior = np.full(count, np.nan)
+            seasoning = np.full(count, np.nan)
+            taker = np.full(count, np.nan)
+            carry = np.full(count, np.nan)
+            present = np.zeros(count, dtype=bool)
+
+            for i, prep in enumerate(prepared):
+                end = prep["m"] - lag
+                if end < 2 * week:
+                    continue
+                measured = _features_at(prep, end, week, state_win)
+                if measured is None:
+                    continue
+                present[i] = True
+                surge[i], level_now[i], level_prior[i], taker[i], carry[i], liq = measured
+                seasoning[i] = -float(prep["n_full"] - lag)
+                if lag == 0:
+                    liquidity[i] = liq
+
+            if int(present.sum()) < _MIN_NAMES:
+                continue
+
+            # Inclusion / attention intensity: rank crossing, dollar-volume surge, and how
+            # newly the contract exists at all. High = entrant, low = leaver.
+            event = (
+                _rank_unit(surge)
+                + _rank_unit(_rank_crossing(level_now, level_prior))
+                + _rank_unit(seasoning)
+            ) / 3.0
+            event = _rank_unit(np.where(present, event, np.nan))
+
+            # Crowdedness of leveraged positioning: what the crowd pays to hold the
+            # position, and which side is lifting. High = crowd is levered long.
+            crowd = (_rank_unit(carry) + _rank_unit(taker)) / 2.0
+            crowd = _rank_unit(np.where(present, crowd, np.nan))
+
+            numerator += np.where(present, kernel * (-event * crowd), 0.0)
+            denominator += np.where(present, kernel, 0.0)
+
+        active = denominator > 0.0
+        if int(active.sum()) < _MIN_NAMES:
             return {}
+        score = np.zeros(count)
+        score[active] = numerator[active] / denominator[active]
 
-        scores = event[selected] * (-crowding[selected])
-        scores = scores - float(scores.mean())
-        if float(np.abs(scores).sum()) <= 0.0:
+        # Tilt the book toward the half of the cross-section that can absorb it. Entrants
+        # and leavers are the widest names in the universe; this is where the cost gate is
+        # won or lost.
+        liquid = (_rank_unit(liquidity) + 1.0) / 2.0
+        raw = score * (_LIQ_FLOOR + (1.0 - _LIQ_FLOOR) * liquid)
+
+        index = np.flatnonzero(active)
+        book = raw[index]
+        book = book - book.mean()
+        spread = float(book.std())
+        if not spread > 0.0:
             return {}
+        book = book / spread
 
-        weights = _cap_net(_shape_book(scores, GROSS_TARGET, MAX_WEIGHT), NET_LIMIT)
+        # Soft threshold: spend turnover only on conviction, and do it continuously so
+        # small perturbations move weights smoothly instead of flipping names in and out.
+        magnitude = np.abs(book)
+        keep = min(book.size, _TARGET_NAMES)
+        floor = float(np.sort(magnitude)[-keep])
+        cut = min(_SOFT_THRESHOLD, floor)
+        book = np.sign(book) * np.maximum(magnitude - cut, 0.0)
 
-        book = {}
-        for position, weight in zip(selected, weights):
-            value = float(weight)
-            if np.isfinite(value) and abs(value) >= DUST_WEIGHT:
-                book[names[position]] = value
-        return book if len(book) >= MIN_BOOK else {}
+        longs = float(book[book > 0.0].sum())
+        shorts = float(-book[book < 0.0].sum())
+        if not longs > 0.0 or not shorts > 0.0:
+            return {}
+        if longs > shorts:
+            book[book > 0.0] *= shorts / longs
+        elif shorts > longs:
+            book[book < 0.0] *= longs / shorts
+
+        gross = float(np.abs(book).sum())
+        if not gross > 0.0:
+            return {}
+        weights = np.clip(book / gross, -_MAX_WEIGHT, _MAX_WEIGHT)
+
+        total = float(np.abs(weights).sum())
+        if not total > 0.0:
+            return {}
+        if total > 1.0:
+            weights = weights / total
+        net = float(weights.sum())
+        if abs(net) > _MAX_NET:
+            side = weights > 0.0 if net > 0.0 else weights < 0.0
+            heavy = float(np.abs(weights[side]).sum())
+            if heavy > 0.0:
+                weights[side] *= max(0.0, 1.0 - (abs(net) - _MAX_NET) / heavy)
+
+        targets = {}
+        for position, i in enumerate(index):
+            weight = float(weights[position])
+            if np.isfinite(weight) and abs(weight) > _DUST:
+                targets[prepared[i]["symbol"]] = weight
+        if len(targets) < _MIN_NAMES:
+            return {}
+        return targets
 
 
 def build_strategy():

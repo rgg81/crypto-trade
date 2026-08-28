@@ -1,139 +1,185 @@
-# team-10 — taker-flow pressure · discovery candidate
+# team-10 — taker-flow pressure — refinement candidate
 
-**Configuration:** `N = ratio`, `L = 3`, `W = 90`, `C = none`, `X = ts z + cross-sectional demean`.
-One cell of the 128-point surface declared in `scouting/THESIS.md` §5.1. Nothing outside that surface
-is varied, and nothing inside it has been fitted — there is no data in this lane yet.
+**Mandate:** aggressor imbalance as a signal about who is pressing and where the pressure resolves.
+**Preregistered thesis:** `lane/scouting/THESIS.md`, sealed 2026-08-26.
+**Evidence in hand:** one packet, `t01`, which is the *unmodified organizer seed* — not my signal.
 
 ---
 
-## 1. What the book is
+## 1. What t01 actually tells me
 
-At every decision boundary, for each eligible symbol with a full standardization window:
+t01 is the seed, so it carries no information about whether taker flow predicts anything. What it
+does carry is a calibration of the machine I have to survive, and that is worth more than a Sharpe.
 
-1. **Aggressor imbalance per bar.** `imb_t = (2·taker_buy_quote_t − quote_volume_t) / quote_volume_t`,
-   in `[−1, +1]`. Bars with no trade contribute `0` (§5.3.8).
-2. **Accumulate** over `L = 3` bars — one calendar day.
-3. **Standardize** against the trailing `W = 90` bar distribution of that same accumulated series,
-   strictly trailing, `min_periods` full. Winsorize at ±3σ (§5.3.3).
-4. **Demean across the cross-section** at that timestamp.
-5. **Map linearly** into weights: `w ∝ +z̃`, normalized to gross 1.0, per-symbol cap water-filled at
-   0.10, residual net trimmed. No thresholds, no gates, no regime switches, no stops.
+**The cost rate is recoverable, and two independent routes agree.**
 
-Rebalance every bar. Symbols without 92 bars of history are excluded — that is the `min_periods` rule,
-not a liquidity screen.
+| route | arithmetic | implied cost per unit turnover |
+|---|---|---|
+| density × cost share | `2.1509 bps × 3.4869` | **7.500 bps** |
+| the 1x/3x pair | `ln(1−0.2400) = −0.2744`; `ln(1−0.6434) = −1.0304`; `Δ = 0.7560` over 2 cost units → `0.3780/yr`; `÷ 502.91` | **7.52 bps** |
 
-## 2. The mechanism
+Both land on **≈7.5 bps charged per unit of turnover at 1x**. Back out the rest:
 
-Binance reports the aggressor side per kline. It is not inferred by a tick rule or by bulk volume
-classification, so the measurement-error haircut that sits under every equity order-flow-imbalance
-result is zero here [C9, C10]. That is the structural reason this lane is worth running at all.
+- gross return ≈ `−0.2744 + 0.3780 = 0.1036` → **≈10.4%/yr gross** on 10.87% realised vol,
+  i.e. a **gross Sharpe of about 0.95**;
+- cost bill ≈ `502.91 × 7.5 bps` = **37.7%/yr**.
 
-Every taker buy is matched by a maker sell. `imb_t > 0` is therefore an accounting statement, not a
-mood reading: **the intermediary sector absorbed `imb_t · quote_volume_t` of unwanted short inventory
-during that bar.** The signal is a direct read on an inventory shock imposed on liquidity providers,
-in the direction it was imposed.
+**The seed did not fail for lack of edge. It failed because it traded 503 times a year.** Every
+structural gate passed — breadth 24.7, mean gross 1.0, long share 0.5001 vs short 0.4999, active bar
+fraction 1.0. The four gates it failed (`turnover_ceiling`, `gross_edge_density`, `cost_share`,
+`survives_triple_cost`) are one failure wearing four names: a cost failure.
 
-That shock resolves two ways, and they point opposite (§1.2). Uninformed immediacy demand is paid for
-with a price concession that reverts — fade it. Informed flow does not revert, it continues — follow
-it. Aggressor imbalance is a mixture of the two, so its unconditional sign is not a constant. The
-mandate's phrase "where the pressure resolves" *is* the question of which component dominates.
+**This is a design problem, not a parameter problem,** and the phase guidance is right to insist on
+the distinction. Write the gate algebraically. With holding period `H` bars, per-name per-bar signed
+return `μ`, and gross pinned near 1:
 
-**This candidate deliberately does not answer that question.** It is the `C = none` corner: the
-unconditional signal, sign preset to *follow*, because Kim & Hansen (2026) is the only published
-result matched to this venue, this contract family and this horizon, and it finds taker-initiated
-imbalance predicting returns with strongest effects at 4–12 hours [C1]. The 8h bar sits at the centre
-of that window. The three conditioners that are supposed to resolve the mixture — absorption, funding,
-composition — are declared in §5.2 and held back for later phases, because a conditioned book I cannot
-diagnose is worth less than an unconditional one I can.
+```
+turnover T ≈ 2190 / H          density d ≈ μ·H / 2          cost_share = 7.5 bps / d
+```
 
-### Why this horizon is not arbitrary
+Triple-cost survival needs `d > 22.5 bps`, i.e. `μ·H > 45 bps`. At a *plausible* per-bar per-name
+edge of 2–3 bps — an information coefficient under 1% against ~3% bar volatility — that forces
+**H ≈ 15–30 bars**. There is no value of `μ` a real 8h flow signal can attain that rescues a book
+rebalancing every bar: at `H = 2` you would need `μ = 22 bps` per bar per name, an IC near 0.075,
+which my own tripwire §4.2 says I should read as a bug rather than alpha.
 
-Funding settles at 00:00/08:00/16:00 UTC and the 8h kline is published on the same grid [C8, C9]. The
-bar is one full cycle of the market's own inventory-financing mechanism. `L = 3` spans exactly all
-three daily settlements, which also means the signal cannot be a single-stamp calendar artifact by
-construction — the §4.1 tripwire is closed mechanically rather than by inspection.
+**The cost structure of this tournament structurally forbids a fast book at 8h decisions.** That is
+the diagnosis. My thesis anticipated it in tripwire §4.5 — *"if the cost model is not binding … taker
+fees of ~0.05% per side dominate any plausible 8h edge"* — and t01 proves the cost model is binding
+by a factor of 3.5. The tripwire fires. I act on it.
 
-### Why cross-sectional demeaning
+---
 
-The mandate is about *relative* pressure — who is being pressed harder than whom. Demeaning also makes
-the book two-sided by construction, which is what the exposure-side gates measure, and keeps net
-exposure near zero without me touching the organizer's risk unit.
+## 2. The mechanism, unchanged
 
-## 3. Who is on the other side
+Binance publishes `taker_buy_quote_volume` per kline: the exchange's own ledger of which side crossed
+the spread. Every taker buy is matched by a maker sell, so
 
-Mechanically, resting limit orders. Economically:
+```
+imb_t = (2·taker_buy_quote_t − quote_volume_t) / quote_volume_t
+```
 
-- **Market makers and HFT desks**, earning spread and the maker fee advantage, who warehouse
-  uninformed flow and flee informed flow.
-- **Cash-and-carry basis desks**, structurally short the perp against spot to harvest funding, and
-  therefore the natural absorber of taker buy pressure. He et al. show this sector is balance-sheet
-  constrained and that the constraint is common across coins [C7].
-- **Delta-hedging desks**, whose perp leg is a hedge and not a view.
+is an accounting statement — the intermediary sector absorbed `imb_t · quote_volume_t` of unwanted
+inventory in that bar, in the direction it was imposed. Unlike the entire equity order-flow-imbalance
+literature, which runs on *estimated* trade signs (tick rule, Lee-Ready, BVC), this measurement
+carries no classification-error haircut.
 
-The aggressor side skews the other way: leveraged directional traders for whom the perpetual is the
-cheapest available leverage and who need to be filled *now*. Binance taker fees (~0.05%) are strictly
-worse than maker fees (~0.02%); anyone appearing in the `taker_buy_*` field **chose** to pay a premium
-for speed over price. That revealed preference is the economic content of the signal.
+The forward payoff of that shock is a **mixture of two components that resolve in opposite
+directions**: an immediacy/inventory premium that reverts (the maker did not want the position and is
+paid to carry it), and an adverse-selection component that continues (some aggressor flow is
+informed, and informed flow does not revert). The unconditional sign is therefore not a constant.
+The whole bet is that the mixing weight is observable from fields this dataset contains:
 
-When this book follows an aggressor imbalance, it is pricing in information the maker sector also sees
-but cannot fully requote against inside an 8h window, and it collects an information rent. Either way
-the payment comes from the same leveraged taker.
+| conditioner | observable | preset sign — **fixed by mechanism, never estimated** |
+|---|---|---|
+| `none` | — | follow the flow |
+| `absorption` | price response per unit flow | high response → informed → follow; low → absorbed → fade |
+| `funding` | trailing funding rate | rich → crowded and financed → fade; cheap → fresh → follow |
+| `composition` | `log(quote_volume / trade_count)` | large average trade → metaorder → follow; small → crowd → fade |
 
-## 4. What would falsify it
+The 8h bar boundary *is* the funding clock (00:00/08:00/16:00 UTC), which is why funding is the
+natural stock variable for this flow signal rather than an unrelated carry cost.
 
-The preregistered falsifier (§3) is an **incremental-information** test, not a Sharpe test, and it is
-aimed at the failure mode I consider most likely: taker-buy share and the same bar's return are
-near-mechanically linked, so a raw flow signal can be a momentum or reversal signal in a flow costume.
+### Who is on the other side
 
-- **F1** — residualized against contemporaneous return, the `L` lagged returns, and contemporaneous
-  `log(quote_volume)`: `|IC| < 0.010` or Newey–West `t < 2.5` ⇒ falsified.
-- **F2** — if orthogonalizing against that control set destroys more than half the forward information
-  (`|IC(s̃)| < 0.50·|IC(s)|`) ⇒ falsified even if F1 passes.
-- **F3** — sign of `IC(s̃)` must agree across three contiguous equal slices of the visible window.
+Mechanically, resting limit orders. Economically: professional market makers and HFT desks earning
+spread plus the maker-fee advantage; cash-and-carry basis desks structurally short the perp against
+spot, harvesting funding, and therefore the natural absorber of taker buy pressure; delta-hedging
+desks whose perp leg is a hedge; and funding-carry funds. The aggressor side skews to leveraged
+directional traders — retail and momentum-chasing programs — for whom the perpetual is the cheapest
+available leverage and who need filling *now*. Binance taker fees (~5 bps) are strictly worse than
+maker fees (~2 bps): **anyone appearing in the taker-buy field revealed a preference for speed over
+price.** That revealed preference is the economic content of the signal. When I fade the imbalance I
+rent balance sheet to an intermediary sector short of capacity and am paid an immediacy premium; when
+I follow it I price information the maker sector cannot fully requote against inside 8h and am paid
+an information rent. Both are payments from the same leveraged taker.
 
-I expect **F3 to be the hardest for this particular candidate**, and I am saying so before the packet
-arrives. The whole thesis is that the *unconditional* sign is a mixture and only the *conditioned*
-signal has a stable sign. A `C = none` book failing F3 is evidence *for* the conditioning programme,
-not against the family. A `C = none` book failing **F1** is different — that is the family itself
-coming apart, and it is the outcome Kim & Hansen's own two-stage decomposition warns about: by 8–12h
-most of what imbalance knows may already be spanned by observable price-volume state [C1].
+---
 
-### Tripwires on a *passing* result
+## 3. What the book does
 
-- Residualized `|IC| > 0.10` at 8h on a public field ⇒ my first hypothesis is lookahead, not alpha.
-- If returns plus `quote_volume` alone reproduce ≥80% of the IC, the aggressor field is not doing the
-  work [C4].
-- If dropping the single largest-contributing symbol sinks pooled IC below F1, this is one asset's
-  history, not a family.
+Per decision, entirely from past-only rows, no state carried across calls:
 
-### Expected magnitude
+1. **Panel.** Align every eligible symbol on the `open_time` *column* — never the positional
+   `RangeIndex` — into one 460-bar cube of `close`, `quote_volume`, `taker_buy_quote_volume`,
+   `trade_count`. A symbol needs 130 bars to be held at all.
+2. **Flow.** Both declared normalisations: `ratio` = `imb_t`, and `trailing` = flow over a *strictly
+   lagged* EWMA of quote volume, the scale-matched fork that avoids multiplying the signal by inverse
+   turnover. Zero-volume bars set the flow to exactly 0, never interpolated.
+3. **Accumulate and standardise.** `L ∈ {9, 21}` bars, trailing z over `W ∈ {90, 360}` bars,
+   min_periods = full window, winsorised at ±3σ.
+4. **Condition.** Multiplicative, no gates or thresholds, all four conditioners at equal weight with
+   their preset signs; a conditioner that is unobservable for a symbol-bar simply drops out of that
+   average rather than voiding the name.
+5. **Ensemble.** Equal weight over all `N × L × W` combinations — 8 of them, each carrying the
+   4-conditioner average. **There is no selection step anywhere in this file.**
+6. **Residualise.** Pooled trailing cross-sectional OLS of the ensemble on the contemporaneous state:
+   accumulated standardised return, single-bar standardised return, and log quote volume — all
+   per-timestamp demeaned, all observable at the same instant as the signal, no forward return
+   anywhere. This is the team falsifier compiled into the book: what trades is only the part of taker
+   imbalance that is *not* a restatement of the bar that produced it.
+7. **Low-pass.** Exponential filter, 12-bar half-life over a 48-bar window. This is the turnover
+   control and it is the one substantive change from the seed's geometry.
+8. **Book.** Cross-sectionally demean, winsorise at ±3σ, scale to gross 1.0, clip |w| ≤ 0.10 with
+   renormalisation, net ≈ 0 by construction. Every eligible symbol appears explicitly, at 0.0 if not
+   held, so exits are stated rather than inferred.
 
-Small and conditional. The immediacy premium is competed down, not arbitraged away, but this is the
-most capacity-constrained, fastest-decaying family there is, and CVD is a retail charting staple. **A
-large unconditional edge here is a bug report, not a result.**
+### Why the filter is a cost response and not a hill-climb
 
-## 5. What this candidate is not
+I have **no return feedback on my own signal** — t01 is the organizer's book. The half-life was not
+chosen against any Sharpe, IC, or drawdown, because I have observed none. It is solved from the cost
+constant recovered in §1 and the filter algebra: cascading an `L`-bar boxcar with an exponential of
+half-life `h` gives a per-bar relative position change of ≈7–9%, i.e. **annualised turnover of
+roughly 50–90 against the seed's 503**, and that is the range where `cost_share` and triple-cost
+survival stop being the binding constraints. The lever was picked by arithmetic on an observable that
+is independent of returns. I record it as a **fixed** choice, not a searched knob, so my
+deflated-Sharpe trial count stays at the preregistered **128**.
 
-- Not vol-targeted. Gross is constant at 1.0 and the organizer's ex-ante risk unit governs.
-- No fitted parameters, no embedded data, no persistent state, no RNG, no symbol identity, no date
-  literals. The signal is a ratio of a ratio, so it is invariant to price and volume scale.
-- Not residualized in-book. Residualization is my *test* (§3), not a declared knob (§5.1); trading a
-  residualized signal would be outside the sealed surface.
-- Not selected on anything. This is the first candidate of the lane and no result has been observed.
+Two deviations from §5.1/§5.2, both declared rather than quietly taken:
 
-## 6. What the next trial depends on
+- **`L ∈ {1, 3}` dropped.** Not on performance — on the §4.5 tripwire, which fired. A book at that
+  speed cannot clear a 7.5 bps/turnover charge at any credible `μ`.
+- **`X` (cross-sectional treatment) collapses to level 2.** Time-series-z-only cannot satisfy
+  `|net| ≤ 0.25` or the both-sides-used gate as a standalone book; it would be clipped into something
+  I did not design. Structural, not a preference.
 
-Strictly the packet, and strictly through the falsifier:
+Everything else holds: preset signs, symmetric buy/sell treatment, one parameter set for the whole
+universe, no per-symbol tuning, no volatility targeting (the organizer owns the risk unit), no
+thresholds, no stop-losses, and the conditioner forms as written.
 
-- F1 fails ⇒ report the mandate falsified and nominate the unmodified seed (§3, commitment on failure).
-- F1 passes, F3 fails ⇒ exactly the predicted signature. Move to the conditioners `absorption`,
-  `funding`, `composition` with signs already preset in §3, and test whether conditioning stabilizes
-  the sign.
-- F1 and F3 pass ⇒ check F2, then vary `L` and `W` inside the declared grid and check turnover against
-  the cost model per §4.5.
+Nomination rule §5.4 said: equal-weight every configuration that passes F1/F2/F3. **The feedback
+packet reports no IC, no residualised IC, and no sign-stability split, so F1/F2/F3 are not evaluable
+with the evidence I have.** The only non-selective reading of my own commitment is therefore to
+nominate the *whole* surface at equal weight. Subsetting it on anything else would be the
+pick-the-best-backtest step my preregistration exists to delete.
 
-Signs are preset by mechanism throughout. If the data prefer the opposite sign, that is a falsification
-of this thesis, not a parameter to flip. Trial count for deflation purposes is the declared **128**
-regardless of how many cells are charged.
+---
 
-*Citation tags [C1]–[C13] refer to `scouting/THESIS.md` §6.*
+## 4. What would falsify this
+
+Stated before the packet, so the next reading is a test and not a search.
+
+**Predicted metrics.** `annualised_turnover` 40–110 (design point ≈65); `mean_gross_exposure` ≈1.0;
+`median_effective_breadth` 25–40; long/short exposure share ≈50/50; `active_bar_fraction` ≈1.0.
+
+- **If turnover comes back above ~150**, my filter algebra is wrong. That is a structural fix — more
+  low-pass, or a slower accumulation — not a reason to touch the signal.
+- **If turnover lands in band but `gross_edge_bps_per_turnover` is below ~5 bps**, the residualised
+  flow signal has no per-trade edge at this horizon. That is F1 and F2 failing in substance: taker
+  imbalance at 8h is spanned by the price-volume state, exactly as the closest horizon-matched
+  published result warns. **I nominate the unmodified seed and report the mandate falsified.** I do
+  not flip the sign and re-submit — the signs are preset by mechanism, and a preferred opposite sign
+  falsifies the thesis rather than parameterising it.
+- **If the book earns at a rate consistent with a sign error** — meaningfully negative net return
+  with turnover in band and density materially non-zero — that is the same falsification with the
+  opposite arithmetic, and it gets the same answer.
+- **If `median_effective_breadth` collapses or one side of the book empties**, it is not a portfolio
+  and it is not a marginal candidate.
+- **If density looks implausibly good** — residualised performance implying |IC| > 0.10 at 8h on a
+  public field — tripwire §4.2 says my first hypothesis is lookahead, and I audit before nominating.
+
+The honest summary of the risk: I have moved the effective holding period to roughly 1–2 weeks
+because the cost model leaves no alternative, while the evidence closest to my horizon locates the
+taker-imbalance effect at 4–12 hours. The conditioners and the residualisation are the reason to
+think something survives the aggregation. If nothing does, the mandate is falsified on visible data,
+and retiring to the seed is a result rather than a forfeit.

@@ -1,185 +1,177 @@
-"""team-11 discovery candidate — participant mix via average trade size.
+"""team-11 -- participant mix from average trade size.
 
-This is the primary expression of the preregistered thesis (THESIS.md §1.5) at the central
-setting of the declared parameter surface (§4.1). Nothing clever is attempted here: the point
-of the discovery trial is a baseline whose every moving part can be diagnosed from one feedback
-packet.
+Economic family: microstructure and participation.
 
-    S_t   = quote_volume_t / trade_count_t              average USD notional per print
-    Z_t   = winsor( trailing z-score of log S_t , 3 )   within-asset participant mix
-    OFI_t = 2 * taker_buy_quote_volume_t / quote_volume_t - 1        signed taker flow
-    signal_t = mean_k(OFI) * mean_k(Z)                  sign pre-committed positive
+Average trade size S = quote_volume / trade_count is the notional that rode on each print.
+log S == log V - log N exactly, so S is the *composition* of trading, orthogonal in direction to
+the *scale* of trading that a volume factor loads on. S is unsigned, so it cannot set a direction
+on its own; it conditions the sign of taker order flow, which is the one signed participation
+variable this dataset exposes.
 
-Both Z and OFI are within-asset and unit-free, so the book carries no level of S anywhere —
-which is the whole point (§4.3, failure mode #3). The signature property of the mechanism is
-that when average trade size sits at its own trailing median the position is zero no matter
-how large volume is; a volume proxy cannot have that property.
+Long  when large prints accompany net taker buying   (professional accumulation -> continuation).
+Short when small prints accompany net taker buying   (retail chasing            -> reversal).
 
-Declared settings used, all central values of §4.1:
-    knob 1 normalisation   = trailing z-score
-    knob 2 window W        = 90 bars (30 days)
-    knob 3 smoothing k     = 3 bars (1 day), applied to both Z and OFI
-    knob 4 contrast        = Z = normalize_W(log S)
-    knob 5 cross-section   = time-series, own-asset only (no cross-sectional demeaning)
-
-No volatility targeting anywhere: the signal emits a unitless conviction and the organizer's
-common ex-ante risk unit does all scaling. The caps applied below are the contract's exposure
-constraints, not a risk target.
+Both inputs are measured only as within-asset deviations from their own trailing distribution,
+never as levels and never as raw cross-sectional ranks, so the book cannot become a size or
+liquidity factor in disguise.
 """
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 import pandas as pd
 
-# --- declared parameter surface (THESIS.md §4.1), at its central setting ---------------
-_WINDOW = 90            # knob 2: trailing window for the z-score, in 8h bars (30 days)
-_SMOOTH = 3             # knob 3: smoothing of both Z and OFI, in 8h bars (1 day)
+# --- Signal construction -------------------------------------------------------------------
+NORM_WINDOW = 180   # 60d: trailing distribution for the within-asset z-score
+NORM_MIN = 90       # 30d: shortest trailing window accepted
+SMOOTH = 45         # 15d: conviction smoothing -- this is the turnover budget knob
+BURN_IN = 30        # declared hygiene: discard a listing's first 30 bars
+CLIP = 3.0          # declared winsorisation, in SD
 
-# --- fixed by preregistration (THESIS.md §4.3), not knobs -----------------------------
-_WARMUP = 30            # hygiene: ignore the first 30 bars after an asset's first observation
-_WINSOR = 3.0           # position map is clipped linear at 3 SD; |OFI| <= 1 bounds the product
+MIN_ROWS = BURN_IN + NORM_MIN + SMOOTH   # 165 bars ~ 55 days of clean history
+TAIL_ROWS = NORM_WINDOW + SMOOTH         # all that the last z-value can depend on
 
-# --- exposure constraints owned by the contract, not by the thesis --------------------
-_MAX_WEIGHT = 0.10      # per-symbol
-_MAX_NET = 0.25         # absolute net
-_TARGET_GROSS = 1.0     # sum of absolute weights
+# --- Rebalance cadence ---------------------------------------------------------------------
+# 9 bars = 3 days = 9 funding epochs. The decision grid is 8h; trading it is not affordable.
+REBALANCE_EVERY = 9
 
-_REQUIRED_COLUMNS = ("quote_volume", "trade_count", "taker_buy_quote_volume")
+# --- Portfolio construction ----------------------------------------------------------------
+MAX_WEIGHT = 0.09   # inside the 0.10 per-symbol cap
+MAX_GROSS = 1.0
+MAX_NET = 0.20      # inside the 0.25 net cap
+MIN_NAMES = 12
+DUST = 2e-4
 
 
-def _usable_history(frame):
-    """Return ``(log_size, ofi)`` for one symbol's usable history, or ``None``.
+def _last_smoothed_z(values: np.ndarray) -> float | None:
+    """Mean of the last SMOOTH trailing z-scores of ``values``; None if not identified.
 
-    Applies the preregistered hygiene rule: skip the first ``_WARMUP`` bars after the asset's
-    first observation, then drop any bar with no trades or no quote volume. Both outputs are
-    ordered oldest to newest and aligned to the same surviving bars.
+    The z-score is taken first and smoothed second, so the trailing scale is estimated from
+    NORM_WINDOW raw observations rather than from a handful of overlapping averages.
     """
-    if frame is None or len(frame) <= _WARMUP:
+    if values.shape[0] < NORM_MIN + SMOOTH:
         return None
-    columns = frame.columns
-    for name in _REQUIRED_COLUMNS:
-        if name not in columns:
+    series = pd.Series(values[-TAIL_ROWS:], dtype="float64")
+    roll = series.rolling(NORM_WINDOW, min_periods=NORM_MIN)
+    scale = roll.std(ddof=0)
+    z = (series - roll.mean()) / scale.where(scale > 0.0)
+    tail = z.to_numpy()[-SMOOTH:]
+    tail = tail[np.isfinite(tail)]
+    if tail.shape[0] * 3 < SMOOTH * 2:
+        return None
+    value = float(tail.mean())
+    if not math.isfinite(value):
+        return None
+    return float(np.clip(value, -CLIP, CLIP))
+
+
+def _conviction(frame) -> float | None:
+    """Signed conviction for one symbol: smoothed z(taker imbalance) x smoothed z(log trade size)."""
+    if not isinstance(frame, pd.DataFrame) or frame.empty:
+        return None
+    for column in ("quote_volume", "trade_count", "taker_buy_quote_volume"):
+        if column not in frame.columns:
             return None
+    if "open_time" in frame.columns:
+        frame = frame.sort_values("open_time", kind="mergesort")
 
-    tail = frame.iloc[_WARMUP:]
-    quote = pd.to_numeric(tail["quote_volume"], errors="coerce").to_numpy(dtype=float)
-    trades = pd.to_numeric(tail["trade_count"], errors="coerce").to_numpy(dtype=float)
-    taker_buy = pd.to_numeric(tail["taker_buy_quote_volume"], errors="coerce").to_numpy(dtype=float)
+    quote = pd.to_numeric(frame["quote_volume"], errors="coerce").to_numpy(dtype="float64")
+    count = pd.to_numeric(frame["trade_count"], errors="coerce").to_numpy(dtype="float64")
+    taker = pd.to_numeric(frame["taker_buy_quote_volume"], errors="coerce").to_numpy(dtype="float64")
 
-    live = (
-        np.isfinite(quote)
-        & np.isfinite(trades)
-        & np.isfinite(taker_buy)
-        & (quote > 0.0)
-        & (trades > 0.0)
+    usable = (
+        np.isfinite(quote) & np.isfinite(count) & np.isfinite(taker)
+        & (quote > 0.0) & (count > 0.0)
     )
-    if not live.any():
+    quote, count, taker = quote[usable], count[usable], taker[usable]
+    if quote.shape[0] < MIN_ROWS:
         return None
-    quote, trades, taker_buy = quote[live], trades[live], taker_buy[live]
+    quote, count, taker = quote[BURN_IN:], count[BURN_IN:], taker[BURN_IN:]
 
-    log_size = np.log(quote / trades)
-    ofi = np.clip(2.0 * (taker_buy / quote) - 1.0, -1.0, 1.0)
-    return log_size, ofi
+    # Composition: USD notional per print. Scale-equivariant once z-scored.
+    size = np.log(quote / count)
+    # Direction: net taker imbalance in [-1, +1]. Scale-invariant by construction.
+    flow = 2.0 * np.clip(taker / quote, 0.0, 1.0) - 1.0
 
-
-def _trailing_z(series, end, window):
-    """Winsorised z-score of ``series[end - 1]`` against the ``window`` bars ending at ``end``."""
-    sample = series[end - window:end]
-    scale = float(sample.std(ddof=1))
-    if not np.isfinite(scale) or scale <= 0.0:
+    z_size = _last_smoothed_z(size)
+    z_flow = _last_smoothed_z(flow)
+    if z_size is None or z_flow is None:
         return None
-    score = (float(series[end - 1]) - float(sample.mean())) / scale
-    if not np.isfinite(score):
+    return float(np.clip(z_flow * z_size, -CLIP, CLIP))
+
+
+def _weights(convictions: dict[str, float]) -> dict[str, float] | None:
+    """Cross-sectionally demeaned conviction -> signed, capped, net-zero weights.
+
+    The signed square root is portfolio construction, not signal: the conviction is a product of
+    two z-scores and is therefore leptokurtic with a peak at zero, which concentrates a linear
+    book into a handful of names. The compression is monotone and odd, so it preserves the
+    ordering and the zero -- a name sitting at its own trailing median still gets no weight.
+    """
+    symbols = sorted(convictions)
+    raw = np.array([convictions[s] for s in symbols], dtype="float64")
+    centred = raw - raw.mean()
+
+    tilt = np.sign(centred) * np.sqrt(np.abs(centred))
+    tilt = tilt - tilt.mean()
+    gross = float(np.abs(tilt).sum())
+    if not math.isfinite(gross) or gross <= 0.0:
         return None
-    return float(np.clip(score, -_WINSOR, _WINSOR))
 
-
-def _conviction(log_size, ofi, window, smooth):
-    """Signed conviction ``mean_k(OFI) * mean_k(Z)`` at the latest bar, or ``None``."""
-    count = log_size.size
-    if count < window + smooth - 1:
+    weights = tilt / gross
+    weights = np.clip(weights, -MAX_WEIGHT, MAX_WEIGHT)
+    weights = weights - weights.mean()
+    gross = float(np.abs(weights).sum())
+    if not math.isfinite(gross) or gross <= 0.0:
         return None
+    weights = weights / gross
 
-    total = 0.0
-    for lag in range(smooth):
-        score = _trailing_z(log_size, count - lag, window)
-        if score is None:
+    # Scale down by whichever constraint binds; the organizer owns the risk unit, not me.
+    denom = max(
+        1.0,
+        float(np.abs(weights).max()) / MAX_WEIGHT,
+        float(np.abs(weights).sum()) / MAX_GROSS,
+        abs(float(weights.sum())) / MAX_NET,
+    )
+    weights = weights / denom
+
+    book: dict[str, float] = {}
+    for symbol, weight in zip(symbols, weights):
+        value = float(weight)
+        if not math.isfinite(value):
             return None
-        total += score
-    mix = total / smooth
-
-    flow = float(np.mean(ofi[count - smooth:]))
-    if not np.isfinite(flow):
-        return None
-
-    # |flow| <= 1 and |mix| <= _WINSOR, so the product is already inside the +/-3 clip.
-    return flow * mix
-
-
-def _cap_net(weights):
-    """Scale down the dominant side until absolute net exposure respects the contract."""
-    net = float(weights.sum())
-    if not np.isfinite(net) or abs(net) <= _MAX_NET:
-        return weights
-
-    longs = weights > 0.0
-    shorts = weights < 0.0
-    long_gross = float(weights[longs].sum())
-    short_gross = float(-weights[shorts].sum())
-
-    capped = weights.copy()
-    if net > _MAX_NET and long_gross > 0.0:
-        capped[longs] = weights[longs] * ((_MAX_NET + short_gross) / long_gross)
-    elif net < -_MAX_NET and short_gross > 0.0:
-        capped[shorts] = weights[shorts] * ((_MAX_NET + long_gross) / short_gross)
-    return capped
-
-
-def _to_book(symbols, convictions):
-    """Normalise convictions to a gross-one book, then apply the contract's exposure caps."""
-    raw = np.asarray(convictions, dtype=float)
-    gross = float(np.abs(raw).sum())
-    if not np.isfinite(gross) or gross <= 0.0:
-        return {}
-
-    weights = _cap_net(np.clip(raw / gross * _TARGET_GROSS, -_MAX_WEIGHT, _MAX_WEIGHT))
-    return {
-        symbol: float(weight)
-        for symbol, weight in zip(symbols, weights)
-        if np.isfinite(weight)
-    }
+        book[symbol] = 0.0 if abs(value) < DUST else value
+    return book
 
 
 class ParticipantMixStrategy:
-    """Signed taker flow conditioned on within-asset participant mix.
-
-    Holds no state between decisions: every quantity is recomputed from the past-only rows in
-    the context that is handed to it.
-    """
+    """Stateless: every decision is recomputed from the past-only rows in the context."""
 
     def target_weights(self, context, *, seed):
-        del seed  # nothing here is stochastic; the book is a pure function of the context
-
         bars = context.bars
-        symbols = []
-        convictions = []
+        eligible = context.eligible_symbols
+        if bars is None or eligible is None or len(bars) == 0 or len(eligible) == 0:
+            return None
 
-        for symbol in context.eligible_symbols:
-            if symbol not in bars:
-                continue
-            history = _usable_history(bars[symbol])
-            if history is None:
-                continue
-            signal = _conviction(history[0], history[1], _WINDOW, _SMOOTH)
-            if signal is None or not np.isfinite(signal):
-                continue
-            symbols.append(symbol)
-            convictions.append(signal)
+        # Data-derived cadence counter. Bar history grows by one row per decision, so this
+        # advances with the run without referring to any absolute date.
+        lengths = [len(frame) for frame in bars.values() if frame is not None]
+        if not lengths:
+            return None
+        if max(lengths) % REBALANCE_EVERY != 0:
+            return None  # hold current quantities; no trade, no cost
 
-        if not symbols:
-            return {}
-        return _to_book(symbols, convictions)
+        convictions: dict[str, float] = {}
+        for symbol in eligible:
+            value = _conviction(bars.get(symbol))
+            if value is not None:
+                convictions[symbol] = value
+        if len(convictions) < MIN_NAMES:
+            return None
+
+        return _weights(convictions)
 
 
 def build_strategy():

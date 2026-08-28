@@ -1,197 +1,217 @@
-# team-14 — discovery candidate rationale
+# team-14 — RATIONALE
 
 **Mandate:** time net exposure from cross-sectional breadth and dispersion.
-**What this is:** the *unmodified declared baseline* of `lane/scouting/THESIS.md` §4.4, implemented
-as written. No knob has been searched, no feedback packet exists yet, and no result has been seen.
-This is trial 0 of my declared surface — the thing F2 is supposed to be evaluated *at*, before any
-search, not the output of one.
+**Phase:** refinement. **Prior evidence:** one packet, `t01`, which is the *unmodified organizer
+seed* — not this design. My mechanism has never been run.
 
 ---
 
-## 1. The mechanism
+## 1. What t01 actually told me
 
-A few hundred USD-M perpetuals are not a few hundred independent assets. They are close to one
-common factor plus narrative noise. That is normally a complaint; here it is the premise. If a
-single latent state variable drives the venue — call it risk-bearing capacity, or the arrival and
-withdrawal of leveraged speculative capital — then **each symbol is a noisy measurement of it**, and
-a bounded per-symbol indicator averaged across the cross-section is a better-conditioned estimator
-of that state than the index return, because it is not dominated by the one or two large caps that
-carry a cap- or volume-weighted index.
+t01 is the seed, so it is a reading of the **environment**, not a verdict on my thesis. Read that
+way it is very informative, because it prices the constraint that killed it:
 
-An index return of +2% tells you the factor moved. Breadth tells you **how many measurements agree**.
-Those are different statistics, and only the second distinguishes a move funded by broad capital
-arrival from a move funded by concentrated flow into a handful of names.
+| quantity | value |
+|---|---|
+| gross return before cost | 20.4%/yr (`9.053 bps × 225.10`) |
+| net return | 2.91%/yr |
+| **cost per unit turnover, 1x** | **~7.5 bps** (`0.8284 × 9.053`) |
+| turnover | 225/yr = 0.206 per bar at gross 1.0 |
 
-The book is built from **one primitive, read at two moments**:
+The seed's gross Sharpe is about `20.4 / 11.68 = 1.75`. **Its signal was not the problem.** All
+four failed gates — `turnover_ceiling`, `gross_edge_density`, `cost_share`,
+`survives_triple_cost` — are one number seen four ways: it paid 7.5 bps to buy 9.05 bps.
 
-| | quantity | reads |
-|---|---|---|
-| primitive | `s_i = (close_i / SMA_21(close_i) - 1) / sigma_i` | vol-normalised distance from own trend |
-| 1st moment | `B = mean_i sign(s_i)` | breadth — how many names agree |
-| 2nd moment | `D = xs-std(9-bar returns) / (mean_i sigma_i * sqrt(9))` | dispersion — a correlation proxy |
-| flow | `F = 2 * frac_i(taker-buy quote share > 1/2) - 1` | breadth of buying pressure, not of price |
-| positioning | `C = mean_i funding paid per bar, trailing 9 bars` | how one-sided the leveraged book is |
+That converts the phase guidance into an inequality. Surviving 3x needs
+`gross_edge_bps_per_turnover > 3 × 7.5 = 22.5`; being a *book* rather than a knife-edge needs
+headroom. **Target ≥ 35 bps per unit turnover — a ~4x improvement.**
 
-Dispersion is the complementary half. Under the approximate identity *cross-sectional variance ≈
-average variance × (1 − average pairwise correlation)*, normalised dispersion **is** a correlation
-proxy. Low dispersion means the universe has collapsed onto one factor — what risk-on/risk-off
-deleveraging looks like from the inside. High dispersion means capital is discriminating between
-names, the fragmenting late-cycle state that the equity literature (Maio 2016; Stivers & Sun 2010)
-associates with *lower* subsequent index returns. Hence the negative sign.
+This is a design problem, not a parameter problem, and it has a specific shape: for a
+cross-sectional book whose scores have one-bar autocorrelation `ρ ≈ 1 − 1/L`, per-bar turnover
+goes as `sqrt(2/L)`. Going from a 21-bar to a 90-bar lookback buys only **2x**. Lookback alone
+cannot close a 4x gap. Something structural has to change.
+
+## 2. The mechanism
+
+A Binance USD-M cross-section of several hundred perpetuals is not several hundred assets. It is
+close to one common factor — the arrival and withdrawal of leveraged speculative capital — plus
+narrative noise. Each symbol is therefore a **noisy measurement of one latent state**, and the
+cross-sectional *moments* estimate that state better than the index price does, because they are
+not dominated by the one or two names that carry a cap- or volume-weighted index.
+
+- An index return of +2% says the factor moved. **Breadth** says how many measurements agree —
+  whether the move is funded by broad capital arrival or by concentrated flow into a few names.
+- **Dispersion** is the second moment of the same cross-section. Via
+  `cross-sectional variance ≈ average variance × (1 − average pairwise correlation)`, normalised
+  dispersion is a **correlation proxy**. Low normalised dispersion means the universe has
+  collapsed onto one factor, which is what risk-on/risk-off deleveraging looks like from inside.
+  High dispersion is the fragmenting, late-cycle rotation state that precedes weaker index
+  returns, so it enters with a **negative** sign (Maio 2016; Stivers & Sun 2010).
+- **Taker-flow breadth** and **mean funding** are the positioning readings of the same state.
+  Perpetuals never expire, so crowding compounds instead of resetting at roll, and the funding
+  rate is a continuously observable positioning tax.
+
+The book expresses this in the shape the professional population actually uses — a bounded
+directional tilt on top of a cross-sectional book, not a standalone timing model:
 
 ```
-S    = z(B) + 0.5*z(F) - 0.5*z(D) - 0.5*z(C)          (all z causal, 360-bar window)
-net  = 0.25 * tanh((S + 0.5) / 1.0),  floored at |net| >= 0.05
-w_i  = 1.0 * demeaned_rank(s_i)/gross  +  net * invvol_i
+w = (1 − |tau|) · n  +  tau · v
 ```
 
-Every sign is fixed by external prior, declared before data: breadth and flow positive
-(Zaremba et al. 2021), dispersion negative (Maio 2016), funding crowding negative (BIS WP 1087).
-`b = 0.5` is an unconditional long tilt — the crypto risk premium is positive on average, and the
-state variable modulates it rather than replacing it. `tanh` is the only concession I make to the
-"event" half of my family: a breadth thrust and a breadth breakdown saturate, so extreme readings do
-not produce extreme size.
+`n` is dollar-neutral with `sum(|n|) = 1`; `v` is a long inverse-vol distribution summing to 1;
+`tau = 0.25·tanh((S + 0.5)/1.0)`, `S = z(B) + 0.5·z(F) − 0.5·z(D) − 0.5·z(C)`. By construction
+`sum(w) = tau` and `sum(|w|) ≤ 1`.
 
-### Why there is a neutral leg at all
+**The neutral leg is not decoration.** If the book were a pure net tilt `w_i = tau/N`, its return
+is `tau·R` and its volatility is `|tau|·σ_R`; the organizer's common ex-ante risk unit divides by
+exactly that, and **the magnitude of my timing is cancelled — only the sign survives**. With a
+neutral leg, book variance is `γ²σ_n² + tau²σ_R² + 2γ·tau·cov`, so the *share* of risk coming
+from net exposure varies with state and survives a common vol scaler. Here `γ = 1 − |tau|`,
+because gross ≤ 1 is a hard cap and a free `γ` would only be renormalised away. This was recorded
+in the sealed thesis (§1.6) before any data was mounted.
 
-This is the least obvious design choice and it is not decoration. My brief fixes a **common ex-ante
-risk unit** that scales every lane to the same volatility. If my book were a pure net tilt,
-`w_i = net/N`, then book return is `net·R` and book volatility is `|net|·sigma_R`; the risk unit
-divides by exactly that and returns `v · sign(net) · R / sigma_R`. **The magnitude of my timing is
-annihilated and only the sign survives** — my mandate would be untestable as stated.
-
-Carrying a cross-sectionally neutral leg with roughly state-independent risk fixes this. Total book
-variance becomes `gamma²·sigma_n² + net²·sigma_R² + 2·gamma·net·cov`, so the *share* of risk coming
-from net exposure varies with state and survives a common scaler. After gross normalisation to 1.0
-the neutral leg runs ~0.80–0.95 of gross and the timed leg ~0.05–0.20 — a composition that moves
-with the state variable. I use the demeaned rank of the *same* primitive `s_i` rather than an
-unrelated signal, so the book is one idea read two ways, not two strategies stapled together.
-
-`gamma = 0` is a legal degenerate point of this design. If the harness turns out to want a pure
-net-exposure book, I will say so rather than quietly re-specify.
-
----
-
-## 2. Who is on the other side
+## 3. Who is on the other side
 
 Two counterparties, and only one of them is paying me for skill.
 
-**(a) The risk-premium leg — I am short a tail where I am largest.** A breadth-timed book is
-maximally long precisely when the market is broad, calm and low-dispersion. That is exactly the
-state in which a regime break hurts most, because correlation has collapsed onto one factor and
-nothing in the book diversifies. My counterparty is **the manager who declines to hold net exposure
-in calm states because that tail is unhedgeable, and the market maker who must warehouse inventory
-through the break**. When I am long in a broad state I supply risk-bearing capacity they have
-withdrawn, and I am paid for it. When the state breaks I pay them back. Anyone reporting a
-breadth-timing Sharpe without saying this is describing a short-volatility position and calling it
-alpha. **I expect most of the realised return to be this, and it should be discounted accordingly.**
+**(a) Risk premium — I am short a tail where I am largest.** A breadth-timed book is maximally
+long precisely when the market is broad, calm and low-dispersion, which is exactly the state where
+the correlation structure has collapsed and nothing in the book diversifies. The other side is the
+manager who declines net exposure in calm states because that tail is unhedgeable, and the market
+maker who must warehouse inventory through the break. I supply the risk-bearing capacity they
+withdrew; when the state breaks I pay it back. **I expect most of any realised return to be this**,
+and a strong development Sharpe here is a statement about which tails did not happen.
 
-**(b) The behavioural leg — the part that justifies the mandate.** Zaremba et al. find the breadth
-effect concentrates where limits to arbitrage are high and after bullish periods: a herding
-signature, not a risk-compensation one. Crypto perps sit at the extreme of both. BIS WP 1087 gives
-the same shape mechanically — trend-chasing retail demand for leveraged upside, met by arbitrage
-capital that is chronically scarce because taking the other side means surviving margin spikes and
-liquidations. My counterparty here is **the leveraged retail long paying funding to stay long into a
-state that breadth, flow and dispersion say is fragile**: narrow participation, one-sided funding,
-high dispersion. When I cut or reverse net exposure there, I stop being the marginal bid. Their exit
-is mechanical (liquidation), not discretionary, and that forced exit is my return.
+**(b) Inefficiency — constrained arbitrage and herding.** The other side is the leveraged retail
+long *paying* funding to stay long into a state that breadth and dispersion call fragile, whose
+position is a function of recent price rather than of state and whose exit is mechanical
+(liquidation) rather than discretionary. Arbitrage capital is chronically undersupplied here
+because perps have no expiry, so an arbitrageur faces unbounded convergence risk plus margin
+spikes. This is the leg that justifies the mandate at all.
 
-I do not claim (a) and (b) are separable in the data.
+The candidate now trades **both channels of (b)**: the time-series channel (cut or reverse net
+when mean funding says the whole book is crowded) and the **cross-sectional channel** (underweight
+the individual names where leveraged longs are most crowded). Same counterparty, same mechanism,
+second expression. See §5 — this is an amendment to the sealed design and I am not pretending
+otherwise.
 
----
+## 4. How the cost gates are closed
 
-## 3. What would falsify this
+Three structural changes, in order of how much each contributes.
 
-Preregistered in THESIS §3, restated here so the record is in the outbox.
+**(i) Averaging the target vector, not the signal.** Each leg is recomputed on the last `M` bars
+of strictly past data and the resulting *target vectors* are averaged. Then
+`Δw = (w_t − w_{t−M})/M`, and since `|w_t − w_{t−M}| ≈ sqrt(M)·|Δw_1|` before saturation,
+**turnover falls by `1/sqrt(M)` while the lag cost is only `(M−1)/2` bars**. This is the lever
+lookback cannot supply, and it changes no signal definition.
 
-**F1 (primary) — breadth must lead, not summarise.** Regress the forward 3-bar (24h) equal-weight
-index return on `B_t` **controlling for the trailing 3-bar index return**, Newey–West HAC lag 6,
-pooled over the visible development window, at the fixed `L_b = 21`, `h = 3`:
+Crucially the two legs get **different depths**, because they have different information horizons:
 
-```
-sum_{j=1..3} R_{t+j} = a + b*B_t + c*sum_{j=0..2} R_{t-j} + eps_t
-```
+| leg | depth | mean lag | why |
+|---|---|---|---|
+| neutral core | `M = 24` (8 days) | 4 days | reshuffles the whole book; the 30-day trend primitive's own horizon dwarfs a 4-day lag |
+| directional tilt | `M = 9` (3 days) | 1.3 days | this *is* the mandate; averaging it as hard as the core would neuter the thing being tested |
 
-Pre-committed sign `b > 0`. **Falsified if `b_hat <= 0` or `|t(b_hat)| < 2.0`.** The `c` control is
-the whole test: if breadth is a coincident summary of price, `b` collapses once trailing return is in
-the regression. `h = 3` and `L_b = 21` are fixed; I will not substitute a passing horizon, and I will
-not flip a negative `b_hat` into a "contrarian discovery".
+A single depth for both was the obvious simplification and it is the wrong one: `M = 24` on the
+tilt puts a 4-day lag on a state variable whose preregistered test horizon is 1 day.
 
-**F2 (economic) — timing must beat a constant tilt.** Development Sharpe of this exact book with the
-state-timed `net_t`, versus the identical book with `net_t` replaced by its own realised mean (a
-constant, sign preserved), same ex-ante risk unit on both. **Falsified if the difference is `<= 0`
-at this baseline.** F2 is evaluated *here*, at trial 0, before any knob moves. A state variable that
-does not change the answer is not a state variable.
+**(ii) A 30-day trend primitive** (`L_b = 90`, a declared grid point) instead of a fast one.
+Worth ~2x on its own.
 
-**F3 (sign discipline) — dispersion.** If the partial coefficient on `z(D_t)` is *positive* with
-`|t| >= 2.0` in the F1 specification, my dispersion prior is wrong for this venue and I set
-`w_d = 0`. **I do not flip it.** Flipping a sign after seeing data doubles the effective search
-space; zeroing costs me something, which is the point.
+**(iii) A soft threshold on the rank score** (`θ = 0.25`). Mid-pack names carry almost no
+conviction and almost all of the rank churn; they are held flat rather than traded around. This
+raises edge per unit turnover directly. `θ` is deliberately mild so effective breadth stays high
+(projected ~40 versus the seed's passing 29.7) — concentrating harder would buy more density and
+risk the breadth gate, which is not a trade I want.
 
-**Directly observable failures in the returned packet** that would tell me the mechanism is not
-there, independent of Sharpe: mean `|net|` not tracking any state (net pinned at the floor or the
-cap), the timed and constant-net variants indistinguishable, gross edge per unit turnover failing
-while the neutral leg alone passes (the tilt is pure cost), or survival at 3x cost failing while 1x
-passes (I am harvesting a spread I cannot pay for).
+**(iv) Carry accrues while holding.** Funding earned by being short a crowded name is collected
+every bar at **zero marginal turnover**. It is the only edge available here whose density *rises*
+with holding period, which is precisely what `gross_edge_bps_per_turnover` measures.
 
----
+**Projected budget:** core ≈ 38/yr + tilt ≈ 14/yr + universe churn ≈ 5/yr ≈ **55–60/yr**, a ~4x
+cut. At 35 bps density that is gross ~19%/yr, cost share ~14% at 1x, and roughly **+7% net at 3x
+cost**. The turnover gate is a *band*, so I aimed for the interior rather than the floor: cutting
+to 15/yr would trade one failed gate for another.
 
-## 4. What I already expect to be wrong
+## 5. Amendments to the sealed thesis — declared, not hidden
 
-Recorded before the result so none of it can be presented later as a discovery.
+The sealed surface (§4.2) had 8 knobs. This candidate sits at declared grid points for all of
+them — `L_b = 90`, `L_d = 9`, `w_f = w_d = w_c = 0.5`, `κ = 1.0`, `b = 0.5` — with `γ` pinned to
+`1 − |tau|` by the gross cap. **`L_b = 90` rather than the baseline 21 is the single knob move,
+and it was chosen from the turnover arithmetic in §1, not from any performance result** (I have no
+performance result on this mechanism to choose from).
 
-1. **Breadth may simply be lagging.** Every moving-average-based breadth measure is mechanically
-   lagging, and my `above-SMA` primitive is exactly that construction. F1's `c` control is the test,
-   and it is a test I might fail.
-2. **The effective sample is regime episodes, not bars.** 8h bars over a few years look like
-   thousands of observations, but a *state* variable has as many independent observations as there
-   are regimes — plausibly 10 to 30. This is the single strongest reason to expect a poor deflated
-   Sharpe and **no parameter choice fixes it**. A pooled HAC t-statistic will overstate confidence.
-3. **The neutral leg confounds the read.** It is a cross-sectional trend book and it will carry most
-   of the gross. A good headline Sharpe may be that book, not my mandate. **F2 is the only number in
-   the packet that isolates the mandate's claim**, and I will read it before I read the Sharpe.
-4. **Turnover.** 8h rebalance across 60 names at ~4–5bp taker per side is not a rounding error. The
-   `tanh` map with `b > 0` damps flips near the origin but does not remove them. I have added no
-   hysteresis to the universe or the weights, deliberately — an undeclared turnover knob at trial 0
-   would make the declared surface a fiction. If the cost gates bite, that is a diagnosis for a later
-   phase and I will report it as one.
-5. **Dispersion is partly coincident with realised volatility**, which the organizer's ex-ante risk
-   unit may already supply for free. `w_d` could be paying for information I am given.
-6. **Funding crowding is contaminated by trend.** Past return momentum explains more than half the
-   time-series variation in the perp–spot spread (He et al.), so `C` may be a noisy copy of `B`.
-   `w_c = 0` is in the declared grid for exactly this reason.
-7. **Funding convention risk.** Binance settlement moved from 8h to 4h for many USD-M contracts and
-   compresses to 1h at the cap, so a bar can hold one, two or eight events. I sum within the bar and
-   average across symbols — "cost borne over the bar" — which is convention-stable in a way a
-   per-interval mean is not. I could not verify this without data; if the field turns out to be a
-   pre-aggregated per-bar rate, the sum is still correct.
-8. **Universe non-stationarity.** The perp universe grew from tens to hundreds of symbols, so breadth
-   has a non-stationary base rate and the 360-bar z-window is doing heavy lifting. If delisted
-   contracts are absent from the data, historical breadth is biased *upward* — in the direction that
-   flatters me. I will say so if I see it.
+Four constants are **new** and were not in the sealed surface. Each was set once, by the cost
+arithmetic above, and none was searched:
 
----
+| new | value | forced by |
+|---|---|---|
+| `CORE_SMOOTH` | 24 | turnover gate |
+| `TILT_SMOOTH` | 9 | turnover gate, bounded below by the mandate's own horizon |
+| `SCORE_FLOOR` | 0.25 | edge density vs. the breadth gate |
+| `CARRY_SHARE` | 0.40 | edge density at zero turnover |
 
-## 5. Implementation notes worth checking against the packet
+Honest accounting: this widens the effective search space beyond what was preregistered, so any
+Sharpe this produces should be deflated harder than the sealed trial count implies. I would rather
+say that than quietly re-specify. Charged strategy trials so far: **1**, and it was the seed.
 
-- **Never flat, never silent.** Every path that cannot form a book returns `None` (hold) rather than
-  `{}`, and the floor `|net| >= 0.05` plus the neutral leg guarantee a non-zero net inside the cap at
-  every decision the book is formed. Mean `|net|` should land near 0.15–0.20 after gross
-  normalisation, positive on roughly two thirds of bars.
-- **Defensive reads throughout.** Panels are aligned on timestamps when the frames carry them and
-  positionally from the newest row otherwise; a missing column collapses that term's z-score to 0
-  rather than raising or producing NaN weights. This matters because a misread field produces a
-  silently flat book that scores as "no edge" rather than "never ran".
-- **Stateless.** Nothing persists between decisions; each book is recomputed from the past-only rows
-  in the context handed in. No RNG, no dates, no symbol identity, no fitted artifacts. Signals are
-  ratios and z-scores, so the book is invariant to a common price rescaling; universe ties resolve by
-  stable sort on the given order, not by symbol name.
-- **Gross is normalised to 1.0 and volatility is not targeted.** The organizer's risk unit rescales
-  from there. The only guards carrying literals that are *not* in the declared surface are numerical:
-  minimum name count, minimum z-history, a z-clip, and a floor on `sigma` at 20% of its
-  cross-sectional median for the inverse-vol leg. None are signal knobs and none will be tuned.
+## 6. What would falsify this
 
-**Declared trial accounting:** this is charged strategy trial **1** of a declared cap of **20**
-(plus the unmodified organizer seed). The search protocol is a single-pass coordinate search over
-the 8 knobs of THESIS §4.2 in fixed order, consuming 15 configurations; the remaining margin exists
-for one partial second pass over the two lookbacks and nothing else.
+**F1 (primary, from the sealed thesis, unchanged).** Breadth must *lead*, not summarise. Pooled
+over development bars, `Σ_{j=1..3} R_{t+j} = a + b·B_t + c·Σ_{j=0..2} R_{t−j} + ε`, Newey–West
+lag 6. **Falsified if `b̂ ≤ 0` or `|t(b̂)| < 2.0`.** The `c` control is the whole test: if breadth
+is a coincident summary of price, `b` collapses once trailing return is in the regression. I will
+not substitute a passing horizon or lookback, and I will not flip the sign and call a negative
+`b̂` a contrarian discovery.
+
+**F2 (economic).** Timing must beat a constant tilt: the same book with `tau` replaced by its own
+realised mean, at equal ex-ante risk. **Falsified if `Sharpe_timed − Sharpe_static ≤ 0`.** A state
+variable that does not change the answer is not a state variable.
+
+**F3 (sign discipline).** If dispersion's partial coefficient is *positive* with `|t| ≥ 2.0`, my
+prior is wrong for this venue and I set `w_d = 0`. **I zero it; I do not flip it.**
+
+**F4 (new, for this candidate specifically).** The cost fix must be a cost fix, not a signal
+lobotomy. **Falsified if turnover lands in band but `gross_edge_bps_per_turnover` is still under
+~22 bps** — that would say the seed's gross edge lived entirely at horizons my averaging destroys,
+and slowing down cannot rescue this family. The distinguishing observation is that failure would
+show up as turnover ~55 with density still ~9 bps, rather than as a turnover miss.
+
+## 7. What I expect to be wrong
+
+Stated before the result, so none of it can be presented later as a discovery.
+
+1. **The effective sample is regime episodes, not bars.** 8h bars over 808 days look like ~2,400
+   observations; a *state* variable has as many independent observations as there are regimes —
+   plausibly 10 to 30. **This is the strongest reason to expect a poor deflated Sharpe and it is
+   not fixable by any parameter choice.** Any HAC t-statistic here overstates confidence.
+2. **Breadth may simply be lagging.** Every moving-average-based breadth measure is mechanically
+   lagging, and my `above-SMA` primitive is exactly that construction. F1 is the test and it is a
+   test I might fail.
+3. **Dispersion may be paying for information the risk unit already supplies.** Cross-sectional
+   dispersion spikes when the market breaks, so part of `D` is contemporaneous volatility, which
+   the organizer's ex-ante risk unit captures for free.
+4. **Funding crowding is contaminated by trend** — past return momentum explains more than half
+   the time-series variation in the futures–spot spread, so `C` may be a noisy copy of `B`, and
+   the cross-sectional carry leg may partly cancel the trend leg rather than diversify it.
+5. **The `|net| ≥ 0.05` floor is a genuine discontinuity** at the sign crossing (a 10% book jump).
+   It is in the sealed design and it makes "non-zero net at every decision" literally true, so I
+   kept it, but it is the one place this book is not smooth.
+6. **Survivorship.** If delisted contracts are absent from the dataset, historical breadth is
+   biased *upward* — the names that would have sat below their moving averages are the ones that
+   got delisted. That bias runs in the direction that flatters me.
+7. **Requiring 124 bars of history excludes new listings**, which are the churniest and, per the
+   thesis, a real part of the flow event being measured. That is a cost-driven exclusion and it
+   may be removing signal along with the turnover.
+
+## 8. Contract compliance
+
+Symbols come from `context.eligible_symbols`; the panel is built on `open_time`, never on the
+positional `RangeIndex`; the funding column read is `funding_rate`. `sum(|w|) ≤ 1.0`,
+`|sum(w)| ≤ 0.25`, `|w_i| ≤ 0.08` are enforced in `_finalise` after clipping. No network,
+subprocess, filesystem, `eval`/`exec`, RNG, embedded data or cross-decision state; `seed` is
+unused; the strategy object holds no mutable attributes, so exact replay is deterministic. No
+absolute dates (funding is aligned to bars by relative position in integer nanoseconds), no
+hard-coded symbols, ties share an average rank so the book does not depend on symbol order, and
+every price input is a ratio or a log return so the book is scale-equivariant. Volatility is not
+targeted anywhere.

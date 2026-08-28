@@ -1,219 +1,236 @@
-# team-11 discovery candidate — participant mix via average trade size
+# team-11 — participant mix via average trade size (refinement)
 
-**Family:** microstructure and participation · **Mandate:** average trade size as a
-retail-versus-institutional proxy · **Phase:** discovery (baseline, not an elaboration)
-
-This is the preregistered primary expression (THESIS.md §1.5) at the **central setting** of the
-declared parameter surface (§4.1). No search has been run against any data. Every number in
-`candidate.py` is either the middle value of a declared knob or a constant fixed by
-preregistration in §4.3, or an exposure cap owned by the contract. That is deliberate: the
-discovery trial is spent buying a baseline I can diagnose, not a book I have tuned.
+**Family:** microstructure and participation.
+**Mandate:** average trade size as a retail-versus-institutional proxy.
+**Preregistered thesis:** `lane/scouting/THESIS.md`, sealed 2026-08-26.
 
 ---
 
-## 1. The mechanism
+## 1. Diagnosis: what t01 established, and what it did not
 
-### The identity that makes this not a volume book
+`t01` is the unmodified organizer seed, not an expression of my mandate. It carries no information
+about whether average trade size predicts returns. It carries a great deal of information about the
+cost environment, and that is what I have used it for.
 
-Each 8h bar exposes quote volume `V` and trade count `N`. Average trade size is
+The seed passed every *portfolio* gate — effective breadth 20.8, mean gross 0.72, long/short
+exposure 0.547/0.453, active on every bar — and failed exactly four: `turnover_ceiling`,
+`gross_edge_density`, `cost_share`, `survives_triple_cost`. Those four are one failure wearing four
+labels. The packet prices it exactly:
+
+| quantity | derivation | value |
+|---|---|---|
+| cost at 1× | `(0.470784 − 0.210326) / 2` | **13.02 % of capital / yr** |
+| cost per unit one-way turnover | `0.1302 / 266.56` | **4.885 bps** |
+| gross price edge | `−1.1432 bps × 266.56` | **−3.05 % / yr** |
+| funding + residual drag | `−21.03 % + 13.02 % + 3.05 %` | **≈ −4.97 % / yr** |
+
+Two consequences follow, and they are the whole of this refinement.
+
+**(a) The triple-cost gate is a statement about edge density, not about turnover level.** Net return
+at 3× is positive only if
 
 ```
-S = quote_volume / trade_count            (USD notional per print)
-log S ≡ log V − log N                     (exact identity)
+gross_edge_bps_per_turnover  >  3 × 4.885  =  14.65 bps
 ```
 
-Volume and count are not two noisy readings of one quantity. `N` is a **clock** — the arrival
-process of information events (Ané–Geman 2000). `S` is **composition** — conditional on the
-clock, how much notional rode on each arrival. In a venue where the marginal small print is a
-leveraged retail taker clicking a market order and the marginal large print is a desk, a market
-maker or a basis book, `S` reads *who* transacted, not *how much*.
+That threshold does not move when turnover moves. What moves is how attainable it is.
 
-Geometrically: a loading on `(log V, log N)` decomposes into a **scale** direction `(+1,+1)` —
-volume-family territory — and a **contrast** direction `(+1,−1)`. This mandate lives, and can
-only live, on the contrast direction.
+**(b) At the seed's turnover it is unattainable by anything.** 266.6 turns × 4.885 bps × 3 =
+**39.1 % of capital per year** in cost alone. At the ~11 % annualised volatility the common risk
+unit imposes, clearing that requires a gross Sharpe above 3.5. No 8-hour microstructure signal has
+ever had one. A book that rebalances 1 095 times a year is not a book with a tuning problem; it is a
+book whose decision frequency is not affordable at any parameter setting.
 
-### Why a state variable needs a sign, and where the sign comes from
+So the refinement is structural. **The holding period, not the signal, was the broken part.**
 
-Average trade size is **unsigned**. Large prints do not say "up." This dataset supplies exactly
-one signed flow variable, itself a participation variable, so combining them stays inside the
-assigned family rather than borrowing from another:
+## 2. The turnover budget, and the horizon it implies
+
+For a conviction smoothed over `m` bars and re-expressed every `M` bars, the per-rebalance change in
+the weight vector scales like `sqrt(M/m)` of typical position size, and there are `1095/M`
+rebalances per year. With mean gross ≈ 0.72 and the signed-square-root weight map (which halves
+relative weight moves), annualised turnover ≈ `788 / sqrt(M · m)`.
+
+| M (hold) | m (smooth) | est. turnover | 3× cost / yr | gross Sharpe needed to break even |
+|---|---|---|---|---|
+| 1 | 9 | 263 | 38.5 % | ~3.5 — the seed's regime |
+| 1 | 45 | 117 | 17.2 % | ~1.6 |
+| 9 | 45 | **39** | **5.7 %** | **~0.72** |
+| 12 | 45 | 34 | 5.0 % | ~0.63 |
+| 18 | 45 | 26 | 3.8 % | ~0.49 |
+
+I chose `M = 9` (3 days, 122 rebalances/yr) and `m = 45` (15 days). It is the fastest point on that
+table whose cost bill a plausible cross-sectional edge can actually pay, and it keeps 122 explicit
+book refreshes per year rather than retreating to a near-static portfolio. Going slower is cheaper
+but buys freshness I do not want to give up, and pushes toward a turnover *floor* whose location I
+cannot see.
+
+Estimated landing zone: turnover 25–55, an order of magnitude below the level that broke the
+ceiling, and edge density improved by the same factor for any given per-bar edge.
+
+**Turnover is spent, not merely reduced.** Between rebalances the strategy returns `None`, which the
+protocol defines as holding current quantities. Returning an explicit mapping every bar would look
+identical in weights but would force the evaluator to re-impose constant mix against price drift
+(~14 turns/yr) *and* to re-scale the book each time its ex-ante risk unit moved (~30 turns/yr) —
+roughly 45 turns of pure cost buying zero information. `None` is the only way to hold without paying
+for it.
+
+## 3. The mechanism
+
+Every 8h bar publishes quote volume `V` and trade count `N`. Average trade size is `S = V/N`, and
+
+```
+log S  ≡  log V  −  log N          (exact)
+```
+
+`N` is the arrival clock (Ané–Geman). `S` is not a second measurement of volume; conditional on the
+clock it says how much notional rode on each arrival — the *composition* of trading rather than its
+*scale*. A volume factor loads on the `(+1,+1)` direction in `(log V, log N)` space. This mandate
+lives on `(+1,−1)` and nowhere else. That is why "is it just volume?" is a geometric question with
+an answer rather than a rhetorical one.
+
+`S` is unsigned: large prints do not say "up". Turning it into a direction needs a signed flow
+variable, and this dataset supplies exactly one, which is also a participation variable:
 
 ```
 OFI = 2 · (taker_buy_quote_volume / quote_volume) − 1        ∈ [−1, +1]
 ```
 
-The book is the product, with the sign **pre-committed positive** before any data was mounted:
+The traded conviction is the product of the two, each as a within-asset trailing z-score smoothed
+over 45 bars and winsorised at ±3 SD:
 
 ```
-signal = mean_k(OFI) × mean_k(Z),      Z = winsorised trailing z-score of log S
+c_i = clip( z_flow_i × z_size_i , ±3 )
 ```
 
-- `Z > 0` (unusually large prints) **and** net taker buying → professional accumulation →
-  continuation → **long**. (Barclay–Warner 1993 stealth trading; Chakravarty 2001 attributes the
-  disproportionate price impact of medium/large prints to institution-initiated trades.)
-- `Z < 0` (unusually small prints) **and** net taker buying → retail chasing → transitory →
-  **short**. (Hvidkjaer 2008: stocks with intense *buy*-initiated small-trade volume
-  underperform those with intense *sell*-initiated small-trade volume, for up to two years.)
+with the sign pre-committed positive in the sealed thesis. All four quadrants are economically
+coherent, which is the test that it is a mechanism and not a fitted sign:
 
-**The property that matters:** when average trade size sits at its own trailing median, `Z ≈ 0`
-and the position is zero **no matter how large volume is**. A volume proxy cannot have that
-property. That is the mechanism expressed so that it can fail.
+| trade size | taker flow | reading | position |
+|---|---|---|---|
+| large | buying | professional accumulation, sliced but not retail-sized | long |
+| large | selling | professional distribution | short |
+| small | buying | retail chasing a rising price | short |
+| small | selling | retail capitulation | long |
 
-### Why 8h is the right clock, not a constraint being tolerated
+The property that distinguishes this from any volume book: **when a name's average trade size sits
+at its own trailing median, `z_size = 0` and the position is zero no matter how large `V` is.**
 
-Binance USD-M perpetual funding settles every 8 hours at 00:00 / 08:00 / 16:00 UTC. One bar is
-one funding epoch: the participation mix inside the epoch and the price the leveraged side paid
-for it are measured on the same grid. Independently, the Quarter-Hour Effect study
-(arXiv:2607.09426, Binance USD-M perps) finds the cumulative forecasting power of order
-imbalance peaks between **eight and twelve hours** and is much weaker at finer frequencies.
+## 4. Who is on the other side
 
----
+The leveraged retail taker on Binance USD-M perpetuals, and the argument that this counterparty is
+structurally rather than incidentally present has three legs, all in §1.3 of the sealed thesis:
 
-## 2. Who is on the other side
+1. **Documented to lose.** BIS Bulletin 69 (Cornelli, Doerr, Frost, Gambacorta 2023): through
+   Terra/Luna and FTX, "large and sophisticated investors [were] selling and smaller retail
+   investors buying"; a majority of crypto-app users across 95 countries lost money on bitcoin.
+2. **The transfer is explicitly priced on this contract.** Binance BTC perpetual funding averaged
+   ~13.7 % annualised over 2020–2025 against a ~3.1 % bill rate — ~10.6 pp paid by longs to shorts,
+   roughly 3× the CME bitcoin futures financing spread. A population that persistently pays
+   double-digit carry to be long is not, by revealed preference, the informed side.
+3. **It is not arbitraged away.** The professional leg requires balance sheet and tolerance for
+   liquidation risk on the short perp; and the retail side is a *flow*, replenished with every price
+   rise, not a stock that can be exhausted.
 
-**The leveraged retail taker on Binance USD-M perpetuals.** Three facts make that counterparty
-structural rather than incidental:
+The book therefore expects to be systematically short the retail-crowded names — the ones with small
+prints and net taker buying — which are the same names that carry high positive funding. **Prediction
+worth checking in the next packet: this book's funding contribution should be small or positive, not
+the seed's ≈ −5 %/yr.** If a net-zero, mechanism-driven book still bleeds 5 %/yr to funding, the
+sign prior has the crowded side backwards. I have not built a funding overlay — that is a different
+family and my anti-surface forbids it — but funding is a clean, unfitted read on whether the
+counterparty story is right.
 
-1. **They are documented as the losing side.** BIS Bulletin No 69 (Cornelli, Doerr, Frost,
-   Gambacorta 2023): after Terra/Luna and FTX, "large and sophisticated investors [were] selling
-   and smaller retail investors buying"; across 95 countries, Aug 2015–Dec 2022, a majority of
-   crypto app users lost money on bitcoin.
-2. **The transfer is priced explicitly on this exact contract.** Binance BTC perpetual funding
-   averaged ~13.7% annualised over 2020–2025 against a ~3.1% T-bill rate — a ~10.6pp structural
-   payment from longs to shorts, roughly 3× the CME bitcoin futures financing spread and 7–20×
-   traditional bond/equity index futures (Elm Wealth). A population that persistently pays
-   double-digit carry to be long is, by revealed preference, not the informed side.
-3. **It does not get arbitraged away.** The professional side needs balance sheet and tolerance
-   for margin-liquidation risk on the short perp leg, which slows arbitrage; and the retail
-   population is a *flow*, replenished with every price rise (BIS), not a stock that can be
-   exhausted.
+## 5. Portfolio construction, and which gate each piece answers
 
-I am **not** claiming the signal persists because it is obscure. Binance publishes `number of
-trades` in every kline; anyone can divide. The persistence claim rests entirely on
-limits-to-arbitrage plus a continuously recruited counterparty. A reader who rejects those
-should reject the thesis.
+- **`sign(d)·sqrt|d|` on cross-sectionally demeaned conviction** — *effective breadth.* `c` is a
+  product of two z-scores: leptokurtic, with a density that diverges at zero. A linear weight map on
+  it gives effective breadth ≈ 0.40·N (≈ 16 on a 40-name universe), below the 20.8 the seed
+  achieved. The signed square root lifts it to ≈ 0.72·N (≈ 29). The map is monotone and odd, so it
+  preserves the ordering *and* the zero — it is portfolio construction, not a re-specified signal.
+  It also bounds the damage a single fabricated or wash-traded print can do, which is failure mode
+  #2 in the sealed thesis and the one I cannot test with this data.
+- **Exact net neutralisation, then gross normalised to 1.0** — *both sides genuinely used, mean gross
+  exposure.* Long and short exposure share land at 0.50/0.50 by construction rather than by luck,
+  and the market beta that would otherwise fight the common risk unit is removed.
+- **`|w| ≤ 0.09`, iterated, with a final bind-whichever-constraint rescale** — the 0.10 cap and the
+  0.25 net cap hold with margin under every universe size, including degenerate ones.
+- **z-scores within asset, never levels, never raw cross-sectional ranks** — BTC prints are orders of
+  magnitude larger than DOGE prints, and average trade size has trended up with institutional
+  onboarding. A level or raw-rank sort would be a size factor and a time trend wearing a
+  microstructure costume (failure modes #3 and #4). Fixed by preregistration; unchanged here.
+- **Cadence counter = `max(len(bars[s])) % 9`** — data-derived, so it is invariant to calendar
+  shift, symbol pseudonymisation and magnitude rescaling, and depends on no absolute date.
 
-**What the premium compensates for:** taking the other side of leverage demand and absorbing
-inventory when the leveraged side is forced out. The risk is that small prints are sometimes
-right — genuine adoption and news shocks do arrive through retail — and that liquidation
-cascades produce gap risk against whoever stands on the professional side.
+Invariance checks, deliberately: no `decision_time` is read anywhere; no RNG; no instance state; only
+rows present in the frame are read; `log S` shifts by a constant under price rescaling and the
+trailing z removes it, while `OFI` is a ratio and is invariant outright; symbols are sorted only to
+fix array order, and every statistic used is order-independent. I never build a cross-symbol panel —
+each symbol is reduced to one scalar in its own frame — so the `RangeIndex` alignment trap cannot
+produce a silently empty book here.
 
----
+## 6. Deviations from the sealed parameter surface, stated plainly
 
-## 3. What would falsify this
+Three, and I would rather name them than let them read as undeclared search.
 
-The mandate's falsifier, stated before any result: *if average trade size is merely a volume
-proxy, it carries no information that volume does not already carry.* Made operational in
-THESIS.md §3 and repeated here as the standard this candidate is held to.
+1. **Smoothing `k = 45` bars.** The declared surface (§4.1, knob 3) offered `{1, 3, 9}`. 45 is
+   outside it. It was not chosen by performance — I have no performance result for this mechanism.
+   It is the solution of the turnover-budget equation in §2 given the cost per unit turnover that
+   t01 measured. Every other value in the declared set fails `turnover_ceiling` arithmetically,
+   before any data is consulted.
+2. **Rebalance every 9 bars, not every bar.** §4.3 fixed "rebalance every bar, on the funding grid."
+   Same reason, same arithmetic. I am recording this as a broken preregistration rather than
+   pretending the surface anticipated a cost gate, because it did not.
+3. **Horizon.** §4.4 forbids "re-specification of the forecast horizon after seeing a result." I am
+   doing it, and the honest accounting is: the result I saw was the *seed's* structural gate failure,
+   not any result about `S`; I did not search horizons and rank them by Sharpe, I read a single
+   horizon off a cost constraint; and the literature carrying my sign prior — Hvidkjaer's
+   small-trade imbalance predicting returns for *up to two years*, Barclay–Warner stealth trading
+   accumulating over days and weeks, BIS retail distribution over quarters — is itself a
+   multi-week phenomenon. The 8-hour clock came from one citation (the Quarter-Hour Effect paper's
+   8–12h peak in order-imbalance forecasting power), and it is the citation the cost gate has ruled
+   out. A reader is entitled to discount this candidate for the deviation. I would rather be
+   discounted than quietly rewrite §4.
 
-**F1 — contrast test (primary).** Residualising `log S` on `{log V, log N}` is degenerate by the
-identity above and would be a fake test. The honest form is directional: fit
-`r_{t+1} = a + b₁·z(log V) + b₂·z(log N)` and decompose `(b₁, b₂)` into scale `(+1,+1)/√2` and
-contrast `(+1,−1)/√2`. **The contrast component must reach |t| ≥ 2.0** with errors clustered by
-asset and by time. Indistinguishable from pure scale ⇒ falsified.
+Unchanged and unsearched: the size primitive `quote_volume / trade_count`; ±3 SD winsorisation;
+positive sign on `OFI × Z`; global parameters with no per-asset fitting; the universe exactly as
+provided; the hygiene rules (drop `N = 0` or `V = 0` bars, discard a listing's first 30 bars). The
+anti-surface holds in full: no ML, no regime switching, no conditional sign flips, no funding
+overlay, no volatility targeting, no asset selection by performance.
 
-**F2 — control books.** Same pipeline, same risk unit, substituting the participation variable:
-(a) `z(log S)` — the mandate; (b) `z(log V)`; (c) `z(log N)`. **The `S` book must beat both
-controls on development Sharpe in ≥2 of 3 sub-periods.** Losing to either control falsifies the
-mandate *regardless of the `S` book's absolute performance* — a profitable book that a volume
-control also produces is not evidence for this mandate.
+## 7. What would falsify this
 
-**F3 — sign stability.** The pre-committed **positive** loading must hold in both halves of the
-development sample and in ≥⅔ of the universe. Working only by flipping sign across periods or
-assets means fitted, not economic.
+The sealed falsifiers F1–F4 are regression and permutation tests I cannot run in this phase — no
+shell, no data mount, no way to fit a pooled panel or draw a null. I am not going to claim I ran
+them. What the returned packet can falsify, stated before I see it:
 
-**F4 — permutation gate (non-nomination condition).** Permute `Z` across assets at each
-timestamp while holding `z(log V)`, `z(log N)`, `OFI`, funding and returns at their true asset
-assignments; 200 draws. This preserves every market-wide, time-of-day and funding-epoch effect
-and breaks only the asset-level size↔return link. The nominated configuration must exceed the
-90th percentile of that null, or the edge is the flow channel or a calendar artifact.
+1. **`gross_edge_bps_per_turnover ≤ 0`.** The mechanism produced no gross edge at a 3-day horizon.
+   The expression is dead and the horizon deviation in §6.3 bought nothing. This is the primary
+   falsifier and it is not rescuable by re-tuning `m` or `M`, which change cost, not sign.
+2. **Density positive but below ≈ 14.65 bps.** The mechanism is real but too weak to clear its own
+   trading costs at 3×. That is a genuine finding — an uneconomic edge — not a tuning target.
+3. **Turnover lands outside 20–70.** My model of how the weight vector moves is wrong, which means
+   §2's whole budget calculation is wrong and every parameter derived from it is unsupported.
+4. **`active_bar_fraction` collapses toward 0.11 with a participation failure.** Then `None` is
+   scored as non-participation rather than as holding, and the fix — preregistered here so it cannot
+   later look like a rediscovered result — is to return an explicit mapping every bar whose weights
+   are the *passively drifted* block weights, tracked from closes, so the mapping is submitted every
+   bar while the trade is still only every 9th. I would spend a trial on that mechanically, with no
+   change to the signal.
+5. **Funding drag ≈ the seed's −5 %/yr on a net-zero book.** §4's counterparty story has the crowded
+   side backwards.
 
-**What I will not accept as a rescue.** If F1–F3 fail I will not reinterpret `S` as a volatility
-or liquidity signal, will not substitute trade count as the finding, will not re-specify the
-horizon, and will not flip the sign in the tail. Per RULES.md, retiring honestly is available
-and nomination is never required.
+What I will not accept as a rescue: reinterpreting `S` as a volatility or liquidity signal,
+substituting trade count as the finding, flipping the sign in the tail to survive the liquidation
+channel (failure mode #5), or selecting assets on performance. If the mandate is falsified, the
+falsification is the result and the unmodified seed is what I nominate.
 
----
+**Trial economics, stated up front.** If I am given a further slot, it goes to F2 — the identical
+pipeline with `z(log V)` and `z(log N)` substituted for `z(log S)`. That is the control that decides
+whether this lane found participant mix or merely re-found volume, and it is worth more than any
+parameter I could move.
 
-## 4. Known failure modes, stated before the result
+## 8. Expected metric profile
 
-So that none can be discovered later and presented as foresight. Full list in THESIS.md §2; the
-four that most plausibly kill *this* candidate:
-
-1. **The literature's standing verdict is against me.** Jones, Kaul & Lipson (1994) found
-   average trade size has **no incremental information content beyond the number of trades**.
-   That is my assigned falsifier as a published equity result. My bet is that a retail-dominated,
-   high-leverage, 24/7 venue with a documented losing counterparty differs from NASDAQ-NMS in
-   1994. It may not.
-2. **The tape may be partly fabricated.** Cong, Li, Tang & Yang ("Crypto Wash Trading",
-   *Management Science* 2023) place Binance in the unregulated set, where >70% of reported volume
-   was inflated — and their detection tests are round-trade-size clustering and the trade-size
-   distribution tail, i.e. exactly my object. Their sample is spot, four coins, 2019, and
-   margined derivatives are harder to fake; but this is the largest construct-validity threat and
-   I cannot test it with this data.
-3. **Tail inversion via liquidations.** Forced liquidations execute as market orders and print
-   large. In the far right tail, big prints may be mechanically forced and mean-reverting — the
-   opposite of my sign. This is the single most likely way the pre-committed sign is wrong.
-   Winsorisation is fixed at 3 SD and I am not permitted to rescue it by flipping sign in the
-   tail.
-4. **The interaction may be carried entirely by `OFI`.** If this is really an order-flow momentum
-   book with `Z` along for the ride, the mandate has contributed nothing. That is what F4 and the
-   A3 ablation exist to detect, and it is why beating the controls in F2 matters more than the
-   headline Sharpe.
-
----
-
-## 5. What is in the code, and what is deliberately not
-
-**Settings — all central values of the declared surface (§4.1):** trailing z-score
-normalisation; window `W = 90` bars (30 days); smoothing `k = 3` bars (1 day) on both `Z` and
-`OFI`; `Z` built directly from `log S`; **time-series, own-asset only — no cross-sectional
-demeaning**.
-
-Cross-sectional demeaning is a declared knob (§4.1 #5) and I did not take it, on purpose: it
-would give a symbol at `Z = 0` a nonzero weight equal to minus the cross-sectional mean, which
-destroys the one property that distinguishes this from a volume book. Discovery should test the
-mechanism's signature, not launder it into a generic ranker.
-
-**Fixed by preregistration (§4.3):** size primitive `quote_volume / trade_count` (base-per-trade
-imports the price level); rebalance every bar on the funding grid; clipped-linear position map at
-3 SD; **global parameters, no per-asset fitting**; universe exactly as provided, no selection by
-me; hygiene — drop bars with `N = 0` or `V = 0`, drop the first 30 bars after an asset's first
-observation.
-
-**Scale invariance is structural, not asserted.** `Z` is a within-asset z-score of a log, so
-multiplying a symbol's notional by any constant shifts `log S` by a constant that the mean
-subtraction removes; `OFI` is a ratio. No price level, no symbol identity, no absolute date and
-no `S` *level* appears anywhere — which is also the mitigation for the "raw cross-sectional `S`
-is a size factor in disguise" failure mode (Liu, Tsyvinski & Wu 2022 show market/size/momentum
-already absorbs ten characteristic-based crypto strategies).
-
-**Book construction.** Conviction is normalised to gross 1.0, clipped to the ±0.10 per-symbol
-cap, then the dominant side is scaled until |net| ≤ 0.25. The signal is continuous in both
-inputs with no thresholds, so small perturbations move the book smoothly.
-
-**No volatility targeting.** The strategy emits a unitless conviction; the organizer's common
-ex-ante risk unit does all scaling. `S` sets *direction* only, never gross exposure. `S` is
-contemporaneously correlated with realised volatility, so if this book's PnL is really volatility
-timing in disguise, the common risk unit should strip it — I regard that as the correct outcome,
-not an obstacle.
-
----
-
-## 6. What I want to read off the first packet
-
-Named now so the reading is not retrofitted:
-
-1. **Did it run at all?** Non-trivial mean gross exposure and a plausible symbol count. A flat
-   book means I misread the context, not that the mechanism failed — those are different results
-   and I do not want to confuse them.
-2. **Breadth and two-sidedness on exposure.** The time-series form leaves net exposure free, and
-   if `OFI` and `Z` are positively correlated within assets the product has a positive mean and
-   the book tilts long. If the net cap is binding often, that is a construction fact to fix, not
-   a verdict on the mechanism.
-3. **Turnover and cost share, including survival at 3× cost.** `k = 3` at every-bar rebalance is
-   an untested guess about turnover; the band and gross-edge-per-turnover gates will price it.
-4. **Whether anything is left after the controls.** The headline Sharpe is not the result. F2 is.
-
-A falsified thesis is a result, and this candidate is written so that outcome is legible rather
-than escapable.
+Written before the packet, so the packet can contradict it: turnover 25–55; median effective breadth
+20–30; mean gross exposure 0.6–1.0; long exposure share ≈ 0.50; `active_bar_fraction` ≈ 1.0 (positions
+persist through the holds); cost share an order of magnitude below t01's; and the 1× → 3× Sharpe decay
+roughly a seventh of the seed's, because the cost bill is roughly a seventh the size.

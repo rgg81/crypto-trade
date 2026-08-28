@@ -1,16 +1,45 @@
-"""team-08 discovery candidate — per-contract, volatility-scaled, multi-horizon time-series trend.
+"""team-08 -- per-contract multi-horizon time-series trend, slow ladder.
 
-This is the direct expression of the mandate and of the Tier-1 centre cell declared in
-``lane/scouting/THESIS.md`` (§7.1 fixed defaults; W=ALL, T=tanh, N=30).
+Economic family: time-series trend. Mandate: the CTA transplant -- per-contract, volatility
+scaled, multiple lookbacks.
 
-The signal for contract *i* is a function of contract *i*'s own past log prices and nothing else:
-a fixed log-spaced ladder of lookbacks, each rung standardised by the contract's own ex-ante
-volatility, each rung mapped to a position by ``tanh``, and the rungs equally weighted. Position
-size is inverse to the contract's own volatility. There is no cross-sectional ranking, no funding
-or basis signal, no reversal overlay, no order-flow feature, and no volatility-regime gate.
+Refinement candidate. Trial t01 (unmodified organizer seed) passed every structural gate --
+effective breadth 21.4, mean gross 0.478, participation 1.0, long/short exposure 50.6/49.4,
+turnover inside the band -- and failed exactly three: gross_edge_density, cost_share and
+survives_triple_cost. Those three are one disease. The seed earned about 14.6 bps of gross edge
+per unit turnover against a charge of about 7.4 bps at 1x, so it needs roughly 22.3 bps to break
+even at 3x. Its signal is not the problem; the frequency at which it spends that signal is.
 
-The strategy is a pure function of the ``DecisionContext`` it is handed: no persistent state, no
-randomness, no absolute dates, no symbol identity, no embedded parameters fitted off-line.
+Two design consequences, both structural rather than parametric:
+
+1. The preregistered no-trade band (THESIS 7.1) is a position-space control and cannot be
+   implemented here. DecisionContext exposes no position and persistent state is forbidden, so
+   turnover has to be designed into the signal path rather than filtered out afterwards. Every
+   map below from data to weight is therefore continuous, and the weight path is smooth because
+   the signal is smooth -- not because trades are suppressed.
+
+2. Equal-weighting the eight preregistered rungs equalizes each rung's contribution to risk but
+   not to cost. Under a random-walk null a rung-L z-score has per-bar innovation sqrt(2/L), so
+   the fast four rungs {3,6,12,21} carry half the risk and about four fifths of the position
+   innovation. Edge per unit turnover scales as sqrt(L) while per-market Sharpe is roughly flat
+   in L, so the fast rungs are funded by the slow rungs' edge. Restricting the ladder to the
+   declared SLOW(5-8) window predicts a turnover reduction of about 2.45x.
+
+Construction, per contract and nothing else -- no cross-sectional rank, no relative strength, no
+market-wide state variable, no volatility gate or exposure throttle (THESIS 0 and 5):
+
+    z_L   = (log return over L bars - funding paid over L bars) / (sigma * sqrt(L))
+    g     = mean over available rungs of tanh(z_L)
+    w_raw = g / sigma
+    w     = w_raw normalised to gross, concentration-capped, net-capped
+
+Because the design is strictly per-contract it never builds a cross-symbol panel, so the
+positional-RangeIndex alignment trap in RULES.md does not arise: every read is positional inside
+a single symbol's frame, whose rows are ordered oldest to newest and truncated at the boundary.
+
+Statelessness: the strategy object holds no attributes and every call is a pure function of the
+context. No RNG, no absolute dates, no symbol identity, no price levels -- only log returns,
+z-scores and volume ranks, all invariant to a magnitude rescale.
 """
 
 from __future__ import annotations
@@ -20,287 +49,328 @@ import math
 import numpy as np
 import pandas as pd
 
-# --- Declared configuration (THESIS §7.1 fixed; §7.2 cell W=ALL, T=tanh, N=30) ----------------
+# --- Ladder: the declared Tier-1 window W = SLOW(5-8) of the preregistered 8-rung ladder.
+# 8h bars, so {45, 90, 180, 360} bars ~ {15d, 30d, 60d, 120d}.
+LADDER = (45, 90, 180, 360)
 
-# The ladder is declared in *days*, not in bars, so the economic horizons are the same whatever
-# the bar spacing of the mounted dataset turns out to be. On an 8h clock these are the declared
-# {3, 6, 12, 21, 45, 90, 180, 360} bars.
-LADDER_DAYS = (1.0, 2.0, 4.0, 7.0, 15.0, 30.0, 60.0, 120.0)
+# Per-contract ex-ante volatility: EWMA of squared bar log returns (MOP form). Declared Tier-2
+# estimator V = com 180 bars (~60d), matched to the centre of gravity of the slow ladder. A vol
+# estimate faster than the signal injects weight churn that carries no directional information.
+VOL_COM = 180.0
+VOL_MAX_LAG = 1500
 
-VOL_COM_DAYS = 20.0        # EWMA centre of mass for ex-ante vol (= 60 bars on an 8h clock)
-VOL_RANK_DAYS = 30.0       # trailing window for the liquidity screen
-UNIVERSE_N = 30            # top-N by trailing median quote volume
-RISK_CAP_MULT = 3.0        # concentration cap: 3x the median inverse-vol weight
+# Data adequacy: 200 bars makes rungs 45/90/180 available and gives the com-180 EWMA an
+# effective sample of roughly 120 observations. Rung 360 is used when history allows.
+MIN_BARS = 200
+MIN_RUNGS = 2
 
-MIN_LADDER_RUNGS = 3       # below this, "multiple lookbacks" no longer means anything
-MIN_NAMES_FOR_DEPTH = 10   # names needed before a deeper ladder rung is worth carrying
-MIN_NAMES_TO_TRADE = 5     # below this the book is not a portfolio; hold flat instead
-MIN_VOL_OBS = 20           # minimum return observations before a vol estimate is trusted
+# Universe: declared Tier-1 breadth axis N = 30, ranked on a long trailing median of quote
+# volume so that the membership edge is stable and does not churn positions on its own.
+LIQ_WINDOW = 270
+UNIVERSE_N = 30
+MIN_UNIVERSE = 5
 
-GROSS_CAP = 0.99           # tournament caps, with a margin so float error cannot trip them
-NET_CAP = 0.245
-SYMBOL_CAP = 0.099
-WEIGHT_FLOOR = 1e-6
+# Book constraints. Gross 1.0 is the submitted shape; the organizer owns the ex-ante risk unit
+# and rescales before re-applying caps, so the submitted level only matters through the caps.
+GROSS = 1.0
+NET_CAP = 0.20          # inside the hard |net| <= 0.25
+MAX_WEIGHT = 0.09       # inside the hard per-symbol |w| <= 0.10
+CONC_MULT = 3.0         # THESIS 7.1 concentration cap: 3x median contract weight
+DUST = 1e-4
 
-DEFAULT_BARS_PER_DAY = 3.0  # fallback only, if the bar index is not datetime-like
-EWMA_TRUNCATION = 12.0      # keep the last 12 centres of mass; the tail weight is < 1e-4
+DEFAULT_BAR_HOURS = 8.0
+DEFAULT_FUNDING_HOURS = 8.0
+MIN_HOURS = 0.05
+MAX_HOURS = 168.0
+RESERVED_PREFIX = "__"
 
 
-# --- Pure helpers -----------------------------------------------------------------------------
+def _as_float_array(col: pd.Series) -> np.ndarray:
+    """Return ``col`` as a float ndarray without assuming its stored dtype."""
+    arr = col.to_numpy(copy=False)
+    if arr.dtype.kind == "f":
+        return arr
+    return pd.to_numeric(col, errors="coerce").to_numpy(dtype=float, copy=False)
 
 
-def _bars_per_day(frame: pd.DataFrame) -> float:
-    """Infer bar spacing from the frame's own index, in bars per day.
+def _epoch_ns(col: pd.Series) -> np.ndarray | None:
+    """Nanoseconds since epoch for a timestamp column, tz-aware or naive, or None.
 
-    Relative spacing only — never an absolute date — so this is calendar-shift equivariant.
+    Total by construction: the bar-spacing caller has a declared fallback and is not otherwise
+    guarded, so any dtype surprise here must degrade to that fallback rather than abort the
+    decision and leave the book flat.
     """
-    index = frame.index
-    if len(index) < 3:
-        return DEFAULT_BARS_PER_DAY
     try:
-        stamps = pd.DatetimeIndex(index)
-        if stamps.tz is not None:
-            stamps = stamps.tz_convert("UTC").tz_localize(None)
-        nanos = stamps.to_numpy(dtype="datetime64[ns]").astype("int64")
+        dtype = col.dtype
+        if isinstance(dtype, pd.DatetimeTZDtype):
+            return col.dt.tz_convert("UTC").astype("int64").to_numpy(copy=False)
+        if dtype.kind == "M":
+            return col.astype("int64").to_numpy(copy=False)
+        conv = pd.to_datetime(col, errors="coerce", utc=True)
+        if conv.isna().all():
+            return None
+        return conv.astype("int64").to_numpy(copy=False)
     except Exception:
-        return DEFAULT_BARS_PER_DAY
-    steps = np.diff(nanos) / 1e9
-    steps = steps[np.isfinite(steps) & (steps > 0.0)]
-    if steps.size == 0:
-        return DEFAULT_BARS_PER_DAY
-    step = float(np.median(steps))
-    if not math.isfinite(step) or step <= 0.0:
-        return DEFAULT_BARS_PER_DAY
-    per_day = 86400.0 / step
-    if per_day < 0.5 or per_day > 48.0:
-        return DEFAULT_BARS_PER_DAY
-    return per_day
+        return None
 
 
-def _log_prices(frame: pd.DataFrame):
-    """Return log closes as a float array, NaN where the close is unusable, or None."""
+def _median_spacing_hours(col: pd.Series, default: float) -> float:
+    """Median positive spacing of a timestamp column, in hours, with a declared fallback."""
+    tail = col.iloc[-65:] if len(col) > 65 else col
+    if len(tail) < 3:
+        return default
+    ns = _epoch_ns(tail)
+    if ns is None:
+        return default
+    gaps = np.diff(ns)
+    gaps = gaps[gaps > 0]
+    if gaps.size == 0:
+        return default
+    hours = float(np.median(gaps)) / 3.6e12
+    if not (MIN_HOURS <= hours <= MAX_HOURS):
+        return default
+    return hours
+
+
+def _ewma_last(values: np.ndarray, com: float, max_lag: int) -> float:
+    """Final value of an adjusted EWMA over ``values``, computed without a Python loop."""
+    n = values.size
+    if n == 0:
+        return float("nan")
+    window = values[-max_lag:] if n > max_lag else values
+    lam = com / (1.0 + com)
+    ages = np.arange(window.size - 1, -1, -1, dtype=float)
+    weights = lam**ages
+    total = float(weights.sum())
+    if not np.isfinite(total) or total <= 0.0:
+        return float("nan")
+    return float(np.dot(weights, window) / total)
+
+
+def _clean_closes(frame: pd.DataFrame) -> np.ndarray | None:
+    """Longest usable suffix of strictly positive, finite closes, or None."""
     if "close" not in frame.columns:
         return None
-    closes = pd.to_numeric(frame["close"], errors="coerce").to_numpy(dtype=float)
-    if closes.size < 2:
+    close = _as_float_array(frame["close"])
+    if close.size < MIN_BARS:
         return None
-    usable = np.isfinite(closes) & (closes > 0.0)
-    if int(usable.sum()) < 2 or not bool(usable[-1]):
+    good = np.isfinite(close) & (close > 0.0)
+    if not bool(good[-1]):
         return None
-    out = np.full(closes.shape, np.nan, dtype=float)
-    out[usable] = np.log(closes[usable])
-    return out
+    if not bool(good.all()):
+        start = int(np.flatnonzero(~good)[-1]) + 1
+        close = close[start:]
+        if close.size < MIN_BARS:
+            return None
+    return close
 
 
-def _ewma_sigma(log_prices, com_bars: float) -> float:
-    """Ex-ante per-bar volatility: EWMA of squared log returns, MOP form."""
-    keep = int(EWMA_TRUNCATION * com_bars) + MIN_VOL_OBS
-    tail = log_prices[-keep:] if log_prices.size > keep else log_prices
-    returns = pd.Series(tail).diff()
-    if int(returns.notna().sum()) < MIN_VOL_OBS:
-        return float("nan")
-    variance = (returns * returns).ewm(com=com_bars, min_periods=MIN_VOL_OBS).mean()
-    value = float(variance.iloc[-1])
-    if not math.isfinite(value) or value <= 0.0:
-        return float("nan")
-    return math.sqrt(value)
-
-
-def _median_quote_volume(frame: pd.DataFrame, window_bars: int) -> float:
-    """Trailing median quote volume — the liquidity screen, computed past-only."""
+def _liquidity(frame: pd.DataFrame) -> float:
+    """Trailing median quote volume; the universe rank is computed on a past-only window."""
     if "quote_volume" not in frame.columns:
         return float("nan")
-    values = pd.to_numeric(frame["quote_volume"], errors="coerce").to_numpy(dtype=float)
-    tail = values[-window_bars:] if values.size > window_bars else values
-    tail = tail[np.isfinite(tail) & (tail >= 0.0)]
-    if tail.size == 0:
+    vol = _as_float_array(frame["quote_volume"])
+    vol = vol[-LIQ_WINDOW:]
+    vol = vol[np.isfinite(vol)]
+    if vol.size == 0:
         return float("nan")
-    return float(np.median(tail))
+    return float(np.median(vol))
 
 
-def _blend_ladder(log_prices, sigma: float, rung_bars, depth: int) -> float:
-    """Equal-weighted mean of ``tanh`` of each rung's volatility-standardised trend.
+def _funding_drag(
+    funding: pd.DataFrame,
+    chosen: list[str],
+    decision_ns: int,
+    span_ns: int,
+    bar_hours: float,
+) -> dict[str, float]:
+    """Per-symbol funding paid by a long, per bar, over the trailing ladder span.
 
-    Every contract in the book uses the identical ladder; a contract that cannot support one of
-    the rungs is rejected upstream rather than run on a shorter ladder.
+    THESIS 1.6: a perpetual long pays funding three times a day by contract design, so the
+    tradeable return of a long is the price return net of funding. This is the declared Tier-2
+    signal basis B = funding-inclusive total return -- funding as a property of the return being
+    measured, never as a carry signal (THESIS 5). Any malformation degrades to price-only rather
+    than to an empty book.
     """
-    last = log_prices[-1]
-    total = 0.0
-    used = 0
-    for position in range(depth):
-        span = rung_bars[position]
-        if log_prices.size <= span:
-            continue
-        prior = log_prices[-1 - span]
-        if not math.isfinite(prior):
-            continue
-        scale = sigma * math.sqrt(float(span))
-        if not math.isfinite(scale) or scale <= 0.0:
-            continue
-        total += math.tanh((last - prior) / scale)
-        used += 1
-    if used < depth:
-        return float("nan")
-    return total / float(depth)
+    empty: dict[str, float] = {}
+    if not isinstance(funding, pd.DataFrame) or len(funding) == 0:
+        return empty
+    if not {"symbol", "funding_rate", "funding_time"}.issubset(funding.columns):
+        return empty
+    try:
+        stamps = _epoch_ns(funding["funding_time"])
+        if stamps is None:
+            return empty
+        recent = funding.loc[stamps >= decision_ns - span_ns]
+        if len(recent) == 0:
+            return empty
+        recent = recent.loc[recent["symbol"].isin(chosen)]
+        if len(recent) == 0:
+            return empty
+
+        head = recent.loc[recent["symbol"] == chosen[0], "funding_time"]
+        funding_hours = _median_spacing_hours(head, DEFAULT_FUNDING_HOURS)
+        per_bar = bar_hours / funding_hours
+        if not (0.02 <= per_bar <= 48.0):
+            per_bar = 1.0
+
+        rates = pd.to_numeric(recent["funding_rate"], errors="coerce")
+        means = rates.groupby(recent["symbol"], sort=False).mean()
+        drag: dict[str, float] = {}
+        for symbol, value in means.items():
+            rate = float(value)
+            if np.isfinite(rate):
+                drag[str(symbol)] = rate * per_bar
+        return drag
+    except Exception:
+        return empty
 
 
-def _apply_symbol_cap(weights, cap: float):
-    """Clip each |w| to ``cap``, redistributing the clipped exposure across uncapped names."""
-    book = dict(weights)
-    names = list(book)
-    if not names:
-        return book
-    if len(names) * cap <= 1.0:
-        return {name: max(-cap, min(cap, value)) for name, value in book.items()}
-    for _ in range(8):
-        over = {name for name in names if abs(book[name]) > cap}
-        if not over:
-            break
-        excess = sum(abs(book[name]) - cap for name in over)
-        for name in over:
-            book[name] = cap if book[name] > 0.0 else -cap
-        free = sum(abs(book[name]) for name in names if name not in over)
-        if free <= 0.0:
-            break
-        scale = (free + excess) / free
-        for name in names:
-            if name not in over:
-                book[name] *= scale
-    # The loop can exit on its iteration bound; the cap is hard, so clip unconditionally.
-    return {name: max(-cap, min(cap, value)) for name, value in book.items()}
-
-
-def _apply_net_cap(weights, cap: float):
-    """Bring |net| inside ``cap`` by shrinking the dominant side.
-
-    Shrinking, not shifting: a uniform shift would flip the sign of small positions, which would
-    override a per-contract trend forecast with a book-level adjustment. Shrinking never changes
-    any contract's direction, and it preserves more gross than a shift does.
-    """
-    book = dict(weights)
-    longs = sum(value for value in book.values() if value > 0.0)
-    shorts = -sum(value for value in book.values() if value < 0.0)
-    net = longs - shorts
-    if net > cap and longs > 0.0:
-        factor = (cap + shorts) / longs
-        return {n: (v * factor if v > 0.0 else v) for n, v in book.items()}
-    if net < -cap and shorts > 0.0:
-        factor = (cap + longs) / shorts
-        return {n: (v * factor if v < 0.0 else v) for n, v in book.items()}
-    return book
-
-
-# --- Strategy ---------------------------------------------------------------------------------
-
-
-class MultiHorizonTrend:
-    """Per-contract multi-horizon time-series trend, inverse-volatility sized.
-
-    Holds no state between decisions; every number is recomputed from the past-only rows in the
-    context it is given.
-    """
+class SlowLadderTrend:
+    """Per-contract, volatility-scaled trend over the slow half of a fixed log-spaced ladder."""
 
     def target_weights(self, context, *, seed):
-        # Deterministic by construction: the seed is deliberately unused.
-        bars = context.bars
+        bars = getattr(context, "bars", None)
+        raw_symbols = getattr(context, "eligible_symbols", None)
+        if bars is None or not raw_symbols:
+            return None
+        symbols = [s for s in raw_symbols if not str(s).startswith(RESERVED_PREFIX)]
+        if not symbols:
+            return None
 
-        # 1. Usable price histories for the point-in-time membership.
-        prepared = []
-        per_day = DEFAULT_BARS_PER_DAY
-        longest = -1
-        for symbol in context.eligible_symbols:
-            if symbol not in bars:
+        # --- universe: stable trailing-liquidity rank, past-only, no symbol identity ---
+        ranked: list[tuple[float, str]] = []
+        for symbol in symbols:
+            frame = bars.get(symbol)
+            if frame is None or len(frame) < MIN_BARS:
                 continue
-            frame = bars[symbol]
-            if not isinstance(frame, pd.DataFrame) or frame.shape[0] < 5:
+            liquidity = _liquidity(frame)
+            if np.isfinite(liquidity) and liquidity > 0.0:
+                ranked.append((liquidity, symbol))
+        if len(ranked) < MIN_UNIVERSE:
+            return None
+        # Stable sort on liquidity alone: ties keep organizer order, never symbol identity.
+        ranked.sort(key=lambda pair: -pair[0])
+        chosen = [symbol for _, symbol in ranked[:UNIVERSE_N]]
+
+        reference = bars[chosen[0]]
+        bar_hours = DEFAULT_BAR_HOURS
+        if "open_time" in reference.columns:
+            bar_hours = _median_spacing_hours(reference["open_time"], DEFAULT_BAR_HOURS)
+
+        drag: dict[str, float] = {}
+        moment = getattr(context, "decision_time", None)
+        if moment is not None:
+            try:
+                stamp = pd.Timestamp(moment)
+                stamp = stamp.tz_localize("UTC") if stamp.tzinfo is None else stamp
+                span_ns = int(bar_hours * max(LADDER) * 3.6e12)
+                drag = _funding_drag(
+                    getattr(context, "funding", None),
+                    chosen,
+                    int(stamp.value),
+                    span_ns,
+                    bar_hours,
+                )
+            except Exception:
+                drag = {}
+
+        # --- per-contract signal: nothing here reads any other contract ---
+        names: list[str] = []
+        weights: list[float] = []
+        for symbol in chosen:
+            close = _clean_closes(bars[symbol])
+            if close is None:
                 continue
-            log_prices = _log_prices(frame)
-            if log_prices is None:
+            log_price = np.log(close)
+            rets = np.diff(log_price)
+            variance = _ewma_last(rets * rets, VOL_COM, VOL_MAX_LAG)
+            if not np.isfinite(variance) or variance <= 0.0:
                 continue
-            prepared.append((symbol, frame, log_prices))
-            if frame.shape[0] > longest:
-                longest = frame.shape[0]
-                per_day = _bars_per_day(frame)
-        if len(prepared) < MIN_NAMES_TO_TRADE:
-            return {}
-
-        # 2. Translate the declared day-ladder onto this dataset's bar clock.
-        com_bars = max(2.0, VOL_COM_DAYS * per_day)
-        rung_bars = [max(1, int(round(days * per_day))) for days in LADDER_DAYS]
-        warmup = int(math.ceil(com_bars)) + 1
-
-        # 3. Ladder depth: carry the longest rungs only while enough contracts can support them,
-        #    and keep the ladder identical across every contract in the book.
-        depth = MIN_LADDER_RUNGS
-        for candidate_depth in range(len(rung_bars), MIN_LADDER_RUNGS - 1, -1):
-            needed = rung_bars[candidate_depth - 1] + warmup
-            supported = sum(1 for _, _, lp in prepared if lp.size >= needed)
-            if supported >= MIN_NAMES_FOR_DEPTH:
-                depth = candidate_depth
-                break
-        needed = rung_bars[depth - 1] + warmup
-        usable = [item for item in prepared if item[2].size >= needed]
-        if len(usable) < MIN_NAMES_TO_TRADE:
-            return {}
-
-        # 4. Liquidity screen — top N by trailing median quote volume. This protects the
-        #    participation limit; it is not a signal.
-        window_bars = max(5, int(round(VOL_RANK_DAYS * per_day)))
-        ranked = []
-        for symbol, frame, log_prices in usable:
-            volume = _median_quote_volume(frame, window_bars)
-            if not math.isfinite(volume) or volume <= 0.0:
+            sigma = math.sqrt(variance)
+            if not np.isfinite(sigma) or sigma <= 0.0:
                 continue
-            ranked.append((volume, symbol, log_prices))
-        if len(ranked) < MIN_NAMES_TO_TRADE:
-            return {}
-        ranked.sort(key=lambda item: (-item[0], item[1]))
-        selected = ranked[:UNIVERSE_N]
 
-        # 5. Per-contract signal and per-contract risk weight.
-        signals = {}
-        inverse_vol = {}
-        for _, symbol, log_prices in selected:
-            sigma = _ewma_sigma(log_prices, com_bars)
-            if not math.isfinite(sigma) or sigma <= 0.0:
+            carry = drag.get(symbol, 0.0)
+            total = 0.0
+            used = 0
+            for rung in LADDER:
+                if rets.size < rung:
+                    continue
+                # Signal on bar t's close; the engine fills at the next executable open.
+                excess = float(log_price[-1] - log_price[-1 - rung]) - carry * rung
+                z = excess / (sigma * math.sqrt(rung))
+                if not np.isfinite(z):
+                    continue
+                # Declared Tier-1 transform T = tanh: bounded, saturating and everywhere
+                # continuous, so no threshold crossing can manufacture a round trip.
+                total += math.tanh(z)
+                used += 1
+            if used < MIN_RUNGS:
                 continue
-            blended = _blend_ladder(log_prices, sigma, rung_bars, depth)
-            if not math.isfinite(blended):
-                continue
-            signals[symbol] = blended
-            inverse_vol[symbol] = 1.0 / sigma
-        if len(signals) < MIN_NAMES_TO_TRADE:
-            return {}
 
-        # 6. Volatility scaling, with the declared concentration cap on the risk weight.
-        risk = np.array([inverse_vol[symbol] for symbol in signals], dtype=float)
-        median_risk = float(np.median(risk))
-        risk_cap = RISK_CAP_MULT * median_risk if median_risk > 0.0 else float("inf")
-        book = {
-            symbol: signals[symbol] * min(inverse_vol[symbol], risk_cap) for symbol in signals
-        }
+            weight = (total / used) / sigma
+            if np.isfinite(weight):
+                names.append(symbol)
+                weights.append(weight)
 
-        gross = sum(abs(value) for value in book.values())
-        if not math.isfinite(gross) or gross <= 0.0:
-            return {}
-        book = {symbol: value / gross for symbol, value in book.items()}
+        if len(names) < MIN_UNIVERSE:
+            return None
 
-        # 7. Tournament exposure constraints, applied in an order I can reason about.
-        book = _apply_symbol_cap(book, SYMBOL_CAP)
-        book = _apply_net_cap(book, NET_CAP)
-        gross = sum(abs(value) for value in book.values())
-        if not math.isfinite(gross) or gross <= 0.0:
-            return {}
-        if gross > GROSS_CAP:
-            shrink = GROSS_CAP / gross
-            book = {symbol: value * shrink for symbol, value in book.items()}
+        book = np.asarray(weights, dtype=float)
+        gross = float(np.abs(book).sum())
+        if not np.isfinite(gross) or gross <= 0.0:
+            return None
+        book *= GROSS / gross
 
-        return {
-            symbol: float(value)
-            for symbol, value in book.items()
-            if math.isfinite(value) and abs(value) >= WEIGHT_FLOOR
-        }
+        # --- concentration cap: 3x median contract weight (THESIS 7.1, risk hygiene) ---
+        # Floored at the equal-weight level: a concentration cap can never sensibly sit below the
+        # weight every name would carry if the book were flat, and the floor also keeps the
+        # renormalisation feasible (cap * n >= GROSS) when the cross-section is degenerate.
+        median_weight = float(np.median(np.abs(book)))
+        cap = min(MAX_WEIGHT, max(CONC_MULT * median_weight, GROSS / book.size))
+        book = np.clip(book, -cap, cap)
+        gross = float(np.abs(book).sum())
+        if gross <= 0.0:
+            return None
+        book *= GROSS / gross
+        book = np.clip(book, -MAX_WEIGHT, MAX_WEIGHT)
+
+        # --- net cap: shrink the dominant side proportionally, continuously at the boundary ---
+        longs = book > 0.0
+        shorts = book < 0.0
+        long_sum = float(book[longs].sum())
+        short_sum = float(-book[shorts].sum())
+        net = long_sum - short_sum
+        # Solving f * long_sum - short_sum = +NET_CAP (or long_sum - f * short_sum = -NET_CAP)
+        # gives f in (0, 1) exactly when the cap binds, so f -> 1 as net -> the boundary.
+        if net > NET_CAP and long_sum > 0.0:
+            book[longs] *= (short_sum + NET_CAP) / long_sum
+        elif net < -NET_CAP and short_sum > 0.0:
+            book[shorts] *= (long_sum + NET_CAP) / short_sum
+
+        # --- emit ---
+        targets: dict[str, float] = {}
+        for symbol, value in zip(names, book):
+            weight = float(value)
+            if np.isfinite(weight) and abs(weight) >= DUST:
+                targets[symbol] = weight
+        if not targets:
+            return None
+
+        gross = sum(abs(w) for w in targets.values())
+        if gross > 1.0:
+            targets = {k: v / gross for k, v in targets.items()}
+        # Belt and braces: NET_CAP and the gross cap already imply |net| <= 0.20, so this only
+        # ever fires on an arithmetic surprise. Scale the whole book rather than one side, which
+        # lands on the limit exactly and cannot raise gross.
+        net = sum(targets.values())
+        if abs(net) > 0.25:
+            shrink = 0.25 / abs(net)
+            targets = {k: v * shrink for k, v in targets.items()}
+        return targets
 
 
 def build_strategy():
-    return MultiHorizonTrend()
+    """Factory: one clean, attribute-free instance per run."""
+    return SlowLadderTrend()

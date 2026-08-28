@@ -1,11 +1,15 @@
-"""team-09 — discovery candidate: volume-confirmed channel breakout.
+"""team-09 — volume-confirmed channel breakout (time-series trend).
 
-The lane mandate in its most direct form: a Donchian channel breakout on closes, where an *entry*
-requires confirmation from abnormal, direction-aligned taker participation, and an *exit* honours
-any break regardless of participation.  Geometry and gate constants are drawn from the declared
-parameter surface in ``lane/scouting/THESIS.md`` §5; nothing here is fitted to data.
+Signal: George-Hwang nearness to a running channel extreme, ensembled over four
+lookbacks, per symbol.  Gate: the position taken at the channel edge is amplified
+when the aggressive (taker) flow in the same bars is aligned with the break and
+abnormal in size and ticket, and attenuated when it is not.  The gate term is
+proportional to |channel score|, so it acts at the break and vanishes mid-range.
 
-Mechanism, counterparty and falsifiers: ``lane/outbox/RATIONALE.md``.
+Every decision is a pure function of the past-only rows in ``context``.  No state
+crosses a decision boundary, no randomness, no absolute dates, no symbol names,
+no price levels -- all statistics are ratios or log-differences taken against the
+symbol's own trailing distribution.
 """
 
 from __future__ import annotations
@@ -13,196 +17,249 @@ from __future__ import annotations
 import math
 
 import numpy as np
-import pandas as pd
 
-# --- declared configuration (THESIS.md §5.1-§5.2), mid-grid values, not searched -----------------
-CHANNEL_LOOKBACK = 42       # N bars of 8h = 14 days; mid of the declared {6,12,21,42,84,168}
-NORM_WINDOW = 63            # W bars for the per-symbol participation norm; from {21,63}
-GATE_THRESHOLD = 1.0        # theta, in robust-z units; mid of the declared {0.5,1.0,1.5}
+# --- signal geometry (THESIS 5.1) ------------------------------------------
+# Channel basis is the extreme of closes; exit is symmetric (exit_fraction 1.0),
+# which the continuous nearness score expresses without needing carried state.
+CHANNEL_LOOKBACKS = (21, 42, 84, 168)   # 7 / 14 / 28 / 56 days on 8h bars
+PRICE_SMOOTH = 3                        # bars averaged into the channel probe
 
-# --- fixed by construction (THESIS.md §5.4), declared rather than searched -----------------------
-REPLAY_SPAN = 12            # break history replayed = REPLAY_SPAN*N + W + 2 bars
-LIQUIDITY_WINDOW = 126      # trailing bars for the per-symbol liquidity read
-LIQUIDITY_QUANTILE = 0.20   # drop the bottom quintile of the mounted universe
-NET_BUDGET = 0.20           # our own |net|/gross ceiling; the engine hard cap is 0.25
-MAX_WEIGHT = 0.10           # engine hard cap per symbol
-GROSS_BUDGET = 1.0          # engine hard cap on sum of absolute weights
-MAD_SCALE = 1.4826          # MAD -> sigma for a Gaussian
-MIN_NORM_ROWS = 16          # a robust norm below this many observations is not trusted
+# --- participation gate (THESIS 5.2) ---------------------------------------
+NORM_WINDOW = 63                        # 21 days; the longer declared window
+CONFIRM_BARS = 2                        # declared k = 2
+GATE_THETA = 1.0                        # declared theta = 1.0, as a tanh scale
+GATE_GAMMA = 0.6                        # soft scaler: modulation spans [0.4, 1.6]
+Z_CLIP = 4.0
 
-REQUIRED_COLUMNS = frozenset({"close", "quote_volume", "taker_buy_quote_volume"})
+# --- fixed by construction (THESIS 5.4) ------------------------------------
+MIN_BARS = 96
+LIQ_WINDOW = 126
+LIQ_DROP = 0.20                         # drop the bottom quintile by liquidity
+MIN_NAMES = 10
+
+# --- portfolio construction under the organiser's caps ---------------------
+XS_CLIP = 3.0
+XS_SHRINK = 0.20
+XS_POWER = 0.70
+GROSS_TARGET = 0.95
+GROSS_CAP = 0.99
+MAX_WEIGHT = 0.090
+NET_TILT_MAX = 0.18
+NET_TILT_SCALE = 0.50
+NET_CAP = 0.22
+
+TAIL = 200
+EPS = 1e-12
 
 
-def _robust_z(history: np.ndarray, value: float) -> float:
-    """Robust z of ``value`` against the *prior* window, using median and MAD.
+def _rolling_sum(values, k):
+    """Trailing ``k``-bar sums; result has ``len(values) - k + 1`` entries."""
+    if k <= 1:
+        return values
+    if values.size < k:
+        return values[:0]
+    cumulative = np.cumsum(values)
+    out = cumulative[k - 1:].copy()
+    out[1:] -= cumulative[:-k]
+    return out
 
-    Returns NaN when the window is too short or degenerate, which is treated downstream as
-    "unconfirmed" rather than as a pass.
+
+def _robust_z(reference, value):
+    """(value - median) / (1.4826 * MAD); 0.0 when the scale is degenerate."""
+    if reference.size < 16 or not math.isfinite(value):
+        return 0.0
+    median = float(np.median(reference))
+    scale = 1.4826 * float(np.median(np.abs(reference - median)))
+    if not (scale > EPS):
+        return 0.0
+    z = (value - median) / scale
+    if not math.isfinite(z):
+        return 0.0
+    return max(-Z_CLIP, min(Z_CLIP, z))
+
+
+def _series_z(series, window):
+    """Robust z of the latest observation against its own trailing window."""
+    usable = min(window, series.size - 1)
+    if usable < 16:
+        return 0.0
+    reference = series[-(usable + 1):-1]
+    reference = reference[np.isfinite(reference)]
+    return _robust_z(reference, float(series[-1]))
+
+
+def _channel_score(close):
+    """Nearness to the running channel extreme, averaged over the lookbacks.
+
+    +1 means the smoothed price sits on the top of every available channel, -1 on
+    the bottom.  Scale-free: it is a ratio of price differences.
     """
-    sample = history[np.isfinite(history)]
-    if sample.size < MIN_NORM_ROWS or not math.isfinite(value):
-        return float("nan")
-    centre = float(np.median(sample))
-    spread = float(np.median(np.abs(sample - centre)))
-    if not math.isfinite(spread) or spread <= 0.0:
-        return float("nan")
-    return (value - centre) / (MAD_SCALE * spread)
+    if close.size < PRICE_SMOOTH + 2:
+        return None
+    probe = float(np.mean(close[-PRICE_SMOOTH:]))
+    total = 0.0
+    used = 0
+    for lookback in CHANNEL_LOOKBACKS:
+        if close.size < lookback:
+            continue
+        window = close[-lookback:]
+        high = float(np.max(window))
+        low = float(np.min(window))
+        width = high - low
+        if not (width > EPS):
+            continue
+        total += (2.0 * probe - high - low) / width
+        used += 1
+    if used == 0:
+        return None
+    return max(-1.0, min(1.0, total / used))
 
 
-def _taker_imbalance(quote_volume: np.ndarray, taker_buy_quote: np.ndarray) -> np.ndarray:
-    """Share of quote volume lifted by buy-side takers, mapped to [-1, +1].
+def _confirmation(quote_volume, taker_buy_quote, trade_count):
+    """Read the participation at the channel edge.
 
-    This is who crossed the spread.  Passive volume is the side being run over, so it carries no
-    directional information on its own.
+    Returns ``(align, amp)``.  ``align`` in (-1, 1) is squashed robust-z of
+    aggressive buy pressure -- positive means takers were lifting offers.  ``amp``
+    in (0, 1) says how abnormal the participation was and how large the tickets
+    were, i.e. how much the alignment reading should be trusted.
     """
-    share = np.where(quote_volume > 0.0, taker_buy_quote / np.where(quote_volume > 0.0, quote_volume, 1.0), np.nan)
-    return 2.0 * share - 1.0
+    k = CONFIRM_BARS
+    volume_k = _rolling_sum(quote_volume, k)
+    taker_k = _rolling_sum(taker_buy_quote, k)
+    count_k = _rolling_sum(trade_count, k)
+    if volume_k.size < 20:
+        return 0.0, 0.5
+
+    traded = volume_k > EPS
+    safe_volume = np.where(traded, volume_k, 1.0)
+    imbalance = np.where(traded, 2.0 * taker_k / safe_volume - 1.0, np.nan)
+    log_volume = np.where(traded, np.log(safe_volume), np.nan)
+
+    counted = traded & (count_k > EPS)
+    safe_count = np.where(counted, count_k, 1.0)
+    log_ticket = np.where(counted, np.log(np.where(counted, volume_k / safe_count, 1.0)), np.nan)
+
+    z_imbalance = _series_z(imbalance, NORM_WINDOW)
+    z_volume = _series_z(log_volume, NORM_WINDOW)
+    z_ticket = _series_z(log_ticket, NORM_WINDOW)
+
+    align = math.tanh(z_imbalance / GATE_THETA)
+    amp = 0.5 * (1.0 + math.tanh(0.5 * (z_volume + z_ticket) / GATE_THETA))
+    return align, amp
 
 
-def _participation_score(
-    quote_volume: np.ndarray, imbalance: np.ndarray, index: int, direction: int
-) -> float:
-    """Directional participation ``D`` at one bar: z(quote volume) * max(0, d * z(imbalance)).
-
-    Abnormal participation alone is not enough — Karpoff (1987) says high volume mostly means a
-    large move — so the volume z is multiplied by the aligned part of the taker imbalance z.  A
-    break on ordinary or counter-aligned aggression scores zero or negative and is not taken.
-    """
-    start = index - NORM_WINDOW
-    if start < 0:
-        return float("nan")
-    z_volume = _robust_z(quote_volume[start:index], float(quote_volume[index]))
-    z_flow = _robust_z(imbalance[start:index], float(imbalance[index]))
-    if not (math.isfinite(z_volume) and math.isfinite(z_flow)):
-        return float("nan")
-    return z_volume * max(0.0, direction * z_flow)
+def _clean(frame, column):
+    values = frame[column].to_numpy(dtype=np.float64)
+    values = np.nan_to_num(values, nan=0.0, posinf=0.0, neginf=0.0)
+    return np.maximum(values, 0.0)
 
 
-def _channel_breaks(close: np.ndarray) -> np.ndarray:
-    """+1 where the close prints above the prior-N close high, -1 where below the prior-N low."""
-    marks = np.zeros(close.size, dtype=np.int8)
-    if close.size <= CHANNEL_LOOKBACK:
-        return marks
-    closes = pd.Series(close)
-    upper = closes.rolling(CHANNEL_LOOKBACK).max().shift(1).to_numpy()
-    lower = closes.rolling(CHANNEL_LOOKBACK).min().shift(1).to_numpy()
-    marks[close > upper] = 1
-    marks[close < lower] = -1
-    return marks
+def _finalise(weights):
+    """Apply the organiser's caps, shaving the dominant side for the net cap."""
+    weights = np.clip(weights, -MAX_WEIGHT, MAX_WEIGHT)
+    gross = float(np.sum(np.abs(weights)))
+    if gross > EPS:
+        weights = weights * (GROSS_TARGET / gross)
+    weights = np.clip(weights, -MAX_WEIGHT, MAX_WEIGHT)
 
+    gross = float(np.sum(np.abs(weights)))
+    if gross > GROSS_CAP:
+        weights = weights * (GROSS_CAP / gross)
 
-def _breakout_state(
-    close: np.ndarray, quote_volume: np.ndarray, imbalance: np.ndarray
-) -> int:
-    """Current position sign: +1 long, -1 short, 0 flat.
-
-    The state is the direction of the most recent *confirmed* break, and a break in the opposite
-    direction always closes it whether or not that break was confirmed.  Walking back over the
-    trailing run of same-direction breaks is sufficient: any state older than the last direction
-    change was already closed by it.
-    """
-    marks = _channel_breaks(close)
-    events = np.flatnonzero(marks)
-    if events.size == 0:
-        return 0
-    latest = int(marks[events[-1]])
-    for position in range(events.size - 1, -1, -1):
-        index = int(events[position])
-        if int(marks[index]) != latest:
-            return 0
-        score = _participation_score(quote_volume, imbalance, index, latest)
-        if math.isfinite(score) and score >= GATE_THRESHOLD:
-            return latest
-    return 0
+    net = float(np.sum(weights))
+    if abs(net) > NET_CAP:
+        longs = weights > 0.0
+        long_sum = float(np.sum(weights[longs]))
+        short_sum = -float(np.sum(weights[~longs]))
+        if net > 0.0 and long_sum > EPS:
+            factor = min(1.0, max(0.0, (NET_CAP + short_sum) / long_sum))
+            weights = np.where(longs, weights * factor, weights)
+        elif net < 0.0 and short_sum > EPS:
+            factor = min(1.0, max(0.0, (NET_CAP + long_sum) / short_sum))
+            weights = np.where(longs, weights, weights * factor)
+    return weights
 
 
 class VolumeConfirmedBreakout:
-    """Channel breakout whose entries require confirming taker participation.
-
-    Holds no state between decisions: every read is recomputed from the past-only rows handed in
-    with the context.
-    """
+    """Channel breakout gated on informed participation, run as a portfolio."""
 
     def target_weights(self, context, *, seed):
-        minimum_rows = CHANNEL_LOOKBACK + NORM_WINDOW + 2
-        replay_rows = REPLAY_SPAN * CHANNEL_LOOKBACK + NORM_WINDOW + 2
+        bars = context.bars
+        names = []
+        signals = []
+        liquidity = []
 
-        weights = {symbol: 0.0 for symbol in context.eligible_symbols}
-
-        frames = {}
-        liquidity = {}
         for symbol in context.eligible_symbols:
-            frame = context.bars.get(symbol)
-            if frame is None or len(frame) < minimum_rows:
+            if symbol not in bars:
                 continue
-            if not REQUIRED_COLUMNS.issubset(frame.columns):
+            frame = bars[symbol]
+            if frame is None or len(frame) < MIN_BARS:
                 continue
-            window = frame.tail(replay_rows)
-            recent = np.asarray(window["quote_volume"].to_numpy(), dtype=float)[-LIQUIDITY_WINDOW:]
-            recent = recent[np.isfinite(recent)]
-            if recent.size == 0:
-                continue
-            frames[symbol] = window
-            liquidity[symbol] = float(np.median(recent))
+            recent = frame.iloc[-TAIL:]
 
-        if not frames:
-            return weights
-
-        # Liquidity floor: bottom quintile of the mounted universe by trailing median quote volume.
-        floor = float(np.quantile(np.array(list(liquidity.values()), dtype=float), LIQUIDITY_QUANTILE))
-
-        longs = []
-        shorts = []
-        for symbol, frame in frames.items():
-            if liquidity[symbol] <= 0.0 or liquidity[symbol] < floor:
+            close = recent["close"].to_numpy(dtype=np.float64)
+            if close.size < MIN_BARS or not np.all(np.isfinite(close)) or np.any(close <= 0.0):
                 continue
-            close = np.asarray(frame["close"].to_numpy(), dtype=float)
-            quote_volume = np.asarray(frame["quote_volume"].to_numpy(), dtype=float)
-            taker_buy_quote = np.asarray(frame["taker_buy_quote_volume"].to_numpy(), dtype=float)
-            state = _breakout_state(
-                close, quote_volume, _taker_imbalance(quote_volume, taker_buy_quote)
+            channel = _channel_score(close)
+            if channel is None:
+                continue
+
+            quote_volume = _clean(recent, "quote_volume")
+            median_volume = float(np.median(quote_volume[-LIQ_WINDOW:]))
+            if not (median_volume > 0.0):
+                continue
+
+            align, amp = _confirmation(
+                quote_volume,
+                _clean(recent, "taker_buy_quote_volume"),
+                _clean(recent, "trade_count"),
             )
-            if state > 0:
-                longs.append(symbol)
-            elif state < 0:
-                shorts.append(symbol)
+            # Confirmation scales with |channel|: it bites at the break, not mid-range.
+            score = channel + GATE_GAMMA * abs(channel) * align * amp
+            if not math.isfinite(score):
+                continue
 
-        count_long = len(longs)
-        count_short = len(shorts)
-        if count_long + count_short == 0:
-            return weights
+            names.append(symbol)
+            signals.append(score)
+            liquidity.append(median_volume)
 
-        # Directional tilt is the breadth of the time-series signal, clipped to the net budget.
-        # Whatever tilt the budget cannot carry is neutralised across the two sides, which is what
-        # keeps a single-asset-class trend book two-sided under a |net| cap.
-        tilt = (count_long - count_short) / float(count_long + count_short)
-        tilt = max(-NET_BUDGET, min(NET_BUDGET, tilt))
+        if len(names) < MIN_NAMES:
+            return {}
 
-        if count_long == 0 or count_short == 0:
-            side = longs if count_long else shorts
-            sign = 1.0 if count_long else -1.0
-            unit = sign * NET_BUDGET / len(side)
-            for symbol in side:
-                weights[symbol] = unit
-        else:
-            long_unit = 0.5 * (1.0 + tilt) / count_long
-            short_unit = 0.5 * (1.0 - tilt) / count_short
-            for symbol in longs:
-                weights[symbol] = long_unit
-            for symbol in shorts:
-                weights[symbol] = -short_unit
+        liquidity = np.asarray(liquidity, dtype=np.float64)
+        floor = float(np.quantile(liquidity, LIQ_DROP))
+        keep = liquidity >= floor
+        if int(np.count_nonzero(keep)) < MIN_NAMES:
+            keep = np.ones_like(liquidity, dtype=bool)
 
-        # Respect the per-symbol cap by scaling the whole book rather than clipping names, so the
-        # long/short balance survives the constraint instead of being distorted by it.
-        peak = max(abs(value) for value in weights.values())
-        if peak > MAX_WEIGHT:
-            weights = {symbol: value * (MAX_WEIGHT / peak) for symbol, value in weights.items()}
+        names = [symbol for symbol, take in zip(names, keep) if take]
+        scores = np.asarray(signals, dtype=np.float64)[keep]
 
-        gross = sum(abs(value) for value in weights.values())
-        if gross > GROSS_BUDGET:
-            weights = {symbol: value * (GROSS_BUDGET / gross) for symbol, value in weights.items()}
+        # The caps force a long-short book: gross 1.0 against |net| 0.25 cannot be
+        # one-sided.  Split the time-series signal into a cross-sectional core plus
+        # a bounded directional tilt carrying the market-wide trend.
+        market = float(np.mean(scores))
+        relative = scores - market
+        spread = float(np.std(relative))
+        if not (spread > EPS):
+            return {}
 
-        return {symbol: (value if math.isfinite(value) else 0.0) for symbol, value in weights.items()}
+        z = np.clip(relative / spread, -XS_CLIP, XS_CLIP)
+        shrunk = np.sign(z) * np.maximum(np.abs(z) - XS_SHRINK, 0.0)
+        shaped = np.sign(shrunk) * np.power(np.abs(shrunk), XS_POWER)
+        total = float(np.sum(np.abs(shaped)))
+        if not (total > EPS):
+            return {}
+
+        core = shaped / total
+        tilt = NET_TILT_MAX * math.tanh(market / NET_TILT_SCALE)
+        weights = _finalise(core + tilt * np.abs(core))
+
+        return {
+            symbol: float(weight)
+            for symbol, weight in zip(names, weights)
+            if abs(weight) > 1e-6 and math.isfinite(weight)
+        }
 
 
 def build_strategy():
