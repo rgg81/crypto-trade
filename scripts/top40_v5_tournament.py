@@ -124,7 +124,7 @@ def _lane_files(lane_root: Path, phase: str) -> dict[str, Path]:
         archive = lane_root / "candidates"
         if archive.is_dir():
             for prior in sorted(archive.iterdir()):
-                if prior.is_file():
+                if prior.is_file() and not prior.name.startswith("."):
                     files[f"candidates/{prior.name}"] = prior
     return files
 
