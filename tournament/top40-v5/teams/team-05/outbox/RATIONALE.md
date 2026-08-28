@@ -1,132 +1,232 @@
-# RATIONALE — team-05, discovery
+# RATIONALE — team-05, illiquidity-conditioned short-horizon reversal
 
-**Lane:** illiquidity-conditioned short-horizon reversal (cross-sectional mispricing)
-**Phase:** discovery. No feedback packets exist yet; nothing in this document is fitted to a result.
-**Relation to the sealed thesis:** this is the base configuration of the declared surface, not the
-declared default. The one deliberate deviation is stated in §5 rather than left to be discovered.
+**Lane:** cross-sectional mispricing · **Phase:** refinement · **Evidence:** `lane/feedback/t01.json`
+(the unmodified organizer seed, visible development window only, 808 days).
 
 ---
 
-## 1. The book in one line
+## 1. What t01 actually said
 
-    weight_i  ∝  (½ − rank(r_i)) · rank(ILLIQ_i) · clip(median σ / σ_i)
+Four gates failed — `turnover_ceiling`, `gross_edge_density`, `cost_share`,
+`survives_triple_cost`. They are not four problems. They are one number reported four ways.
 
-Fade the last 8h cross-sectional move, and scale that fade linearly in the name's *ex-ante*
-illiquidity percentile. Dollar-neutral, rank-weighted across the full tradable cross-section, unit
-gross every bar.
+Reconstructing the book's economics from the packet:
 
-There is one factor and one conditioning variable. That is the point of this phase: I want the first
-metric packet to be attributable to a mechanism, not to an interaction between six choices.
+| quantity | derivation | value |
+|---|---|---|
+| gross alpha | `797.2 × 0.9843 bps` | **+7.8 % / yr** |
+| total cost | `7.6198 × gross` | **≈ 59 % / yr** |
+| implied cost rate | `59 % / 797` | **≈ 7.4 bps per unit turnover at 1×** |
+| gross Sharpe | `7.8 % / 10.7 %` | ≈ 0.73 |
+| net Sharpe | reported | −4.84 |
 
-## 2. The mechanism, and why the conditioning is the strategy
+The seed is not signal-dead. Its gross edge is positive and its gross Sharpe is respectable.
+It is destroyed by trading 0.73 of gross per bar — roughly a full book replacement every 2.7
+bars — at ~7.4 bps a unit. Costs are 7.6× the entire gross edge.
 
-Short-horizon reversal is not a mispricing being corrected. Following Nagel (2012), a negative past
-return is a *noisy observation of the inventory the market-making sector was just forced to absorb*,
-and the reversal profit is the rent paid to whoever takes that inventory off their hands. The
-discriminant matters: information-driven price impact is permanent and induces no negative serial
-correlation (Glosten–Milgrom), so any reversal profit that exists is, by construction, the inventory
-channel net of the information channel.
+**This is Junior (2026) exactly**, the base rate I recorded in the sealed thesis (§1.5, citation
+[10]): positive information coefficient, deeply negative net Sharpe, same instrument, same
+columns, same period. A costs-and-turnover failure, not a signal failure. I wrote down that this
+was the single most likely way this lane dies. It is what happened.
 
-If that is the mechanism, the premium must scale with the shadow cost of inventory to the marginal
-liquidity supplier. That cost is unobservable; Amihud illiquidity — absolute return per dollar of
-volume — is its observable dual, since it *is* price impact per dollar of flow, i.e. the inverse of
-the depth the marginal maker will show. Thin book → same order displaces price further → the maker
-ends up holding more inventory relative to their risk budget → they charge more to hold it.
+## 2. Why this is a design problem and not a parameter problem
 
-So the tilt term is not a filter bolted onto a reversal signal. It is the mandate written as
-arithmetic: **reversal strength is an increasing function of ex-ante illiquidity.** Strip the tilt
-and this book is a generic reversal ranker that makes no claim about liquidity provision at all.
+Write the book's economics per unit of gross exposure. Turnover per bar is `2/h` for a book of
+mean holding `h`, so annual turnover is `τ = 2190/h` and annual gross alpha is
+`g = 1095·A_h/h`, where `A_h` is the cumulative alpha one position earns over its whole life.
+Then
 
-The crypto prior justifies the conditioning rather than the raw trade. Bianchi, Babiak & Dickerson
-(2022) find the reversal premium at +1.26%/day equal-weighted in low-activity pairs versus
-+0.54%/day in high-activity, and — the line that decides this design — value-weighted the liquid
-half is an insignificant **−0.19%/day**. The premium lives in the thin half. Meanwhile Liu, Tsyvinski
-& Wu (2022) document weekly *continuation* across ~1,800 coins. My thesis is only coherent if these
-coexist: momentum in the liquid core, reversal in the illiquid tail, at a shorter horizon. A raw
-unconditional reversal book would be betting against the better-established of the two results.
+```
+net(k×) = τ · ( A_h/2 − k·c )        with c ≈ 7.4 bps
+```
 
-## 3. Who is on the other side
+The holding period cancels out of the *sign*. Survival at 3× requires
 
-At the 8h bar boundary on Binance USD-M I am the residual liquidity supplier to four populations:
+```
+A_h  >  6c  ≈  45 bps of cumulative gross alpha per position, at ANY horizon.
+```
 
-1. **Forcibly liquidated leveraged traders.** The exchange's liquidation engine submits their market
-   order. They did not choose to trade, hold no information, and cannot wait for a better price.
-   This is the purest liquidity-motivated flow in any liquid market, and it does not exist in the
-   equity cross-section the founding literature was built on. Ali, Peng & Shams (2025) name this
-   channel directly: forced liquidations trigger cascading price reversals on high-leverage perp
-   venues.
-2. **Retail momentum takers** chasing the 8h move and paying the taker fee for immediacy.
-3. **Delta-neutral and funding-carry desks** rebalancing around the 00/08/16 UTC settlements — i.e.
-   non-informational flow clustered exactly at my decision boundary.
-4. **Market makers who have already left.** Not my counterparty — the *reason* my counterparty got a
-   bad price. When realized vol spikes and their collateral tightens, they widen or pull quotes. The
-   illiquidity tilt is my attempt to point the book at the names where that has just happened.
+The seed earns `A ≈ 2·0.9843 = 2.0 bps` per position. The gap is a factor of 22, and it is
+horizon-invariant, which is precisely why no setting inside my declared surface can close it.
+`holding_bars ∈ {1,2,3}` and `turnover_band ∈ {0.0,0.25,0.5}` move `τ` and `g` together and
+leave `A_h/2 − 3c` negative. Tuning them buys a smaller negative number, not a positive one.
 
-Funding is treated as a cost/credit and **never as a signal**. Funding-as-signal is the carry
-family, not mine, and blending it would make the falsifier untestable.
+The 45 bps hurdle is also the reason the horizon has to move. At 8h resolution a single-bar
+reversal position that clears 45 bps net of nothing would be an implausible signal. At the
+2–5 day horizon it is the *modal* number in the literature I preregistered: Bianchi/Babiak/
+Dickerson report +1.26 %/day equal-weighted in low-activity crypto pairs, Ali/Peng/Shams
+~2.77 % weekly for the crypto reversal factor. A tenth of either clears 45 bps comfortably.
 
-## 4. Construction choices, and what each is defending against
+**So: the mechanism is intact, the expression was wrong, and the specific thing that was wrong
+is the holding period. That is a structural finding, and it is what this candidate is built on.**
 
-| Choice | Why |
-|---|---|
-| Rank transforms throughout | Crypto's cross-section is fat-tailed; a raw-return factor would be one outlier per bar. Also makes the book invariant to price scale and to any monotone relabelling. |
-| Percentile ranks on (0,1) via `(rank−½)/n` | No name gets an exactly-zero multiplier, so the tilt is continuous rather than a disguised gate. |
-| Continuous tilt, not a tercile gate | A gate has a boundary that can be fit to a subsample and would break the organizer's small-perturbation stability check. A continuous confirmation is also the stronger evidence for the mandate. |
-| No explicit demeaning step in code | Da, Liu & Schaumburg (2014) show raw reversal is contaminated by across-industry momentum — in crypto, BTC/ETH beta. Cross-sectional demeaning is required, but `rank(r)` ≡ `rank(r − mean r)`, so the rank transform already carries it. Stated because a missing line that *looks* missing is worse than one explained. |
-| Full cross-section, no top-N cut | A top-N threshold is a hidden knob. Linear-in-rank weighting already sends near-median names to near-zero weight, which is the same effect without a fitted boundary. |
-| `1/σ` balancing, clipped to [0.5, 2.0]× | Cross-sectional risk balancing at **constant gross** — not a volatility target, which the rules reserve to the organizer. Without it the book's risk is owned by whichever illiquid name is currently most volatile. The clip is a stability guard, not an alpha knob. |
-| 30-bar median volume floor at the 20th percentile | Declared ex ante. Participation is capped at 0.1% of prior-24h quote volume, so weight on untradable names silently converts into un-filled gross. The floor drops the part of the tail I could not actually harvest anyway. |
-| Explicit net/gross/per-symbol clamps | The evaluator enforces them regardless; doing it myself means the book I reason about is the book that trades. |
-| No use of `decision_time`, no symbol literals, all windows anchored at the newest row | Satisfies calendar-shift equivariance, symbol pseudonymisation, and future-append invariance by construction rather than by luck. |
+## 3. The mechanism, unchanged
 
-Stateless by design: every decision is recomputed from the past-only rows in `context`. No RNG, no
-persisted state, no embedded parameters.
+A negative (or positive) short-horizon cross-sectional return is not information about value. It
+is a noisy observation of the inventory the market-making sector was just forced to absorb
+(Nagel 2012). Only *transitory* price impact induces negative serial correlation; information
+impact is permanent and pays the liquidity supplier nothing (Glosten–Milgrom). The rent for
+holding that inventory scales with the shadow cost of holding it, whose observable dual is
+illiquidity — price impact per dollar of flow (Amihud 2002). Hence: **reversal strength should
+increase in ex-ante illiquidity**, and if it does not, what I am harvesting is not a
+liquidity-provision premium.
 
-## 5. What this is *not* — the one declared deviation
+**Who is on the other side.** Four named populations, at the 8h Binance USD-M bar:
 
-The sealed thesis names a default configuration with `inventory_proxy = return_and_flow` and
-`turnover_band = 0.25`. This candidate runs `return` and `0.0`. That is a deviation and I am
-recording it rather than quietly shipping it:
+1. **Forcibly liquidated leveraged directional traders.** The exchange's liquidation engine
+   submits their market order; they did not choose to trade, hold no information, and cannot
+   wait. This is the purest liquidity-motivated flow in any liquid market, and it does not exist
+   in the equity cross-section the founding literature was built on.
+2. **Retail momentum takers** chasing a multi-bar move and paying the taker fee for immediacy.
+3. **Delta-neutral and funding-carry desks** mechanically rebalancing around the 00/08/16 UTC
+   settlements — non-informational flow clustering exactly on my bar boundary.
+4. **Market makers who have already left** — not my counterparty, but the reason my counterparty
+   got a bad fill. When realised volatility spikes and their margin tightens they widen or pull.
 
-- **Taker-flow inventory proxy.** §1.6 of the thesis declares it as a *refinement* to Nagel's noisy
-  proxy — and flags that the practitioner evidence on order-flow imbalance in perps runs momentum,
-  not reversal, at sub-minute horizons, so the sign may not survive aggregation to 8h. Adding it now
-  would mean the first packet cannot separate "reversal conditioned on illiquidity works" from "the
-  flow sign survived aggregation". It is a later-phase test with a clean control.
-- **No-trade band.** A band compares against the position I am actually holding, which I cannot
-  observe and may not persist. Implementing it would mean recomputing my own prior target from
-  truncated history — a real technique, but one that adds a second failure surface to a baseline
-  whose job is to be diagnosable. It is the first thing I add if costs are the binding constraint.
+My role: the marginal supplier of immediacy of last resort, accepting inventory the constrained
+intermediary sector declined, and holding it while the transitory component decays.
 
-Both deviations are in the conservative direction: fewer active knobs than preregistered, not more.
+**A tailwind I do not trade for.** The seed's arithmetic leaves roughly +11 %/yr unexplained by
+gross-minus-cost. The natural candidate is funding: a reversal book is short recent winners,
+which carry positive funding, so it is structurally long the funding carry. I take that as a
+by-product and do **not** use funding as a signal — funding-as-signal is the carry family, and
+blending it would make the mandate untestable.
+
+## 4. What changed, and why each change is forced
+
+### 4.1 Overlapping sleeves — the turnover fix (the load-bearing change)
+
+The book is the equal-weight average of `H = 18` dated reversal sleeves, sleeve `k` being the
+book the signal implied `k` bars ago, recomputed from the same past-only rows. Then
+
+```
+w_t − w_{t−1} = ( s_t − s_{t−H} ) / H
+```
+
+exactly — every intervening sleeve cancels. Turnover falls as `1/H` with **no** dependence on
+the intermediate path, while the composite still expresses each signal for its full life. Nothing
+else in the design moves turnover by an order of magnitude. Expected annual turnover ≈ 130–170
+against the seed's 797.
+
+This replaces the declared `turnover_band` (Novy-Marx & Velikov's buy/hold spread) rather than
+implementing it. **A position-dependent no-trade band is not implementable through this API**:
+`DecisionContext` does not expose current quantities, and the evaluator independently applies
+membership exits, participation limits and exposure reductions, so any band would be measured
+against a reconstructed position that drifts from the real one — and a band applied against a
+wrong reference *adds* turnover. Overlapping sleeves obtain the same effect with an exact
+identity instead of an estimate. I regard this as the correct reading of the citation, not a
+departure from it.
+
+### 4.2 Horizon: 9-bar formation, 18-bar span
+
+72h dislocation, held across a 144h envelope (~3.2 bars mean age). Chosen so that `A_h` is
+measured over the window where the crypto reversal literature actually places the effect
+(daily-to-weekly), and short enough to stay clear of the 1–4 week formation horizons where
+Liu/Tsyvinski/Wu document *continuation*. This is still "short-horizon reversal" in the sense the
+family uses the term (Jegadeesh, Da–Liu–Schaumburg and Nagel all sit at weekly-or-shorter).
+
+### 4.3 Selectivity — extremes only
+
+Weight is `sign(c)·max(0, |c| − θ)` on the centred cross-sectional rank `c`, with `θ` set so
+~60 % of the cross-section carries weight (capped at 40 names). A linear ranker spends turnover
+on names whose signal is near zero. Under the mechanism, ordinary moves are information and only
+large ones are plausibly inventory, so the alpha is convex in dislocation and the marginal name
+is worth less than it costs. This raises `A_h` without raising `τ`.
+
+### 4.4 The mandate — a continuous illiquidity tilt
+
+Weights are multiplied by `0.40 + 1.20·rank_pct(Amihud)`: the most illiquid eligible name gets
+4× the weight of the most liquid, continuously, with no threshold to fit. A gate would score
+better on a subsample and worse as evidence; a monotone tilt that survives is the stronger
+confirmation, and it is stable under the organizer's small-perturbation check.
+
+Amihud has `|return|` in its numerator, so it is partly a volatility measure in disguise. The
+inverse-volatility risk balancing applied alongside it (§4.5) largely removes that component, so
+what the tilt is left leaning on is thinness — dollar depth — rather than variance. That is the
+intended reading and it makes the tilt a cleaner test of the mandate than Amihud alone would be.
+
+**Guard against the tilt eating itself.** My own thesis (§1.5) records that cost scales with the
+same illiquidity that generates the premium, so the tilt is bounded (4:1, not unbounded) and the
+thinnest decile by 30-bar median quote volume is excluded outright. Tilting *toward* thinness
+while refusing the very thinnest tail is deliberate, not a contradiction: the interior optimum in
+illiquidity is the whole difficulty of this lane.
+
+### 4.5 Fixed from the sealed thesis, unchanged
+
+Cross-sectional demeaning of the formation return (Da–Liu–Schaumburg — trading raw reversal is
+shorting the market factor); rank transform to `[−0.5, +0.5]`; inverse-volatility cross-sectional
+risk balancing at **constant gross**, which is risk balancing, not volatility targeting; funding
+accrued, never signalled; dollar-neutral by construction, with each side scaled to exactly half
+the gross so "both sides genuinely used" holds on exposure and not merely on P&L.
+
+Volatility is not targeted anywhere. Gross is pinned at 1.0 every bar and the organizer's common
+ex-ante risk unit sets the scale.
+
+### 4.6 One softening I want on the record
+
+The sealed surface defines `inventory_proxy = return_and_flow` as **requiring sign agreement**
+between the demeaned return and the taker-buy imbalance. Implemented literally on a
+top-of-market universe (the seed's median effective breadth of 18.8 implies a cross-section of
+order 40), a hard AND-gate halves an already-small universe and drops effective breadth below the
+structural gate. I therefore blend the two reversal ranks 0.70/0.30 and re-rank. Because the
+magnitude threshold in §4.3 keeps only the tails of the blended rank, and the blend is extreme
+precisely where the two components agree, this is a continuous version of the declared operator
+rather than a different one — but it is a softening and I am not going to call it anything else.
+
+## 5. Declared amendment to the parameter surface
+
+The sealed surface was 972 configurations over seven knobs. t01 refutes two of them structurally:
+`formation_bars ∈ {1,3}` and `holding_bars ∈ {1,2,3}` cannot clear a 45 bps per-position hurdle
+at any value. I replace them with
+
+- `formation_bars ∈ {3, 6, 9, 12}` (4)
+- `sleeve_span ∈ {9, 12, 15, 18, 21}` (5)
+
+and retire `turnover_band` (subsumed by `sleeve_span`, per §4.1). New cardinality
+**972 / (2·3·3) × (4·5) = 54 × 20 = 1080**. Reported so the deflation benchmark stays a real
+number: total multiple-testing exposure is now the 1080-point surface, the 19 development-split
+configurations named in the sealed §4.3, and the realised count of charged trials. This candidate
+is the declared default of the amended surface (`formation_bars = 9`, `sleeve_span = 18`, all
+other knobs at their sealed defaults), not a swept optimum — nothing has been fitted to t01
+beyond the cost rate, which is a measurement.
 
 ## 6. What would falsify this
 
-The mandate's falsifier, restated on what this candidate can actually show:
+The sealed falsifier stands: **if reversal strength does not increase with illiquidity, the
+premium is not compensation for providing liquidity, and the correct nomination is the unmodified
+seed.** I cannot run F1/F2/F4 directly in this phase — there is no shell and the only instrument
+is the metric packet — so I state the packet signatures that stand in for them, with
+pre-committed readings:
 
-- **Primary.** If reversal strength does not increase with illiquidity, the premium is not
-  compensation for providing liquidity. On the development window that means: if this
-  illiquidity-tilted book does not beat an equivalently-constructed *unconditional* reversal book on
-  gross Sharpe, the conditioning is doing nothing and the liquidity-provision story is wrong.
-  Pre-committed consequence: I do not swap the conditioning variable for one that works, and I do
-  not nominate an illiquidity-conditioned book.
-- **Sign.** If the panel interaction between past return and illiquidity is non-negative, same
-  conclusion. Note the thesis explicitly permits the *unconditional* reversal coefficient to be zero
-  or positive — crypto momentum per Liu et al. — while the interaction is negative. That case would
-  be the strongest confirmation available, because conditioning would be doing all the work.
-- **Tradeability, scored separately on purpose.** The mechanism claim is about gross returns. Whether
-  it survives taker execution at 8h is a different question, and conflating them would let a cost
-  failure masquerade as a refutation of the economics. Avramov, Chordia & Goyal (2006) is explicit
-  that contrarian profits in high-turnover, low-liquidity names are smaller than the transaction
-  costs of harvesting them, and my cost scales with the same ILLIQ that generates the premium —
-  there is an interior optimum in illiquidity and it may be at zero net of costs.
+| observation on the next packet | reading |
+|---|---|
+| `gross_edge_bps_per_turnover` still ≈ 1–3 bps | The horizon was not the problem. `A_h` does not grow with holding, the reversion is not multi-bar, and the transitory-impact story (F4) is wrong. Mechanism in trouble, not just the expression. |
+| edge density ≥ ~25 bps but `survives_triple_cost` still fails | Mechanism confirmed, expression not harvestable at taker execution — the sealed §3 "F3 fails" branch. Nominate a minimal-turnover variant, labelled as such. |
+| turnover lands ≪ 130 with edge density high but `annualised_return` ≈ 0 | Over-smoothed: `A_h` saturated well before bar 18 and I am paying 1/H dilution for nothing. Shorten `sleeve_span`, do not touch the signal. |
+| `median_effective_breadth` collapses or `mean_gross_exposure` falls | The selectivity threshold or the tilt is too aggressive for a ~40-name cross-section. Structural, fix before reading any performance number. |
+| edge density rises but realised cost per unit turnover rises with it | The illiquidity tilt is buying premium and paying for it in the same coin — the §1.5 interior-optimum problem, resolved against me. Cap or invert the tilt and report the mandate as unconfirmed. |
 
-**The failure mode I expect, named in advance.** Junior (2026) runs a near-identical exercise on
-Binance USDT-margined perps and reports a gradient-boosted ranker reaching positive rank-IC
-(+0.0243) alongside net Sharpe −2.91 and −95.6% drawdown. Positive IC with deeply negative net
-Sharpe is the signature of a turnover-and-cost failure, not a signal failure. If this book's packet
-shows edge in the signal and destruction in the P&L — high turnover, poor gross edge per unit
-turnover, cost share dominating, death at 3× cost — that is the predicted outcome, and the response
-is the buy/hold spread of Novy-Marx & Velikov (2016), not a new signal.
+And the standing pre-committed consequence from the sealed thesis: **zero movement from the seed
+is an acceptable outcome of this lane; a rescued falsifier is not.** If the illiquidity tilt turns
+out to be dead weight — if the book works only with the tilt removed — that is a falsification of
+my mandate, not a parameter to flip, and I will report it as one.
 
-Zero movement from the seed is an acceptable outcome of this lane. A rescued falsifier is not.
+## 7. Honest residual risks
+
+- **The 45 bps hurdle may simply not be clearable.** Everything above shows the hurdle is
+  horizon-invariant; nothing above shows it is *reachable*. Avramov/Chordia/Goyal's warning is
+  that contrarian profits are smallest net of cost exactly where they are largest gross. That is
+  the equilibrium condition keeping the premium alive, and it may sit below zero here.
+- **Horizon extension buys the cost gate at the price of colliding with crypto momentum.**
+  9-bar formation is comfortably inside Liu/Tsyvinski/Wu's continuation region if their effect
+  starts earlier than one week in perpetuals. A negative `gross_edge_bps_per_turnover` — not
+  merely a small one — is the signature, and it would mean the sign has flipped on me.
+- **Flow may be momentum, not inventory.** The practitioner evidence on order-flow imbalance in
+  crypto perps runs momentum at sub-minute horizons; I am assuming it aggregates to inventory at
+  72h. It carries only 30 % of the blend so a wrong sign degrades rather than destroys, but it is
+  an assumption and not a result.
+- **Universe size is inferred, not observed.** Effective breadth of 18.8 in the seed packet is the
+  only evidence about the cross-section's width. The selectivity rule is written to be
+  size-adaptive (`60 % of the cross-section, floored at 16 names, capped at 40`) so that a much
+  wider universe than I expect does not silently produce an unselective book — but if the
+  universe is materially wider, `MAX_KEEP` is the parameter that is wrong.

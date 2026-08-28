@@ -177,6 +177,34 @@ def run_lane(
             timeout_seconds=timeout_seconds,
         )
         # Artifacts go back into the lane they came from, never into a shared directory.
+        #
+        # Guarded, because a phase can time out having written only part of a file. The harvest
+        # collects whatever is on disk regardless of how the phase ended, so a truncated candidate
+        # would silently replace a working one and the lane would discover it at evaluation. Seen
+        # live: team-07 timed out in refinement, and only luck decided that it had already finished
+        # writing. Parsing is cheap, decisive against truncation, and does not execute the file.
+        if outcome.produced and not outcome.skipped:
+            broken = []
+            for name, body in outcome.produced.items():
+                if not name.endswith(".py"):
+                    continue
+                try:
+                    compile(body.decode("utf-8", "replace"), name, "exec")
+                except SyntaxError as error:
+                    broken.append(f"{name}: {error}")
+            if broken:
+                print(f"  {lane.team_id}: DISCARDED, artifact does not parse: {broken}", flush=True)
+                journal.append(
+                    journal_path,
+                    "trial_evaluator_fault",
+                    {
+                        "team_id": lane.team_id,
+                        "phase": phase,
+                        "error": f"harvested artifact does not parse; lane keeps its previous "
+                        f"candidate: {broken}",
+                    },
+                )
+                return outcome
         if outcome.produced and not outcome.skipped:
             surface = "scouting" if phase == isolation.SCOUTING_PHASE else "outbox"
             destination = lane_root / surface

@@ -1,379 +1,320 @@
-"""team-07 — cointegration convergence, discovery baseline.
+"""team-07 — cointegration convergence as a cross-sectional residual book.
 
-Rolling pairwise Engle-Granger cointegration on log close prices, a preregistered
-half-life, and the three-part stop described in section 4 of lane/scouting/THESIS.md.
+Mandate: rolling pairwise cointegration on log prices, a preregistered half-life, a divergence
+stop.
 
-Every constant below is a Tier-0 fixture, a Tier-1 declared centre, or a Tier-2
-declared default from the preregistered parameter surface. Nothing here has been
-moved in response to a result, because no result exists yet.
+The pair is the *estimator*, not the position. At every decision each eligible symbol is regressed
+(Engle-Granger, with intercept, on log closes over a rolling 180-bar window) against its top-5
+return-correlated partners. Each pair yields a standardised residual z and a set of continuous
+quality multipliers. A symbol's score is the evidence-weighted mean of the residuals it appears
+in, signed so that a symbol trading rich to its cointegrated peers is sold. The book is that score
+demeaned across the cross-section, soft-thresholded, gross-normalised and per-name capped.
 
-State: none. Every quantity is recomputed from the past-only window at each decision,
-including the "position", which is reconstructed from the residual path rather than
-remembered (commitment C4).
+Every screen is a multiplier in [0, 1] rather than an admission test, and the response to z is
+linear rather than gated, so the target weight is Lipschitz in every input: a pair whose ADF
+t-statistic or z drifts across a nominal boundary changes size by a few percent instead of
+round-tripping two legs.
+
+Stateless by construction. Nothing persists between decisions; every quantity, including the
+excursion clock, is a function of the rolling window alone.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 
 import numpy as np
 import pandas as pd
 
-# --- Tier 0: fixed by preregistration, never searched -------------------------------
-# price transform          log(close)
-# method                   Engle-Granger, log P_dep ~ 1 + log P_ind, ADF on residual
-# z basis                  in-window residual mean/sd, past-only, no embargo
-# excursion clock          bars since the residual last crossed its in-window mean
-# leg sizing               beta-weighted, pair gross normalised
-# volatility targeting     none (engine-owned)
+# --- Tier 0: fixed by preregistration -------------------------------------------------------
+HALF_LIFE = 30              # H, in 8h bars (10 days) — preregistered, never fitted per pair
+WINDOW = 6 * HALF_LIFE      # W >= 6H is the declared window/half-life coupling
+SMOOTH = max(2, HALF_LIFE // 5)   # trailing span used to measure the residual (see RATIONALE)
 
-# --- Tier 1: declared centre --------------------------------------------------------
-HALF_LIFE = 15  # H, preregistered half-life in 8h bars (5 days)
-K_AGE = 2  # k, excursion-age stop, in half-lives
-Z_IN = 2.0  # entry threshold, in formation-window sigma
-Z_STOP = 3.5  # divergence stop, in formation-window sigma
-N_PAIRS = 20  # pairs held
+# --- the divergence stop, as a shape rather than an event -----------------------------------
+Z_STOP = 3.0                # response peaks here; beyond it the position is being wound down
+Z_KILL = 4.0                # and is fully flat here
+AGE_STOP = 3 * HALF_LIFE    # k*H excursion-age stop (model invalidation), k = 3
+AGE_KILL = 2 * AGE_STOP
 
-# --- Tier 2: declared defaults ------------------------------------------------------
-WINDOW = 180  # W, formation window in 8h bars (60 days); satisfies W >= 6H
-ADF_TAU = -3.0  # residual ADF t-statistic screen
-Z_OUT = 0.25  # take-profit band
-M_PARTNERS = 5  # correlation-ranked partners tested per symbol
-M_MAX = 2  # max pairs a single symbol may appear in
-EVENT_E = 8.0  # idiosyncratic-event veto, in trailing leg dispersion
-BETA_DRIFT = 0.50  # beta-drift invalidation band (stop S2)
-LIQ_FLOOR = 0.25  # universe filter, cross-sectional quote-volume percentile
-FUNDING_VETO = True
+# --- continuous replacements for the hard screens -------------------------------------------
+ADF_LO, ADF_HI = 1.8, 3.2         # ramp on -t_adf, bracketing the declared tau band
+CORR_LO, CORR_HI = 0.20, 0.50     # ramp on partner return correlation
+BETA_HARD_LO, BETA_SOFT_LO = 0.20, 0.40
+BETA_SOFT_HI, BETA_HARD_HI = 2.50, 4.00
+EVENT_LO, EVENT_HI = 5.0, 8.0     # idiosyncratic-event veto, in trailing leg dispersion
+EVENT_BARS = 3
+FUND_BARS = 90                    # funding rows averaged per symbol (~30 days)
+FUND_SPAN = pd.Timedelta(days=45)  # relative span used to bound the funding scan
 
-# --- Implementation fixtures (not knobs; the simplest admissible value) -------------
-ADF_LAGS = 1  # augmenting lags in the residual Dickey-Fuller regression
-GROSS = 1.0  # book gross before caps; the engine owns the risk unit
-MAX_WEIGHT = 0.10
-MAX_NET = 0.25
-MIN_SYMBOLS = 3
+# --- book construction ----------------------------------------------------------------------
+PARTNERS = 5                # m: correlation-ranked partners tested per symbol
+SHRINK = 1.0                # evidence shrinkage on the per-symbol weighted mean
+SOFT_FLOOR = 0.20           # soft threshold, as a fraction of the 95th pctile of |score|
+MAX_WEIGHT = 0.030          # per-name cap, well inside the 0.10 hard cap
+LIQ_FLOOR = 0.25            # drop the bottom quartile by trailing median quote volume
+MAX_UNIVERSE = 400          # compute guard, applied by liquidity
+MIN_NAMES = 20              # below this the cross-section is not a portfolio
+
 EPS = 1e-12
 
 
-def _build_panel(
-    bars: Mapping[str, pd.DataFrame], symbols: Sequence[str], window: int
-) -> pd.DataFrame | None:
-    """Close-price panel aligned on ``open_time``, not on the positional index.
+def _ramp(x, lo, hi):
+    """0 below ``lo``, 1 above ``hi``, linear in between."""
+    if hi <= lo:
+        return np.where(np.asarray(x) >= hi, 1.0, 0.0)
+    return np.clip((np.asarray(x, dtype=float) - lo) / (hi - lo), 0.0, 1.0)
 
-    Symbols whose own last ``window`` bars do not land exactly on the panel grid are
-    dropped rather than forward-filled: a gap means the spread was not observable.
+
+def _band(x, hard_lo, soft_lo, soft_hi, hard_hi):
+    """1 on ``[soft_lo, soft_hi]``, ramping to 0 at ``hard_lo`` and ``hard_hi``."""
+    return np.minimum(_ramp(x, hard_lo, soft_lo), 1.0 - _ramp(x, soft_hi, hard_hi))
+
+
+def _column_panel(bars, symbols, column, tail):
+    """Align a per-symbol column on ``open_time``, which is the only correct alignment key.
+
+    Each frame is sliced to its last ``tail`` rows *before* reindexing: symbols carry thousands of
+    bars and only the window is ever read.
     """
-    cols: dict[str, pd.Series] = {}
-    for sym in symbols:
-        frame = bars.get(sym)
-        if frame is None or len(frame) < window:
+    keys = []
+    series = []
+    for symbol in symbols:
+        frame = bars.get(symbol)
+        if frame is None or len(frame) == 0:
             continue
-        if "open_time" not in frame.columns or "close" not in frame.columns:
+        columns = list(frame.columns)
+        if "open_time" not in columns or column not in columns:
             continue
-        tail = frame.iloc[-window:]
-        stamps = tail["open_time"]
-        if stamps.duplicated().any() or stamps.isna().any():
-            continue
-        cols[sym] = pd.Series(tail["close"].to_numpy(dtype=float), index=stamps.to_numpy())
-    if len(cols) < MIN_SYMBOLS:
-        return None
-
-    panel = pd.concat(cols, axis=1).sort_index()
-    if panel.shape[0] < window:
-        return None
-    panel = panel.iloc[-window:].dropna(axis=1, how="any")
-    if panel.shape[1] < MIN_SYMBOLS:
-        return None
-    panel = panel.loc[:, (panel > 0.0).all(axis=0).to_numpy()]
-    return panel if panel.shape[1] >= MIN_SYMBOLS else None
+        recent = frame.iloc[-tail:]
+        panel_series = pd.Series(
+            recent[column].to_numpy(), index=pd.Index(recent["open_time"].to_numpy())
+        )
+        panel_series = panel_series[~panel_series.index.duplicated(keep="last")]
+        keys.append(symbol)
+        series.append(panel_series)
+    if not keys:
+        return pd.DataFrame()
+    return pd.concat(series, axis=1, keys=keys).sort_index()
 
 
-def _median_quote_volume(
-    bars: Mapping[str, pd.DataFrame], symbols: Sequence[str], window: int
-) -> np.ndarray:
-    out = np.zeros(len(symbols), dtype=float)
-    for pos, sym in enumerate(symbols):
-        frame = bars.get(sym)
-        if frame is None or "quote_volume" not in frame.columns:
-            continue
-        vol = frame["quote_volume"].iloc[-window:].to_numpy(dtype=float)
-        if vol.size:
-            med = np.nanmedian(vol)
-            out[pos] = med if np.isfinite(med) else 0.0
+def _mean_funding(funding, lookback):
+    """Trailing mean 8h funding rate per symbol; missing symbols simply carry no view."""
+    empty = {}
+    if funding is None or len(funding) == 0:
+        return empty
+    columns = list(funding.columns)
+    if "symbol" not in columns or "funding_rate" not in columns:
+        return empty
+    frame = funding
+    if "funding_time" in columns:
+        # A relative span, never an absolute date: bound the sort without touching the calendar.
+        times = frame["funding_time"]
+        latest = times.max()
+        if pd.notna(latest):
+            frame = frame[times >= latest - FUND_SPAN]
+        frame = frame.sort_values("funding_time")
+    frame = frame[["symbol", "funding_rate"]].dropna()
+    if len(frame) == 0:
+        return empty
+    tail = frame.groupby("symbol", sort=False).tail(lookback)
+    means = tail.groupby("symbol", sort=False)["funding_rate"].mean()
+    out = {}
+    for symbol, value in means.items():
+        rate = float(value)
+        if np.isfinite(rate):
+            out[symbol] = rate
     return out
 
 
-def _mean_funding(funding: pd.DataFrame, symbols: Sequence[str], since) -> np.ndarray:
-    """Trailing mean 8h funding rate per symbol over the formation window's span.
-
-    Returns zeros when the funding frame is unusable, which makes the funding veto
-    inert rather than silently wrong. That shows up as an unchanged cost share.
-    """
-    zeros = np.zeros(len(symbols), dtype=float)
-    if funding is None or len(funding) == 0:
-        return zeros
-    needed = {"symbol", "funding_rate", "funding_time"}
-    if not needed.issubset(set(funding.columns)):
-        return zeros
-    stamps = funding["funding_time"]
-    # ``since`` comes from the bar panel's own ``open_time``; only compare the two
-    # clocks when they are the same kind of clock. Otherwise leave the veto inert.
-    if pd.api.types.is_datetime64_any_dtype(stamps) != isinstance(
-        since, (pd.Timestamp, np.datetime64)
-    ):
-        return zeros
-    recent = funding.loc[stamps.to_numpy() >= since, ["symbol", "funding_rate"]]
-    if recent.empty:
-        return zeros
-    per_symbol = recent.groupby("symbol")["funding_rate"].mean()
-    return np.array([float(per_symbol.get(sym, 0.0)) for sym in symbols], dtype=float)
+def _liquid_universe(bars, index, symbols):
+    """Keep names above the ``LIQ_FLOOR`` percentile of trailing median quote volume."""
+    volume = _column_panel(bars, symbols, "quote_volume", WINDOW + 4)
+    if volume.empty:
+        return symbols
+    volume = volume.reindex(index=index, columns=symbols)
+    median = volume.median(axis=0, skipna=True).to_numpy(dtype=float)
+    usable = np.isfinite(median) & (median > 0.0)
+    if usable.sum() < max(MIN_NAMES, len(symbols) // 2):
+        return symbols
+    threshold = np.quantile(median[usable], LIQ_FLOOR)
+    keep = usable & (median >= threshold)
+    if keep.sum() < MIN_NAMES:
+        return symbols
+    kept = [symbols[i] for i in np.flatnonzero(keep)]
+    if len(kept) > MAX_UNIVERSE:
+        ranked = np.argsort(-median[keep])[:MAX_UNIVERSE]
+        kept = [kept[i] for i in sorted(ranked.tolist())]
+    return kept
 
 
-def _robust_scale(values: np.ndarray) -> np.ndarray:
-    """Column-wise MAD scale, normalised to be a standard deviation under normality.
-
-    The event veto has to measure a jump against a dispersion the jump did not itself
-    inflate. With 179 returns in the window, a genuine 8-sigma bar raises the ordinary
-    standard deviation by ~17%, so an ``e * std`` rule would need a ~10-sigma move to
-    fire and would sit inert. The median absolute deviation does not move.
-    """
-    centre = np.median(values, axis=0)
-    return 1.4826 * np.median(np.abs(values - centre), axis=0)
-
-
-def _ols_beta(dep: np.ndarray, ind: np.ndarray) -> np.ndarray:
-    """Slope of a batched univariate regression with intercept, column-wise."""
-    dep_c = dep - dep.mean(axis=0)
-    ind_c = ind - ind.mean(axis=0)
-    denom = (ind_c * ind_c).sum(axis=0)
-    return np.where(denom > EPS, (dep_c * ind_c).sum(axis=0) / np.where(denom > EPS, denom, 1.0), np.nan)
+def _pair_index(corr, partners):
+    """Top-``partners`` return-correlated counterparts for every symbol."""
+    scored = corr.copy()
+    np.fill_diagonal(scored, -np.inf)
+    take = min(partners, scored.shape[1] - 1)
+    if take <= 0:
+        return np.empty(0, dtype=int), np.empty(0, dtype=int)
+    order = np.argsort(-scored, axis=1)[:, :take]
+    dependent = np.repeat(np.arange(scored.shape[0]), take)
+    regressor = order.reshape(-1)
+    live = np.isfinite(scored[dependent, regressor]) & (scored[dependent, regressor] > CORR_LO)
+    return dependent[live], regressor[live]
 
 
-def _df_tstat(resid: np.ndarray, lags: int) -> np.ndarray:
-    """Dickey-Fuller t-statistic on each column of ``resid``.
-
-    The Engle-Granger residual is mean-zero by construction, so the test regression
-    carries no intercept: d u_t = rho * u_{t-1} + sum_l phi_l * d u_{t-l} + e_t.
-    Only ``lags == 1`` is used; the branchless algebra below is the 2x2 solve.
-    """
-    du = np.diff(resid, axis=0)
-    resp = du[lags:]
-    ylag = resid[lags:-1]
-    if lags == 0:
-        s11 = (ylag * ylag).sum(axis=0)
-        rho = np.where(s11 > EPS, (ylag * resp).sum(axis=0) / np.where(s11 > EPS, s11, 1.0), np.nan)
-        err = resp - rho * ylag
-        dof = max(resp.shape[0] - 1, 1)
-        sigma2 = (err * err).sum(axis=0) / dof
-        var_rho = np.where(s11 > EPS, sigma2 / np.where(s11 > EPS, s11, 1.0), np.nan)
-    else:
-        dlag = du[:-lags]
-        s11 = (ylag * ylag).sum(axis=0)
-        s12 = (ylag * dlag).sum(axis=0)
-        s22 = (dlag * dlag).sum(axis=0)
-        b1 = (ylag * resp).sum(axis=0)
-        b2 = (dlag * resp).sum(axis=0)
-        det = s11 * s22 - s12 * s12
-        safe = np.where(np.abs(det) > EPS, det, np.nan)
-        rho = (b1 * s22 - b2 * s12) / safe
-        phi = (s11 * b2 - s12 * b1) / safe
-        err = resp - rho * ylag - phi * dlag
-        dof = max(resp.shape[0] - 2, 1)
-        sigma2 = (err * err).sum(axis=0) / dof
-        var_rho = sigma2 * s22 / safe
-    return rho / np.sqrt(np.where(var_rho > EPS, var_rho, np.nan))
+def _excursion_age(residual):
+    """Bars since the residual last crossed its in-window mean. Stateless by construction."""
+    same_side = (residual * residual[-1][None, :]) > 0.0
+    reversed_side = same_side[::-1]
+    age = np.argmin(reversed_side, axis=0).astype(float)
+    never_crossed = reversed_side.all(axis=0)
+    return np.where(never_crossed, float(residual.shape[0]), age)
 
 
-def _excursion(resid: np.ndarray) -> np.ndarray:
-    """First row index of the residual's current excursion, per column.
-
-    The excursion begins at the bar after the residual last crossed its in-window
-    mean. If it never crossed, the excursion is the whole window, which the
-    excursion-age stop will then reject.
-    """
-    positive = resid > 0.0
-    changed = positive[1:] != positive[:-1]
-    last = (changed.shape[0] - 1) - np.argmax(changed[::-1], axis=0)
-    return np.where(changed.any(axis=0), last + 1, 0)
-
-
-def _masked_from(values: np.ndarray, start: np.ndarray, fill: float) -> np.ndarray:
-    rows = np.arange(values.shape[0])[:, None]
-    return np.where(rows >= start[None, :], values, fill)
+def _adf_t(residual):
+    """t-statistic of phi in dE_t = phi * E_{t-1} + u, the Engle-Granger residual ADF screen."""
+    lagged = residual[:-1]
+    change = np.diff(residual, axis=0)
+    lag_ss = (lagged * lagged).sum(axis=0) + EPS
+    cross = (lagged * change).sum(axis=0)
+    phi = cross / lag_ss
+    residual_ss = np.maximum((change * change).sum(axis=0) - phi * cross, 0.0)
+    dof = max(residual.shape[0] - 2, 1)
+    stderr = np.sqrt(residual_ss / dof / lag_ss) + EPS
+    return phi / stderr
 
 
-def _apply_caps(weights: dict[str, float]) -> dict[str, float]:
-    """Gross <= 1.0, |w| <= 0.10, |net| <= 0.25 -- in that order, reductions only."""
-    if not weights:
+def _book(score, symbols):
+    """Demean, soft-threshold, cap and gross-normalise the cross-section into a target book."""
+    centred = score - score.mean()
+    magnitude = np.abs(centred)
+    if not np.isfinite(magnitude).any() or magnitude.max() <= EPS:
         return {}
-    names = list(weights)
-    vec = np.array([weights[n] for n in names], dtype=float)
-    vec = np.where(np.isfinite(vec), vec, 0.0)
 
-    gross = np.abs(vec).sum()
+    high = float(np.quantile(magnitude, 0.95))
+    if high <= EPS:
+        return {}
+    clipped = np.clip(centred, -high, high)
+    floor = SOFT_FLOOR * high
+    weight = np.sign(clipped) * np.maximum(np.abs(clipped) - floor, 0.0)
+
+    gross = np.abs(weight).sum()
     if gross <= EPS:
         return {}
-    vec = vec * (GROSS / gross)
-    vec = np.clip(vec, -MAX_WEIGHT, MAX_WEIGHT)
+    weight = weight / gross
 
-    net = vec.sum()
-    if abs(net) > MAX_NET:
-        longs = vec[vec > 0].sum()
-        shorts = -vec[vec < 0].sum()
-        if net > 0.0 and longs > EPS:
-            vec = np.where(vec > 0, vec * ((shorts + MAX_NET) / longs), vec)
-        elif net < 0.0 and shorts > EPS:
-            vec = np.where(vec < 0, vec * ((longs + MAX_NET) / shorts), vec)
+    for _ in range(6):
+        weight = weight - weight.mean()
+        weight = np.clip(weight, -MAX_WEIGHT, MAX_WEIGHT)
+        gross = np.abs(weight).sum()
+        if gross <= EPS:
+            return {}
+        weight = weight / gross
 
-    return {n: float(w) for n, w in zip(names, vec) if abs(w) > 1e-6}
+    weight = np.clip(weight - weight.mean(), -MAX_WEIGHT, MAX_WEIGHT)
+    gross = np.abs(weight).sum()
+    if gross > 1.0:
+        weight = weight / gross
+    net = weight.sum()
+    if abs(net) > 0.25:
+        weight = weight - net / weight.size
+
+    live = np.flatnonzero(np.abs(weight) > 1e-5)
+    if live.size < MIN_NAMES:
+        return {}
+    return {symbols[i]: float(weight[i]) for i in live}
+
+
+def _target_weights(context):
+    eligible = [str(s) for s in context.eligible_symbols]
+    if len(eligible) < MIN_NAMES:
+        return {}
+
+    closes = _column_panel(context.bars, eligible, "close", WINDOW + 4)
+    if closes.empty or closes.shape[0] < WINDOW:
+        return {}
+    closes = closes.iloc[-(WINDOW + 4):].ffill(limit=2).iloc[-WINDOW:]
+    closes = closes.dropna(axis=1, how="any")
+    closes = closes.loc[:, (closes > 0.0).all(axis=0)]
+    if closes.shape[1] < MIN_NAMES:
+        return {}
+
+    symbols = _liquid_universe(context.bars, closes.index, list(closes.columns))
+    if len(symbols) < MIN_NAMES:
+        return {}
+    closes = closes.loc[:, symbols]
+
+    log_price = np.log(closes.to_numpy(dtype=float))
+    if not np.isfinite(log_price).all():
+        return {}
+    # Centring absorbs the Engle-Granger intercept, which is what makes the whole book
+    # invariant to any common rescaling of price levels.
+    centred = log_price - log_price.mean(axis=0)
+    returns = np.diff(log_price, axis=0)
+
+    demeaned = returns - returns.mean(axis=0)
+    scale = np.sqrt((demeaned * demeaned).sum(axis=0)) + EPS
+    corr = (demeaned.T @ demeaned) / np.outer(scale, scale)
+
+    dependent, regressor = _pair_index(corr, PARTNERS)
+    if dependent.size == 0:
+        return {}
+
+    moment = centred.T @ centred
+    variance = np.diag(moment)
+    beta = moment[dependent, regressor] / (variance[regressor] + EPS)
+    beta = np.nan_to_num(beta, nan=0.0, posinf=0.0, neginf=0.0)
+
+    residual = centred[:, dependent] - beta[None, :] * centred[:, regressor]
+    spread_sd = np.sqrt((residual * residual).sum(axis=0) / max(WINDOW - 2, 1)) + EPS
+    # The residual is averaged over SMOOTH bars before standardising: the frozen-beta spread is
+    # measured, not sampled, so bar-to-bar noise does not become turnover.
+    z = residual[-SMOOTH:].mean(axis=0) / spread_sd
+
+    quality = _ramp(-_adf_t(residual), ADF_LO, ADF_HI)
+    quality = quality * _band(beta, BETA_HARD_LO, BETA_SOFT_LO, BETA_SOFT_HI, BETA_HARD_HI)
+    quality = quality * _ramp(corr[dependent, regressor], CORR_LO, CORR_HI)
+    quality = quality * (1.0 - _ramp(_excursion_age(residual), AGE_STOP, AGE_KILL))
+
+    dispersion = returns.std(axis=0) + EPS
+    shock = np.abs(returns[-EVENT_BARS:]).max(axis=0) / dispersion
+    calm = 1.0 - _ramp(shock, EVENT_LO, EVENT_HI)
+    quality = quality * np.minimum(calm[dependent], calm[regressor])
+
+    # Divergence stop as a shape: the response grows with |z| up to Z_STOP, then winds down to
+    # flat at Z_KILL. A broken relationship is exited; it is never exited by a step.
+    response = -np.clip(z, -Z_STOP, Z_STOP) * (1.0 - _ramp(np.abs(z), Z_STOP, Z_KILL))
+
+    denominator = 1.0 + np.abs(beta)
+    dependent_leg = 1.0 / denominator
+    regressor_leg = -beta / denominator
+
+    funding = _mean_funding(context.funding, FUND_BARS)
+    rate = np.array([funding.get(s, 0.0) for s in symbols], dtype=float)
+    direction = np.sign(response)
+    carry = -direction * (dependent_leg * rate[dependent] + regressor_leg * rate[regressor])
+    expected = 0.5 * np.abs(z) * spread_sd + EPS
+    # Funding is a veto, never an alpha: this multiplier can only reduce a pair's size.
+    quality = quality * np.clip(1.0 + HALF_LIFE * carry / expected, 0.0, 1.0)
+
+    signal = np.nan_to_num(quality * response, nan=0.0, posinf=0.0, neginf=0.0)
+
+    numerator = np.zeros(len(symbols), dtype=float)
+    evidence = np.zeros(len(symbols), dtype=float)
+    np.add.at(numerator, dependent, signal * dependent_leg)
+    np.add.at(numerator, regressor, signal * regressor_leg)
+    np.add.at(evidence, dependent, quality * np.abs(dependent_leg))
+    np.add.at(evidence, regressor, quality * np.abs(regressor_leg))
+    score = numerator / (evidence + SHRINK)
+
+    return _book(np.nan_to_num(score, nan=0.0, posinf=0.0, neginf=0.0), symbols)
 
 
 class CointegrationConvergence:
-    """Hold a book of beta-hedged pairs whose residual is far from its in-window mean."""
+    """Cross-sectional book over rolling pairwise Engle-Granger residuals."""
 
-    def target_weights(self, context, *, seed: int) -> Mapping[str, float] | None:
-        del seed  # no randomness is used anywhere in this strategy
-
-        eligible = list(context.eligible_symbols)
-        if len(eligible) < MIN_SYMBOLS:
-            return {}
-        panel = _build_panel(context.bars, eligible, WINDOW)
-        if panel is None:
-            return {}
-
-        symbols = [str(c) for c in panel.columns]
-        logp = np.log(panel.to_numpy(dtype=float))
-
-        # --- universe filter: drop the thinnest LIQ_FLOOR of the cross-section -------
-        med_qv = _median_quote_volume(context.bars, symbols, WINDOW)
-        rets = np.diff(logp, axis=0)
-        disp = rets.std(axis=0)
-        keep = (disp > EPS) & np.isfinite(disp)
-        if LIQ_FLOOR > 0.0 and keep.sum() >= MIN_SYMBOLS:
-            floor = np.quantile(med_qv[keep], LIQ_FLOOR)
-            keep &= med_qv >= floor
-        if keep.sum() < MIN_SYMBOLS:
-            return {}
-        idx = np.flatnonzero(keep)
-        symbols = [symbols[i] for i in idx]
-        logp = logp[:, idx]
-        rets = rets[:, idx]
-        disp = disp[idx]
-        n_sym = len(symbols)
-
-        # --- C6: bounded candidate generation, top-m return-correlated partners ------
-        centred = rets - rets.mean(axis=0)
-        corr = (centred.T @ centred) / (rets.shape[0] * np.outer(disp, disp))
-        np.fill_diagonal(corr, -np.inf)
-        m_use = min(M_PARTNERS, n_sym - 1)
-        partners = np.argsort(-corr, axis=1, kind="stable")[:, :m_use]
-        candidates = set()
-        for i in range(n_sym):
-            for j in partners[i]:
-                jj = int(j)
-                if not np.isfinite(corr[i, jj]) or corr[i, jj] <= 0.0:
-                    continue
-                candidates.add((i, jj) if i < jj else (jj, i))
-        if not candidates:
-            return {}
-        pair_list = sorted(candidates)
-        left = np.array([a for a, _ in pair_list])
-        right = np.array([b for _, b in pair_list])
-
-        # The higher-return-variance leg is the regressand. This is symmetric under
-        # renaming and under price rescaling, and avoids testing both directions and
-        # keeping the better one, which would be a second selection channel.
-        swap = disp[left] < disp[right]
-        dep_i = np.where(swap, right, left)
-        ind_i = np.where(swap, left, right)
-
-        # --- Engle-Granger on log levels --------------------------------------------
-        y = logp[:, dep_i]
-        x = logp[:, ind_i]
-        beta = _ols_beta(y, x)
-        resid = (y - y.mean(axis=0)) - beta * (x - x.mean(axis=0))
-        sigma = resid.std(axis=0)
-
-        tstat = _df_tstat(resid, ADF_LAGS)
-
-        half = WINDOW // 2
-        beta_recent = _ols_beta(y[-half:], x[-half:])
-        drift = np.abs(beta_recent - beta) / np.maximum(np.abs(beta), EPS)
-
-        with np.errstate(invalid="ignore", divide="ignore"):
-            zpath = resid / np.where(sigma > EPS, sigma, np.nan)
-        z_now = zpath[-1]
-
-        start = _excursion(resid)
-        age = (WINDOW - 1) - start
-        peak = _masked_from(np.abs(zpath), start, -1.0).max(axis=0)
-
-        # --- idiosyncratic-event veto: news is a break, not an excursion -------------
-        scale = _robust_scale(rets)
-        scale = np.where(scale > EPS, scale, disp)
-        jumped = np.abs(rets) > (EVENT_E * scale[None, :])
-        pair_jump = jumped[:, dep_i] | jumped[:, ind_i]
-        news = _masked_from(pair_jump.astype(float), np.maximum(start - 1, 0), 0.0).max(axis=0) > 0.0
-
-        # --- screen and the three stops ---------------------------------------------
-        ok = np.isfinite(tstat) & np.isfinite(beta) & (sigma > EPS)
-        ok &= tstat <= ADF_TAU  # cointegration screen
-        ok &= beta > 0.0  # a negative hedge ratio doubles the common trend
-        ok &= drift <= BETA_DRIFT  # S2, relationship invalidation
-        ok &= ~news  # idiosyncratic-event veto
-        ok &= np.isfinite(z_now)
-
-        side = -np.sign(z_now)  # +1 means long the dependent leg
-        active = (
-            ok
-            & (peak >= Z_IN)  # the excursion did reach the entry band ...
-            & (peak < Z_STOP)  # ... and was not stopped out on divergence (S3)
-            & (np.abs(z_now) >= Z_OUT)  # ... and has not yet taken profit
-            & (age <= K_AGE * HALF_LIFE)  # S1, excursion-age / model invalidation
-            & (side != 0.0)
-        )
-
-        # --- funding veto: carry that swallows the convergence it is waiting for -----
-        if FUNDING_VETO:
-            fund = _mean_funding(context.funding, symbols, panel.index[0])
-            # legs are w_dep = side*size, w_ind = -side*beta*size; a long pays f, so
-            # funding P&L per bar per unit size is -(w_dep f_dep + w_ind f_ind)/size.
-            carry = -side * (fund[dep_i] - beta * fund[ind_i])
-            gain = np.abs(z_now) * sigma  # convergence to zero, per unit size
-            active &= ~((carry < 0.0) & (HALF_LIFE * np.abs(carry) > gain))
-
-        chosen = np.flatnonzero(active)
-        if chosen.size == 0:
-            return {}
-
-        # --- rank by strength of cointegration, cap reuse of any single symbol -------
-        chosen = chosen[np.argsort(tstat[chosen], kind="stable")]
-        used: dict[int, int] = {}
-        held = []
-        for p in chosen:
-            a, b = int(dep_i[p]), int(ind_i[p])
-            if used.get(a, 0) >= M_MAX or used.get(b, 0) >= M_MAX:
-                continue
-            used[a] = used.get(a, 0) + 1
-            used[b] = used.get(b, 0) + 1
-            held.append(int(p))
-            if len(held) >= N_PAIRS:
-                break
-        if not held:
-            return {}
-
-        # --- equal gross per pair, beta-weighted legs --------------------------------
-        per_pair = GROSS / len(held)
-        raw: dict[str, float] = {}
-        for p in held:
-            b = float(beta[p])
-            size = per_pair / (1.0 + b)
-            s = float(side[p])
-            dep_sym = symbols[int(dep_i[p])]
-            ind_sym = symbols[int(ind_i[p])]
-            raw[dep_sym] = raw.get(dep_sym, 0.0) + s * size
-            raw[ind_sym] = raw.get(ind_sym, 0.0) - s * size * b
-
-        return _apply_caps(raw)
+    def target_weights(self, context, *, seed) -> Mapping[str, float] | None:
+        return _target_weights(context)
 
 
 def build_strategy() -> CointegrationConvergence:

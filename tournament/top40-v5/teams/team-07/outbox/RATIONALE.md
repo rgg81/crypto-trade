@@ -1,242 +1,264 @@
-# team-07 — Discovery candidate: cointegration convergence
+# team-07 — cointegration convergence, refinement trial
 
 **Family:** cross-sectional mispricing
 **Mandate:** rolling pairwise cointegration on log prices, preregistered half-life, divergence stop
-**Preregistration:** `lane/scouting/THESIS.md` (sealed in Phase S)
-**Feedback consumed:** none. `lane/feedback/` is empty; this is the first pass.
-**Grid points evaluated against feedback so far: 0.**
+**Prior evidence:** `lane/feedback/t01.json` (unmodified organizer seed, visible window, 808 days)
 
 ---
 
-## 1. What this book is, in one paragraph
+## 1. What t01 actually said
 
-At every 8h decision I build a log-close panel aligned on `open_time`, drop the thinnest quartile of
-the cross-section by trailing median `quote_volume`, and for each surviving symbol test its five
-most return-correlated partners. Each candidate pair gets an Engle–Granger regression of the
-higher-return-variance leg's log price on the other's, with an intercept, over a 180-bar (60-day)
-window. Pairs whose residual passes a Dickey–Fuller screen at t ≤ −3.0 form the tradable set. Within
-that set I hold pairs whose residual is currently displaced from its in-window mean, sized β-hedged
-and equal-gross per pair, at most 20 pairs, each symbol in at most two of them. Gross is normalised
-to 1.0 before the exposure caps; I never touch volatility — that unit belongs to the engine.
+The seed failed five gates: `effective_breadth`, `breadth_persistence`, `gross_edge_density`,
+`cost_share`, `survives_triple_cost`. They are not five findings. They are one.
 
-Every constant in `candidate.py` is a Tier-0 fixture, a Tier-1 declared centre, or a Tier-2 declared
-default from §5 of the thesis. **Nothing has been moved in response to a result, because there is no
-result yet.** This is the seed of my own search, deliberately the plainest expression of the mandate
-I can write and still call it cointegration.
+| metric | value |
+|---|---|
+| `median_effective_breadth` | 4.0 |
+| `breadth_pass_fraction` | 0.241 |
+| `annualised_turnover` | 168.8 |
+| `gross_edge_bps_per_turnover` | 5.97 |
+| `cost_share_of_positive_gross` | 1.256 |
+| `triple_cost_annualised_return` | −0.246 |
 
-## 2. The mechanism, and why the residual should revert
+Implied cost per unit turnover ≈ 5.97 × 1.256 ≈ **7.5bp at 1x**, so **~22.5bp at 3x**. The bar for
+`survives_triple_cost` is therefore roughly a **4x improvement in gross edge per unit turnover**.
 
-The claim is *not* that two perpetual contracts share a fundamental equilibrium. It is that the
-Binance USD-M cross-section is low-rank — one or two common stochastic trends dominate log prices —
-so a rolling EG regression of `log P_i` on `[1, log P_j]` is mostly **an estimate of i's loading on
-the common trend relative to j**. β̂ absorbs the shared trend; the residual is what is left, which is
-the *relative idiosyncratic* component of two names that move together for structural reasons.
+The important thing in that table is that `gross_edge_bps_per_turnover` is **positive**. Before
+costs, the seed's P&L had the sign the thesis predicts. The mandate's falsifier — *"if
+cointegrating relationships do not survive out of the window they were estimated in, there is
+nothing to converge to"* — is not what fired. A book with no out-of-window convergence would show
+gross edge density near zero, not ~6bp. What t01 refutes is the **expression**: a mechanism worth
+~6bp per unit of trading cannot be monetised by a construction that pays 7.5bp per unit of
+trading, and the deficit is 3x wider at the triple-cost gate.
 
-I am therefore not forecasting the market. I am claiming that when that residual makes a large
-excursion, the excursion was caused by flow rather than by information, and that flow reverses. The
-compensation for taking that side is divergence risk: many small convergent gains against occasional
-large losses when the relationship was real and then broke. Under Kondor (2009) that negative skew
-is the premium, not a defect to engineer away — which is why my falsifiers below are mechanism tests
-and not P&L tests.
+### Why this is a design fault and not a parameter fault
 
-Contract homogeneity is why this expression is more defensible here than where it was developed.
-Every USD-M perp settles in the same quote asset, funds on the same 8h clock, and is anchored by the
-same premium-index formula. Two perps are genuinely comparable instruments, so a log-price spread
-between them is not contaminated by differing tick conventions, settlement currencies or roll
-schedules. And a short costs what a long costs — no locate, no recall, no borrow — so the asymmetry
-that Do & Faff blame for the decay of equity pairs profitability does not exist in this venue.
+The seed expresses the mandate as *a set of discrete pair trades gated on a threshold*: hold pair
+(i, j) iff it clears an ADF cutoff **and** |z| ≥ z_in. That construction has two properties that no
+setting of my declared Tier-1 grid can remove, because the grid moves them in opposite directions:
 
-## 3. Who is on the other side
+- **Breadth is an accident of how many spreads happen to be wide right now.** Four effective
+  positions, and the bar met on 24% of bars.
+- **Position existence is a step function of a fast statistic**, so every threshold crossing — of
+  z *or* of the ADF cutoff — is a full round trip on two legs. 168.8x turnover is a 6.5-bar
+  holding period against a preregistered 15-bar half-life: the book traded 2.3x faster than its
+  own thesis says the edge decays.
 
-Named concretely, and with the boundary stated up front: **none of these flows are observable in my
-dataset.** There is no liquidation feed, no open interest and no order book here. They are the reason
-a residual excursion exists and should decay; they are not inputs. I am not going to spend a trial
-trying to reconstruct liquidations from OHLCV.
+Lower `z_in` → breadth up, turnover up. Raise it → turnover down, breadth collapses. Raise
+`N_pairs` → breadth up, screen quality down. `z_stop` and `k` change *when* a position dies, not
+how many exist or how often they flip. There is no admissible point on the declared grid where
+breadth clears the bar **and** edge density reaches ~22bp. Hill-climbing here would buy a search
+statistic, not an edge.
 
-- **Leveraged retail being liquidated.** Forced liquidation is price-insensitive, lands in one
-  contract, and mechanically overshoots. It is the largest single-name dislocation source in crypto
-  perps. When a cascade moves one leg double digits without moving its economic peers, whoever takes
-  the other side is paid for it.
-- **Funding-carry and basis desks.** These size the perp short leg *by funding*, not by relative
-  value. A funding spike on one name gets that specific perp sold below its peers for a reason
-  unrelated to its relative fundamentals, and the position unwinds when funding normalises. That
-  flow is mean-reverting by construction, and it is roughly a third of the crypto hedge fund
-  universe, so it is large enough to move a name.
-- **Rotation and narrative flow.** Listings, exchange promotions, sector narratives and token unlocks
-  pull capital into and out of individual names over hours to days.
-- **Market makers laying off inventory** after absorbing one-sided flow in a single contract.
+---
 
-The uncomfortable half of that list: the same paper that identifies crypto short-reversal as a
-liquidity-provision premium finds the premium *largest where liquidity is worst* — and Binance perps
-are, by construction, the most liquid crypto instruments there are. I am fishing in the part of the
-pond where the fish are smallest. That is priced into my expectation, not hidden from it.
+## 2. The redesign
 
-## 4. The stop — the part the mandate calls hard, and why it is three things
+**The pair is the estimator, not the position.**
 
-The hard problem is that **a distance stop fires exactly when the trade is most attractive under the
-model.** If the residual really is an OU process, a spread at 4σ is a *better* entry than one at 2σ.
-So a pure distance stop is only coherent if distance is evidence that the *relationship broke*, not
-evidence that the opportunity grew. That is a claim about model invalidation, and it deserves its own
-instrument. Hence three stops, only one of which is a loss stop:
+Cointegration is used to construct, for each symbol, a continuous relative-value score against its
+cointegrated peer set. The *book* is the cross-sectionally demeaned, symbol-level portfolio over
+the whole eligible universe. Three changes, each of which attacks both failures with the same sign.
 
-- **S1 — excursion-age (primary).** Under a preregistered half-life H, an excursion should decay by
-  2⁻ᵏ in k half-lives. If the residual has been on one side of its in-window mean for more than
-  `k·H = 30` bars (10 days), the preregistered model is wrong *for this pair* and I hold nothing.
-  Scale-free, requires no P&L, and is the stop most directly aligned with the mandate's falsifier.
-- **S2 — relationship invalidation.** The screen is recomputed every decision; a pair that stops
-  passing is out. Additionally β̂ re-estimated on the trailing half-window must be within 50% of β̂ on
-  the full window. This is the thesis's F2 diagnostic turned into a live control.
-- **S3 — divergence (the loss stop).** `|z| ≥ 3.5` in formation-window σ. It exists because roughly
-  38% of pairs trades historically never converge and something must close them. Its declared range
-  includes **off**, precisely so a later trial can tell me the stop is destroying value — a live
-  possibility under Kondor.
+### 2.1 Continuous response instead of a gate
 
-Plus an **idiosyncratic-event veto**: a single-bar move on either leg exceeding 8× that leg's own
-trailing dispersion, occurring inside the current excursion, is treated as news. News is a permanent
-break, not a temporary excursion. This is the observable shadow of the unlocks, delistings and
-listing shocks I cannot see directly. It vetoes entry and forces exit; it is never a reason to size
-up.
+Weight is linear in −z up to `Z_STOP`, then tapered to flat by `Z_KILL`. This is not a softening
+for its own sake: under the OU dynamics the mandate preregisters, the conditional drift of the
+spread *is* proportional to −z, so a threshold is a strictly worse estimator of the conditional
+mean as well as a turnover generator. Thresholding throws away the distinction between z = 2.0 and
+z = 2.9 and then charges two legs of commission for the crossing between them.
 
-**All four are stateless.** The rules forbid state across decisions, so I cannot remember when a
-trade was entered. Every stop is therefore a function of the rolling window alone: the clock is
-"bars since the residual last crossed its in-window mean", not "bars since I entered". The position
-itself is *reconstructed* from the residual path — a pair is held iff, since the last mean crossing,
-the peak |z| reached the entry band, never reached the divergence stop, current |z| is still above
-the take-profit band, and the excursion is younger than k·H. This is a faithful path-consistent
-replay of an entry/hold/exit rule with no memory, and it satisfies exact-replay determinism by
-construction rather than by patch. It also gives me hysteresis for free — positions are held from
-|z|=2.0 down through |z|=0.25 rather than flapping at a single threshold — which matters for the
-turnover and cost gates.
+### 2.2 Continuous screens instead of admission tests
 
-One consequence of that clock is worth stating rather than discovering later: because the age is
-measured from the **mean crossing** and not from entry, a slow-building divergence that takes 25 bars
-to reach |z| = 2.0 has only 5 bars of life left and may never be traded at all. With H = 15 the
-`k·H = 30` bar budget is comparable to a whole typical OU excursion, so S1 at the declared centre is
-an aggressive stop — it discards the longer half of excursions on the grounds that they are
-inconsistent with the preregistered half-life. That is what a model-invalidation stop is *for*, and
-`k` has {1, 2, 3, off} in its declared range if the feedback says the cut is too deep. What I will
-not do is reinterpret the clock as running from entry, because a stateless strategy has no entry to
-run it from.
+ADF t-statistic, β plausibility, partner correlation, excursion age, the idiosyncratic-event veto
+and the funding carry are all multipliers in [0, 1]. A pair whose t-statistic wanders across τ now
+changes size by a few percent rather than flipping between full size and flat. This removes
+**pair-set churn**, which I believe was the larger of the seed's two turnover sources, since it
+generates round trips for reasons that have nothing to do with the spread having moved.
 
-**Funding is treated as a veto, not as alpha.** A pair that is long a persistently
-positive-funding name and short a persistently negative-funding name bleeds whether or not the price
-spread converges. I veto a pair when its adverse trailing carry, compounded over the preregistered
-half-life, exceeds the convergence gain the trade is waiting for. This is a genuine ex-ante
-observable cost with no analogue in the equity pairs literature, and it is not a place I want to
-earn a return — that would be a different family.
+### 2.3 Aggregate to symbols and net
 
-## 5. Structural properties that were designed in, not patched on
+A symbol's score is the evidence-weighted mean of the signed residuals of every pair it appears in,
+shrunk toward zero by the amount of evidence behind it. Offsetting legs across pairs cancel
+**before** they are traded. This is the one move that raises breadth and cuts turnover
+simultaneously — 5 partners per symbol across a few hundred names is thousands of pairwise
+estimates collapsed into one diversified cross-section, rather than twenty concentrated bets.
 
-- **Magnitude-scale equivariance.** The regression carries an intercept, so `P → cP` shifts `log P`
-  by `log c`, is absorbed by α̂, and leaves β̂ and the residual untouched. The z-score, the screen and
-  the stops are all functions of the residual.
-- **Symbol pseudonymisation.** No symbol identity appears anywhere. Pair enumeration is by integer
-  index; the regressand is chosen by *return variance*, which is rename- and scale-invariant, so
-  relabelling the universe cannot change which pairs form or which direction they regress in.
-- **Calendar shift.** No absolute dates, no time-of-day conditioning. This costs me something real —
-  the 00:00/08:00/16:00 UTC funding clock is a plausible effect and I am declining to use it — and I
-  am recording that as a deliberate forfeit.
-- **Small-perturbation stability.** The screen admits a large candidate set and the book holds up to
-  20 pairs; no single threshold decides the book. The one place I am genuinely exposed is `Z_IN`,
-  since it gates entry — a pair sitting at |z| = 1.99 flips on a perturbation. Breadth is the
-  defence: with 20 pairs, one flip is 5% of gross.
-- **Two-sided by construction.** Every pair is one long leg and one short leg. The "both sides
-  genuinely used" gate is satisfied structurally, not statistically.
-- **Effective breadth.** 20 pairs with each symbol in at most 2 of them means at least 20 distinct
-  names. `M_MAX = 2` also makes the 0.10 per-symbol cap nearly automatic at full breadth.
+Breadth stops being an accident: with a per-name cap of 0.030 against gross 1.0, the book holds at
+minimum ~34 names, in practice several times the seed's effective 4, on *every* bar where the
+window is populated — which is what `breadth_persistence` measures.
+
+### 2.4 Turnover, explicitly
+
+Four levers, in order of expected size:
+
+1. **No threshold crossings** (§2.1) and **no pair-set churn** (§2.2).
+2. **Netting at the symbol level** (§2.3).
+3. **H = 30 bars** (10 days), the long end of the declared Tier-1 range, forcing W = 180 by the
+   Tier-0 coupling W ≥ 6H. The seed asked a multi-day mechanism to pay for 2.3x-faster trading.
+4. **The residual is measured, not sampled.** z is the frozen-β spread averaged over the last 6
+   bars (H/5) and then standardised. For a half-life of 30 bars this costs ~7% of signal amplitude
+   and removes roughly a factor of √6 of bar-to-bar noise from the target vector — a direct,
+   favourable trade of edge for turnover.
+
+I am explicit that this is where the candidate lives or dies: it must move gross edge per unit
+turnover from ~6bp to ~22bp+. Levers 1–3 are structural and I expect the bulk from them; lever 4
+is the only one that trades signal for cost, and it is sized by H rather than chosen freely.
+
+---
+
+## 3. The stop — the hard part of the mandate
+
+The mandate names the stop as the difficult piece, and the reason is real: **under a true OU, a
+spread at 4σ is a better entry than one at 2σ.** A distance stop is only correct if distance is
+evidence that the *relationship broke*, not evidence that the opportunity grew. So the stop is
+three stops, and only one is a loss stop. All three are stateless — functions of the rolling window
+alone, never of when a position was opened — which is required, and which also means a stop can
+never drift out of sync with the book.
+
+- **S1 — excursion age (primary, model invalidation).** Bars since the residual last crossed its
+  in-window mean. Because the regression carries an intercept, the residual has exactly zero mean
+  in-window, so the crossing is well defined. Full size to 3H = 90 bars, ramping to flat at 180.
+  An excursion that has survived three preregistered half-lives should have decayed 87.5%; if it
+  has not, the preregistered model is wrong *for that pair*, and that is a statement about the
+  model rather than about P&L.
+- **S2 — relationship invalidation.** The ADF ramp, the β plausibility band and the partner-
+  correlation ramp are recomputed every decision. A relationship that stops looking like one is
+  wound down continuously.
+- **S3 — divergence stop (the loss stop).** `|z| ≥ Z_STOP = 3.0` is the peak of the response; from
+  there it ramps linearly to flat at `Z_KILL = 4.0`. Something has to close the ~38% of pairs that
+  never converge.
+
+**The design point:** in a stateless continuous book the stop must be a *shape of the response
+function*, not an event. A hard exit at z_stop reintroduces exactly the step this redesign exists
+to remove — it would round-trip two legs every time a diverging spread jittered across 3.0. The
+taper is a genuine stop (the position is flat beyond 4σ) that is Lipschitz in z, so its cost is
+bounded by how far the spread actually moved.
+
+Alongside it, the **idiosyncratic-event veto**: a single-bar move on either leg exceeding 5–8x that
+leg's trailing dispersion ramps the pair to zero. News is a permanent relationship break, not a
+temporary excursion, and this is the observable shadow of the unlocks, listings and liquidation
+cascades I cannot see directly. It vetoes entry and forces exit; it can never size a pair up.
+
+---
+
+## 4. Who is on the other side
+
+Unchanged from the preregistration, and worth restating because it is what justifies the sign.
+
+- **Leveraged retail being liquidated.** Forced liquidation is price-insensitive, concentrated in
+  one contract, and mechanically overshoots. When a token-specific cascade moves one leg double
+  digits without moving its economic peers, whoever takes the other side is compensated.
+- **Funding-carry and basis desks.** They size the perp short leg *by funding*, not by relative
+  value. When funding on one name spikes they short that specific perp — pushing it below its peers
+  for a reason unrelated to its relative fundamentals — and unwind when funding normalises. Their
+  flow is mean-reverting by construction.
+- **Rotation and narrative flow**, and **market makers laying off inventory** after absorbing
+  one-sided flow in a single contract.
+
+The premium is compensation for **divergence risk** — being short an option on relationship
+stability — and secondarily for liquidity provision. None of these flows are observable in the
+dataset; they are the reason the residual exists and should decay, not a signal. Inputs are log
+closes, `quote_volume` and `funding_rate`, nothing else.
+
+Funding enters only as a **veto**: a pair whose expected net 8h carry over one half-life would eat
+more than the expected convergence gain is damped to zero. The multiplier is clipped at 1, so it can
+only ever reduce a pair's size. This is deliberate — sizing by funding would be a different family.
+At H = 30 bars the carry term is second-order against a 60-day spread's dispersion, so I expect it
+to bind rarely; it exists for the regimes where it does not.
+
+---
+
+## 5. Declared-surface accounting, honestly
+
+**Moved, within Tier 1 (declared):** `H` 15 → **30** (long end of {6, 15, 30}), which forces
+W = 180 through the Tier-0 coupling W ≥ 6H. `k` 2 → **3**, matched to the longer half-life.
+`z_stop` held at the declared centre 3.5 in spirit but **implemented as a 3.0 → 4.0 taper**, whose
+midpoint is the declared centre. `z_in` and `N_pairs` no longer exist as knobs — the redesign
+deletes them, which is the point.
+
+**Tier-2 knobs opened, with their preregistered triggers actually fired:**
+
+- **13 `liq_floor` = 0.25** (the declared default). Trigger: *"only if participation or cost-share
+  gates fail."* `cost_share` failed.
+- **7 `τ`.** Trigger: *"only if the screen admits fewer than `N_pairs` candidates at a majority of
+  decisions."* `breadth_pass_fraction = 0.241` is that condition, measured. The response is **not**
+  to move τ to −2.6; it is to replace the cutoff with a ramp over −1.8 → −3.2, which brackets the
+  entire declared band {−2.6, −3.0, −3.4}.
+- **9 `m` = 5**, **10/15 (breadth)**: superseded — breadth is now set by the cross-section rather
+  than by a pair count, so `m_max` and `pair_weighting` are not used.
+- **14 `funding_veto` = on** (declared default).
+- **11 `e`**: the event veto is on at its declared default of 8, implemented as a 5 → 8 ramp.
+
+**Deviations I have to declare as such.** Per §5 of the thesis — *"if I find during Phases 1–3 that
+I need a parameter that is not on this list, the honest report is that the preregistration was
+incomplete, and I will say so"*:
+
+1. `SMOOTH = H/5 = 6 bars`, the trailing span over which the frozen-β residual is averaged before
+   standardising. The preregistration declared thresholds *on* z but never declared how z is
+   measured in time; it implicitly assumed a single last observation. It is tied to H by
+   construction and is not searched.
+2. The **ramp endpoints** replacing each hard cutoff, and the **β plausibility band** (0.2/0.4 —
+   2.5/4.0), which the preregistration did not contain at all.
+3. `SHRINK`, `SOFT_FLOOR`, `MAX_WEIGHT` — book-construction constants that only exist because the
+   book is now a cross-section rather than a pair list.
+
+None of these were tuned against feedback; there is one feedback packet and it contains no
+per-parameter information. They are consequences of the gates→ramps redesign. **Trials evaluated
+against feedback so far: 1** (the unmodified seed). This candidate is the second.
+
+---
 
 ## 6. What would falsify this
 
-The mandate's falsifier — *if cointegrating relationships do not survive out of the window they were
-estimated in, there is nothing to converge to* — was operationalised in §3 of the thesis before any
-data was mounted. Restated here so the commitment is visible next to the code:
+Stated before the result, and separated so that a single number cannot be read as vindicating the
+whole design.
 
-- **F1 (hard).** Freeze α̂, β̂ and the residual moments at t; evaluate the frozen spread forward over
-  k·H bars with no re-estimation. Among frozen spreads at |z| ≥ 2.0, the fraction reaching |z| ≤ 0.25
-  before touching |z| = 3.5 or running out of clock. A driftless random walk from z = 2.0 with
-  barriers at 0 and 3.5 converges 42.9% of the time; the equity base rate is ~62%. **If the observed
-  fraction is below 55%, F1 fails and I retire the mandate rather than search for a window or
-  threshold that lifts it.**
-- **F3 (hard).** Build a control set of pairs at the same t that *failed* the cointegration screen
-  but had |z| matched within ±0.25. **If the screened set's convergence fraction does not exceed the
-  control's by at least 5 percentage points, F3 fails** — the screen adds nothing over "the spread is
-  wide" — and I do not nominate a cointegration book on the strength of a distance effect, **even if
-  it makes money.**
-- **F2 (diagnostic).** Median |β_{t+W} − β_t| / |β_t| on the next non-overlapping window. Above 0.50
-  the cointegrating vector is being redefined faster than the spread can reach it. A passing F2 does
-  not rescue a failing F1.
+- **The mechanism.** `gross_edge_bps_per_turnover` at or below ~6bp again, *despite* turnover
+  falling substantially. That would mean the edge scales down exactly with the trading — i.e. the
+  seed's positive gross edge was the fast, threshold-crossing component and there is nothing slow
+  to hold. That is the mandate's falsifier arriving at last: the cointegrating relationship does
+  not survive out of the window it was estimated in, on the horizon I am now trading. Under my
+  preregistration this retires the mandate; I do not go looking for a shorter H, because
+  Fil & Kristoufek locate the effect at 5 minutes and one hour and I cannot reach either.
+- **The redesign.** Turnover *not* falling materially below 168x. Then netting, ramps and the
+  6-bar measurement did not do what I claim they do, and my diagnosis of t01 was wrong.
+- **The construction.** `effective_breadth` or `breadth_persistence` failing again. With a 0.030
+  per-name cap those are close to arithmetically guaranteed, so a failure means the book is not
+  being built at all — most likely the panel is collapsing and I am returning `{}`. That is an
+  implementation bug, not a finding, and I would treat it as one.
+- **The cost gate specifically.** `survives_triple_cost` still failing while edge density lands in,
+  say, 12–18bp. That is the genuinely ambiguous outcome: the redesign worked directionally and the
+  mechanism is simply too thin for this venue's cost floor at 3x. The honest report is then that
+  the family is present and unmonetisable at the required cost multiple, and I would say so rather
+  than search for the parameter that squeaks over the line.
 
-**The most likely killer is not the stop; it is the sampling frequency.** Fil & Kristoufek found
-crypto pair-spread mean reversion at 5 minutes and at 1 hour and *absent at daily*. My grid is 8h —
-squarely in the dead zone between the two. Meanwhile crypto short-horizon reversal concentrates in
-illiquid names while the liquid ones show daily momentum, and my universe is by construction the
-liquid end. My defence is that a β-hedged spread is not a raw return: the hedge removes the common
-trend that carries the momentum. **That defence is a claim, not a fact, and F1 tests it directly.**
+I expect a **modest** result if the design is right. Krauss's survey puts pairs trading at ~10.8%
+annualised and Sharpe ≈ 0.96 across 76 studies, decaying to 6.4% post-2010, and PwC has 31% of
+digital-asset hedge funds running market neutral. A large measured effect here would be a red flag,
+not a success.
 
-A second, cheaper way this dies: turnover. A 5-day half-life on an 8h grid implies a lot of trading,
-and a full round-trip on both legs of a pair costs roughly 20bp gross at taker fees — about 60bp
-under the triple-cost gate. If gross edge per unit turnover does not clear that, the honest report is
-that the mechanism exists and is not harvestable at this frequency. **I will not tune H until
-turnover lands inside the gate**; that would let the cost gate choose my half-life instead of the
-mechanism.
+---
 
-## 7. Implementation choices the preregistration did not pin down
+## 7. Interface compliance
 
-Per the thesis's own closing rule — if I need something not on the declared list, the honest report
-is that the preregistration was incomplete — these five were under-specified and I fixed each at the
-simplest admissible value rather than choosing among them. **None is a knob I will turn, and if a
-later phase needs to move one I will say so explicitly.**
-
-1. **Augmenting lags in the residual Dickey–Fuller regression: 1.** Zero lags over-reject under
-   serially correlated increments; one lag is the cheapest correction. The test regression carries no
-   intercept because the EG residual is mean-zero by construction.
-2. **Which leg is the regressand: the one with higher return variance.** EG is direction-asymmetric.
-   The common alternative — run both directions, keep the stronger rejection — adds a second
-   selection channel on top of the screen. The variance rule is deterministic and invariant under
-   both renaming and price rescaling.
-3. **"Adverse funding carry" as a magnitude test, not a sign test.** A pure sign veto would reject
-   about half of all signals and import a systematic carry tilt — a different family leaking into
-   this one. I veto only when H·|carry| exceeds |z|·σ_u, i.e. when funding actually swamps the trade,
-   which uses no parameter outside the declared surface.
-4. **"Trailing leg dispersion" in the event veto is a MAD scale, not a standard deviation.** This one
-   I want to be loud about, because the naive reading is a silent no-op. A single 8σ bar inside a
-   179-return window inflates that window's own standard deviation by about 17%, so an `e·std` rule
-   would need a ~10σ clean move to fire and the veto would sit inert while looking active. The median
-   absolute deviation (×1.4826, the standard normal consistency factor) does not move with the
-   outlier, so `e = 8` means what it says. `e` itself is untouched at its declared default. Because
-   8h crypto returns are fat-tailed, a MAD scale runs somewhat below the standard deviation, so in
-   practice this veto will fire on roughly 5–6 std-measured sigma — which is the intended order of
-   magnitude for "this was news".
-5. **Cap ordering: gross → per-symbol clip → net.** Every step after the first is a reduction, so all
-   three constraints hold simultaneously at the end. The net fix scales the dominant side only,
-   preserving relative weights within each side.
-
-I should also flag, without dressing it up: **at the declared default the ADF screen is loose.** With
-180 observations the 5% Engle–Granger critical value sits nearer −3.34 than −3.0, so `ADF_TAU = -3.0`
-is closer to a 10% test and admits roughly one candidate pair in ten by chance alone. That is a
-consequence of the Tier-2 default I preregistered, not a choice made here, and it is exactly the
-condition F3 is designed to detect. If F3 fails, this is the first place to look.
-
-## 8. What I want out of the feedback packet
-
-Ranked by what would change my next move, not by what would look good:
-
-1. **Effective breadth and mean number of held pairs.** If the book is routinely holding far fewer
-   than 20 pairs, the declared trigger for opening `τ` (Tier-2 #7) has fired and that is a
-   contingency, not a search.
-2. **Turnover and gross edge per unit turnover, at 1× and 3× cost.** This decides whether the
-   mechanism is harvestable at 8h at all. It is the fastest available proxy for the frequency problem
-   in §6.
-3. **Cost share split between fees and funding.** If funding dominates, Tier-2 #14 opens. If fees
-   dominate, the answer is a longer half-life, not a better filter.
-4. **Mean holding period.** If it sits far below `k·H = 30` bars, S1 is cutting trades short rather
-   than catching broken ones, and `k` is the first Tier-1 coordinate to move — which is also the
-   order the thesis committed to, stops first.
-5. **Participation.** The 0.25 liquidity floor is a guess at where the participation cap binds.
-6. **Whether the book ran at all.** A flat book for the whole window means the panel alignment or a
-   filter is wrong, not that the edge is absent — and those two look identical in a Sharpe number.
-
-Performance is reported here and enforced on blocks I never see. With twelve feedback-driven trials,
-a development Sharpe is a statement about a search rather than about an edge. I am not going to
-hill-climb it. The two numbers that decide whether this mandate survives are F1 and F3, and neither
-is a P&L number.
+- `build_strategy()` returns an object with `target_weights(context, *, seed)`.
+- The panel is built on **`open_time`**, never on the positional `RangeIndex`.
+- Returns `dict[str, float]` over `context.eligible_symbols`, or `{}` while the 180-bar window is
+  unpopulated. Never `None`.
+- `sum(abs(w)) ≤ 1.0`, `abs(sum(w)) ≤ 0.25` (the book is demeaned, so net is ~0 by construction),
+  `abs(w) ≤ 0.030` against the 0.10 cap.
+- Reads only `close`, `quote_volume`, `open_time` from `bars` and `symbol`/`funding_rate`/
+  `funding_time` from `funding`.
+- **No volatility targeting.** Nothing conditions on realised or forecast portfolio volatility; the
+  book is normalised to unit gross and handed to the organizer's risk unit.
+- Stateless, deterministic, no RNG, no I/O, no `eval`/`exec`/`getattr`, no embedded data. `seed` is
+  accepted and unused.
+- **Scale invariance** is structural: log prices are column-centred, which absorbs the
+  Engle–Granger intercept, so `P → cP` leaves β̂ and every residual untouched. The liquidity filter
+  is a cross-sectional percentile, so it is invariant too.
+- **No symbol identity** anywhere — symbols are dict keys only. **No absolute dates and no
+  time-of-day conditioning**, so calendar shift is satisfied; I decline the 00:00/08:00/16:00
+  funding clock deliberately for this reason.
+- **Small-perturbation stability** is the design: every screen is a ramp and the response is
+  piecewise linear, so there is no threshold whose crossing changes the book discontinuously.

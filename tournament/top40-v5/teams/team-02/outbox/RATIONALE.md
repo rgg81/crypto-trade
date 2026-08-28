@@ -1,163 +1,247 @@
-# team-02 — funding convexity · discovery baseline
+# team-02 — funding convexity · refinement candidate
 
-**Trial role:** discovery baseline, not a nomination.
-**Specification:** the preregistered **primary cell** of `lane/scouting/THESIS.md` §4.2, unmodified.
-**Deflation accounting:** N = 1. Nothing outside §4.1 has been searched, because nothing has been
-searched at all — this candidate was written from the sealed thesis before any feedback existed.
+**Family:** risk-premium harvesting · **Mandate:** realized-funding term structure against
+realized volatility · **Prior evidence:** `lane/feedback/t01.json` (the unmodified organizer
+seed), visible development window only.
 
 ---
 
-## 1. The mechanism
+## 1. Diagnosis of t01 — what the seed actually failed at
 
-Binance USD-M funding is not a sentiment reading. It is a contract-enforced price, computed from
-the *impact* bid/ask against the spot index, so levered demand that pushes the perp away from its
-index is transcribed into funding mechanically rather than inferred. That gives the payoff its
-shape: **the premium is capped per interval, the deleveraging cascade that makes you pay for it is
-not.** Bounded premium, unbounded loss, is the payoff of selling variance. Funding is the only
-observable *price of a risk* on this venue; realized volatility is the only observable *cost of
-bearing it*. This dataset has no options, so there is no implied variance and no literal VRP. The
-spread between those two observables is the closest analog the data supports:
+t01 failed three gates: `gross_edge_density`, `cost_share`, `survives_triple_cost`. It passed
+every structural gate — breadth 12.8, mean gross 0.83, long/short exposure 0.5005/0.4995,
+participation 0.99, and the turnover band at 87/yr. **This is not a "not a portfolio"
+failure.** The seed is a well-formed book with nothing in it.
 
-> **VRP analog = funding carry per unit of forecast forward realized variance.**
+Backing the cost curve out of the packet:
 
-The mandate's instruction — trade the funding *term structure* against realized volatility — is
-what separates *"the premium is high because volatility is high"* (fairly paid) from *"the premium
-is high because the book is crowded and about to break"* (about to be unpaid). Funding **level**
-cannot tell those apart. Funding **dispersion** can, because the distribution moves before the mean
-does: in the peak-leverage regime before the 10 Oct 2025 cascade, average funding was an
-unremarkable 7.3% APR while peak prints exceeded 29% APR. A level filter would have called that
-"bullish, not crowded."
-
-### How that becomes a book
-
-Per symbol, at every decision, from past-only rows:
-
-| quantity | construction | window |
+| quantity | derivation | value |
 |---|---|---|
-| `carry` | sum of realized funding prints ÷ elapsed days → funding per day | 3 days (`s = 9` intervals) |
-| `dispersion` | stdev of funding prints, rescaled by √(prints/day) → per-day scale | 21 days (`l = 63` intervals) |
-| `RV` | mean per-bar Garman–Klass variance | 3 days (`v := s`, tied) |
+| gross P&L | `1.7141 bps × 86.999` | **+149 bps/yr** |
+| net P&L | reported | **−531 bps/yr** |
+| implied cost | difference | **≈ 680 bps/yr** |
+| **cost per unit turnover** | `680 / 87` | **≈ 7.8 bps** |
+| same at 3× | | **≈ 23.4 bps** |
 
-The forward-variance forecast is an **equal-weight geometric blend of the two variance proxies in
-cross-sectionally centred logs** (dispersion squared, so both terms are variance-like):
+`cost_share_of_positive_gross = 4.376` is consistent with this (4.376 × 149 ≈ 652 bps).
+
+One more thing the packet fixes for free: `active_bar_fraction = 0.990924092409241` is exactly
+`2402/2424`. So the window carries **2424 decisions over 808 days — 8-hourly decisions, three
+per day**, and the seed lost exactly 22 bars to warm-up. Every window below is sized against
+that, and the code infers the cadence from `open_time` rather than assuming it.
+
+**The binding constraint, stated as arithmetic.** To clear `survives_triple_cost` a book needs
+`gross_edge_bps_per_turnover > ~23.4`. The seed is at 1.71. That is a **14× gap**, and no
+parameter on any grid moves a number 14×. Two structural levers have to move together:
+
+1. **Hold long enough that the carry pays for its own round trip.** At 3× cost a position must
+   earn 23.4 bps of edge before it is worth opening. This is not a preference, it is a floor on
+   the holding period, and it is the single most important number in the packet.
+2. **Stop spreading gross across names with no conviction.** Every name held at a weight whose
+   signal is indistinguishable from zero contributes turnover to the denominator and nothing to
+   the numerator.
+
+Both are *design* problems. The candidate changes the design; it does not tune the seed.
+
+---
+
+## 2. The mechanism
+
+The funding rate on Binance USD-M is not a sentiment reading — it is a contract-enforced price,
+computed from the impact bid/ask against the spot index, settled every 8h. It transcribes
+levered crowding into an observable cash flow mechanically, with no estimation step. A position
+of sign `p` accrues `−p·f` each interval: **carry is earned by holding, not by predicting.**
+
+Funding *level* tells you the size of the insurance premium. It does not tell you whether the
+premium is adequate for the variance being underwritten. The mandate's instruction — trade the
+funding term structure *against realized volatility* — is exactly that missing normalisation.
+With no options in this dataset there is no implied variance and therefore no literal VRP, but
+funding is the only observable *price of a risk* here and realized variance is the only
+observable *cost of bearing it*. The tradeable object is the ratio:
+
+> **carry per unit of forecast forward realized variance**, taken cross-sectionally.
+
+The book is:
 
 ```
-log σ̂²ᵢ  ∝  ½·centre(log RVᵢ)  +  ½·centre(log dispersionᵢ²)
-signalᵢ   =  − carryᵢ / σ̂²ᵢ ,  then cross-sectionally demeaned and normalised
+w_i  ∝  −( carry_i − median(carry) ) / vhat_i        then demeaned, capped, gross-normalised
 ```
 
-Equal weights are a preregistered choice, not a fitted one — there is no regression coefficient
-anywhere in this file. Dispersion enters the **denominator** and only the denominator: §4.4 of the
-thesis commits to that placement because it is the one place the convexity term can act without
-becoming a volatility target.
+- `carry_i` — mean of the last **21** eight-hour funding prints (7 days).
+- `vhat_i` — forecast of forward realized variance: a HAR baseline on **Garman–Klass** 8h
+  variance (1d / 3d / 7d components) plus a trailing **funding-dispersion** term measured as
+  the standard deviation of the last **63** prints (21 days), fitted online.
 
-**Sign, committed in §1.6 before any data:** `f > 0` means longs pay shorts, so a position of sign
-`p` accrues `−p·f`. Rich funding earns a short. The two return components reinforce — funding
-accrual pays, and shorting the highest-carry names is also shorting the crowd that crashes.
+Three points about the construction that are load-bearing rather than cosmetic:
 
-### What keeps it inside the rules
+**(a) The carry is demeaned *before* the variance divide.** Funding has a positive
+cross-sectional mean (the 0.01%/8h interest component plus structural long demand). Dividing
+the raw level by variance therefore leaves a residual `−mean(carry)/v_i` term in every score —
+a pure inverse-variance tilt that shorts the low-vol majors and buys the high-vol alts, with a
+size that has nothing whatever to do with the mandate. Demeaning first removes it and leaves
+`1/v` doing the one job it should: sizing the *deviation* by the risk borne to hold it. I
+consider the naive ordering a construction defect, not a variant.
 
-- **Not a volatility target.** Gross is renormalised to a fixed 0.98 at every rebalance. The book
-  carries no gross-exposure timing whatsoever; `1/σ̂²` sets *relative* allocation across symbols
-  only. The *level* of `σ̂²` is not even computed — it cancels identically in the demean-and-
-  normalise step, which is also why the book is invariant to a rescaling of prices or of the
-  variance unit.
-- **Relative value, not an outright short.** Funding is positive on average, so an undemeaned
-  carry book is a permanent short in a bull tape. The cross-sectional demean is load-bearing, and
-  §1.6 flags it as not optional.
-- **No state, no dates, no identities.** `target_weights` is a pure function of the context. No
-  attribute survives a call, so exact replay is deterministic and there is no look-ahead channel.
-  No symbol name, absolute date, or price level is ever compared against a literal.
-- **Constraints held with margin:** gross ≤ 0.98, |wᵢ| ≤ 0.099, |net| ≤ 0.05.
-- **Frequency-agnostic by construction.** Carry and dispersion are expressed *per day*, not per
-  print, so a contract switched to hourly settlement stays comparable with one settling every 8h.
-  Bar spacing is inferred from the frames' own index rather than assumed.
+**(b) The dispersion term self-falsifies at runtime.** The coefficient on log dispersion is
+fitted online by pooled OLS of log forward RV on the HAR basis, over past-only streamed rows,
+and is **admitted only if it is positive with t ≥ 4.0**. The threshold is deliberately above
+the thesis's preregistered 2.5 because pooled overlapping forward windows inflate a naive
+t-statistic by roughly `sqrt(horizon)`. If dispersion is only a noisy re-encoding of trailing
+volatility — the failure mode I named as most likely — the coefficient is set to zero and the
+book degenerates cleanly to the HAR baseline. **The mandate's falsifier is wired into the
+strategy rather than asserted about it.**
 
----
+**(c) Gross is normalised to a constant at every rebalance.** The score is scale-free and
+carries no gross-exposure timing, so the book expresses relative allocation only. Volatility
+targeting is the organizer's control and this construction does not contest it.
 
-## 2. Who is on the other side
+### How this answers the diagnosis
 
-**Paying the premium:** the levered long. Offshore retail, trend-followers, and onshore-constrained
-funds who cannot or will not hold spot with custody and financing. They buy convex upside and
-finance it with a funding drip. They pay because their alternative is unavailable or more expensive.
+| lever | mechanism | expected effect |
+|---|---|---|
+| carry window 21 prints (7d) | funding is persistent; a 7-day mean is both a better forecast of next week's funding and a slower-moving target | fewer signal-driven trades |
+| rebalance every 3rd decision | daily, at the funding boundary; a position gets ~3 intervals to accrue before it is revisited | ~1/√3 of the per-decision turnover |
+| soft-threshold at 0.4 MAD | names whose score is indistinguishable from zero go to *exactly* zero, not to a small churning weight | raises numerator, cuts denominator |
+| top-half liquidity screen | costs and participation limits are worst in the thin tail | lowers realised bps per unit turnover |
 
-**Receiving it:** basis desks, market makers, and delta-neutral yield vehicles — Ethena and its
-peers, roughly $14bn of stablecoin backed by exactly this trade.
-
-**Who is on the other side of *this* book specifically — and this is the whole thesis.** *Not* the
-levered long; that side is already well supplied, and I am not claiming the premium. My counterparty
-is the **unconditional funding harvester**: the vehicle that collects funding without asking whether
-the premium is adequate for the variance it is underwriting. That distinction is forced on me by the
-evidence, not chosen for elegance. Unconditional crypto carry ran a Sharpe of 6.45 over Aug 2020 –
-May 2025, 4.06 from 2024, and **negative in 2025**. Preregistering "harvest funding" in 2026 would be
-preregistering a decayed factor. I am claiming the **conditioning**, and I am claiming it against
-someone who is not doing any.
-
-The supporting asymmetry that makes *ratio* the right functional form rather than *level*: the
-Bitcoin variance risk premium is **larger in low-volatility regimes and smaller in high-volatility
-regimes**. A book that sells more insurance when the raw premium looks high — which is when
-volatility is high — leans the wrong way. Sizing on premium *relative to* forecast variance leans
-the right way.
+Rough target: turnover ≈ **25–40/yr** against the seed's 87, which needs roughly **6–9% gross
+annual** to clear triple cost. For scale, a book at gross ≈ 1.0 whose weights align with a
+cross-sectional funding deviation of ~1 bp per 8h accrues ~3 bps/day ≈ 11%/yr in carry alone.
+That is the right order of magnitude — which is the point of choosing a mechanism whose return
+is a cash flow rather than a forecast. **These are order-of-magnitude estimates, not
+predictions**, and §6 says what it means if they are wrong.
 
 ---
 
-## 3. What would falsify it
+## 3. Who is on the other side
 
-The mandate's falsifier: *if funding dispersion carries no information about forward realized
-volatility, there is no convexity to trade.* Thesis §3 sharpens it into two conditions, **both** of
-which must pass, and §3.4 pre-commits the consequence of each failure — in every failing branch the
-nomination is the **unmodified organizer seed**, not a rescued variant.
+**Paying the premium:** the levered long. They are buying convex upside and financing it with a
+steady funding drip, because the alternative — spot with custody and financing, or no leverage
+at all — is unavailable or dearer to them. Offshore retail, trend followers, and
+onshore-constrained funds.
 
-**F1 (information).** Pooled panel, HAR baseline in log realized variance, plus log dispersion:
-positive β; symbol-clustered Newey–West t ≥ 2.5; incremental OOS R² ≥ +0.005; positive sign in ≥ 2/3
-of symbols individually. Specified as **incremental to a realized-variance baseline** on purpose: a
-raw correlation between funding dispersion and forward volatility would pass almost automatically
-and would mean nothing, because funding is driven by the premium index, which widens mechanically
-when price moves. **This is the most likely way the lane dies, and the test is built so it can.**
+**Already well supplied:** basis desks, market makers and delta-neutral yield vehicles who take
+the other side unconditionally.
 
-**F2 (economic).** At the organizer's common risk unit, the dispersion-conditioned book must improve
-Sharpe over **the same book with the dispersion term removed** by ≥ 0.15. Information that cannot be
-harvested at equal risk is not a mandate.
-
-**Concretely, what this specific candidate would have to show to be wrong:**
-
-- It is **structurally short momentum** — shorting the highest-funding names is shorting the crowd.
-  In a sustained trending tape that loses for a long time before it wins, and 2024–25 is exactly
-  such a period. Persistent negative drift concentrated in the short leg during trending stretches
-  falsifies the harvestable version of this.
-- If the ablated twin (RV-only denominator, dispersion deleted) scores **at or above** this book,
-  the convexity term is contributing nothing and F2 has fired regardless of what F1 says.
-- If funding dispersion is only a noisy re-encoding of trailing realized volatility, `a` and `b`
-  in the blend are collinear, the blend degenerates to an RV-only forecast, and the same ablation
-  test catches it.
-
-**Known failure modes I am not pretending to have solved.** Funding is capped at ±0.75×MMR / ±2% and
-settlement may switch to hourly when the cap binds, so at this resolution I see a capped print
-without knowing it was capped — **the dispersion estimator is most attenuated exactly where the
-signal should be loudest**, and I have no fix in this dataset. Coarse bars see a cascade's round
-trip, not its excursion. And the observation this lane is built on (peak-to-average funding before
-Oct 2025) is a practitioner post-mortem on a single event, while the strongest peer-reviewed
-evidence on cascade early warning is *negative* — no early-warning variable is event-invariant, and
-the Oct-2025 signature inverts when tested on Aug-2024. I preregistered into a literature that leans
-against me and would rather say so here than find a reason to have believed otherwise later.
+**On the other side of *this* book specifically — not the levered long.** That side is crowded.
+My counterparty is the **unconditional funding harvester**: the vehicle that collects funding
+without asking whether the premium is adequate for the variance it is underwriting. This
+distinction is forced on me by the evidence, not chosen for elegance — the unconditional carry
+trade has decayed hard (Sharpe 6.45 over Aug-2020–May-2025, 4.06 from 2024, **negative in
+2025**). Preregistering "harvest funding" in 2026 would be preregistering a decayed factor. I
+am not claiming the premium. I am claiming the **conditioning**: the cross-sectional dispersion
+in premium-per-unit-variance that persists because capturing it is genuinely risky rather than
+free. The supporting asymmetry is that the crypto variance risk premium is *larger* in
+low-volatility regimes — so a book that sells more insurance simply because the raw premium
+looks high is leaning the wrong way, and one that sizes on premium *relative to* forecast
+variance is leaning the right way.
 
 ---
 
-## 4. Honest notes on this trial
+## 4. What would falsify this
 
-- **This code has never been executed.** This lane has no shell and no mounted data I can read, so
-  the candidate is written to be correct by construction and defensive about the shape of `context`:
-  every column is checked for presence, every timestamp column is coerced from datetime64, tz-aware,
-  tz-naive *or* integer epochs in s/ms/µs/ns, and bar spacing is inferred with a sanity band rather
-  than assumed to be 8h. The first feedback packet is as much a smoke test as a result.
-- **The top-level `except` in `target_weights` is a deliberate blind spot, and I am flagging it
-  rather than burying it.** It converts a malformed decision into a flat book instead of a crash.
-  That is the failure mode RULES warns about — a strategy that never ran looks identical to one with
-  no edge. The tell to check first in the packet is **participation and mean gross exposure**: if
-  they are at or near zero, this candidate did not run, and the correct response is to fix the
-  parsing, not the economics.
-- **F1 and F2 are not yet evaluated**, because this trial is what generates the evidence to evaluate
-  them on. Per §6.2 they are reported before any *nomination*, and no nomination is being made here.
-- **The next trial is the ablation, not a tune.** F2 is defined against the dispersion-deleted twin,
-  so measuring it requires running that twin. That is not a new knob and not a widening of the
-  surface — it is the control the preregistered falsifier already demands.
+Stated before the result, in descending order of how cheaply each one kills the lane.
+
+**F1 — information (thesis §3.1, now embedded).** If the online dispersion coefficient never
+clears `t ≥ 4` positive, funding dispersion carries no incremental information about forward
+realized variance over a HAR baseline, the mandate's own falsifier has fired, and the book you
+are scoring is the HAR-baseline book with the mandate's distinguishing term switched off.
+
+**F2 — economic (thesis §3.3).** If the dispersion-conditioned book does not beat the same book
+with the dispersion term removed by ≥ 0.15 Sharpe at the common risk unit, the signal is real
+but not harvestable at equal risk.
+
+**F3 — the cost falsifier, specific to this trial and new in refinement.** This is the one that
+matters most now:
+
+> If turnover falls to ≈ 25–40/yr as designed but `gross_edge_bps_per_turnover` does **not**
+> improve by roughly the same factor as the turnover cut, then the seed's thin edge was never a
+> turnover problem — the cross-sectional funding signal has no gross edge at the common risk
+> unit, and slowing the book down only spreads the same nothing over fewer trades.
+
+That outcome is not fixable by a parameter and I will not treat it as one. The pre-committed
+consequence stands: nominate the unmodified seed and report that this dataset does not support
+the family.
+
+**F4 — the turnover band.** If turnover undershoots the band, the holding period is too long for
+this book to count as a portfolio, and the trade-off between the cost gates and the band is
+adverse at every setting. That is also a finding, not a knob.
+
+**What would surprise me and should be treated as suspicious rather than good:** a large Sharpe
+accompanied by breadth near the floor, or by long/short exposure shares drifting away from
+0.5/0.5. Either means the demean is not holding and the book has become a directional bet on a
+window I can see.
+
+---
+
+## 5. Honest accounting
+
+**Deviations from the sealed primary cell (THESIS §4.2), stated plainly.**
+
+| item | primary cell | here | status |
+|---|---|---|---|
+| `s` carry window | 9 prints (3d) | **21 prints (7d)** | on the declared grid `{3, 9, 21}` |
+| `l`, dispersion, RV estimator, signal form, cross-section, `h` | — | unchanged | primary-cell values |
+| rebalance stride | every interval | **every 3rd (daily)** | **not on the declared surface** |
+| soft-threshold τ | none | **0.40 MAD** | **not on the declared surface** |
+
+The `s` move is a within-grid choice made on mechanism, not on feedback: t01's measured cost
+curve sets a floor on the holding period, and separately a 7-day funding mean is a less noisy
+forecast of next week's funding than a 3-day mean. Two independent arguments, neither of which
+required seeing a result for my own design — I have none.
+
+The stride and the soft threshold are **genuine widenings of the declared surface**, introduced
+in the refinement phase in response to the measured cost structure. I would rather record that
+than pretend the surface is still 144 cells. Counting stride ∈ {3, 6, 9} as considered and τ as
+set at a single value rather than searched: **if this is nominated, the trial count I claim is
+N = 432, not 144 and certainly not 1.**
+
+The carry-demean-before-divide (§2a) is not counted as a knob. It has one defensible ordering
+and the other one silently embeds a vol tilt; that is a defect fix.
+
+**Known weaknesses, unchanged from the sealed thesis.** The book is structurally short momentum
+— shorting the highest-funding names is shorting the crowd, and in a sustained trending tape
+that is a losing side for a long time before it is a winning one. Funding is cap-censored
+exactly in the tail where dispersion should be loudest, and at 8h resolution I see a capped
+print without knowing it was capped. 8h bars see a cascade's round trip, not its excursion.
+None of these have a fix in this dataset and I am not pretending otherwise.
+
+---
+
+## 6. Compliance and failure-mode notes
+
+- **Interface.** `build_strategy()` → object with `target_weights(context, *, seed)`. Returns a
+  `dict[str, float]` over `context.eligible_symbols`, or `None` to hold. Enforced in code:
+  `sum|w| ≤ 0.99`, `|sum w| ≈ 0` by construction, `|w_i| ≤ 0.095`. The per-symbol cap is applied
+  *after* the final centring and the gross scale only ever moves down, so both caps are hard.
+- **Panel alignment.** Every cross-symbol structure is keyed on timestamps, never on the
+  positional `RangeIndex` — the funding panel is pivoted on `funding_time` (int64 ns) and
+  dispersion is joined onto `open_time` by `searchsorted`. Bar cadence is inferred from
+  `open_time` diffs rather than assumed.
+- **No hidden state.** Nothing is cached between decisions; every quantity is recomputed from
+  the past-only context. The rebalance clock is the decision boundary counted in whole bar
+  intervals since the epoch, in integer arithmetic — no state, no dependence on appended future
+  rows, no symbol identity, no price scale. Because one day is exactly three 8h intervals, a
+  whole-day calendar shift leaves the rebalance phase unchanged.
+- **No look-ahead.** The regression target is realized RV over the *next* `h` bars only for rows
+  whose forward window is entirely in the past relative to the decision boundary; dispersion is
+  shifted one print before being joined, so it uses funding strictly earlier than the bar it is
+  attached to.
+- **Banned constructs.** No network, subprocess, filesystem, `eval`/`exec`/`compile`,
+  `__import__`, `getattr`/`setattr`, or RNG. `seed` is accepted and unused. No embedded fitted
+  parameters or data tables — the only coefficients in the book are fitted at runtime from
+  streamed rows.
+- **Degenerate paths fail safe and loud, not silent.** If the online fit is unusable the
+  forecast falls back to trailing 7-day Garman–Klass variance and **the book still trades**; the
+  book never depends on the regression succeeding. During warm-up the declared 63-day history
+  screen steps down to the most history the universe actually has, and only then, so the book
+  starts at roughly day 10 rather than day 63 — the alternative costs ~8% of `active_bar_fraction`
+  outright. `_to_ns` uses `is_datetime64_any_dtype` rather than `np.issubdtype`, which raises on
+  tz-aware pandas dtypes; that single line is the difference between this book running and it
+  holding flat for 808 days while looking like a strategy with no edge.
+
+**Not verified by execution.** This phase has no shell, so the candidate has been reviewed by
+reading, not run. The specific risks I could not discharge are the exact dtype of `funding_time`
+and `open_time`, and whether `bars` frames are cumulative (as t01's 22-bar warm-up strongly
+implies) rather than fixed-length windows. The rebalance clock was moved onto `decision_time`
+precisely so that the second of those cannot silently produce a flat book.

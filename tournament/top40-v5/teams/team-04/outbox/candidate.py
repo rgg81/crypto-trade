@@ -1,27 +1,20 @@
-"""team-04 — residual cross-sectional momentum (discovery candidate).
+"""team-04 -- residual cross-sectional momentum on Binance USD-M perpetuals.
 
-Direct expression of the mandate: rank the cross-section on the part of each contract's recent
-return that the equal-weighted market factor does not explain, then hold a long-short book that is
-both dollar-neutral and neutral to the same estimated betas that produced the residuals.
+Signal
+    8h log returns orthogonalised to an equal-weighted cross-sectional market
+    factor using a winsorised, shrunk rolling beta; the residual series is
+    accumulated over a lookback window and divided by its own residual
+    volatility over that window.
 
-This is the pre-registered *primary configuration* of `lane/scouting/THESIS.md` §4.1 and nothing
-else: beta window 90d, shrinkage lambda = 0.5, momentum lookback 7d, hold 3d, vol-scaled signal.
-No knob has been moved after seeing a result, because no result has been seen.
+Book
+    Cross-sectional linear rank scores, averaged over every overlapping
+    formation lag inside the holding period (Jegadeesh-Titman construction),
+    then projected orthogonal to {1, beta} so the submitted book is dollar-
+    and beta-neutral by construction.
 
-Construction notes that matter for reading the code:
-
-* Horizons are declared in **days** and converted to bars from the observed bar spacing. The thesis
-  assumes 8h funding-aligned bars (90d = 270 bars, 7d = 21, 3d = 9); deriving the spacing rather
-  than hard-coding it means the book still expresses the declared horizons if the runner streams a
-  different frequency, instead of silently trading a 3-day lookback labelled as 7.
-* The 3-day hold is implemented **statelessly**, as a Jegadeesh-Titman overlapping portfolio: the
-  rank score is averaged over the H formation windows ending at t, t-1, ... t-H+1. That is the same
-  book as rebalancing a third of the capital every day, and it carries no state across decisions.
-* Beta neutrality is a projection of the score onto the orthogonal complement of {1, beta_hat}, so
-  `sum(w) == 0` and `sum(w * beta_hat) == 0` hold simultaneously by construction.
-
-Every number below is a construction constant or a declared parameter, never a fitted one; nothing
-is keyed to a date, a symbol, or a price level.
+Everything is recomputed from the past-only rows in ``DecisionContext``.  The
+object carries no state across decisions, reads no clock, and never references
+a symbol by name.
 """
 
 from __future__ import annotations
@@ -29,282 +22,263 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-# --- Declared parameter surface, primary configuration (THESIS.md §4.1) ------------------------
-BETA_WINDOW_DAYS = 90.0       # W = 270 bars at 8h
-LOOKBACK_DAYS = 7.0           # L = 21 bars at 8h
-HOLD_DAYS = 3.0               # H = 9 bars at 8h
-BETA_SHRINK = 0.5             # lambda: beta_hat = (1 - lambda) * beta_ols + lambda * 1.0
-VOL_SCALED_SIGNAL = True      # s = residual-vol-scaled
+# --- residualisation ---------------------------------------------------------
+BETA_WINDOW = 270          # W: 90 days of 8h bars
+BETA_MIN_OBS = 60          # do not trust a beta fitted on less than 20 days
+BETA_SHRINK = 0.5          # lambda: beta_hat = (1-l) * ols + l * 1.0
+BETA_LO = -1.0             # OLS winsorisation before shrinkage
+BETA_HI = 3.0
 
-# --- Fixed by fiat (THESIS.md §4.2) ------------------------------------------------------------
-LIQUIDITY_DAYS = 30.0         # trailing median quote volume horizon for the universe screen
-UNIVERSE_SIZE = 150           # top-N liquid contracts
-BETA_WINSOR_LOW = -1.0        # winsorise beta_ols before shrinking, per Sila et al. (2025)
-BETA_WINSOR_HIGH = 3.0
+# --- signal ------------------------------------------------------------------
+LOOKBACKS = (45, 90)       # L: 15 and 30 days, blended with equal weight
+HOLD = 63                  # H: overlapping formation lags = 21 days
 
-# --- Engine-facing construction constants ------------------------------------------------------
-MIN_SYMBOLS = 12              # below this a cross-sectional book is not a portfolio
-MIN_BETA_BARS = 45            # hard floor on a usable beta window
-TARGET_GROSS = 0.98           # shape only; the organizer owns the ex-ante risk unit
-MAX_WEIGHT = 0.095            # engine cap is 0.10
-MAX_NET = 0.20                # engine cap is 0.25
-WEIGHT_FLOOR = 1e-6           # drop dust rather than pay to trade it
-DEFAULT_BARS_PER_DAY = 3.0    # fallback when the bar index is not a timestamp index
-MIN_BARS_PER_DAY = 0.25
-MAX_BARS_PER_DAY = 96.0
+# --- universe ----------------------------------------------------------------
+UNIVERSE_CAP = 150         # top-N by trailing median 8h quote volume
+LIQ_WINDOW = 90            # bars behind the liquidity median
+MIN_HISTORY = 66           # shortest trailing run of clean bars we will use
+MIN_NAMES = 12             # below this a cross-section is not a portfolio
+MIN_MARKET_NAMES = 5       # names needed before a market factor row is usable
 
-
-def _bars_per_day(index) -> float:
-    """Observed bars per day, from the median spacing of the most recent bars."""
-    if not isinstance(index, pd.DatetimeIndex) or len(index) < 4:
-        return DEFAULT_BARS_PER_DAY
-    deltas = pd.Series(index[-64:]).diff().dropna().dt.total_seconds()
-    deltas = deltas[deltas > 0.0]
-    if deltas.empty:
-        return DEFAULT_BARS_PER_DAY
-    step = float(deltas.median())
-    if not np.isfinite(step) or step <= 0.0:
-        return DEFAULT_BARS_PER_DAY
-    return float(min(max(86400.0 / step, MIN_BARS_PER_DAY), MAX_BARS_PER_DAY))
+# --- book --------------------------------------------------------------------
+MAX_WEIGHT = 0.10
+GROSS_TARGET = 1.0
+RETURN_CLIP = 0.5          # log-return hygiene bound; scale-free
+PANEL_ROWS = 440           # BETA_WINDOW + max(LOOKBACKS) + HOLD + margin
+EPS = 1e-12
 
 
-def _bars(days: float, per_day: float, floor: int) -> int:
-    """Convert a declared horizon in days into a bar count."""
-    return max(floor, int(round(days * per_day)))
+def _select_universe(bars, symbols, window, cap):
+    """Point-in-time liquidity screen. Volume enters here and nowhere else."""
+    names = []
+    scores = []
+    for sym in symbols:
+        frame = bars.get(sym)
+        if frame is None or len(frame) < 2:
+            continue
+        columns = frame.columns
+        if "close" not in columns or "open_time" not in columns:
+            continue
+        liq = 0.0
+        if "quote_volume" in columns:
+            vol = np.asarray(frame["quote_volume"].to_numpy()[-window:], dtype=float)
+            vol = vol[np.isfinite(vol)]
+            if vol.size:
+                liq = float(np.median(vol))
+        names.append(sym)
+        scores.append(liq)
+    if len(names) <= cap:
+        return names
+    order = np.argsort(-np.asarray(scores, dtype=float), kind="stable")[:cap]
+    return [names[i] for i in sorted(int(j) for j in order)]
 
 
-def _liquidity(frame: pd.DataFrame, n_bars: int) -> float:
-    """Trailing median quote volume; the only place volume enters (THESIS.md §4.3)."""
-    columns = frame.columns
-    if "quote_volume" in columns:
-        notional = pd.to_numeric(frame["quote_volume"], errors="coerce")
-    elif "volume" in columns and "close" in columns:
-        notional = pd.to_numeric(frame["volume"], errors="coerce") * pd.to_numeric(
-            frame["close"], errors="coerce"
-        )
-    else:
-        return float("nan")
-    tail = notional.tail(n_bars).dropna()
-    if tail.empty:
-        return float("nan")
-    value = float(tail.median())
-    return value if np.isfinite(value) else float("nan")
-
-
-def _close_panel(frames, symbols, reference, n_rows: int):
-    """Right-aligned close panel over the last ``n_rows`` bars of the reference grid.
-
-    On a timestamp index the panel is aligned on the timestamps themselves, so a symbol with a gap
-    contributes a NaN rather than a silently shifted price. Without a timestamp index the only safe
-    assumption is that every eligible symbol's last row is the same period, so alignment is
-    positional from the end.
-    """
+def _tail_panel(bars, symbols, rows):
+    """Align close prices on ``open_time`` -- the only correct alignment key."""
     columns = {}
-    if isinstance(reference, pd.DatetimeIndex):
-        target = reference[-n_rows:]
-        for symbol in symbols:
-            series = pd.to_numeric(frames[symbol]["close"], errors="coerce")
-            if not isinstance(series.index, pd.DatetimeIndex):
-                continue
-            series = series[~series.index.duplicated(keep="last")]
-            try:
-                aligned = series.reindex(target)
-            except (TypeError, ValueError):
-                # e.g. a tz-aware symbol against a tz-naive grid: drop the symbol, keep the book.
-                continue
-            columns[symbol] = aligned.to_numpy(dtype="float64")
-    else:
-        for symbol in symbols:
-            series = pd.to_numeric(frames[symbol]["close"], errors="coerce")
-            values = series.to_numpy(dtype="float64")
-            if values.size >= n_rows:
-                columns[symbol] = values[-n_rows:]
+    for sym in symbols:
+        frame = bars.get(sym)
+        if frame is None or len(frame) < 2:
+            continue
+        tail = frame.iloc[-rows:]
+        index = pd.Index(np.asarray(tail["open_time"]))
+        series = pd.Series(np.asarray(tail["close"], dtype=float), index=index)
+        series = series[~series.index.duplicated(keep="last")]
+        columns[sym] = series
     if not columns:
-        return None, []
-    names = list(columns)
-    panel = np.column_stack([columns[name] for name in names])
-    return panel, names
+        return [], None
+    panel = pd.DataFrame(columns).sort_index()
+    return list(panel.columns), panel.to_numpy(dtype=float)
 
 
-def _log_returns(panel: np.ndarray):
-    """Log returns from a close panel; non-positive prices become NaN rather than -inf."""
-    prices = np.where(panel > 0.0, panel, np.nan)
-    return np.log(prices[1:, :]) - np.log(prices[:-1, :])
+def _log_returns(prices, clip):
+    with np.errstate(divide="ignore", invalid="ignore"):
+        safe = np.where(prices > 0.0, prices, np.nan)
+        rets = np.log(safe[1:] / safe[:-1])
+    rets = np.where(np.isfinite(rets), rets, np.nan)
+    return np.clip(rets, -clip, clip)
 
 
-def _rank_score(values: np.ndarray):
-    """Cross-sectional rank z-score. Symbols without a signal score neutral (zero)."""
-    series = pd.Series(values, dtype="float64")
-    valid = series.notna().to_numpy()
-    count = int(valid.sum())
-    if count < MIN_SYMBOLS:
+def _trailing_run(mask):
+    """Length of the unbroken run of valid observations ending at the last row."""
+    reversed_mask = mask[::-1]
+    first_gap = np.argmin(reversed_mask, axis=0)
+    complete = reversed_mask.all(axis=0)
+    return np.where(complete, reversed_mask.shape[0], first_gap).astype(np.int64)
+
+
+def _cumsum0(values):
+    out = np.zeros((values.shape[0] + 1, values.shape[1]), dtype=float)
+    out[1:] = np.cumsum(values, axis=0)
+    return out
+
+
+def _average_rank(values):
+    """Tie-aware average ranks, so the book does not depend on symbol order."""
+    n = values.size
+    order = np.argsort(values, kind="stable")
+    sorted_values = values[order]
+    positions = np.arange(1.0, n + 1.0)
+    fresh = np.empty(n, dtype=bool)
+    fresh[0] = True
+    if n > 1:
+        fresh[1:] = sorted_values[1:] != sorted_values[:-1]
+    group = np.cumsum(fresh) - 1
+    sums = np.bincount(group, weights=positions)
+    counts = np.bincount(group)
+    averaged = (sums / counts)[group]
+    ranks = np.empty(n, dtype=float)
+    ranks[order] = averaged
+    return ranks
+
+
+def _rank_score(values):
+    """Standardised rank on [-1, 1] with zero mean -- linear in rank."""
+    n = values.size
+    if n < 2:
+        return np.zeros(n, dtype=float)
+    return (2.0 * _average_rank(values) - (n + 1.0)) / (n - 1.0)
+
+
+def _shrunk_beta(cum, run, n_rows):
+    """Winsorised OLS beta on the longest available window, shrunk toward 1."""
+    count, sum_r, sum_m, sum_rm, sum_mm = cum
+    index = np.arange(run.size)
+    width = np.minimum(BETA_WINDOW, run)
+    start = n_rows - width
+    obs = count[n_rows] - count[start, index]
+    s_r = sum_r[n_rows] - sum_r[start, index]
+    s_m = sum_m[n_rows] - sum_m[start, index]
+    s_rm = sum_rm[n_rows] - sum_rm[start, index]
+    s_mm = sum_mm[n_rows] - sum_mm[start, index]
+    safe_obs = np.maximum(obs, 1.0)
+    covariance = s_rm - s_r * s_m / safe_obs
+    variance = s_mm - s_m * s_m / safe_obs
+    usable = (obs >= BETA_MIN_OBS) & (variance > EPS)
+    ols = np.where(usable, covariance / np.where(usable, variance, 1.0), 1.0)
+    ols = np.clip(ols, BETA_LO, BETA_HI)
+    return (1.0 - BETA_SHRINK) * ols + BETA_SHRINK
+
+
+def _neutralise(score, beta):
+    """Residual of ``score`` on {1, beta}: sum(w) = 0 and sum(w * beta) = 0."""
+    centred = score - score.mean()
+    beta_centred = beta - beta.mean()
+    denominator = float(beta_centred @ beta_centred)
+    if denominator > EPS * max(beta.size, 1):
+        centred = centred - (float(centred @ beta_centred) / denominator) * beta_centred
+    return centred - centred.mean()
+
+
+def _to_book(weights, names):
+    gross = float(np.abs(weights).sum())
+    if not np.isfinite(gross) or gross <= EPS:
         return None
-    ranks = series[valid].rank(method="average").to_numpy(dtype="float64")
-    centred = (ranks - (count + 1.0) / 2.0) / (count / 2.0)
-    centred = centred - centred.mean()
-    spread = float(centred.std(ddof=0))
-    if not np.isfinite(spread) or spread <= 0.0:
-        return None
-    scores = np.zeros(series.size, dtype="float64")
-    scores[valid] = centred / spread
-    return scores
+    weights = weights / gross
+    for _ in range(4):
+        weights = np.clip(weights, -MAX_WEIGHT, MAX_WEIGHT)
+        gross = float(np.abs(weights).sum())
+        if gross <= EPS:
+            return None
+        weights = weights * (GROSS_TARGET / gross)
+    weights = np.clip(weights, -MAX_WEIGHT, MAX_WEIGHT)
+    gross = float(np.abs(weights).sum())
+    net = float(weights.sum())
+    if gross > EPS and abs(net) > 0.20 * gross:
+        weights = np.clip(weights - net / weights.size, -MAX_WEIGHT, MAX_WEIGHT)
+    book = {}
+    for name, weight in zip(names, weights):
+        value = float(weight)
+        if np.isfinite(value) and abs(value) > 1e-6:
+            book[name] = value
+    return book or None
 
 
 class ResidualCrossSectionalMomentum:
-    """Rank on market-orthogonalised return; hold dollar- and beta-neutral."""
+    """Stateless residual momentum book, refitted from scratch each decision."""
+
+    __slots__ = ()
 
     def target_weights(self, context, *, seed):
+        eligible = context.eligible_symbols
         bars = context.bars
-        eligible = []
-        for symbol in context.eligible_symbols:
-            if symbol not in bars:
-                continue
-            frame = bars[symbol]
-            if not isinstance(frame, pd.DataFrame) or "close" not in frame.columns:
-                continue
-            if len(frame.index) < MIN_BETA_BARS + 2:
-                continue
-            eligible.append(symbol)
-        if len(eligible) < MIN_SYMBOLS:
+        if eligible is None or bars is None:
+            return None
+        symbols = list(eligible)
+        if len(symbols) < MIN_NAMES or len(bars) == 0:
             return None
 
-        frames = {symbol: bars[symbol] for symbol in eligible}
-        reference = max((frames[s].index for s in eligible), key=len)
-        if isinstance(reference, pd.DatetimeIndex):
-            reference = reference[~reference.duplicated(keep="last")]
-
-        per_day = _bars_per_day(reference)
-        beta_bars_wanted = _bars(BETA_WINDOW_DAYS, per_day, MIN_BETA_BARS)
-        lookback = _bars(LOOKBACK_DAYS, per_day, 3)
-        hold = _bars(HOLD_DAYS, per_day, 1)
-        liquidity_bars = _bars(LIQUIDITY_DAYS, per_day, 5)
-
-        universe = self._screen(frames, eligible, liquidity_bars)
-
-        signal_bars = lookback + hold - 1
-        min_returns = max(signal_bars, MIN_BETA_BARS)
-        available = len(reference)
-
-        # Preferred window first; a shorter one only if too few contracts have a clean full
-        # history. This is a data-availability fallback, not a searched knob.
-        wanted = [
-            min(beta_bars_wanted + signal_bars + 1, available),
-            min(min_returns + 1, available),
-        ]
-        returns = None
-        names: list = []
-        for n_rows in dict.fromkeys(wanted):
-            if n_rows < min_returns + 1:
-                continue
-            panel, panel_names = _close_panel(frames, universe, reference, n_rows)
-            if panel is None:
-                continue
-            candidate = _log_returns(panel)
-            complete = np.isfinite(candidate).all(axis=0)
-            if int(complete.sum()) < MIN_SYMBOLS:
-                continue
-            returns = candidate[:, complete]
-            names = [name for name, keep in zip(panel_names, complete) if keep]
-            break
-        if returns is None or returns.shape[0] < min_returns:
+        universe = _select_universe(bars, symbols, LIQ_WINDOW, UNIVERSE_CAP)
+        if len(universe) < MIN_NAMES:
             return None
 
-        market = returns.mean(axis=1)
-        beta = self._beta(returns, market, min(beta_bars_wanted, returns.shape[0]))
-        if beta is None:
+        names, prices = _tail_panel(bars, universe, PANEL_ROWS)
+        if prices is None or prices.shape[0] < MIN_HISTORY + 2:
             return None
 
-        residual = returns[-signal_bars:, :] - np.outer(market[-signal_bars:], beta)
-        score = self._score(residual, lookback, hold)
-        if score is None:
+        rets = _log_returns(prices, RETURN_CLIP)
+        run = _trailing_run(np.isfinite(rets))
+        keep = run >= MIN_HISTORY
+        if int(keep.sum()) < MIN_NAMES:
+            return None
+        names = [name for name, flag in zip(names, keep) if flag]
+        rets = rets[:, keep]
+        run = run[keep]
+        n_rows, n_names = rets.shape
+
+        # Equal-weighted market factor over the surviving cross-section.
+        valid = np.isfinite(rets)
+        filled = np.where(valid, rets, 0.0)
+        per_row = valid.sum(axis=1)
+        market = np.where(per_row > 0, filled.sum(axis=1) / np.maximum(per_row, 1), 0.0)
+        market = np.where(per_row >= MIN_MARKET_NAMES, market, 0.0)
+
+        observed = valid & (per_row >= MIN_MARKET_NAMES)[:, None]
+        r_obs = np.where(observed, filled, 0.0)
+        m_obs = np.where(observed, market[:, None], 0.0)
+        beta = _shrunk_beta(
+            (
+                _cumsum0(observed.astype(float)),
+                _cumsum0(r_obs),
+                _cumsum0(m_obs),
+                _cumsum0(r_obs * m_obs),
+                _cumsum0(m_obs * m_obs),
+            ),
+            run,
+            n_rows,
+        )
+
+        # One coherent residual series per contract, then windowed statistics.
+        residual = np.where(valid, rets - market[:, None] * beta[None, :], 0.0)
+        cum_e = _cumsum0(residual)
+        cum_e2 = _cumsum0(residual * residual)
+
+        total = np.zeros(n_names, dtype=float)
+        components = 0
+        for lookback in LOOKBACKS:
+            for lag in range(HOLD):
+                end = n_rows - lag
+                begin = end - lookback
+                if begin < 0:
+                    continue
+                fitted = run >= (lag + lookback)
+                if int(fitted.sum()) < MIN_NAMES:
+                    continue
+                total_e = cum_e[end] - cum_e[begin]
+                total_e2 = cum_e2[end] - cum_e2[begin]
+                mean_e = total_e / lookback
+                variance = total_e2 / lookback - mean_e * mean_e
+                deviation = np.sqrt(np.maximum(variance, 0.0))
+                usable = fitted & (deviation > EPS)
+                if int(usable.sum()) < MIN_NAMES:
+                    continue
+                total[usable] += _rank_score(total_e[usable] / deviation[usable])
+                components += 1
+        if components == 0:
             return None
 
-        weights = self._neutralise(score, beta)
-        if weights is None:
-            return None
-        return {
-            name: float(weight)
-            for name, weight in zip(names, weights)
-            if np.isfinite(weight) and abs(float(weight)) >= WEIGHT_FLOOR
-        }
-
-    def _screen(self, frames, eligible, liquidity_bars):
-        """Top-N by trailing median quote volume, in the order the venue offered them."""
-        ranked = []
-        for position, symbol in enumerate(eligible):
-            notional = _liquidity(frames[symbol], liquidity_bars)
-            if np.isfinite(notional) and notional > 0.0:
-                ranked.append((-notional, position, symbol))
-        if len(ranked) < MIN_SYMBOLS:
-            return list(eligible)
-        ranked.sort()
-        return [symbol for _, _, symbol in ranked[:UNIVERSE_SIZE]]
-
-    def _beta(self, returns, market, window):
-        """Winsorised OLS beta on the equal-weighted market factor, shrunk toward 1.0."""
-        if window < MIN_BETA_BARS:
-            return None
-        panel = returns[-window:, :]
-        factor = market[-window:]
-        factor_centred = factor - factor.mean()
-        variance = float(factor_centred @ factor_centred)
-        if not np.isfinite(variance) or variance <= 0.0:
-            return None
-        panel_centred = panel - panel.mean(axis=0, keepdims=True)
-        ols = (factor_centred @ panel_centred) / variance
-        ols = np.clip(np.nan_to_num(ols, nan=1.0), BETA_WINSOR_LOW, BETA_WINSOR_HIGH)
-        return (1.0 - BETA_SHRINK) * ols + BETA_SHRINK
-
-    def _score(self, residual, lookback, hold):
-        """Rank score averaged over the H overlapping formation windows — the stateless hold."""
-        end = residual.shape[0]
-        total = np.zeros(residual.shape[1], dtype="float64")
-        used = 0
-        for offset in range(hold):
-            stop = end - offset
-            start = stop - lookback
-            if start < 0:
-                break
-            window = residual[start:stop, :]
-            cumulative = window.sum(axis=0)
-            if VOL_SCALED_SIGNAL:
-                spread = window.std(axis=0, ddof=1)
-                positive = spread > 0.0
-                cumulative = np.where(
-                    positive, cumulative / np.where(positive, spread, 1.0), np.nan
-                )
-            ranked = _rank_score(cumulative)
-            if ranked is None:
-                continue
-            total += ranked
-            used += 1
-        if used == 0:
-            return None
-        return total / used
-
-    def _neutralise(self, score, beta):
-        """Project off {1, beta_hat}, then size to the target gross and the engine's caps."""
-        centred = score - score.mean()
-        beta_centred = beta - beta.mean()
-        dispersion = float(beta_centred @ beta_centred)
-        if dispersion > 1e-12:
-            centred = centred - (float(centred @ beta_centred) / dispersion) * beta_centred
-        centred = centred - centred.mean()
-
-        gross = float(np.abs(centred).sum())
-        if not np.isfinite(gross) or gross <= 0.0:
-            return None
-        weights = np.clip(centred * (TARGET_GROSS / gross), -MAX_WEIGHT, MAX_WEIGHT)
-
-        net = float(weights.sum())
-        if abs(net) > MAX_NET:
-            weights = np.clip(weights - net / weights.size, -MAX_WEIGHT, MAX_WEIGHT)
-        gross = float(np.abs(weights).sum())
-        if gross > TARGET_GROSS:
-            weights = weights * (TARGET_GROSS / gross)
-        if not np.isfinite(weights).all():
-            return None
-        return weights
+        weights = _neutralise(total / components, beta)
+        return _to_book(weights, names)
 
 
 def build_strategy():
