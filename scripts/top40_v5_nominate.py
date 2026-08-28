@@ -11,8 +11,8 @@ parameter that could suppress it. This script cannot override that, and does not
 fails is retired.
 
 The nominee is the lane's **decision-phase candidate**, and nothing else. That phase exists so the
-team chooses, and its guidance says in as many words that a nomination need not be the highest-Sharpe
-book -- so picking a lane best-scoring trial on its behalf would be the organizer choosing and
+book -- so picking a lane best trial for it is the organizer choosing while
+book -- so picking a lane best trial on its behalf is the organizer choosing while
 calling it the team's decision. A lane whose decision candidate does not clear the bar is retired;
 promoting an earlier trial instead would be a fallback, which this edition does not have.
 
