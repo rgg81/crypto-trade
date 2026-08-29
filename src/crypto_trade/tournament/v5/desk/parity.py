@@ -93,4 +93,12 @@ def desk_parity(desk_root: str | Path) -> Parity:
     return Parity(OK, verified, "last tick reproduced the frozen record")
 
 
-__all__ = ["BROKEN", "OK", "PARITY_BREAKING", "UNVERIFIED", "DeskParityError", "Parity", "desk_parity"]
+__all__ = [
+    "BROKEN",
+    "OK",
+    "PARITY_BREAKING",
+    "UNVERIFIED",
+    "DeskParityError",
+    "Parity",
+    "desk_parity",
+]
