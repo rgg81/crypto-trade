@@ -1,0 +1,14 @@
+{
+  "activation_freeze": "63945108c8f6e445c7de08922315c807e376335ecfe7f1d8e53443fd602217f9",
+  "capital_rule": "Read ONCE after >=365 official days. Until then the rule is not readable and no provisional winner may be computed. If no desk qualifies, no capital is deployed and the edition closes without deployment -- a legal, pre-registered outcome.",
+  "desks": [
+    "desk-1-team-14",
+    "desk-2-team-08",
+    "desk-3-team-09",
+    "ensemble-eq3"
+  ],
+  "launched_at": "2026-08-29 15:12:00.243140+00:00",
+  "official_days_required": 365,
+  "official_start": "2026-09-01 00:00:00+00:00",
+  "paper_only": "no signed client, no order path; paper by construction, not configuration"
+}

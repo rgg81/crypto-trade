@@ -1,0 +1,60 @@
+{
+  "desk-1-team-14": {
+    "bundle": {
+      "team-14": {
+        "bytes": 16438,
+        "sha256": "bc86c58c6598ccc0487d2890ac61550c2ec10949b660e5b7f06210073ab4d6a5"
+      }
+    },
+    "kind": "individual",
+    "lane": "team-14",
+    "rank": 1
+  },
+  "desk-2-team-08": {
+    "bundle": {
+      "team-08": {
+        "bytes": 18793,
+        "sha256": "1e340c72e87a8ab1d96e0b36e353b0251e6c6737f960aaa4102d2c35fda8ac3d"
+      }
+    },
+    "kind": "individual",
+    "lane": "team-08",
+    "rank": 2
+  },
+  "desk-3-team-09": {
+    "bundle": {
+      "team-09": {
+        "bytes": 12921,
+        "sha256": "abe2f439f8c10a0299f9adca3bf63ac710fc25a2c7dcd6134361033a49dc465c"
+      }
+    },
+    "kind": "individual",
+    "lane": "team-09",
+    "rank": 3
+  },
+  "ensemble-eq3": {
+    "bundle": {
+      "team-08": {
+        "bytes": 18793,
+        "sha256": "1e340c72e87a8ab1d96e0b36e353b0251e6c6737f960aaa4102d2c35fda8ac3d"
+      },
+      "team-09": {
+        "bytes": 12921,
+        "sha256": "abe2f439f8c10a0299f9adca3bf63ac710fc25a2c7dcd6134361033a49dc465c"
+      },
+      "team-14": {
+        "bytes": 16438,
+        "sha256": "bc86c58c6598ccc0487d2890ac61550c2ec10949b660e5b7f06210073ab4d6a5"
+      }
+    },
+    "kind": "ensemble",
+    "lane": null,
+    "members": [
+      "team-14",
+      "team-08",
+      "team-09"
+    ],
+    "rank": null,
+    "weight_each": 0.3333333333333333
+  }
+}
