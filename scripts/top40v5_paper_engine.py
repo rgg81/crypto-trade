@@ -46,7 +46,13 @@ from crypto_trade.tournament.v5.engine import EvaluatorConfig, evaluate_targets,
 
 REPO = Path(__file__).resolve().parents[1]
 PAPER = REPO / "paper-top40v5"
-SNAPSHOT = REPO / "data" / "top40" / "snapshot-v3"
+# The desks read the FORWARD snapshot when it exists -- the frozen one is the tournament's
+# evidence and stops at the historical window's end, so a desk reading it can never publish an
+# official day. The forward snapshot is the frozen one plus a REST-appended tail; live-append.json
+# beside it records exactly which range came from REST rather than from checksummed archives.
+FROZEN_SNAPSHOT = REPO / "data" / "top40" / "snapshot-v3"
+FORWARD_SNAPSHOT = REPO / "data" / "top40" / "forward"
+SNAPSHOT = FORWARD_SNAPSHOT if (FORWARD_SNAPSHOT / "bars.parquet").is_file() else FROZEN_SNAPSHOT
 INTERVAL_HOURS = 8
 # The desk replays from here so that carried positions and funding are path-correct at the
 # boundary. Starting at the boundary itself would score a cold book against a warm one.
@@ -120,7 +126,15 @@ def _returns_for(desk: str, spec: dict, data: dict, decisions: list) -> pd.DataF
     keep = [
         c for c in ("boundary", "net_return", "gross_exposure", "turnover") if c in rows.columns
     ]
-    return rows[keep]
+    # Drop the final boundary: it is provisional until a later bar exists.
+    #
+    # Measured, not assumed. Replaying the same snapshot to 2024-03-01 and to 2024-06-01 produces
+    # identical rows everywhere EXCEPT the shorter run's last boundary, which moves by 2.2e-04 --
+    # the evaluator treats a decision with no subsequent bar differently from the same decision
+    # once one exists. Publishing it would mean every tick rewrites the row it published last time,
+    # which the append-invariant ledger correctly refuses. A row becomes final when the next
+    # boundary exists, so that is when it is published.
+    return rows[keep].iloc[:-1]
 
 
 def tick(now: pd.Timestamp) -> int:
