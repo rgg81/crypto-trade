@@ -168,6 +168,25 @@ def _tick_locked(now: pd.Timestamp, launch: Path) -> int:
     _assert_manifest(manifest)
 
     boundary = _boundary(now)
+
+    # Nothing to do if every desk already published this boundary.
+    #
+    # This guard is worth more than it looks. A tick replays 2.5 years across four desks and costs
+    # about 25 minutes at 100% of a core, while adding a single row. Without the check the watchdog
+    # re-ran that whole replay on every wake-up and the engine sat at full CPU essentially
+    # continuously -- roughly seventy pointless full replays a day to publish three rows. The lock
+    # stopped them corrupting each other; it did not stop them being wasteful.
+    already = []
+    for desk in manifest:
+        record = PAPER / desk / "boundary.json"
+        if record.is_file():
+            published = json.loads(record.read_text(encoding="utf-8")).get("boundary")
+            already.append(published == str(boundary))
+        else:
+            already.append(False)
+    if already and all(already):
+        print(f"boundary {boundary} already published by all {len(manifest)} desks; nothing to do")
+        return 0
     official_start = pd.Timestamp(json.loads(launch.read_text(encoding="utf-8"))["official_start"])
     print(f"boundary {boundary}  (official from {official_start.date()})")
 

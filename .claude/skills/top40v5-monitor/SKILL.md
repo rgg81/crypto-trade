@@ -104,7 +104,7 @@ gets ignored on the day it matters.
   where the desks launched, so its early rows are real out-of-sample data that existed before any
   desk went live. Only the `official` phase — from **2026-09-01** — is the forward record. Report
   them apart, always. Adding them would credit a desk with performance it never traded, and the
-  bridge is 912 days of it sitting right there in a column that is easy to ignore.
+  bridge is over 900 days of it sitting right there in a column that is easy to ignore.
 
 A useful sanity check: the bridge Sharpes should reproduce the historical release exactly —
 team-14 +1.357, team-08 +0.901, team-09 +0.809. If they drift, that is a finding, not a rounding.
@@ -124,9 +124,10 @@ Alert on these and nothing else:
    `ATTENTION`. So should you.
 2. **DATA-STALE** — the snapshot's last bar is more than 8h behind the boundary. Reported once for
    the field, not per desk. The engine clamps to the last available bar and publishes nothing past
-   it rather than raising, so a stale desk is *waiting*, not broken. **This is the current state:
-   the snapshot ends 2026-07-31 and the official record cannot begin until it is extended past
-   2026-09-01.**
+   it rather than raising, so a stale desk is *waiting*, not broken. The watchdog appends from live
+   REST before every tick (`top40v5_live_append.py`: klines from the local proxy, funding direct
+   from Binance, marks derived from the funding response), so persistent staleness means that
+   append is failing — read `logs/v5_live_append.log` rather than the desks.
 3. **NO-TICK** — launched but never published a boundary.
 4. **LATE** — more than 8h45m past the boundary it owes.
 5. **FAIL** — last attempt recorded an exception that is not a parity break. Read `attempt.json`.
@@ -144,6 +145,18 @@ Alert on these and nothing else:
     desks and the other run's summary and read as a failure that had not occurred. The lock now
     makes it impossible; if it happens anyway, find the second process before restarting anything.
 11. **BOUNDARY-SKEW** — a published boundary off the 8h grid, or ahead of now.
+12. **Runaway CPU** — the engine at 100% of a core for long stretches. A tick replays 2.5 years
+    across four desks and legitimately costs ~25 minutes, so one busy tick is normal; *continuous*
+    busy is not. It happened once: the watchdog was scheduled every 20 minutes against a 25-minute
+    tick, so a finished replay was immediately followed by another, roughly seventy a day to
+    publish three rows. The engine lock stopped them corrupting each other and did nothing about
+    the waste, because a lock is the wrong tool for it.
+
+    Two things hold it fixed. The cron cadence is boundary-aligned — `13 2,3,10,11,18,19` local,
+    shortly after each 8h boundary plus one retry — and the engine exits in about a second when
+    every desk has already published the current boundary. If you see sustained full CPU, check
+    the cadence first (`crontab -l | grep top40v5`) and then that the early-exit guard still fires:
+    running the engine by hand should print "already published by all 4 desks".
 
 ## Diagnose in order
 
