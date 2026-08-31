@@ -43,6 +43,13 @@ paper tick. Report the digest as observational information. Before 90 official f
 label the result `INSUFFICIENT`; do not infer success or failure. The unscored continuity bridge
 begins 2026-07-01. Official forward observations begin 2026-08-03T00:00:00Z.
 
+The 90-bar value is a minimum sample-size gate, not an expected-current-row count. Before using
+`INSUFFICIENT`, verify that the official timestamps form the complete scheduled 8-hour grid from
+the forward start through the latest sealed return. If the grid is complete, report the count as
+`X/90 collected`, state `complete so far; no missing bars`, and, when useful, give the expected
+boundary at which the gate will be reached. Never describe the difference from 90 as unavailable
+or missing data unless the timestamp audit actually finds a gap.
+
 ## Diagnose an alert
 
 Inspect, in order:
@@ -115,5 +122,6 @@ Sharpe/max drawdown when meaningful, current gross/net and long/short count, act
 count, and any integrity action taken. For performance reports, add a parity section with the
 full-replay test pass count, exact-equality scope (targets, held positions, and evaluator bar
 returns), live decision-history PASS count versus total sealed boundaries, and the sealed live
-return count. Name any mismatch rather than reducing it to a generic failure. Never recommend a
-strategy intervention based on losses.
+return count. Express a pre-gate observation count as progress toward the sample threshold and
+state whether the scheduled grid is complete. Name any mismatch rather than reducing it to a
+generic failure. Never recommend a strategy intervention based on losses.
