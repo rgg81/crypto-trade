@@ -28,7 +28,26 @@ from crypto_trade.tournament.v5.desk.parity import BROKEN, UNVERIFIED, desk_pari
 
 REPO = Path(__file__).resolve().parents[1]
 PAPER = REPO / "paper-top40v5"
-LATE_AFTER = pd.Timedelta(hours=8, minutes=45)
+INTERVAL = pd.Timedelta(hours=8)
+# Grace after the owed bar closes, before a desk that has not published it counts as late. The
+# watchdog fires at :13 past, so 45 minutes covers a normal tick plus its retry entry.
+LATE_GRACE = pd.Timedelta(minutes=45)
+
+
+def _owed_boundary(now: pd.Timestamp) -> pd.Timestamp:
+    """The boundary the engine currently owes -- the same rule the engine itself uses.
+
+    The engine publishes the PREVIOUS closed boundary, never the one now floors to, because the
+    final boundary is provisional until a later bar exists. So a perfectly current desk always sits
+    between 8h and 16h behind the wall clock.
+
+    Comparing `now - published` against 8h45m therefore fires on a healthy desk for most of every
+    cycle -- it read LATE(9h) on a field that had just published on time. A check that cries wolf
+    on a healthy desk is worse than no check: the skill's own warning is that a noisy alarm is the
+    one ignored on the day it matters, and this one sat next to a genuine LATE(40h).
+    """
+
+    return now.floor(f"{int(INTERVAL.total_seconds() // 3600)}h") - INTERVAL
 
 
 def _classes(desk: str, spec: dict, launched: bool, now: pd.Timestamp) -> list[str]:
@@ -58,8 +77,12 @@ def _classes(desk: str, spec: dict, launched: bool, now: pd.Timestamp) -> list[s
         found.append("BOUNDARY-SKEW(ahead of now)")
     if published.hour % 8 or published.minute or published.second:
         found.append("BOUNDARY-SKEW(off-grid)")
-    if now - published > LATE_AFTER:
-        found.append(f"LATE({(now - published).total_seconds() / 3600:.0f}h)")
+    owed = _owed_boundary(now)
+    lag = owed - published
+    # Late once a boundary has been missed outright, or once the owed one has been open long
+    # enough for the watchdog and its retry to have run.
+    if lag > INTERVAL or (lag > pd.Timedelta(0) and now - owed - INTERVAL > LATE_GRACE):
+        found.append(f"LATE({lag.total_seconds() / 3600:.0f}h behind {owed})")
 
     attempt = root / "attempt.json"
     if attempt.is_file():

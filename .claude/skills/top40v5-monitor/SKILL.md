@@ -167,7 +167,15 @@ Alert on these and nothing else:
     is what found the first one, and it is cheap — `seasoned_membership` over the whole grid takes
     seconds.
 3. **NO-TICK** — launched but never published a boundary.
-4. **LATE** — more than 8h45m past the boundary it owes.
+4. **LATE** — the desk has not published the boundary the engine owes. Measured against
+   `_owed_boundary(now)`, which is the engine's own rule, **not** against the wall clock: the
+   engine publishes the PREVIOUS closed boundary because the final one is provisional until a
+   later bar exists, so a perfectly current desk always sits 8–16h behind now. The old wall-clock
+   threshold fired on a healthy field for most of every cycle — it read `LATE(9h)` minutes after
+   all four published on time, sitting directly beside a genuine `LATE(40h)` from a crashed
+   append. A check that cries wolf on a healthy desk is the one nobody reads on the day it is
+   right. It fires immediately once more than one boundary is missed, and after a 45-minute grace
+   for a single one.
 5. **FAIL** — last attempt recorded an exception that is not a parity break. Read `attempt.json`.
 6. **DEPLOYMENT-DRIFT** — a frozen bundle's sha256 no longer matches `deployment-manifest.json`. The
    desk is no longer replaying what was frozen.
