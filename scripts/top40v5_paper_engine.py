@@ -137,6 +137,35 @@ def _returns_for(desk: str, spec: dict, data: dict, decisions: list) -> pd.DataF
     return rows[keep].iloc[:-1]
 
 
+def _record_staleness(
+    boundary: pd.Timestamp, last_bar: pd.Timestamp, effective: pd.Timestamp, **extra: object
+) -> None:
+    """Write the field-level staleness observation, preserving whatever else is already recorded.
+
+    Called from both the early-exit path and the full tick so DATA-STALE reflects the current
+    fetch state rather than the last completed replay's. `extra` carries the generation hash, which
+    only the full path can afford to compute.
+    """
+
+    path = PAPER / "boundary.json"
+    record: dict = {}
+    if path.is_file():
+        try:
+            record = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            record = {}
+    record.update(
+        {
+            "boundary": str(boundary),
+            "replayed_through": str(effective),
+            "snapshot_last_bar": str(last_bar),
+            "stale_hours": round((boundary - last_bar) / pd.Timedelta(hours=1), 1),
+        }
+    )
+    record.update(extra)
+    path.write_text(json.dumps(record, indent=2), encoding="utf-8")
+
+
 def tick(now: pd.Timestamp) -> int:
     warnings.filterwarnings("ignore")
     launch = PAPER / "launch.json"
@@ -169,23 +198,47 @@ def _tick_locked(now: pd.Timestamp, launch: Path) -> int:
 
     boundary = _boundary(now)
 
-    # Nothing to do if every desk already published this boundary.
+    # Nothing to do if every desk has already replayed as far as the data currently allows.
     #
     # This guard is worth more than it looks. A tick replays 2.5 years across four desks and costs
     # about 25 minutes at 100% of a core, while adding a single row. Without the check the watchdog
     # re-ran that whole replay on every wake-up and the engine sat at full CPU essentially
     # continuously -- roughly seventy pointless full replays a day to publish three rows. The lock
     # stopped them corrupting each other; it did not stop them being wasteful.
+    #
+    # It compares *replayed_through*, not the nominal boundary, and the difference matters. When the
+    # bar has not landed yet the engine clamps and records boundary B while having only replayed
+    # B-8h. Keying the guard on B would then mark the boundary done at the first attempt and make
+    # the retry cron entry -- which exists precisely for the too-early case -- exit without looking,
+    # stranding a row for a full 8h. Reading one column of one parquet is cheap; the replay is not.
+    last_bar = pd.Timestamp(
+        pd.read_parquet(SNAPSHOT / "bars.parquet", columns=["open_time"])["open_time"].max()
+    )
+    effective = min(boundary, last_bar)
     already = []
     for desk in manifest:
         record = PAPER / desk / "boundary.json"
         if record.is_file():
-            published = json.loads(record.read_text(encoding="utf-8")).get("boundary")
-            already.append(published == str(boundary))
+            published = json.loads(record.read_text(encoding="utf-8"))
+            # A record written before replayed_through existed only claims its nominal boundary;
+            # treat it as current only when nothing was clamped.
+            reached = published.get("replayed_through", published.get("boundary"))
+            already.append(reached == str(effective))
         else:
             already.append(False)
     if already and all(already):
-        print(f"boundary {boundary} already published by all {len(manifest)} desks; nothing to do")
+        # Refresh the staleness observation before returning.
+        #
+        # DATA-STALE is computed by the healthcheck from this file, and this guard returns before
+        # the full record is written further down -- so a guard that short-circuits every tick also
+        # freezes stale_hours at whatever the last completed tick saw. The class named for
+        # persistent staleness then cannot fire during persistent staleness: it read 0.0 through
+        # 40h of a broken append, and only LATE caught it. A gate that cannot flip is not a gate.
+        _record_staleness(boundary, last_bar, effective)
+        print(
+            f"boundary {boundary} already replayed through {effective} "
+            f"by all {len(manifest)} desks; nothing to do"
+        )
         return 0
     official_start = pd.Timestamp(json.loads(launch.read_text(encoding="utf-8"))["official_start"])
     print(f"boundary {boundary}  (official from {official_start.date()})")
@@ -204,27 +257,13 @@ def _tick_locked(now: pd.Timestamp, launch: Path) -> int:
     # Clamp and say so, loudly, rather than raising: a desk that is merely waiting for data is not
     # a broken desk, and conflating the two would make DATA-STALE read as a parity failure. The
     # monitor surfaces this as its own class.
-    last_bar = pd.Timestamp(data["bars"]["open_time"].max())
     stale_hours = (boundary - last_bar) / pd.Timedelta(hours=1)
-    effective = min(boundary, last_bar)
     if effective < boundary:
         print(
             f"DATA-STALE: snapshot ends {last_bar}, boundary is {boundary} "
             f"({stale_hours:.0f}h behind); replaying to {effective} and publishing nothing past it"
         )
-    (PAPER / "boundary.json").write_text(
-        json.dumps(
-            {
-                "boundary": str(boundary),
-                "replayed_through": str(effective),
-                "snapshot_last_bar": str(last_bar),
-                "stale_hours": round(stale_hours, 1),
-                "generation": generation[:32],
-            },
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
+    _record_staleness(boundary, last_bar, effective, generation=generation[:32])
 
     decisions = list(
         pd.date_range(
@@ -244,7 +283,14 @@ def _tick_locked(now: pd.Timestamp, launch: Path) -> int:
             rows["official"] = rows["boundary"] >= official_start
             added = append_rows(root / "ledger" / "forward_returns.parquet", rows, key="boundary")
             (root / "boundary.json").write_text(
-                json.dumps({"boundary": str(boundary), "generation": generation[:32]}, indent=2),
+                json.dumps(
+                    {
+                        "boundary": str(boundary),
+                        "replayed_through": str(effective),
+                        "generation": generation[:32],
+                    },
+                    indent=2,
+                ),
                 encoding="utf-8",
             )
             attempt.write_text(

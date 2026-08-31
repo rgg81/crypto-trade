@@ -100,6 +100,7 @@ tournament/top40-v4-r2/teams/*/work/*
 reports-top40-v5/is/
 reports-top40-v5/source-archives/
 reports-top40-v5/historical/
+paper-top40v5/engine.lock
 tournament/top40-v5/broker.lock
 tournament/top40-v5/result.lock
 tournament/top40-v5/.result-command.lock

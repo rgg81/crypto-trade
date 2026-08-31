@@ -47,6 +47,15 @@ Do not delete a ledger row, hand-edit an `attempt.json` or a `boundary.json`, or
 The forward year produces exactly one thing — an unedited record. **A red check with intact evidence
 is worth incomparably more than a green one without.**
 
+The one thing that is not an edit: withdrawing rows that were computed on **wrong inputs**, before
+the official record opens. That is not making a check pass, it is refusing to publish a number the
+desk never earned — and it is only legitimate with the whole apparatus attached. Record it in
+`paper-top40v5/corrections.jsonl` (hash-chained, append-only, separate from the tournament's
+research journal because that journal's event vocabulary was frozen at activation and is release
+evidence), state exactly what was wrong and how it was verified fixed, back up the pre-correction
+artifacts, and confirm no `official` row is touched. Once the official record has opened, a wrong
+input is a finding to report, not rows to withdraw.
+
 ## The desks are paper-only, by construction
 
 `top40v5_paper_engine.py` has no signed client and no order path anywhere in its import graph. There
@@ -125,9 +134,38 @@ Alert on these and nothing else:
 2. **DATA-STALE** — the snapshot's last bar is more than 8h behind the boundary. Reported once for
    the field, not per desk. The engine clamps to the last available bar and publishes nothing past
    it rather than raising, so a stale desk is *waiting*, not broken. The watchdog appends from live
-   REST before every tick (`top40v5_live_append.py`: klines from the local proxy, funding direct
-   from Binance, marks derived from the funding response), so persistent staleness means that
-   append is failing — read `logs/v5_live_append.log` rather than the desks.
+   REST before every tick (`top40v5_live_append.py`: klines from the local proxy, funding and
+   exchangeInfo direct from Binance, marks derived from the funding response), so persistent
+   staleness means that append is failing — read `logs/v5_live_append.log` rather than the desks.
+
+   A clamped tick is retried, not abandoned. Each desk's `boundary.json` records both the nominal
+   `boundary` and the `replayed_through` it actually reached, and the early-exit guard compares the
+   latter — so when the bar lands, the retry cron entry re-ticks and fills the row.
+
+13. **UNIVERSE-DIVERGENCE** — the desks trading a universe that is not the one they were selected
+    on. It has no automatic check and it does not announce itself: nothing raises, the membership
+    frame simply contains different symbols and every downstream number is quietly built on them.
+
+    It has happened twice, both times in `top40v5_live_append.py`, both times because an
+    incremental path applied a *laxer* rule than the canonical builder:
+
+    - **Persistence not armed.** `seasoned_membership()` applies persistence only once a week has
+      ten prior reconstitutions *inside the grid it is handed*, and exempts the first ten. Passing
+      only the new weeks means none of them ever has ten priors, so the rule silently does not
+      apply. The four weeks from 2026-08-03 came out with three to five wrong symbols each —
+      admitting newly liquid ALLOUSDT and ESPORTSUSDT while dropping 1000SHIBUSDT and XMRUSDT,
+      which is the RIVER failure the seasoned rule exists to prevent. Fixed by arming the grid
+      backwards and discarding the extension; the 320 affected bridge rows were withdrawn and
+      republished (`paper-top40v5/corrections.jsonl`).
+    - **Eligibility not applied.** Binance reports `underlyingType == "COIN"` for USDCUSDT,
+      USTCUSDT, PAXGUSDT and XAUTUSDT alike, so a filter built from exchangeInfo's own fields
+      admits stablecoin pegs and gold-backed tokens. Of nine listings absent from the snapshot,
+      `is_eligible_usdt_perpetual()` rejects seven. Caught before it shipped.
+
+    The lesson generalizes past these two: **when a rule is applied incrementally, check it against
+    a from-scratch rebuild rather than against the previous incremental output.** That comparison
+    is what found the first one, and it is cheap — `seasoned_membership` over the whole grid takes
+    seconds.
 3. **NO-TICK** — launched but never published a boundary.
 4. **LATE** — more than 8h45m past the boundary it owes.
 5. **FAIL** — last attempt recorded an exception that is not a parity break. Read `attempt.json`.
@@ -154,9 +192,16 @@ Alert on these and nothing else:
 
     Two things hold it fixed. The cron cadence is boundary-aligned — `13 2,3,10,11,18,19` local,
     shortly after each 8h boundary plus one retry — and the engine exits in about a second when
-    every desk has already published the current boundary. If you see sustained full CPU, check
-    the cadence first (`crontab -l | grep top40v5`) and then that the early-exit guard still fires:
-    running the engine by hand should print "already published by all 4 desks".
+    every desk has already replayed as far as the data reaches. If you see sustained full CPU,
+    check the cadence first (`crontab -l | grep top40v5`) and then that the early-exit guard still
+    fires: running the engine by hand should print "already replayed through …".
+
+    The guard reads one column of one parquet before deciding, and keys on `replayed_through`
+    rather than on the nominal boundary. That is deliberate: keying on the boundary would mark a
+    clamped tick finished at the first attempt and make the retry entry — which exists for exactly
+    the too-early case — exit without looking, stranding a row for a full 8h. Skipping owed work is
+    the worse failure of the two, so it carries more tests than the waste does
+    (`tests/tournament/test_v5_paper_engine_guard.py`, both directions mutation-checked).
 
 ## Diagnose in order
 
