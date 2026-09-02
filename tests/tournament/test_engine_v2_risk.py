@@ -93,6 +93,78 @@ def test_no_policy_preserves_v1_evaluator_behavior() -> None:
     pd.testing.assert_frame_equal(actual.events, expected.events)
 
 
+def test_deferred_symbol_does_not_revise_pre_admission_returns() -> None:
+    prices = {
+        f"S{index:03d}USDT": [100.0, 100.0, 100.0 + index / 10.0, 101.0]
+        for index in range(128)
+    }
+    bars, funding, membership, times = _market(prices)
+    targets = pd.DataFrame(
+        {
+            REBALANCE_INSTRUCTION_COLUMN: [True, False, False],
+            **{
+                symbol: [
+                    (0.05 if index % 2 == 0 else -0.05) if index < 10 else 0.0,
+                    0.0,
+                    0.0,
+                ]
+                for index, symbol in enumerate(prices)
+            },
+        },
+        index=times[1:],
+    )
+    baseline = evaluate_targets(
+        bars,
+        funding,
+        membership,
+        targets,
+        mark_prices=_marks(bars),
+        config=_config(),
+    )
+
+    new_symbol = "A_NEWUSDT"
+    appended_bars = pd.concat(
+        [
+            bars,
+            pd.DataFrame(
+                {
+                    "open_time": times[2:],
+                    "symbol": new_symbol,
+                    "open": [50.0, 51.0],
+                    "high": [50.0, 51.0],
+                    "low": [50.0, 51.0],
+                    "close": [50.0, 51.0],
+                    "quote_volume": [1_000_000_000.0, 1_000_000_000.0],
+                }
+            ),
+        ],
+        ignore_index=True,
+    )
+    appended_targets = targets.assign(**{new_symbol: 0.0})
+    appended = evaluate_targets(
+        appended_bars,
+        funding,
+        membership,
+        appended_targets,
+        mark_prices=_marks(appended_bars),
+        config=_config(),
+        deferred_symbol_admissions={new_symbol: times[2]},
+    )
+
+    pd.testing.assert_frame_equal(
+        appended.returns.loc[appended.returns.index < times[2]],
+        baseline.returns.loc[baseline.returns.index < times[2]],
+        check_exact=True,
+    )
+    pd.testing.assert_frame_equal(
+        appended.positions.loc[
+            appended.positions.index < times[2], baseline.positions.columns
+        ],
+        baseline.positions.loc[baseline.positions.index < times[2]],
+        check_exact=True,
+    )
+
+
 def test_position_stop_ignores_intrabar_low_and_exits_at_next_open_without_reentry() -> None:
     bars, funding, membership, times = _market(
         {"AAAUSDT": [100.0, 100.0, 100.0, 80.0, 80.0, 80.0]},

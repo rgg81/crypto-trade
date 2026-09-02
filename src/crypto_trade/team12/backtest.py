@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import json
 import math
 from collections.abc import Iterable
@@ -41,6 +42,11 @@ HISTORICAL_END_EXCLUSIVE = pd.Timestamp("2026-07-01T00:00:00Z")
 IS_END_EXCLUSIVE = pd.Timestamp("2023-07-01T00:00:00Z")
 IS_CONFIRMATION_END_EXCLUSIVE = pd.Timestamp("2024-07-01T00:00:00Z")
 LIVE_FORWARD_START = pd.Timestamp("2026-08-03T00:00:00Z")
+LIVE_REPLAY_ACTIVATION_BOUNDARY = pd.Timestamp("2026-08-03T16:00:00Z")
+LIVE_REPLAY_BASELINE_SYMBOL_COUNT = 670
+LIVE_REPLAY_BASELINE_SYMBOLS_SHA256 = (
+    "417eac3bf18d8801f3d3f9ebce9f3ffd66287e0d42ddfc272808216c0ad4bbb5"
+)
 INTERVAL_HOURS = 8
 STRATEGY_SEED = 20_260_731
 
@@ -345,6 +351,10 @@ def run_replay(
     ):
         raise ValueError("cost multipliers must be finite and positive")
     evaluations: dict[float, EvaluationResult] = {}
+    deferred_symbol_admissions = _live_deferred_symbol_admissions(
+        data.bars,
+        end_exclusive=end,
+    )
     for multiplier in unique_multipliers:
         evaluation = evaluate_targets(
             data.bars,
@@ -355,6 +365,7 @@ def run_replay(
             config=EVALUATOR_CONFIG,
             cost_multiplier=multiplier,
             risk_policy=policy,
+            deferred_symbol_admissions=deferred_symbol_admissions,
         )
         evaluation.returns.index.name = "timestamp"
         evaluation.returns.index = pd.DatetimeIndex(
@@ -370,6 +381,53 @@ def run_replay(
         targets=targets,
         evaluations=evaluations,
     )
+
+
+def _live_deferred_symbol_admissions(
+    bars: pd.DataFrame,
+    *,
+    end_exclusive: pd.Timestamp,
+) -> dict[str, pd.Timestamp]:
+    """Freeze the activation universe and causally admit later listings.
+
+    Historical tournament replays end before paper activation and retain their
+    original global symbol schema.  Live replays bind the exact activation
+    schema by count and hash; symbols first seen later enter only at their first
+    bar, preventing a future listing from changing already-sealed reductions.
+    """
+
+    if end_exclusive <= LIVE_REPLAY_ACTIVATION_BOUNDARY:
+        return {}
+    first_seen = (
+        bars.assign(open_time=pd.to_datetime(bars["open_time"], utc=True))
+        .groupby(bars["symbol"].astype(str), observed=True)["open_time"]
+        .min()
+        .sort_index()
+    )
+    baseline_symbols = sorted(
+        str(symbol)
+        for symbol, timestamp in first_seen.items()
+        if timestamp <= LIVE_REPLAY_ACTIVATION_BOUNDARY
+    )
+    baseline_payload = json.dumps(
+        baseline_symbols,
+        ensure_ascii=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    baseline_hash = hashlib.sha256(baseline_payload).hexdigest()
+    if (
+        len(baseline_symbols) != LIVE_REPLAY_BASELINE_SYMBOL_COUNT
+        or baseline_hash != LIVE_REPLAY_BASELINE_SYMBOLS_SHA256
+    ):
+        raise RuntimeError(
+            "Team 12 live replay baseline-symbol authority drift: "
+            f"count={len(baseline_symbols)} sha256={baseline_hash}"
+        )
+    return {
+        str(symbol): pd.Timestamp(timestamp)
+        for symbol, timestamp in first_seen.items()
+        if timestamp > LIVE_REPLAY_ACTIVATION_BOUNDARY
+    }
 
 
 def replay_summary(replay: Team12Replay) -> dict[str, object]:

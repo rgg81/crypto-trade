@@ -48,13 +48,13 @@
     },
     {
       "path": "src/crypto_trade/team12/authority.py",
-      "sha256": "c13d0f5be4b0e274d4cc451c0a84b6bad6e10e933406476b285668c8f5d403ed",
+      "sha256": "30a0f5a64ae62ea1dab87ac66dddd3c113221e3482233f3d5954ef265a40a474",
       "size": 17092
     },
     {
       "path": "src/crypto_trade/team12/backtest.py",
-      "sha256": "d8eadf13beefda269fde304e6b7f3c2c49b3ccb40f57164755d919be3f0a2977",
-      "size": 20879
+      "sha256": "4da67040aa52a4450e79d32bd654ff61299216432622972a8513c0d0229a7ade",
+      "size": 22982
     },
     {
       "path": "src/crypto_trade/team12/live.py",

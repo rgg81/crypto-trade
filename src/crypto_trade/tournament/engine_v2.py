@@ -162,6 +162,7 @@ def evaluate_targets(
     config: EvaluatorConfig | None = None,
     cost_multiplier: float = 1.0,
     risk_policy: RiskPolicy | None = None,
+    deferred_symbol_admissions: Mapping[str, object] | None = None,
 ) -> EvaluationResult:
     """Convert target weights to fills, costs, funding cashflows, and open-to-open returns.
 
@@ -210,7 +211,7 @@ def evaluate_targets(
         raise ValueError("target frame contains non-finite target weights")
     if frame["symbol"].astype(str).eq(REBALANCE_INSTRUCTION_COLUMN).any():
         raise ValueError("market data contains the reserved rebalance instruction symbol")
-    symbols = sorted(set(frame["symbol"]) | set(target_frame.columns))
+    all_symbols = sorted(set(frame["symbol"]) | set(target_frame.columns))
     opens = frame.pivot(index="open_time", columns="symbol", values="open").sort_index()
     closes = frame.pivot(index="open_time", columns="symbol", values="close").sort_index()
     quote_volume = frame.pivot(
@@ -228,6 +229,39 @@ def evaluate_targets(
     if len(evaluation_times) < 2:
         raise ValueError("at least two base bars within the target span are required")
 
+    admissions: dict[str, pd.Timestamp] = {}
+    for raw_symbol, raw_timestamp in (deferred_symbol_admissions or {}).items():
+        symbol = str(raw_symbol)
+        if symbol not in all_symbols:
+            raise ValueError(f"deferred symbol admission names unknown symbol {symbol}")
+        timestamp = pd.Timestamp(raw_timestamp)
+        timestamp = (
+            timestamp.tz_localize("UTC")
+            if timestamp.tzinfo is None
+            else timestamp.tz_convert("UTC")
+        )
+        symbol_opens = frame.loc[frame["symbol"].eq(symbol), "open_time"]
+        if symbol_opens.empty or timestamp != symbol_opens.min():
+            raise ValueError(
+                f"deferred symbol admission for {symbol} must equal its first bar"
+            )
+        if symbol in target_frame:
+            premature = target_frame.index < timestamp
+            if target_frame.loc[premature, symbol].abs().gt(1e-12).any():
+                raise ValueError(f"nonzero target for {symbol} before its admission")
+        admissions[symbol] = timestamp
+
+    # A symbol first observed after a live replay was activated must not widen the
+    # evaluator's historical vectors.  Widening a NumPy/Pandas reduction with an
+    # otherwise-zero column can alter old IEEE-754 results by an ULP.  Admit such
+    # symbols only at their first executable bar so every earlier boundary keeps
+    # the exact vector shape under future data appends.
+    symbols = [
+        symbol
+        for symbol in all_symbols
+        if admissions.get(symbol, evaluation_times[0]) <= evaluation_times[0]
+    ]
+
     quantities = pd.Series(0.0, index=symbols)
     policy_reference_weights = pd.Series(0.0, index=symbols)
     entry_prices = pd.Series(np.nan, index=symbols, dtype=float)
@@ -239,6 +273,24 @@ def evaluate_targets(
     position_rows: list[pd.Series] = []
     event_rows: list[dict[str, object]] = []
     for index, fill_time in enumerate(evaluation_times):
+        active_symbols = [
+            symbol
+            for symbol in all_symbols
+            if admissions.get(symbol, fill_time) <= fill_time
+        ]
+        if active_symbols != symbols:
+            if not set(symbols).issubset(active_symbols):  # pragma: no cover - monotone grid
+                raise AssertionError("deferred symbol admissions must be monotone")
+            quantities = quantities.reindex(active_symbols, fill_value=0.0)
+            policy_reference_weights = policy_reference_weights.reindex(
+                active_symbols, fill_value=0.0
+            )
+            entry_prices = entry_prices.reindex(active_symbols)
+            holding_bars = holding_bars.reindex(active_symbols, fill_value=0).astype(int)
+            cooldown_bars_remaining = cooldown_bars_remaining.reindex(
+                active_symbols, fill_value=0
+            ).astype(int)
+            symbols = active_symbols
         terminal_bar = index == len(evaluation_times) - 1
         next_time = (
             fill_time + pd.Timedelta(hours=cfg.interval_hours)
