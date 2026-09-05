@@ -22,19 +22,19 @@ Treat the frozen strategy plus organizer evaluator as one indivisible model.
   daily quote volume over the 180 complete prior UTC days with the symbol tie-breaker.
 - Keep the desk paper-only. `run_team12_paper.py` has no signed client or order path.
 
-## Run the standard check
+## Run the fast standard check
 
-Run these commands serially:
+For routine status or performance questions, run this single command:
 
 ```bash
 cd /home/roberto/crypto-trade/.worktrees/quant-portfolio-blind-top12-v2
-uv run python scripts/team12_paper_healthcheck.py
-uv run python scripts/team12_paper_digest.py
+uv run python scripts/team12_paper_status.py
 ```
 
-For a basic performance request, run the full parity workflow below after these commands and
-include its result in the same response. A process-status-only or recovery request does not need
-the compute-heavy replay unless the user also asks for performance or parity.
+The command combines the bound-artifact healthcheck and observational digest and normally
+finishes in about one second. Do not run the compute-heavy multi-year replay for an ordinary
+"performance so far" or status request. Run it only when parity is explicitly requested, after
+a Team 12 deployment change, or while proving recovery from an integrity incident.
 
 Interpret `STATUS OK` as operationally healthy. The healthcheck binds every paper artifact and
 load-bearing market-cache file by path, size, row count, and SHA-256. It also verifies that every
@@ -94,11 +94,10 @@ it uses the same engine lock and never launches a second desk. A running process
 deployment identity and exits if a new committed Team 12 deployment appears, allowing the
 watchdog to restart it on one internally consistent release.
 
-## Pair deep parity with performance
+## Run deep parity only when warranted
 
-Run the multi-year parity replay whenever the user asks for basic performance statistics or
-explicit parity verification. Do not run it in routine status-only monitoring ticks. Run it by
-itself after the standard healthcheck and digest:
+Run the multi-year parity replay for explicit parity verification, after a deployment change, or
+as a recovery gate following an integrity incident. Run it by itself after the fast check:
 
 ```bash
 uv run pytest -m parity tests/team12/test_team12_pipeline.py -q
@@ -119,9 +118,9 @@ Lead with one verdict:
 
 Then give latest boundary, official forward bar/day counts and cumulative return, daily-annualized
 Sharpe/max drawdown when meaningful, current gross/net and long/short count, actual funding-event
-count, and any integrity action taken. For performance reports, add a parity section with the
-full-replay test pass count, exact-equality scope (targets, held positions, and evaluator bar
-returns), live decision-history PASS count versus total sealed boundaries, and the sealed live
-return count. Express a pre-gate observation count as progress toward the sample threshold and
-state whether the scheduled grid is complete. Name any mismatch rather than reducing it to a
-generic failure. Never recommend a strategy intervention based on losses.
+count, and any integrity action taken. When deep parity was warranted, add its pass count and
+exact-equality scope (targets, held positions, and evaluator bar returns), live decision-history
+PASS count versus total sealed boundaries, and the sealed live return count. Express a pre-gate
+observation count as progress toward the sample threshold and state whether the scheduled grid is
+complete. Name any mismatch rather than reducing it to a generic failure. Never recommend a
+strategy intervention based on losses.

@@ -73,6 +73,7 @@ _DEPLOYMENT_BUNDLE_PATHS = (
     "scripts/team12_backtest.py",
     "scripts/team12_paper_digest.py",
     "scripts/team12_paper_healthcheck.py",
+    "scripts/team12_paper_status.py",
     "scripts/team12_paper_watchdog.sh",
     "src/crypto_trade/backtest_report.py",
     "src/crypto_trade/team12/__init__.py",

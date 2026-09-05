@@ -3,8 +3,8 @@
   "files": [
     {
       "path": ".agents/skills/team12-monitor/SKILL.md",
-      "sha256": "bbd8f96f09004e5b2644366f4789904eb22a504d65fddc1e1bc3ce29b1a8efea",
-      "size": 7300
+      "sha256": "e39428fd1bbcc307d972c277e6d02e3fc1b46665fc4d85a8a4bd3407c5e0e6b9",
+      "size": 7313
     },
     {
       "path": ".agents/skills/team12-monitor/agents/openai.yaml",
@@ -32,6 +32,11 @@
       "size": 23306
     },
     {
+      "path": "scripts/team12_paper_status.py",
+      "sha256": "fd0719c288418352468b402abc19adfc5986ef6961242a40b31904deb338fb46",
+      "size": 787
+    },
+    {
       "path": "scripts/team12_paper_watchdog.sh",
       "sha256": "6ae6a8f89f593df8341064a2b428ca101d3ae8fad80343e1e7cc25c39d209db7",
       "size": 575
@@ -48,8 +53,8 @@
     },
     {
       "path": "src/crypto_trade/team12/authority.py",
-      "sha256": "30a0f5a64ae62ea1dab87ac66dddd3c113221e3482233f3d5954ef265a40a474",
-      "size": 17092
+      "sha256": "fd8ed1a6bafb06658beda4a5df0d240a55fa2777bc65605ae1f600cf55aad692",
+      "size": 17130
     },
     {
       "path": "src/crypto_trade/team12/backtest.py",
